@@ -1,0 +1,12 @@
+/**:
+  ros__parameters:
+    frame_pub_rate: 25
+    frame_read_pub: "/frame_read_pub"
+    frame_pub: "/frame_pub"
+
+
+/video_reader:
+  ros__parameters:
+    video_path: "/mnt/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.7.164-2023-06-18-17-00-00.mp4"
+    start_frame_number: -1
+    end_frame_number: -1

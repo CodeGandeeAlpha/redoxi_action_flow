@@ -1,0 +1,10 @@
+Header header
+int32 category
+float32 confidence
+float32 x
+float32 y
+float32 w
+float32 h
+float32[] idfeat
+bool is_detected_by_camera
+int32 frame_num

@@ -1,3 +1,10 @@
+build/
+default.etcd/
+install/
+libs/
+log/
+design.md
+
 # Prerequisites
 *.d
 

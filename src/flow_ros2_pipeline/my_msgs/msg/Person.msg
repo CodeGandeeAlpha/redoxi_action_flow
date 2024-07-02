@@ -1,0 +1,17 @@
+Header header
+Detection person_head
+Detection person_body
+Detection person_face
+bool has_head
+bool has_body
+bool has_face
+Pose person_pose
+bool has_pose
+int32 id
+int32 frame_number
+float32 body_height
+float32 body_height_conf
+float32[] head_position
+bool has_head_position
+float32[] foot_position
+bool has_foot_position

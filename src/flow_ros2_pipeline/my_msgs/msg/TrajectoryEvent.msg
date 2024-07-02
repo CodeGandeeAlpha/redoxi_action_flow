@@ -1,0 +1,9 @@
+Header header
+int32 event_type
+string event_zone_name
+float32 start_time
+float32 end_time
+int32 person_id
+string event_pattern
+string matched_trajectory
+float32[] speed
