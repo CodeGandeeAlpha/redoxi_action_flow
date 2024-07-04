@@ -1,4 +1,3 @@
 [submodule "src/PassengerFlow"]
 	path = src/PassengerFlow
 	url = git@codeup.aliyun.com:61adcb80e05da4a409ab67b8/intellif/PassengerFlow.git
-	branch = master
