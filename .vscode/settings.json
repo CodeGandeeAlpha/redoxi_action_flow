@@ -1,0 +1,4 @@
+{
+    "cmake.sourceDirectory": "${workspaceFolder}/src/PassengerFlow",
+    "cmake.buildDirectory": "${workspaceFolder}/build-3rd"
+}

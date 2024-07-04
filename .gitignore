@@ -37,3 +37,5 @@ design.md
 *.exe
 *.out
 *.app
+
+build-*/
