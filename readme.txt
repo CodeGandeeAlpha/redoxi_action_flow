@@ -1,0 +1,1 @@
+1. passengerflow生成的so文件路径需要添加到LD_LIBRARY_PATH中

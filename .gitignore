@@ -39,3 +39,4 @@ design.md
 *.app
 
 build-*/
+.cache/
