@@ -1,10 +1,7 @@
-std_msgs/Header header
+# empty message: category = -1
 int32 category
 float32 confidence
-float32 x
-float32 y
-float32 w
-float32 h
-float32[] idfeat
+Box2 bbox
+float32[] feature
 bool is_detected_by_camera
-int32 frame_num
+Frame frame

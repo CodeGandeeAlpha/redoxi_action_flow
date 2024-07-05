@@ -1,5 +1,4 @@
-#ifndef CACHE_HPP_
-#define CACHE_HPP_
+#pragma once
 
 #include <rclcpp/rclcpp.hpp>
 #include <map>

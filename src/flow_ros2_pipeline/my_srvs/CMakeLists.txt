@@ -12,6 +12,9 @@ find_package(rclpy REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/DeleteObjId.srv"
+  "srv/GetObjId.srv"
+  "srv/RegisterObjId.srv"
   "srv/SendDet.srv"
   # DEPENDENCIES builtin_interfaces
   # ADD_LINTER_TESTS
