@@ -1,4 +1,4 @@
-Header header
+std_msgs/Header header
 int32 event_type
 string event_zone_name
 float32 start_time

@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.8)
 project(my_msgs)
 
-# Default to C++14
+# Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD 17)
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -12,11 +12,11 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# find_package(builtin_interfaces REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclpy REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(pg_for_ros2 REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(passengerflow REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Image1080p.msg"
@@ -27,30 +27,50 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/PersonTrajectory.msg"
   "msg/PersonTrajectories.msg"
   "msg/Pose.msg"
+  "msg/Poses.msg"
   "msg/TrajectoryEvent.msg"
   "msg/TrajectoryEvents.msg"
 
-  # DEPENDENCIES builtin_interfaces
+  DEPENDENCIES std_msgs
   # ADD_LINTER_TESTS
 )
 
-include_directories(include)
+ament_python_install_package(${PROJECT_NAME})
 
-
-## Declare a C++ library
+# Declare a C++ library
 add_library(converter SHARED
   src/converter.cpp
 )
-ament_target_dependencies(converter rclcpp passengerflow)
+# target_include_directories(converter PUBLIC include)
+target_include_directories(converter
+  PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
 
-install(
-  TARGETS converter
-  DESTINATION lib/${PROJECT_NAME}
+ament_target_dependencies(converter PUBLIC
+  rclcpp
+  pg_for_ros2
+  rosidl_default_runtime  # Add this line to ensure rosidl generated files are found
 )
+
+# only required when you want to use interfaces
+# in the same package as the one in which they are defined
+rosidl_get_typesupport_target(cpp_typesupport_target
+  ${PROJECT_NAME} rosidl_typesupport_cpp)
+
+message("----------------- ${cpp_typesupport_target}")
+
+target_link_libraries(converter PUBLIC "${cpp_typesupport_target}")
+
 
 install(
   DIRECTORY include/
   DESTINATION include
+)
+
+install(
+  TARGETS converter
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 
@@ -66,7 +86,7 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_export_include_directories(include)
-ament_export_libraries(converter)
-ament_export_dependencies(rclcpp passengerflow rosidl_default_generators)
+# ament_export_include_directories(include)
+# ament_export_libraries(converter)
+# ament_export_dependencies(rclcpp rosidl_default_generators)
 ament_package()

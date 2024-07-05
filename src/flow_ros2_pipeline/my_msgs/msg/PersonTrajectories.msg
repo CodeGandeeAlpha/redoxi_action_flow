@@ -1,2 +1,2 @@
-Header header
+std_msgs/Header header
 PersonTrajectory[] person_trajectories

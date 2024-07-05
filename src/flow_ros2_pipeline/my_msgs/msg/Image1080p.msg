@@ -1,3 +1,4 @@
+std_msgs/Header header
 uint32 HEIGHT = 1080
 uint32 WIDTH = 1920
 uint32 CHANNELS = 3

@@ -12,8 +12,8 @@ namespace FlowRosPipeline {
         msg.confidence = det.get_confidence();
         msg.frame_num = det.get_frame_number();
 
-        if (det.get_type() == IntellifTracking::DetectioncTypes::PersonBody) {
-            IntellifTracking::fVECTOR feature;
+        if (det.get_type() == RedoxiTracking::DetectionTypes::PersonBody) {
+            RedoxiTracking::fVECTOR feature;
             det.get_feature(feature);
             std::vector<float> vec(feature.data(), feature.data()+feature.rows()*feature.cols());
             msg.idfeat = vec;
@@ -24,20 +24,20 @@ namespace FlowRosPipeline {
         det->set_bbox(bbox);
         det->set_confidence(msg.confidence);
 
-        if (msg.category == IntellifTracking::DetectionTypes::PersonBody) {
-            IntellifTracking::fVECTOR single_feature;
+        if (msg.category == RedoxiTracking::DetectionTypes::PersonBody) {
+            RedoxiTracking::fVECTOR single_feature;
             single_feature.resize(128, 1);
             for (int j = 0; j < msg.idfeat.size(); j++) {
                 single_feature(j, 0) = msg.idfeat[j];
             }
-            det->set_type(IntellifTracking::DetectionTypes::PersonBody);
+            det->set_type(RedoxiTracking::DetectionTypes::PersonBody);
             det->set_feature(single_feature);
         }
-        else if (msg.category == IntellifTracking::DetectionTypes::PersonFace) {
-            det->set_type(IntellifTracking::DetectionTypes::PersonFace);
+        else if (msg.category == RedoxiTracking::DetectionTypes::PersonFace) {
+            det->set_type(RedoxiTracking::DetectionTypes::PersonFace);
         }
         else {
-            det->set_type(IntellifTracking::DetectionTypes::PersonHead);
+            det->set_type(RedoxiTracking::DetectionTypes::PersonHead);
         }
 
         det->set_frame_number(msg.frame_num);
@@ -54,21 +54,21 @@ namespace FlowRosPipeline {
 
         if (person->body()) {
             my_msgs::msg::Detection msg_body;
-            auto* body_ptr = IntellifTracking::dyncast_with_check<PassengerFlow::Detection>(person->body().get());
+            auto* body_ptr = RedoxiTracking::dyncast_with_check<PassengerFlow::Detection>(person->body().get());
             convert_detection_to_msg(*body_ptr, msg_body);
             msg.has_body = true;
             msg.person_body = msg_body;
         }
         if (person->head()) {
             my_msgs::msg::Detection msg_head;
-            auto* head_ptr = IntellifTracking::dyncast_with_check<PassengerFlow::Detection>(person->head().get());
+            auto* head_ptr = RedoxiTracking::dyncast_with_check<PassengerFlow::Detection>(person->head().get());
             convert_detection_to_msg(*head_ptr, msg_head);
             msg.has_head = true;
             msg.person_head = msg_head;
         }
         if (person->face()) {
             my_msgs::msg::Detection msg_face;
-            auto* face_ptr = IntellifTracking::dyncast_with_check<PassengerFlow::Detection>(person->face().get());
+            auto* face_ptr = RedoxiTracking::dyncast_with_check<PassengerFlow::Detection>(person->face().get());
             convert_detection_to_msg(*face_ptr, msg_face);
             msg.has_face = true;
             msg.person_face = msg_face;

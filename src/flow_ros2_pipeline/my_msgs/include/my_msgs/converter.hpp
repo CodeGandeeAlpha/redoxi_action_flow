@@ -3,11 +3,11 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "passenger_flow_header.h"
-#include "my_msgs/msg/Person.hpp"
-#include "my_msgs/msg/PersonTrajectories.hpp"
-#include "my_msgs/msg/TrajectoryEvents.hpp"
-#include "my_msgs/msg/Persons.hpp"
-#include "my_msgs/msg/Poses.hpp"
+#include "my_msgs/msg/person.hpp"
+#include "my_msgs/msg/person_trajectories.hpp"
+#include "my_msgs/msg/trajectory_events.hpp"
+#include "my_msgs/msg/persons.hpp"
+#include "my_msgs/msg/poses.hpp"
 
 namespace FlowRos2Pipeline {
     void convert_detection_to_msg(PassengerFlow::Detection& det, my_msgs::msg::Detection& msg);

@@ -1,4 +1,4 @@
-Header header
+std_msgs/Header header
 int32 category
 float32 confidence
 float32 x

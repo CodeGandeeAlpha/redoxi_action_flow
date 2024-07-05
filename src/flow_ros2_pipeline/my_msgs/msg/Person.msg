@@ -1,4 +1,4 @@
-Header header
+std_msgs/Header header
 Detection person_head
 Detection person_body
 Detection person_face

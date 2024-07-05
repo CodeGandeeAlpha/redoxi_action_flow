@@ -1,3 +1,3 @@
-Header header
+std_msgs/Header header
 Person[] persons
 int32 person_id
