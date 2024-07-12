@@ -16,6 +16,7 @@
   <depend>psg_actions</depend>
   <depend>psg_services</depend>
   <depend>psg_common</depend>
+  <depend>sensor_msgs</depend>
   <depend>vineyard</depend>
 
   <test_depend>ament_lint_auto</test_depend>

@@ -15,6 +15,7 @@ find_package(std_msgs REQUIRED)
 find_package(psg_actions REQUIRED)
 find_package(psg_services REQUIRED)
 find_package(psg_common REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(rclcpp_action)
 
 find_package(OpenCV REQUIRED)
@@ -37,6 +38,7 @@ ament_target_dependencies(${PROJECT_NAME}_node
   psg_actions
   psg_services
   psg_common
+  sensor_msgs
 )
 target_link_libraries(${PROJECT_NAME}_node ${OpenCV_LIBS} ${VINEYARD_LIBRARIES})
 

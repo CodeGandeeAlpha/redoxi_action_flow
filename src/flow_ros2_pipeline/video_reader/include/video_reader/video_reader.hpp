@@ -9,11 +9,10 @@
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <psg_actions/action/send_frame.hpp>
 #include <psg_services/srv/status_query.hpp>
+#include <sensor_msgs/msg/image.hpp>
 
 
 namespace FlowRos2Pipeline{
-
-
     class OpencvVideoReaderImpl;
 
     /* Video reader node that reads video frames and sends them to downstreams,
@@ -60,9 +59,14 @@ namespace FlowRos2Pipeline{
                 void from_parameter(OpencvVideoReader* node);
             };
 
+            const std::string TOPIC_IMAGE = "image";
+
         public:
             // explicit VideoReader(const rclcpp::NodeOptions & options);
             explicit OpencvVideoReader();
+
+            void set_image_topic_enable(bool enable);
+            std::string get_image_topic_name() const;
 
             // initialize with configurations, must be called once before open()
             void init(const InitConfig& config, const RuntimeConfig& runtime_config);
@@ -76,24 +80,20 @@ namespace FlowRos2Pipeline{
             const RuntimeConfig& get_runtime_config() const;
 
             // make the node ready to start, after calling this, you cannot modify init config
-            virtual void open() override;
+            virtual int open() override;
 
             // call this after ready() and before you spin this node
             // after calling this, you cannot modify runtime config
-            virtual void start() override;
+            virtual int start() override;
 
             // call this before you modify runtime config
-            virtual void stop() override;
+            virtual int stop() override;
 
             // call this before you want to modify init config
-            virtual void close() override;
+            virtual int close() override;
 
-            void img_read();
-
-            void send_frame_goal_response_callback(const DownstreamSendFrameActionGoalHandle::SharedPtr & goal_handle);
-            void send_frame_feedback_callback(DownstreamSendFrameActionGoalHandle::SharedPtr,
-                                        const std::shared_ptr<const DownstreamSendFrameAction::Feedback> feedback);
-            void send_frame_result_callback(const DownstreamSendFrameActionGoalHandle::WrappedResult & result);
+            // get the status code of this node
+            virtual int get_status_code() const;
 
             // void add_frame_goal_response_callback(const GoalHandleAddFrame::SharedPtr & goal_handle);
             // void add_frame_feedback_callback(GoalHandleAddFrame::SharedPtr,
@@ -101,6 +101,13 @@ namespace FlowRos2Pipeline{
             // void add_frame_result_callback(const GoalHandleAddFrame::WrappedResult & result);
 
         protected:
+            void img_read();
+
+            void send_frame_goal_response_callback(const DownstreamSendFrameActionGoalHandle::SharedPtr & goal_handle);
+            void send_frame_feedback_callback(DownstreamSendFrameActionGoalHandle::SharedPtr,
+                                        const std::shared_ptr<const DownstreamSendFrameAction::Feedback> feedback);
+            void send_frame_result_callback(const DownstreamSendFrameActionGoalHandle::WrappedResult & result);
+
             void _declare_all_parameters();
 
             // member of downstreams
@@ -113,5 +120,11 @@ namespace FlowRos2Pipeline{
             // impl data
             std::shared_ptr<OpencvVideoReaderImpl> m_impl;
 
+            // status code
+            int m_status_code = NodeStatusCode::BEFORE_INIT;
+
+            // publish info for visualization
+            bool m_publish_image = false;
+            rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_topic_image;
     };
 }
