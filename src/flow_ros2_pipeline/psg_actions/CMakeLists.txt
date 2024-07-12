@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(my_srvs)
+project(psg_actions)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -10,14 +10,15 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(psg_public_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "srv/DeleteObjId.srv"
-  "srv/GetObjId.srv"
-  "srv/RegisterObjId.srv"
-  "srv/SendDet.srv"
-  # DEPENDENCIES builtin_interfaces
-  # ADD_LINTER_TESTS
+  "action/SendFrame.action"
+  "action/AddFrame.action"
+  "action/DelFrame.action"
+  "action/DropFrame.action"
+
+  DEPENDENCIES psg_public_msgs
 )
 
 if(BUILD_TESTING)

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.8)
 project(cache_node)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
@@ -8,6 +10,17 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(psg_actions REQUIRED)
+find_package(vineyard REQUIRED)
+
+add_executable(${PROJECT_NAME}_node src/cache_node.cpp src/cache.cpp)
+target_include_directories(${PROJECT_NAME}_node PUBLIC include ${VINEYARD_INCLUDE_DIRS})
+
+ament_target_dependencies(${PROJECT_NAME}_node PUBLIC
+  rclcpp
+  psg_actions)
+
+target_link_libraries(${PROJECT_NAME}_node PUBLIC ${VINEYARD_LIBRARIES})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -20,5 +33,8 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
+
+install(TARGETS ${PROJECT_NAME}_node
+  DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

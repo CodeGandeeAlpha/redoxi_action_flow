@@ -19,7 +19,7 @@ public:
 
         // 获取参数
         std::string frame_read_pub_topic = this->get_parameter("frame_read_pub").as_string();
-        RCLCPP_INFO(logger, "[MasterNode] frame_read_pub_topic: %s", frame_read_pub_topic);
+        RCLCPP_INFO(logger, "[MasterNode] frame_read_pub_topic: %s", frame_read_pub_topic.c_str());
 
         frame_read_publisher_ = this->create_publisher<std_msgs::msg::Empty>(frame_read_pub_topic, 10);
 

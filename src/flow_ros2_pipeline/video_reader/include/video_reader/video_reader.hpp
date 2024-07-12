@@ -1,72 +1,117 @@
-#ifndef VIDEO_READER_HPP_
-#define VIDEO_READER_HPP_
+#pragma once
 
-#include "rclcpp/rclcpp.hpp"
-// #include <nodelet/nodelet.h>
-#include <opencv2/opencv.hpp>
-#include "vineyard/client/client.h"
-// #include "my_srv/SendVideoFrame2Det.h"
-// #include "my_srv/SendVideoFrame2Pose.h"
-// #include "my_srv/SendVideoFrame2Tracker.h"
-// #include "my_srv/ImageShmNameService.h"
-// #include "my_srv/SendImgShm2Det.h"
-// #include "my_srv/SendImgShm2Pose.h"
-// #include "my_srv/SendImgShm2Tracker.h"
-// #include "my_srv/VideoServiceDownstream.h"
-// #include "my_srv/ImageShmWriteService.h"
-
-#include "my_msgs/msg/image1080p.hpp"
-#include "std_msgs/msg/string.hpp"
-#include "std_msgs/msg/bool.hpp"
-#include "std_msgs/msg/empty.hpp"
+#include "psg_common/psg_common.hpp"
+// #include "rclcpp/rclcpp.hpp"
+#include <memory>
+#include <rclcpp/client.hpp>
+#include <rclcpp/node.hpp>
+#include <rclcpp/service.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
+#include <psg_actions/action/send_frame.hpp>
+#include <psg_services/srv/status_query.hpp>
 
 
 namespace FlowRos2Pipeline{
-    class VideoReader : public rclcpp::Node {
+
+
+    class OpencvVideoReaderImpl;
+
+    /* Video reader node that reads video frames and sends them to downstreams,
+    using cv::VideoCapture to read video frames, can accept any source that can be read by cv::VideoCapture.
+    Supports reading partial video frames by specifying start and end frame numbers.
+    */
+    class OpencvVideoReader : public rclcpp::Node, public IOpenCloseProtocol {
         public:
-            // virtual void onInit();
-            VideoReader();
-            void img_read_sub_callback(const std_msgs::msg::Empty &msg);
-            // void sendToAll(my_srv::VideoServiceDownstream& det_srv,
-            //                 my_srv::VideoServiceDownstream& pose_srv,
-            //                 my_srv::VideoServiceDownstream& tracker_srv);
-        private:
-            rclcpp::Publisher<my_msgs::msg::Image1080p>::SharedPtr publisher_;
-            rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr img_read_subscripter_;
-            rclcpp::Logger logger_;
-            // ros::NodeHandle m_node_handle;
-            // ros::ServiceClient m_send_to_det_client;
-            // ros::ServiceClient m_send_to_posedet_client;
-            // ros::ServiceClient m_send_to_tracker_client;
+            using DownstreamReadyQueryService = psg_services::srv::StatusQuery;
+            using DownstreamSendFrameAction = psg_actions::action::SendFrame;
+            using DownstreamSendFrameActionGoalHandle = rclcpp_action::ClientGoalHandle<DownstreamSendFrameAction>;
 
-            // std::vector<ros::ServiceClient> m_other_clients;
+            class Downstream{
+            public:
+                virtual ~Downstream(){}
+                // client to call query service
+                rclcpp::Client<DownstreamReadyQueryService>::SharedPtr get_status;
+                rclcpp_action::Client<DownstreamSendFrameAction>::SharedPtr send_frame;
+                // decltype(send_frame)::element_type::SendGoalOptions send_frame_options;
+                rclcpp_action::Client<DownstreamSendFrameAction>::SendGoalOptions send_frame_options;
+            };
 
-            // ros::ServiceClient m_img_shm_name_client;
+            class InitConfig{
+            public:
+                virtual ~InitConfig(){}
+                // can be a file path or a camera index
+                // only one source can be specified
+                std::string source_file;
+                int source_camera_index = -1; //-1 means not using camera
 
-            // ros::Subscriber m_write_enable_sub;
+                //read frames as frames[start_frame_number:end_frame_number], like python
+                int start_frame_number = 0; // 0 means start from the beginning
+                int end_frame_number = -1;  // -1 means read all frames
 
-            // ros::Publisher m_end_flag_pub;
-            // ros::Publisher m_time_stamp_pub;
+                void from_parameters(OpencvVideoReader* node);
+            };
 
-            // bool m_have_created_img_shm = false;
-            // bool m_shm_write_enabled = false;
+            class RuntimeConfig{
+            public:
+                virtual ~RuntimeConfig(){}
+                double frame_internal_ms = -1;
+                int image_width = -1;
+                int image_height = -1;
+                void from_parameter(OpencvVideoReader* node);
+            };
 
-            // std::string m_img_shm_name;
+        public:
+            // explicit VideoReader(const rclcpp::NodeOptions & options);
+            explicit OpencvVideoReader();
 
-            cv::VideoCapture m_video_capture;
-            int m_frame_number = 1;
-            cv::Size m_image_size;
-            int m_start_frame_number = 1;
-            int m_end_frame_number = -1;
+            // initialize with configurations, must be called once before open()
+            void init(const InitConfig& config, const RuntimeConfig& runtime_config);
 
-            std::shared_ptr<vineyard::Client> m_v6d_client;
+            // you can set configuration before starting this node
+            void update_init_config(const InitConfig& config);
+            const InitConfig& get_init_config() const;
 
-            // ros::Time m_start_time;
-            // ros::Duration m_total_time;
+            // modify runtime settings, must be called after open() or stop()
+            void update_runtime_config(const RuntimeConfig& config);
+            const RuntimeConfig& get_runtime_config() const;
 
-            // bi::shared_memory_object m_img_shm;
-            // bi::mapped_region m_img_shm_region;
+            // make the node ready to start, after calling this, you cannot modify init config
+            virtual void open() override;
+
+            // call this after ready() and before you spin this node
+            // after calling this, you cannot modify runtime config
+            virtual void start() override;
+
+            // call this before you modify runtime config
+            virtual void stop() override;
+
+            // call this before you want to modify init config
+            virtual void close() override;
+
+            void img_read();
+
+            void send_frame_goal_response_callback(const DownstreamSendFrameActionGoalHandle::SharedPtr & goal_handle);
+            void send_frame_feedback_callback(DownstreamSendFrameActionGoalHandle::SharedPtr,
+                                        const std::shared_ptr<const DownstreamSendFrameAction::Feedback> feedback);
+            void send_frame_result_callback(const DownstreamSendFrameActionGoalHandle::WrappedResult & result);
+
+            // void add_frame_goal_response_callback(const GoalHandleAddFrame::SharedPtr & goal_handle);
+            // void add_frame_feedback_callback(GoalHandleAddFrame::SharedPtr,
+            //                             const std::shared_ptr<const AddFrame::Feedback> feedback);
+            // void add_frame_result_callback(const GoalHandleAddFrame::WrappedResult & result);
+
+        protected:
+            void _declare_all_parameters();
+
+            // member of downstreams
+            std::map<std::string, std::shared_ptr<Downstream>> m_downstreams;
+
+            // configuration
+            std::shared_ptr<InitConfig> m_init_config;
+            std::shared_ptr<RuntimeConfig> m_runtime_config;
+
+            // impl data
+            std::shared_ptr<OpencvVideoReaderImpl> m_impl;
+
     };
 }
-
-#endif

@@ -6,5 +6,5 @@
         "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
     ],
     "cmake.parallelJobs": 63,
-    "clangd.path": "clangd-12"
+    "clangd.path": "clangd-18"
 }

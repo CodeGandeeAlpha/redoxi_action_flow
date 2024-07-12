@@ -1,0 +1,6 @@
+---
+int32 status
+
+# 0 - OK, ready to accept new requests
+# 1 - Busy, cannot accept new requests
+# -1 - Error, cannot continue to work

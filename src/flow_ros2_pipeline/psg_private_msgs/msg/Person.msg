@@ -1,0 +1,10 @@
+psg_public_msgs/Detection head
+psg_public_msgs/Detection body
+psg_public_msgs/Detection face
+psg_public_msgs/BodyPose pose
+psg_public_msgs/Frame frame
+int32 track_id
+float32 body_height
+float32 body_height_conf
+geometry_msgs/Point head_position_3
+geometry_msgs/Point foot_position_3
