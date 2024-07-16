@@ -14,6 +14,7 @@ namespace FlowRos2Pipeline {
 
     namespace ReturnCode{
         const int SUCCESS = 0;
+        const int REJECTED = 1;
         const int ERROR = -1;
 
         // reserved status code, your custom status code should be greater than this

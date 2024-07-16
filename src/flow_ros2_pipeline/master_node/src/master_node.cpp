@@ -3,10 +3,13 @@
 #include <string>
 
 #include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/empty.hpp>
+#include <master_node/master_node.hpp>
 
 using namespace std::chrono_literals;
 
+int main(int argc, char ** argv){return 1;}
+
+#ifdef COMPILE_MASTER_NODE
 class MasterNode : public rclcpp::Node
 {
 public:
@@ -48,3 +51,4 @@ int main(int argc, char ** argv)
     rclcpp::shutdown();
     return 0;
 }
+#endif

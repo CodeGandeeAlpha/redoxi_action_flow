@@ -1,0 +1,4 @@
+psg_public_msgs/Detections detections
+---
+string result
+---

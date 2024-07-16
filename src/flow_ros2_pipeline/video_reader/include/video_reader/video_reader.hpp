@@ -56,7 +56,7 @@ namespace FlowRos2Pipeline{
                 double frame_internal_ms = -1;
                 int image_width = -1;
                 int image_height = -1;
-                void from_parameter(OpencvVideoReader* node);
+                void from_parameters(OpencvVideoReader* node);
             };
 
             const std::string TOPIC_IMAGE = "image";
@@ -65,19 +65,19 @@ namespace FlowRos2Pipeline{
             // explicit VideoReader(const rclcpp::NodeOptions & options);
             explicit OpencvVideoReader();
 
-            void set_image_topic_enable(bool enable);
+            virtual int set_image_topic_enable(bool enable);
             std::string get_image_topic_name() const;
 
             // initialize with configurations, must be called once before open()
-            void init(const InitConfig& config, const RuntimeConfig& runtime_config);
+            virtual int init(const std::shared_ptr<InitConfig>& config, const std::shared_ptr<RuntimeConfig>& runtime_config);
 
             // you can set configuration before starting this node
-            void update_init_config(const InitConfig& config);
-            const InitConfig& get_init_config() const;
+            virtual int update_init_config(const std::shared_ptr<InitConfig> & config);
+            const std::shared_ptr<InitConfig>& get_init_config() const;
 
             // modify runtime settings, must be called after open() or stop()
-            void update_runtime_config(const RuntimeConfig& config);
-            const RuntimeConfig& get_runtime_config() const;
+            virtual int update_runtime_config(const std::shared_ptr<RuntimeConfig> & config);
+            const std::shared_ptr<RuntimeConfig>& get_runtime_config() const;
 
             // make the node ready to start, after calling this, you cannot modify init config
             virtual int open() override;
@@ -95,13 +95,10 @@ namespace FlowRos2Pipeline{
             // get the status code of this node
             virtual int get_status_code() const;
 
-            // void add_frame_goal_response_callback(const GoalHandleAddFrame::SharedPtr & goal_handle);
-            // void add_frame_feedback_callback(GoalHandleAddFrame::SharedPtr,
-            //                             const std::shared_ptr<const AddFrame::Feedback> feedback);
-            // void add_frame_result_callback(const GoalHandleAddFrame::WrappedResult & result);
-
         protected:
             void img_read();
+
+            int _get_current_frame_number() const;
 
             void send_frame_goal_response_callback(const DownstreamSendFrameActionGoalHandle::SharedPtr & goal_handle);
             void send_frame_feedback_callback(DownstreamSendFrameActionGoalHandle::SharedPtr,
