@@ -46,8 +46,8 @@ namespace FlowRos2Pipeline {
         int remove_entries_by_frame(int frame_number);
         int remove_all_entries();
 
-        std::optional<std::reference_wrapper<const MemoryEntry>> get_entry(int frame_number, const std::string& name) const;
-        std::optional<std::reference_wrapper<const FrameEntries>> get_entries_by_frame(int frame_number) const;
+        const MemoryEntry* get_entry(int frame_number, const std::string& name) const;
+        const FrameEntries* get_entries_by_frame(int frame_number) const;
         const MemoryEntriesByFrame& get_all_entries() const;
 
     private:

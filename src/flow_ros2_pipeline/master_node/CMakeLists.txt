@@ -15,6 +15,7 @@ find_package(std_msgs REQUIRED)
 find_package(psg_services REQUIRED)
 find_package(psg_actions REQUIRED)
 find_package(psg_common REQUIRED)
+find_package(psg_private_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
 
 
@@ -34,7 +35,7 @@ endif()
 
 
 include_directories(include ${VINEYARD_INCLUDE_DIRS})
-add_executable(${PROJECT_NAME}_node src/master_node.cpp src/memory_registry.cpp)
+add_executable(${PROJECT_NAME}_node src/main.cpp src/master_node.cpp src/memory_registry.cpp src/master_node_types.cpp)
 
 ament_target_dependencies(${PROJECT_NAME}_node
   rclcpp
@@ -44,6 +45,7 @@ ament_target_dependencies(${PROJECT_NAME}_node
   psg_actions
   psg_common
   rclcpp_action
+  psg_private_msgs
 )
 
 target_link_libraries(${PROJECT_NAME}_node ${VINEYARD_LIBRARIES})

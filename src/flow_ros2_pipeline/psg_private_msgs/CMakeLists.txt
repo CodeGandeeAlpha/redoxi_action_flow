@@ -19,6 +19,7 @@ find_package(rclpy REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(psg_public_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Person.msg"
@@ -27,6 +28,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/PersonTrajectory.msg"
   "msg/TrajectoryEvent.msg"
   "msg/TrajectoryEvents.msg"
+  "msg/PsgDocument.msg"
 
   DEPENDENCIES geometry_msgs psg_public_msgs
   # ADD_LINTER_TESTS

@@ -13,7 +13,6 @@ int main(int argc, char * argv[])
     init_config->from_parameters(node.get());
     runtime_config->from_parameters(node.get());
     node->init(init_config, runtime_config);
-    node->open();
     node->start();
     rclcpp::spin(node);
     rclcpp::shutdown();

@@ -1,5 +1,5 @@
 ---
-int32 status
+int64 status
 
 # 0 - OK, ready to accept new requests
 # 1 - Busy, cannot accept new requests

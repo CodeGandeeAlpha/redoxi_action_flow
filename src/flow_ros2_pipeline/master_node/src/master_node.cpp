@@ -1,54 +1,286 @@
-#include <chrono>
+#include "master_node/memory_registry.hpp"
+#include "psg_common/psg_common.hpp"
 #include <functional>
-#include <string>
+#include <memory>
+#include <chrono>
+#include <set>
+#include <rclcpp_action/create_client.hpp>
 
 #include <rclcpp/rclcpp.hpp>
 #include <master_node/master_node.hpp>
+#include <rclcpp_action/create_server.hpp>
+#include <stdexcept>
+#include <master_node/_master_node.hpp>
 
-using namespace std::chrono_literals;
 
-int main(int argc, char ** argv){return 1;}
-
+#define COMPILE_MASTER_NODE
 #ifdef COMPILE_MASTER_NODE
-class MasterNode : public rclcpp::Node
-{
-public:
-    MasterNode()
-    : Node("master_node")
+namespace FlowRos2Pipeline {
+    MasterNode::MasterNode() : Node("master_node")
     {
-        auto logger = rclcpp::get_logger("master_node");
-        // 声明参数
-        this->declare_parameter<std::string>("frame_read_pub", "default_value");
+        m_impl = std::make_shared<MasterNodeImpl>(this);
 
-        // 获取参数
-        std::string frame_read_pub_topic = this->get_parameter("frame_read_pub").as_string();
-        RCLCPP_INFO(logger, "[MasterNode] frame_read_pub_topic: %s", frame_read_pub_topic.c_str());
+        _declare_all_parameters();
 
-        frame_read_publisher_ = this->create_publisher<std_msgs::msg::Empty>(frame_read_pub_topic, 10);
+        m_memory_registry = std::make_shared<MemoryRegistry>(this);
 
-        timer_ = this->create_wall_timer(10ms, std::bind(&MasterNode::timer_callback, this));
-
-        RCLCPP_INFO(logger, "[MasterNode] init success!");
+        RCLCPP_INFO(m_impl->logger, "[MasterNode] constraction success!");
     }
 
-    void timer_callback()
-    {
-        auto logger = rclcpp::get_logger("master_node");
-        auto message = std_msgs::msg::Empty();
-        RCLCPP_INFO(logger, "[MasterNode] frame_read_publisher_->publish()");
-        frame_read_publisher_->publish(message);
+    void MasterNode::_declare_all_parameters() {
+        this->declare_parameter<std::string>("downstream_action", "");
     }
 
-private:
-    rclcpp::TimerBase::SharedPtr timer_;
-    rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr frame_read_publisher_;
-};
+    int MasterNode::init(const std::shared_ptr<InitConfig>& config,
+                            const std::shared_ptr<RuntimeConfig>& runtime_config) {
+        if (m_status_code != NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::CLOSED) {
+            RCLCPP_ERROR(m_impl->logger, "[MasterNode] init FAILED! status code is not BEFORE_INIT or CLOSED");
+            return ReturnCode::ERROR;
+        }
 
-int main(int argc, char ** argv)
-{
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<MasterNode>());
-    rclcpp::shutdown();
-    return 0;
+        m_init_config = config;
+        m_runtime_config = runtime_config;
+
+
+        // create status_query server
+        std::string status_query_service = this->get_parameter("status_query_service").as_string();
+        // m_srv_status_query = this->create_service<MSG_StatusQuery>(
+        //     status_query_service, &MasterNode::status_query_callback);
+        m_srv_status_query = this->create_service<psg_services::srv::StatusQuery>(
+            status_query_service, std::bind(&MasterNode::status_query_callback, this, std::placeholders::_1, std::placeholders::_2));
+
+
+        // create send_frame server
+        std::string send_frame_action = this->get_parameter("send_frame_action").as_string();
+        m_act_accept_frame = rclcpp_action::create_server<ACT_AcceptFrame>(
+            this, send_frame_action,
+            std::bind(&MasterNode::accept_frame_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
+            std::bind(&MasterNode::accept_frame_cancel_callback, this, std::placeholders::_1),
+            std::bind(&MasterNode::accept_frame_accepted_callback, this, std::placeholders::_1));
+
+        // create downstream action client
+        m_ds_psgdocument["downstream_action"] = std::make_shared<DS_PSGDocument>();
+        m_ds_psgdocument["downstream_action"]->handler =
+                rclcpp_action::create_client<DownstreamFunctions::DocumentAction>(this, m_init_config->downstream_action_name);
+        m_ds_psgdocument["downstream_action"]->options.goal_response_callback =
+                std::bind(&MasterNode::process_document_goal_response_callback, this, std::placeholders::_1);
+        m_ds_psgdocument["downstream_action"]->options.feedback_callback =
+                std::bind(&MasterNode::process_document_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
+        m_ds_psgdocument["downstream_action"]->options.result_callback =
+                std::bind(&MasterNode::process_document_result_callback, this, std::placeholders::_1);
+
+        m_status_code = NodeStatusCode::INITIALIZED;
+        return ReturnCode::SUCCESS;
+    }
+
+    const std::shared_ptr<MasterNode::InitConfig>& MasterNode::get_init_config() const {
+        return m_init_config;
+    }
+
+    const std::shared_ptr<MasterNode::RuntimeConfig>& MasterNode::get_runtime_config() const {
+        return m_runtime_config;
+    }
+
+    int MasterNode::update_runtime_config(const std::shared_ptr<RuntimeConfig>& config) {
+        // if (m_status_code != NodeStatusCode::OPENED) {
+        //     RCLCPP_ERROR(m_impl->logger, "[MasterNode] update_runtime_config FAILED! status code is not OPENED");
+        //     return ReturnCode::ERROR;
+        // }
+
+        m_runtime_config = config;
+        return ReturnCode::SUCCESS;
+    }
+
+    int MasterNode::get_status_code() const {
+        return m_status_code;
+    }
+
+    void MasterNode::process_document_goal_response_callback(
+            const rclcpp_action::ClientGoalHandle<MasterNode::DownstreamFunctions::DocumentAction>::SharedPtr & goal_handle) {
+        if(goal_handle->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
+            //TODO: here
+        } else {
+            RCLCPP_INFO(m_impl->logger, "Frame rejected");
+        }
+    }
+
+    void MasterNode::process_document_feedback_callback(rclcpp_action::ClientGoalHandle<MasterNode::DownstreamFunctions::DocumentAction>::SharedPtr,
+        const std::shared_ptr<const MasterNode::DownstreamFunctions::DocumentAction::Feedback> feedback) {
+        (void)feedback;
+    }
+
+    void MasterNode::process_document_result_callback(
+        const rclcpp_action::ClientGoalHandle<MasterNode::DownstreamFunctions::DocumentAction>::WrappedResult & result) {
+        (void)result;
+    }
+
+
+    void MasterNode::status_query_callback(const std::shared_ptr<psg_services::srv::StatusQuery::Request> request,
+            std::shared_ptr<psg_services::srv::StatusQuery::Response> response) {
+        (void)request;  // not used
+        response->status = ReturnCode::SUCCESS;
+    }
+
+    rclcpp_action::GoalResponse MasterNode::accept_frame_goal_callback(
+        const rclcpp_action::GoalUUID & uuid,
+        std::shared_ptr<const ACT_AcceptFrame::Goal> goal) {
+        RCLCPP_INFO(m_impl->logger, "Received goal request with frame %d", goal->frame.frame_num);
+        (void)uuid;  // not used
+        return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+    }
+
+    rclcpp_action::CancelResponse MasterNode::accept_frame_cancel_callback(
+        const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptFrame>> goal_handle) {
+        RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
+        (void)goal_handle;  // not used
+        return rclcpp_action::CancelResponse::REJECT;
+    }
+
+    void MasterNode::accept_frame_accepted_callback(
+        const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptFrame>> goal_handle) {
+
+        //cache the frame
+        const auto& frame = goal_handle->get_goal()->frame;
+
+        //add to memory registry
+        _add_frame_to_buffer(frame);
+
+        //create tasks for all downstreams
+        process_document_create_tasks(frame);
+    }
+
+    void MasterNode::_add_frame_to_buffer(const MSG_Frame& frame) {
+        m_frame_buffer[frame.frame_num] = frame;
+
+        //add to memory registry
+        MemoryEntry e;
+        e.frame_number = frame.frame_num;
+        e.name = "frame";
+
+        if(!frame.cache.has_int_id)
+            throw std::runtime_error("frame.cache has no int_id");
+
+        e.v6d_object_id = frame.cache.id_int;
+        m_memory_registry->add_entry(e);
+    }
+
+    void MasterNode::_remove_frame_from_buffer(int frame_number, bool remove_memory_entry){
+        m_frame_buffer.erase(frame_number);
+        if(remove_memory_entry)
+            m_memory_registry->remove_entries_by_frame(frame_number);
+    }
+
+    void MasterNode::process_document_create_tasks(const MSG_Frame& frame){
+        //create tasks of this frame for all downstreams
+        for(auto& x : m_ds_psgdocument) {
+            auto task = std::make_shared<DSTask_PSGDocument>();
+            task->downstream = x.second;
+            task->frame = frame;
+            m_psgdoc_task_waiting[std::make_tuple(task->downstream.get(), frame.frame_num)] = task;
+        }
+    }
+
+    int MasterNode::start() {
+        if (m_status_code != NodeStatusCode::INITIALIZED && m_status_code != NodeStatusCode::STOPPED) {
+            RCLCPP_ERROR(m_impl->logger, "[MasterNode] start FAILED! status code is not INITIALIZED or STOPPED");
+            return ReturnCode::ERROR;
+        }
+
+        //start timer
+        m_impl->timer = this->create_wall_timer(
+            std::chrono::milliseconds((int)m_runtime_config->frame_internal_ms),
+            std::bind(&MasterNode::_step, this));
+
+        m_status_code = NodeStatusCode::STARTED;
+        return ReturnCode::SUCCESS;
+    }
+
+    int MasterNode::stop() {
+        if (m_status_code != NodeStatusCode::STARTED) {
+            RCLCPP_ERROR(m_impl->logger, "[MasterNode] stop FAILED! status code is not STARTED");
+            return ReturnCode::ERROR;
+        }
+
+        if(m_impl->timer)
+            m_impl->timer->cancel();
+        else
+            throw std::runtime_error("timer is not initialized but stop() is called");
+
+        m_status_code = NodeStatusCode::STOPPED;
+        return ReturnCode::SUCCESS;
+    }
+
+    void MasterNode::_step() {
+        if(!m_psgdoc_task_waiting.empty())
+        {
+            // initiate all waiting tasks
+            std::vector<decltype(m_psgdoc_task_waiting)::key_type> tasks_to_remove;
+
+            for(auto& it : m_psgdoc_task_waiting){
+                auto& task = it.second;
+                DownstreamFunctions::DocumentAction::Goal goal;
+                goal.document.frame = task->frame;
+                auto ds = task->downstream;
+                auto handle = task->downstream->handler->async_send_goal(goal, ds->options);
+
+                auto task_response = handle.get();
+                if(task_response != nullptr){
+                    // accepted?
+                    if(task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED){
+                        //successfully sent, record this
+                        task->goal_id = task_response->get_goal_id();
+                        task->status = DSTask_PSGDocument::TASK_SENT;
+                        m_psgdoc_task_doing[task->goal_id] = task;
+                        tasks_to_remove.push_back(it.first);
+                    }
+                }
+
+                //FIXME: what if failed to send many times?
+                //you need to terminate a frame, remove it from memory registry
+            }
+
+            // remove all sent tasks
+            for(auto& it : tasks_to_remove){
+                m_psgdoc_task_waiting.erase(it);
+            }
+        }
+
+        //for on-going tasks, if it is done, remove it
+        if(!m_psgdoc_task_doing.empty()){
+            std::vector<GoalID> tasks_to_remove;
+            for(auto& it : m_psgdoc_task_doing){
+                auto& task = it.second;
+                if(task->status == DSTask_PSGDocument::TASK_DONE || task->status == DSTask_PSGDocument::TASK_FAILED){
+                    tasks_to_remove.push_back(it.first);
+                }
+            }
+
+            for(auto& it : tasks_to_remove){
+                m_psgdoc_task_doing.erase(it);
+            }
+        }
+
+        //if a frame has no waiting tasks or running tasks associated with it, remove it from buffer
+        std::set<int> useful_frames;
+        std::vector<int> useless_frames;
+        for(auto& it : m_psgdoc_task_waiting){
+            useful_frames.insert(it.second->frame.frame_num);
+        }
+        for(auto& it : m_psgdoc_task_doing){
+            useful_frames.insert(it.second->frame.frame_num);
+        }
+        for(auto& it : m_frame_buffer){
+            // if not useful, it is useless
+            if(useful_frames.find(it.first) == useful_frames.end()){
+                useless_frames.push_back(it.first);
+            }
+        }
+
+        // remove useless frames
+        for(auto& it : useless_frames){
+            _remove_frame_from_buffer(it, false);
+        }
+    }
 }
+
 #endif
