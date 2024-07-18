@@ -10,6 +10,8 @@ namespace FlowRos2Pipeline {
     class MasterNodeInitConfig {
     public:
         virtual ~MasterNodeInitConfig(){}
+
+        //FIXME: support multiple downstreams
         std::string downstream_action_name;
 
         void from_parameters(MasterNode* node);

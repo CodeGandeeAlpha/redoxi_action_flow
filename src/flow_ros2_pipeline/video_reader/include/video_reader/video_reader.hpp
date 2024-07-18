@@ -4,6 +4,7 @@
 #include <memory>
 #include <opencv2/opencv.hpp>
 
+#include <psg_public_msgs/msg/detail/frame__struct.hpp>
 #include <rclcpp/client.hpp>
 #include <rclcpp/node.hpp>
 #include <rclcpp/service.hpp>
@@ -27,45 +28,45 @@ namespace FlowRos2Pipeline{
     class OpencvVideoReader : public rclcpp::Node, public IOpenCloseProtocol {
         public:
             using DownstreamReadyQueryService = psg_services::srv::StatusQuery;
-            using DownstreamSendFrameAction = psg_actions::action::SendFrame;
-            using DownstreamSendFrameActionGoalHandle = rclcpp_action::ClientGoalHandle<DownstreamSendFrameAction>;
+            using DownstreamAcceptFrameAction = psg_actions::action::SendFrame;
+            using DownstreamSendFrameActionGoalHandle = rclcpp_action::ClientGoalHandle<DownstreamAcceptFrameAction>;
 
             class Downstream{
             public:
                 virtual ~Downstream(){}
                 // client to call query service
                 rclcpp::Client<DownstreamReadyQueryService>::SharedPtr get_status;
-                rclcpp_action::Client<DownstreamSendFrameAction>::SharedPtr send_frame;
-                // decltype(send_frame)::element_type::SendGoalOptions send_frame_options;
-                rclcpp_action::Client<DownstreamSendFrameAction>::SendGoalOptions send_frame_options;
+                rclcpp_action::Client<DownstreamAcceptFrameAction>::SharedPtr accept_frame;
+                rclcpp_action::Client<DownstreamAcceptFrameAction>::SendGoalOptions accept_frame_options;
             };
 
             using InitConfig = OpencvVideoReaderInitConfig;
             using RuntimeConfig = OpencvVideoReaderRuntimeConfig;
+            using MSG_Frame = psg_public_msgs::msg::Frame;
 
-            const std::string TOPIC_IMAGE = "image";
+            inline static const std::string TOPIC_IMAGE = "image";
+            inline static const int DEFAULT_IMAGE_TOPIC_QUEUE_LENGTH = 10;
 
         public:
-            // explicit VideoReader(const rclcpp::NodeOptions & options);
             explicit OpencvVideoReader();
 
             virtual int set_image_topic_enable(bool enable);
-            std::string get_image_topic_name() const;
+            virtual std::string get_image_topic_name() const;
 
             // initialize with configurations, must be called once before open()
             virtual int init(const std::shared_ptr<InitConfig>& config, const std::shared_ptr<RuntimeConfig>& runtime_config);
 
             // you can set configuration before open() or after close()
             virtual int update_init_config(const std::shared_ptr<InitConfig> & config);
-            const std::shared_ptr<InitConfig>& get_init_config() const;
+            virtual const std::shared_ptr<InitConfig>& get_init_config() const;
 
             // modify runtime settings, must be called before start(), after stop() or close()
             virtual int update_runtime_config(const std::shared_ptr<RuntimeConfig> & config);
-            const std::shared_ptr<RuntimeConfig>& get_runtime_config() const;
+            virtual const std::shared_ptr<RuntimeConfig>& get_runtime_config() const;
 
             // can modify init config, runtime config
 
-            // make the node ready to start, after calling this, you cannot modify init config
+            // open video source, get ready to read
             virtual int open() override;
 
             // can modify runtime config
@@ -90,20 +91,32 @@ namespace FlowRos2Pipeline{
             virtual int get_status_code() const;
 
         protected:
-            void _step();
+            virtual void _step();
 
-            void status_query_callback(rclcpp::Client<DownstreamReadyQueryService>::SharedFuture future);
+            // create publisher for visualization
+            virtual void _create_image_topic();
 
-            void send_frame_goal_response_callback(const DownstreamSendFrameActionGoalHandle::SharedPtr & goal_handle);
-            void send_frame_feedback_callback(DownstreamSendFrameActionGoalHandle::SharedPtr,
-                                        const std::shared_ptr<const DownstreamSendFrameAction::Feedback> feedback);
-            void send_frame_result_callback(const DownstreamSendFrameActionGoalHandle::WrappedResult & result);
+            // find and connect to downstreams
+            virtual void _connect_to_downstreams();
 
-            void _declare_all_parameters();
+            // check if all downstreams are ready to accept new frame
+            virtual bool _check_downstreams_ready();
+
+            // add a frame to shared memory, return object id
+            virtual uint64_t _add_frame_to_shared_memory(const cv::Mat& frame);
+
+            // send frame in shared memory to all downstreams
+            // return whether the frame is actually sent
+            virtual bool _send_frame_to_downstreams(
+                const MSG_Frame& frame_msg,
+                bool check_downstream_ready_before_send);
+
+            virtual void _declare_all_parameters();
 
             // read next frame and return true if success
-            bool _read_frame(cv::Mat& frame);
+            virtual bool _read_frame(cv::Mat& frame);
 
+        protected:
             // member of downstreams
             std::map<std::string, std::shared_ptr<Downstream>> m_downstreams;
 

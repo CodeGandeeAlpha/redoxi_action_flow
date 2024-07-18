@@ -1,4 +1,12 @@
 #pragma once
+#include <memory>
+#include <string>
+
+namespace vineyard{
+    class Client;
+};
+
+std::shared_ptr<vineyard::Client> create_v6d_client(const std::string& socket = "");
 
 namespace FlowRos2Pipeline {
     class IOpenCloseProtocol{
@@ -34,4 +42,7 @@ namespace FlowRos2Pipeline {
     };
 
     const double DefaultServiceTimeoutMs = 1000;
+
+    // how many ms to wait before next _step()
+    const double DefaultNodeStepIntervalMs = 10;
 }

@@ -10,6 +10,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(vineyard REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -28,7 +29,11 @@ add_library(${PROJECT_NAME}
 )
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
+  $<INSTALL_INTERFACE:include>
+  ${VINEYARD_INCLUDE_DIRS}
+  )
+
+target_link_libraries(${PROJECT_NAME} ${VINEYARD_LIBRARIES})
 
 install(DIRECTORY include/
   DESTINATION include)
@@ -40,5 +45,6 @@ install(TARGETS ${PROJECT_NAME}
 
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
+ament_export_dependencies(rclcpp vineyard)
 
 ament_package()

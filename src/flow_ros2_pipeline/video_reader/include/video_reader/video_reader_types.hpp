@@ -1,8 +1,18 @@
 #pragma once
 #include <string>
+#include <map>
+#include <psg_common/psg_common.hpp>
 
 namespace FlowRos2Pipeline {
     class OpencvVideoReader;
+
+    class OpencvVideoReaderDownstreamNode{
+    public:
+        virtual ~OpencvVideoReaderDownstreamNode(){}
+        std::string accept_frame_action;
+        std::string status_query_service;
+    };
+
     class OpencvVideoReaderInitConfig{
     public:
         virtual ~OpencvVideoReaderInitConfig(){}
@@ -15,13 +25,22 @@ namespace FlowRos2Pipeline {
         int start_frame_number = 0; // 0 means start from the beginning
         int end_frame_number = -1;  // -1 means read all frames
 
+        //downstream nodes, mapping node name to node configurations
+        using DownstreamNode = OpencvVideoReaderDownstreamNode;
+        std::map<std::string, DownstreamNode> downstreams;
+
         void from_parameters(OpencvVideoReader* node);
     };
 
     class OpencvVideoReaderRuntimeConfig{
     public:
         virtual ~OpencvVideoReaderRuntimeConfig(){}
-        double frame_internal_ms = -1;
+
+        // step frequency
+        double step_interval_ms = DefaultNodeStepIntervalMs;
+
+        // frame rate
+        double frame_interval_ms = -1;
 
         // if image_width=-1 and image_height>0, then auto resize to image_height, image_width=image_height*aspect_ratio
         int image_width = -1;

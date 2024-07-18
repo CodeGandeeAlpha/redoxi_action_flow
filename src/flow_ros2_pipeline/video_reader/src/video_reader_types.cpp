@@ -18,8 +18,8 @@ namespace FlowRos2Pipeline {
 
     void OpencvVideoReaderRuntimeConfig::from_parameters(OpencvVideoReader* node) {
         auto logger_ = node->get_logger();
-        this->frame_internal_ms = node->get_parameter("frame_internal_ms").as_double();
-        RCLCPP_INFO(logger_, "[OpencvVideoReader] frame_internal_ms: %f", this->frame_internal_ms);
+        this->frame_interval_ms = node->get_parameter("frame_internal_ms").as_double();
+        RCLCPP_INFO(logger_, "[OpencvVideoReader] frame_internal_ms: %f", this->frame_interval_ms);
 
         this->image_width = node->get_parameter("image_width").as_int();
         RCLCPP_INFO(logger_, "[OpencvVideoReader] image_width: %d", this->image_width);
