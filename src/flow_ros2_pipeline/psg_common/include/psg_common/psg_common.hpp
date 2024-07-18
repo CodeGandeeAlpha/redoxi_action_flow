@@ -32,4 +32,6 @@ namespace FlowRos2Pipeline {
         // reserved status code, your custom status code should be greater than this
         const int MAX_RESERVED_STATUS = 10000;
     };
+
+    const double DefaultServiceTimeoutMs = 1000;
 }

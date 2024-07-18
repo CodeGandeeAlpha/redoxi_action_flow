@@ -1,20 +1,26 @@
-#include "video_reader/video_reader.hpp"
-#include "psg_common/psg_common.hpp"
-#include "video_reader/_video_reader.hpp"
 #include <cstring>
+#include <future>
 #include <memory>
-#include <psg_public_msgs/msg/detail/cache_data__struct.hpp>
-#include <psg_public_msgs/msg/detail/frame__struct.hpp>
+#include <chrono>
+#include <string>
+#include <opencv2/core/mat.hpp>
+#include <vineyard/basic/ds/tensor.h>
+
 #include <rclcpp/create_client.hpp>
 #include <rclcpp/executors.hpp>
 #include <rclcpp/logger.hpp>
 #include <rclcpp/logging.hpp>
 #include <rclcpp/utilities.hpp>
-#include <chrono>
-#include <string>
-#include "vineyard/basic/ds/tensor.h"
-#include <opencv2/highgui.hpp>
+#include <rcpputils/asserts.hpp>
 
+#include <psg_common/psg_common.hpp>
+#include <psg_public_msgs/msg/detail/cache_data__struct.hpp>
+#include <psg_public_msgs/msg/detail/frame__struct.hpp>
+
+#include <video_reader/video_reader.hpp>
+#include <video_reader/_video_reader.hpp>
+
+static constexpr auto ROS_ASSERT = rcpputils::assert_true;
 
 using namespace std::chrono_literals;
 using std::placeholders::_1;
@@ -30,48 +36,7 @@ using namespace vineyard;
 #define COMPILE_THIS
 #ifdef COMPILE_THIS
 namespace FlowRos2Pipeline{
-    int OpencvVideoReader::_get_current_frame_number() const {
-        if (m_impl->video_capture == nullptr) {
-            return -1;
-        }
-        if (!m_impl->video_capture->isOpened()) {
-            return -1;
-        }
-        if (m_impl->video_capture->get(cv::CAP_PROP_FRAME_COUNT) == 0) {
-            return -1;
-        }
-
-        return m_impl->video_capture->get(cv::CAP_PROP_POS_FRAMES);
-    }
-
-    void OpencvVideoReader::InitConfig::from_parameters(OpencvVideoReader* node) {
-        auto logger_ = node->get_logger();
-
-        source_file = node->get_parameter("source_file").as_string();
-        source_camera_index = node->get_parameter("source_camera_index").as_int();
-        start_frame_number = node->get_parameter("start_frame_number").as_int();
-        end_frame_number = node->get_parameter("end_frame_number").as_int();
-
-        RCLCPP_INFO(logger_, "[OpencvVideoReader] source_file: %s", source_file.c_str());
-        RCLCPP_INFO(logger_, "[OpencvVideoReader] source_camera_index: %d", source_camera_index);
-        RCLCPP_INFO(logger_, "[OpencvVideoReader] start_frame_number: %d", start_frame_number);
-        RCLCPP_INFO(logger_, "[OpencvVideoReader] end_frame_number: %d", end_frame_number);
-    }
-
-    void OpencvVideoReader::RuntimeConfig::from_parameters(OpencvVideoReader* node) {
-        auto logger_ = node->get_logger();
-        frame_internal_ms = node->get_parameter("frame_internal_ms").as_double();
-        RCLCPP_INFO(logger_, "[OpencvVideoReader] frame_internal_ms: %f", frame_internal_ms);
-
-        image_width = node->get_parameter("image_width").as_int();
-        RCLCPP_INFO(logger_, "[OpencvVideoReader] image_width: %d", image_width);
-        image_height = node->get_parameter("image_height").as_int();
-        RCLCPP_INFO(logger_, "[OpencvVideoReader] image_height: %d", image_height);
-
-    }
-
     OpencvVideoReader::OpencvVideoReader(): rclcpp::Node("video_reader") {
-
         _declare_all_parameters();
 
         // implementation init
@@ -82,28 +47,69 @@ namespace FlowRos2Pipeline{
         m_impl->v6d_client = std::make_shared<vineyard::Client>();
 
         // v6d init
-        std::string v6d_ipc_socket = "v6d_socket";
+        std::string v6d_ipc_socket = "/var/run/vineyard.sock";
         VINEYARD_CHECK_OK(m_impl->v6d_client->Connect(v6d_ipc_socket));
         RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] v6d Connected to IPCServer: %s", v6d_ipc_socket.c_str());
 
         // m_timer = this->create_wall_timer(10ms, std::bind(&OpencvVideoReader::img_read, this));
-
-
         RCLCPP_INFO(logger_, "[OpencvVideoReader] construct success!");
     }
 
-    void OpencvVideoReader::img_read() {
-        auto logger_ = m_impl->logger;
-        cv::Mat frame;
+    bool OpencvVideoReader::_read_frame(cv::Mat& frame){
+        ROS_ASSERT(m_impl->video_capture->isOpened(), "[OpencvVideoReader] video capture is not opened but tried to read");
+
+        // end of required number of frames to read?
+        auto frame_number = this->m_frame_number;   //convert to absolute frame number
+        if(m_init_config->start_frame_number >= 0)
+            frame_number += m_init_config->start_frame_number;
+
+        if (m_init_config->end_frame_number != -1 && frame_number+1 >= m_init_config->end_frame_number) {
+            RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] reached end of frame %d", m_init_config->end_frame_number);
+            return false;
+        }
+
+        // read it
         auto success = m_impl->video_capture->read(frame);
+        if(!success || frame.empty()){
+            // end of video sequence
+            return false;
+        }
+        this->m_frame_number += 1;
+    }
+
+    void OpencvVideoReader::_step() {
+        //check status
+        if(m_status_code != NodeStatusCode::STARTED){
+            // nothing to do if not started
+            return;
+        }
+
+        //in started mode, read frames and process them
+        auto& logger = m_impl->logger;
+        auto& frame = m_impl->src_frame;
+
+        //read first or check first?
+        if(m_runtime_config->read_frame_mode == RuntimeConfig::RFM_READ_ALL)
+        {
+            auto success = _read_frame(frame);
+            if(!success || frame.empty()){
+                // end of video sequence
+                RCLCPP_INFO(logger,  "[OpencvVideoReader] end of video reached");
+                stop();
+                return;
+            }
+        }
+
+        // query the downstreams to see if they are ready
+
         auto frame_number = _get_current_frame_number();
-        RCLCPP_INFO(logger_, "[OpencvVideoReader] m_video_capture.read %d frame", frame_number);
+        RCLCPP_INFO(logger, "[OpencvVideoReader] m_video_capture.read %d frame", frame_number);
 
         if (!success || frame.empty()) {
-            RCLCPP_ERROR(logger_, "[OpencvVideoReader] m_video_capture.read FAILED");
+            RCLCPP_ERROR(logger, "[OpencvVideoReader] m_video_capture.read FAILED");
         }
         else if (frame_number > m_init_config->end_frame_number && m_init_config->end_frame_number != -1) {
-            RCLCPP_INFO(logger_, "[OpencvVideoReader] m_video_capture.read end_frame_number %d", m_init_config->end_frame_number);
+            RCLCPP_INFO(logger, "[OpencvVideoReader] m_video_capture.read end_frame_number %d", m_init_config->end_frame_number);
             m_impl->timer->cancel();
             m_status_code = NodeStatusCode::STOPPED;
         }
@@ -116,79 +122,89 @@ namespace FlowRos2Pipeline{
             for (auto it: m_downstreams) {
                 while (!it.second->get_status->wait_for_service(1s)) {
                     if (!rclcpp::ok()) {
-                        RCLCPP_ERROR(logger_, "[OpencvVideoReader] Interrupted while waiting for the service. Exiting.");
+                        RCLCPP_ERROR(logger, "[OpencvVideoReader] Interrupted while waiting for the service. Exiting.");
                         return ;
                     }
-                    RCLCPP_INFO(logger_, "[OpencvVideoReader] service not available, waiting again...");
+                    RCLCPP_INFO(logger, "[OpencvVideoReader] service not available, waiting again...");
                 }
-            }
+                RCLCPP_INFO(logger, "[OpencvVideoReader] service available, can send request to it!");
 
-            // 发送请求
-            for (auto it: m_downstreams) {
+                // auto result = it.second->get_status->async_send_request(
+                //         request, std::bind(&OpencvVideoReader::status_query_callback, this, std::placeholders::_1));
+                const auto& ds = it.second;
+
                 auto result = it.second->get_status->async_send_request(request);
-                // rclcpp::spin_until_future_complete表示一定要等待服务返回
-                // 如果不需要等待，可以使用rclcpp::Client::async_send_request(request, callback)里面带一个回调函数
-                if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), result) ==
-                    rclcpp::FutureReturnCode::SUCCESS)
-                {
-                    if (result.get()->status == ReturnCode::REJECTED) {
-                        RCLCPP_INFO(logger_, "[OpencvVideoReader] DownstreamReadyQueryService::Response is ReturnCode::REJECTED");
-                    }
-                    else if (result.get()->status == ReturnCode::ERROR) {
-                        // TODO: shutdown node or not
-                        RCLCPP_FATAL(logger_, "[OpencvVideoReader] DownstreamReadyQueryService::Response is ReturnCode::ERROR");
-                        rclcpp::shutdown();
-                    }
-                    else {
-                        // 将帧存到v6d，并将id发给cache node
-                        // 获取图像的尺寸
-                        int height = frame.rows;
-                        int width = frame.cols;
-                        int ch = frame.channels();
+                auto timeout_ms = this->m_runtime_config->timeout_ms_send_frame_to_downstream;
+                auto _wait_status = result.wait_for(std::chrono::milliseconds((long)timeout_ms));
+                if(_wait_status == std::future_status::timeout)
+                auto response = result.get();
 
-                        // 创建 TensorBuilder，并根据图像尺寸构建 Tensor
-                        TensorBuilder<uint8_t> builder(*m_impl->v6d_client, {height, width, ch});
-                        auto tensor_data = builder.data();
+                if (response->status == ReturnCode::REJECTED) {
+                    RCLCPP_INFO(logger, "[OpencvVideoReader] DownstreamReadyQueryService::Response is ReturnCode::REJECTED");
+                }
+                else if (response->status == ReturnCode::ERROR) {
+                    // TODO: shutdown node or not
+                    RCLCPP_FATAL(logger, "[OpencvVideoReader] DownstreamReadyQueryService::Response is ReturnCode::ERROR");
+                    rclcpp::shutdown();
+                }
+                else {
+                    // 将帧存到v6d，并将id发给cache node
+                    // 获取图像的尺寸
+                    int height = frame.rows;
+                    int width = frame.cols;
+                    int ch = frame.channels();
 
-                        // memcpy(tensor_data, frame.data, height * width * ch);
+                    // 创建 TensorBuilder，并根据图像尺寸构建 Tensor
+                    TensorBuilder<uint8_t> builder(*m_impl->v6d_client, {height, width, ch});
+                    auto tensor_data = builder.data();
 
-                        // 将图像数据复制到 Tensor 中
-                        for (int row = 0; row < height; ++row) {
-                            for (int col = 0; col < width; ++col) {
-                                cv::Vec3b pixel = frame.at<cv::Vec3b>(row, col);
-                                tensor_data[row * width * 3 + col * 3 + 0] = pixel[0]; // Blue
-                                tensor_data[row * width * 3 + col * 3 + 1] = pixel[1]; // Green
-                                tensor_data[row * width * 3 + col * 3 + 2] = pixel[2]; // Red
-                            }
+                    // memcpy(tensor_data, frame.data, height * width * ch);
+
+                    // 将图像数据复制到 Tensor 中
+                    for (int row = 0; row < height; ++row) {
+                        for (int col = 0; col < width; ++col) {
+                            cv::Vec3b pixel = frame.at<cv::Vec3b>(row, col);
+                            tensor_data[row * width * 3 + col * 3 + 0] = pixel[0]; // Blue
+                            tensor_data[row * width * 3 + col * 3 + 1] = pixel[1]; // Green
+                            tensor_data[row * width * 3 + col * 3 + 2] = pixel[2]; // Red
                         }
-
-                        // 封存 Tensor 并持久化到 Vineyard
-                        auto sealed = std::dynamic_pointer_cast<Tensor<uint8_t>>(builder.Seal(*m_impl->v6d_client));
-                        VINEYARD_CHECK_OK(m_impl->v6d_client->Persist(sealed->id()));
-
-                        ObjectID id = sealed->id();
-
-                        RCLCPP_INFO(logger_, "[OpencvVideoReader] Successfully sealed, ObjectID: %s", ObjectIDToString(id).c_str());
-
-                        // 发送帧
-                        auto goal_msg = DownstreamSendFrameAction::Goal();
-                        psg_public_msgs::msg::Frame frame_msg;
-                        frame_msg.frame_num = frame_number;
-                        psg_public_msgs::msg::CacheData cache_data_msg;
-                        cache_data_msg.id_int = id;
-                        cache_data_msg.has_int_id = true;
-                        cache_data_msg.id_string = ObjectIDToString(id).c_str();
-                        frame_msg.cache = cache_data_msg;
-
-                        goal_msg.frame = frame_msg;
-
-                        it.second->send_frame->async_send_goal(goal_msg, it.second->send_frame_options);
                     }
-                } else { // TODO
-                    RCLCPP_ERROR(logger_, "[OpencvVideoReader] call DownstreamReadyQueryService FAILED");
+
+                    // 封存 Tensor 并持久化到 Vineyard
+                    auto sealed = std::dynamic_pointer_cast<Tensor<uint8_t>>(builder.Seal(*m_impl->v6d_client));
+                    VINEYARD_CHECK_OK(m_impl->v6d_client->Persist(sealed->id()));
+
+                    ObjectID id = sealed->id();
+
+                    RCLCPP_INFO(logger, "[OpencvVideoReader] Successfully sealed, ObjectID: %s", ObjectIDToString(id).c_str());
+
+                    // 发送帧
+                    auto goal_msg = DownstreamSendFrameAction::Goal();
+                    psg_public_msgs::msg::Frame frame_msg;
+                    frame_msg.frame_num = frame_number;
+                    psg_public_msgs::msg::CacheData cache_data_msg;
+                    cache_data_msg.id_int = id;
+                    cache_data_msg.has_int_id = true;
+                    cache_data_msg.id_string = ObjectIDToString(id).c_str();
+                    frame_msg.cache = cache_data_msg;
+
+                    goal_msg.frame = frame_msg;
+
+                    downstream->send_frame->async_send_goal(goal_msg, downstream->send_frame_options);
                 }
             }
+
         }
+    }
+
+    void OpencvVideoReader::status_query_callback(
+        rclcpp::Client<DownstreamReadyQueryService>::SharedFuture future, const cv::Mat & frame, int frame_number,
+        const std::shared_ptr<Downstream> & downstream) {
+        auto logger_ = m_impl->logger;
+
+        auto response = future.get();
+
+
     }
 
     void OpencvVideoReader::send_frame_goal_response_callback(const DownstreamSendFrameActionGoalHandle::SharedPtr & goal_handle) {
@@ -287,6 +303,9 @@ namespace FlowRos2Pipeline{
             return ReturnCode::ERROR;
         }
 
+        RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] open SUCCESS!");
+
+
         // 创建status_query_client
         std::string status_query_service = this->get_parameter("status_query_service").as_string();
         auto status_query_client_ptr_ = this->create_client<DownstreamReadyQueryService>(status_query_service);
@@ -329,7 +348,7 @@ namespace FlowRos2Pipeline{
 
         // set timer
         m_impl->timer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(m_runtime_config->frame_internal_ms)),
-                 std::bind(&OpencvVideoReader::img_read, this));
+                 std::bind(&OpencvVideoReader::_step, this));
     }
 
     int OpencvVideoReader::stop() {

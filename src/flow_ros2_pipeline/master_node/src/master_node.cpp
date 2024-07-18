@@ -29,6 +29,9 @@ namespace FlowRos2Pipeline {
 
     void MasterNode::_declare_all_parameters() {
         this->declare_parameter<std::string>("downstream_action", "");
+        this->declare_parameter<std::string>("status_query_service", "");
+        this->declare_parameter<std::string>("send_frame_action", "");
+        this->declare_parameter<double>("frame_internal_ms", -1);
     }
 
     int MasterNode::init(const std::shared_ptr<InitConfig>& config,
@@ -40,6 +43,8 @@ namespace FlowRos2Pipeline {
 
         m_init_config = config;
         m_runtime_config = runtime_config;
+
+        m_memory_registry->connect_to_v6d("/var/run/vineyard.sock");
 
 
         // create status_query server
@@ -100,7 +105,7 @@ namespace FlowRos2Pipeline {
         if(goal_handle->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
             //TODO: here
         } else {
-            RCLCPP_INFO(m_impl->logger, "Frame rejected");
+            RCLCPP_INFO(m_impl->logger, "[MasterNode] Frame rejected");
         }
     }
 

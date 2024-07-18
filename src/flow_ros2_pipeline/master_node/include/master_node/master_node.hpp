@@ -1,6 +1,5 @@
 #pragma once
 #include <memory>
-#include <rclcpp_action/types.hpp>
 #include <string>
 #include <map>
 #include <tuple>
@@ -8,6 +7,7 @@
 #include <rclcpp/client.hpp>
 #include <rclcpp/node.hpp>
 #include <rclcpp/service.hpp>
+#include <rclcpp_action/types.hpp>
 #include <rclcpp_action/client.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 

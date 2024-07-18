@@ -1,6 +1,6 @@
-int32 frame_num
+int64 frame_num
 string meaning
 string obj_id
 ---
 string flag
-int32 return_code
+int64 return_code

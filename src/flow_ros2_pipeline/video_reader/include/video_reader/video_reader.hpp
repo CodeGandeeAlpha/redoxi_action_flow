@@ -1,15 +1,20 @@
 #pragma once
 
-#include "psg_common/psg_common.hpp"
-// #include "rclcpp/rclcpp.hpp"
+#include <cstdint>
 #include <memory>
+#include <opencv2/opencv.hpp>
+
 #include <rclcpp/client.hpp>
 #include <rclcpp/node.hpp>
 #include <rclcpp/service.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
+
+#include <sensor_msgs/msg/image.hpp>
+#include <psg_common/psg_common.hpp>
 #include <psg_actions/action/send_frame.hpp>
 #include <psg_services/srv/status_query.hpp>
-#include <sensor_msgs/msg/image.hpp>
+
+#include <video_reader/video_reader_types.hpp>
 
 
 namespace FlowRos2Pipeline{
@@ -35,29 +40,8 @@ namespace FlowRos2Pipeline{
                 rclcpp_action::Client<DownstreamSendFrameAction>::SendGoalOptions send_frame_options;
             };
 
-            class InitConfig{
-            public:
-                virtual ~InitConfig(){}
-                // can be a file path or a camera index
-                // only one source can be specified
-                std::string source_file;
-                int source_camera_index = -1; //-1 means not using camera
-
-                //read frames as frames[start_frame_number:end_frame_number], like python
-                int start_frame_number = 0; // 0 means start from the beginning
-                int end_frame_number = -1;  // -1 means read all frames
-
-                void from_parameters(OpencvVideoReader* node);
-            };
-
-            class RuntimeConfig{
-            public:
-                virtual ~RuntimeConfig(){}
-                double frame_internal_ms = -1;
-                int image_width = -1;
-                int image_height = -1;
-                void from_parameters(OpencvVideoReader* node);
-            };
+            using InitConfig = OpencvVideoReaderInitConfig;
+            using RuntimeConfig = OpencvVideoReaderRuntimeConfig;
 
             const std::string TOPIC_IMAGE = "image";
 
@@ -71,34 +55,44 @@ namespace FlowRos2Pipeline{
             // initialize with configurations, must be called once before open()
             virtual int init(const std::shared_ptr<InitConfig>& config, const std::shared_ptr<RuntimeConfig>& runtime_config);
 
-            // you can set configuration before starting this node
+            // you can set configuration before open() or after close()
             virtual int update_init_config(const std::shared_ptr<InitConfig> & config);
             const std::shared_ptr<InitConfig>& get_init_config() const;
 
-            // modify runtime settings, must be called after open() or stop()
+            // modify runtime settings, must be called before start(), after stop() or close()
             virtual int update_runtime_config(const std::shared_ptr<RuntimeConfig> & config);
             const std::shared_ptr<RuntimeConfig>& get_runtime_config() const;
 
+            // can modify init config, runtime config
+
             // make the node ready to start, after calling this, you cannot modify init config
             virtual int open() override;
+
+            // can modify runtime config
 
             // call this after ready() and before you spin this node
             // after calling this, you cannot modify runtime config
             virtual int start() override;
 
+            // cannot modify any config, can call set_xxx() to modify relevant states
+
             // call this before you modify runtime config
             virtual int stop() override;
 
+            // can modify runtime config
+
             // call this before you want to modify init config
             virtual int close() override;
+
+            // can modify init config, runtime config
 
             // get the status code of this node
             virtual int get_status_code() const;
 
         protected:
-            void img_read();
+            void _step();
 
-            int _get_current_frame_number() const;
+            void status_query_callback(rclcpp::Client<DownstreamReadyQueryService>::SharedFuture future);
 
             void send_frame_goal_response_callback(const DownstreamSendFrameActionGoalHandle::SharedPtr & goal_handle);
             void send_frame_feedback_callback(DownstreamSendFrameActionGoalHandle::SharedPtr,
@@ -106,6 +100,9 @@ namespace FlowRos2Pipeline{
             void send_frame_result_callback(const DownstreamSendFrameActionGoalHandle::WrappedResult & result);
 
             void _declare_all_parameters();
+
+            // read next frame and return true if success
+            bool _read_frame(cv::Mat& frame);
 
             // member of downstreams
             std::map<std::string, std::shared_ptr<Downstream>> m_downstreams;
@@ -123,5 +120,9 @@ namespace FlowRos2Pipeline{
             // publish info for visualization
             bool m_publish_image = false;
             rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_topic_image;
+
+            // current frame number read by this reader
+            // -1 means not read any frame, starting from 0 regardless of the absolute frame number in cv::VideoCapture
+            int64_t m_frame_number = -1;
     };
 }

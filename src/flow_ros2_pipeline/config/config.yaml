@@ -7,6 +7,19 @@
 
 /video_reader:
   ros__parameters:
-    video_path: "/mnt/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.7.164-2023-06-18-17-00-00.mp4"
+    source_file: "/mnt/chengxiao/20240222-194919.mp4"
+    source_camera_index: -1
     start_frame_number: -1
     end_frame_number: -1
+    image_width: 1920
+    image_height: 1080
+    frame_internal_ms: 40.0
+    status_query_service: "status_query"
+    send_frame_action: "send_frame"
+
+/master_node:
+  ros__parameters:
+    downstream_action: "person_generator_node"
+    status_query_service: "status_query"
+    send_frame_action: "send_frame"
+    frame_internal_ms: 40.0

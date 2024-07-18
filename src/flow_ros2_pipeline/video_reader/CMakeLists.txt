@@ -29,6 +29,7 @@ install(DIRECTORY include/
 add_executable(${PROJECT_NAME}_node
   src/video_reader_node.cpp
   src/video_reader.cpp
+  src/video_reader_types.cpp
 )
 ament_target_dependencies(${PROJECT_NAME}_node
   rclcpp

@@ -1,7 +1,9 @@
-#include <rclcpp/rclcpp.hpp>
-#include "video_reader/video_reader.hpp"
 #include <memory>
+
+#include <rclcpp/rclcpp.hpp>
 #include <rclcpp/executors.hpp>
+
+#include <video_reader/video_reader.hpp>
 
 int main(int argc, char * argv[])
 {
