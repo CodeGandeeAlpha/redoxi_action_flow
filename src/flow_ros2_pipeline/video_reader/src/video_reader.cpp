@@ -182,6 +182,11 @@ namespace FlowRos2Pipeline{
 
         auto read_next_frame = [&](){
             auto success = _read_frame(frame);
+
+            // do we have limited reading frame rate?
+            if (m_runtime_config->frame_interval_ms > 0)
+                m_impl->ready_to_read_next_frame = false;
+
             if(!success || frame.empty()){
                 // end of video sequence
                 RCLCPP_INFO(logger,  "[OpencvVideoReader] end of video reached");
@@ -322,6 +327,10 @@ namespace FlowRos2Pipeline{
         // start frame timer
         if(m_runtime_config->frame_interval_ms > 0){
             // read frame every x ms
+            m_impl->ready_to_read_next_frame = true;    //allow reading next frame
+
+            // setup timer to flip the flag periodically
+            // the frame is read and processed in _step()
             auto t = (long)m_runtime_config->frame_interval_ms;
             auto func = [&](){m_impl->ready_to_read_next_frame = true;};
             auto frame_timer = this->create_wall_timer(std::chrono::milliseconds(t),func);
@@ -330,6 +339,10 @@ namespace FlowRos2Pipeline{
             m_impl->frame_timer = nullptr;
         }
 
+        RCLCPP_INFO(m_impl->logger,
+             "[OpencvVideoReader] m_status_code from %d to %d!",
+              m_status_code, NodeStatusCode::STARTED);
+
         m_status_code = NodeStatusCode::STARTED;
     }
 
@@ -337,6 +350,16 @@ namespace FlowRos2Pipeline{
         // only stoppable if the node is started
         ROS_ASSERT(m_status_code == NodeStatusCode::STARTED,
                 "[OpencvVideoReader] cannot stop because status code is not STARTED");
+
+        // stop frame timer
+        if(m_impl->frame_timer != nullptr){
+            m_impl->frame_timer->cancel();
+            m_impl->frame_timer = nullptr;
+        }
+
+        RCLCPP_INFO(m_impl->logger,
+             "[OpencvVideoReader] m_status_code from %d to %d!",
+              m_status_code, NodeStatusCode::STOPPED);
 
         m_status_code = NodeStatusCode::STOPPED;
         return ReturnCode::SUCCESS;
@@ -356,6 +379,10 @@ namespace FlowRos2Pipeline{
 
         // reset frame number
         m_frame_number = -1;
+
+        RCLCPP_INFO(m_impl->logger,
+             "[OpencvVideoReader] m_status_code from %d to %d!",
+              m_status_code, NodeStatusCode::CLOSED);
 
         m_status_code = NodeStatusCode::CLOSED;
         return ReturnCode::SUCCESS;
@@ -389,7 +416,10 @@ namespace FlowRos2Pipeline{
         // setup downstreams
         _connect_to_downstreams();
 
-        //TODO: log all state transitions for debugging
+        RCLCPP_INFO(m_impl->logger,
+             "[OpencvVideoReader] m_status_code from %d to %d!",
+              m_status_code, NodeStatusCode::INITIALIZED);
+
         m_status_code = NodeStatusCode::INITIALIZED;
 
         // start step timer
