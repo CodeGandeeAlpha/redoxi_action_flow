@@ -1,10 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <memory>
 #include <opencv2/opencv.hpp>
 
-#include <psg_public_msgs/msg/detail/frame__struct.hpp>
 #include <rclcpp/client.hpp>
 #include <rclcpp/node.hpp>
 #include <rclcpp/service.hpp>
@@ -43,6 +43,7 @@ namespace FlowRos2Pipeline{
             using InitConfig = OpencvVideoReaderInitConfig;
             using RuntimeConfig = OpencvVideoReaderRuntimeConfig;
             using MSG_Frame = psg_public_msgs::msg::Frame;
+            using MSG_IMG = sensor_msgs::msg::Image;
 
             inline static const std::string TOPIC_IMAGE = "image";
             inline static const int DEFAULT_IMAGE_TOPIC_QUEUE_LENGTH = 10;
@@ -115,6 +116,9 @@ namespace FlowRos2Pipeline{
 
             // read next frame and return true if success
             virtual bool _read_frame(cv::Mat& frame);
+
+            // publish frame msg for visualization
+            virtual void _publish_frame(const cv::Mat& frame);
 
         protected:
             // member of downstreams

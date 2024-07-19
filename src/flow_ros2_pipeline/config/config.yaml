@@ -15,11 +15,11 @@
     image_height: 1080
     frame_internal_ms: 40.0
     status_query_service: "status_query"
-    send_frame_action: "send_frame"
+    send_frame_action: "accept_frame"
 
 /master_node:
   ros__parameters:
     downstream_action: "person_generator_node"
     status_query_service: "status_query"
-    send_frame_action: "send_frame"
+    send_frame_action: "accept_frame"
     frame_internal_ms: 40.0

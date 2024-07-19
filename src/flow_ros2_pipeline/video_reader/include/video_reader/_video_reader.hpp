@@ -1,9 +1,12 @@
 #pragma once
 
+#include <memory>
 #include <opencv2/opencv.hpp>
 #include <rcl/time.h>
 #include <rclcpp/clock.hpp>
 #include <rclcpp/timer.hpp>
+#include <vector>
+#include <thread>
 
 #include "common/util/uuid.h"
 #include "vineyard/client/client.h"
@@ -14,9 +17,7 @@ namespace FlowRos2Pipeline {
     class OpencvVideoReaderImpl{
     public:
         virtual ~OpencvVideoReaderImpl(){}
-        OpencvVideoReaderImpl(OpencvVideoReader* node): logger(node->get_logger()){
-            ros_clock = rclcpp::Clock(RCL_ROS_TIME);
-        }
+        OpencvVideoReaderImpl(OpencvVideoReader* node): logger(node->get_logger()){}
         rclcpp::Logger logger;
         std::shared_ptr<vineyard::Client> v6d_client;
         std::shared_ptr<cv::VideoCapture> video_capture;
@@ -26,9 +27,9 @@ namespace FlowRos2Pipeline {
         cv::Mat src_frame;  // last read frame, avoid creating cv::Mat object every time
         cv::Mat resized_frame; // resized frame
 
-    private:
-        // the time we read the last frame
-        rclcpp::Clock ros_clock;
-        rclcpp::Time time_reading_last_frame;
+        // flags to convert async call to sync call
+        std::vector<bool> frame_sent_flags;
+        std::shared_ptr<std::thread> step_thread;
+        bool step_running = false;
     };
 }

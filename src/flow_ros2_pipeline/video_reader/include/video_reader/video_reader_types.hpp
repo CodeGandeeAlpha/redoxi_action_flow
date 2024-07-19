@@ -46,7 +46,7 @@ namespace FlowRos2Pipeline {
         int image_width = -1;
         int image_height = -1;
 
-        double timeout_ms_send_frame_to_downstream = 1000;
+        double timeout_ms_send_frame_to_downstream = 10000;
 
         // frame reading mode
         enum ReadFrameMode {

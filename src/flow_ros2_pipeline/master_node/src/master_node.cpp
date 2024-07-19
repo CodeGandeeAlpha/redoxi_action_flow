@@ -51,7 +51,7 @@ namespace FlowRos2Pipeline {
         std::string status_query_service = this->get_parameter("status_query_service").as_string();
         // m_srv_status_query = this->create_service<MSG_StatusQuery>(
         //     status_query_service, &MasterNode::status_query_callback);
-        m_srv_status_query = this->create_service<psg_services::srv::StatusQuery>(
+        m_srv_status_query = this->create_service<MSG_StatusQuery>(
             status_query_service, std::bind(&MasterNode::status_query_callback, this, std::placeholders::_1, std::placeholders::_2));
 
 
@@ -120,16 +120,17 @@ namespace FlowRos2Pipeline {
     }
 
 
-    void MasterNode::status_query_callback(const std::shared_ptr<psg_services::srv::StatusQuery::Request> request,
-            std::shared_ptr<psg_services::srv::StatusQuery::Response> response) {
+    void MasterNode::status_query_callback(const std::shared_ptr<MSG_StatusQuery::Request> request,
+            std::shared_ptr<MSG_StatusQuery::Response> response) {
         (void)request;  // not used
+        RCLCPP_INFO(m_impl->logger, "Received status query request");
         response->status = ReturnCode::SUCCESS;
     }
 
     rclcpp_action::GoalResponse MasterNode::accept_frame_goal_callback(
         const rclcpp_action::GoalUUID & uuid,
         std::shared_ptr<const ACT_AcceptFrame::Goal> goal) {
-        RCLCPP_INFO(m_impl->logger, "Received goal request with frame %d", goal->frame.frame_num);
+        RCLCPP_INFO(m_impl->logger, "Received goal request with frame %ld", goal->frame.frame_num);
         (void)uuid;  // not used
         return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
     }
@@ -197,6 +198,17 @@ namespace FlowRos2Pipeline {
             std::bind(&MasterNode::_step, this));
 
         m_status_code = NodeStatusCode::STARTED;
+
+        m_impl->step_running = true;
+        m_impl->step_thread = std::make_shared<std::thread>(
+            [this](){
+                while(rclcpp::ok() && m_impl->step_running){
+                    _step();
+                    std::this_thread::sleep_for(std::chrono::milliseconds((int)DefaultNodeStepIntervalMs));
+                }
+            }
+        );
+
         return ReturnCode::SUCCESS;
     }
 
@@ -206,12 +218,20 @@ namespace FlowRos2Pipeline {
             return ReturnCode::ERROR;
         }
 
-        if(m_impl->timer)
-            m_impl->timer->cancel();
-        else
-            throw std::runtime_error("timer is not initialized but stop() is called");
+        // if(m_impl->timer)
+        //     m_impl->timer->cancel();
+        // else
+        //     throw std::runtime_error("timer is not initialized but stop() is called");
 
         m_status_code = NodeStatusCode::STOPPED;
+
+        //terminate step thread
+        m_impl->step_running = false;
+        if(m_impl->step_thread){
+            m_impl->step_thread->join();
+            m_impl->step_thread = nullptr;
+        }
+
         return ReturnCode::SUCCESS;
     }
 

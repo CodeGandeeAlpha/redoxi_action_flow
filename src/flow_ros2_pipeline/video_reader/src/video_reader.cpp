@@ -1,11 +1,7 @@
-#include <cstdint>
 #include <cstring>
 #include <future>
-#include <memory>
 #include <chrono>
-#include <rclcpp_action/types.hpp>
-#include <string>
-#include <opencv2/core/mat.hpp>
+#include <sensor_msgs/msg/detail/image__struct.hpp>
 #include <vineyard/basic/ds/tensor.h>
 
 #include <rclcpp/create_client.hpp>
@@ -14,10 +10,7 @@
 #include <rclcpp/logging.hpp>
 #include <rclcpp/utilities.hpp>
 #include <rcpputils/asserts.hpp>
-
-#include <psg_common/psg_common.hpp>
-#include <psg_public_msgs/msg/detail/cache_data__struct.hpp>
-#include <psg_public_msgs/msg/detail/frame__struct.hpp>
+#include <rclcpp_action/types.hpp>
 
 #include <video_reader/video_reader.hpp>
 #include <video_reader/_video_reader.hpp>
@@ -25,8 +18,8 @@
 static constexpr auto ROS_ASSERT = rcpputils::assert_true;
 
 using namespace std::chrono_literals;
-using std::placeholders::_1;
-using std::placeholders::_2;
+// using std::placeholders::_1;
+// using std::placeholders::_2;
 using namespace vineyard;
 
 // static rclcpp::Logger& get_logger(rclcpp::Node* node)
@@ -52,11 +45,31 @@ namespace FlowRos2Pipeline{
         //If v6d id is sent to downstream, and timeout, the system is in inconsistent state,
         //should be terminated, because we do not know when to delete v6d data.
         bool any_downstream_accepted_frame = false;
+        m_impl->frame_sent_flags.clear();
         for(auto& it : m_downstreams)
         {
             auto goal_msg = DownstreamAcceptFrameAction::Goal();
             goal_msg.frame = frame_msg;
             auto& ds = it.second;
+
+            // m_impl->frame_sent_flags.push_back(false);
+            // int flag_index = m_impl->frame_sent_flags.size() - 1;
+
+            // using DownStreamGoalHandle = rclcpp_action::ClientGoalHandle<DownstreamAcceptFrameAction>::SharedPtr;
+            // decltype(ds->accept_frame_options) opt;
+            // auto callback = [this, flag_index](DownStreamGoalHandle handle) {
+            //     auto s = handle->get_status();
+            //     bool ok = false;
+
+            //     // downstream accepted?
+            //     ok |= s == rclcpp_action::GoalStatus::STATUS_ACCEPTED;
+            //     ok |= s == rclcpp_action::GoalStatus::STATUS_SUCCEEDED;
+            //     ok |= s == rclcpp_action::GoalStatus::STATUS_EXECUTING;
+
+            //     m_impl->frame_sent_flags[flag_index] = ok;
+            // };
+
+            // opt.goal_response_callback = callback;
             auto res = ds->accept_frame->async_send_goal(goal_msg, ds->accept_frame_options);
 
             auto t = (long)m_runtime_config->timeout_ms_send_frame_to_downstream;
@@ -82,8 +95,6 @@ namespace FlowRos2Pipeline{
         int width = frame.cols;
         int elem_size = frame.elemSize();
         // int ch = frame.channels();
-
-        // number of bytes in cvmat
 
         // 创建 TensorBuilder，并根据图像尺寸构建 Tensor
         TensorBuilder<uint8_t> builder(*m_impl->v6d_client, {height, width, elem_size});
@@ -143,6 +154,10 @@ namespace FlowRos2Pipeline{
     }
 
     bool OpencvVideoReader::_check_downstreams_ready(){
+        // check m_downstreams size first
+        if (m_downstreams.empty())
+            return false;
+
         //check if all downstreams can accept new frame
         for (auto it: m_downstreams) {
             auto& ds = it.second;
@@ -151,12 +166,19 @@ namespace FlowRos2Pipeline{
             auto timeout_ms = this->m_runtime_config->timeout_ms_send_frame_to_downstream;
             auto wait_status =
                 result.wait_for(std::chrono::milliseconds((long)timeout_ms));
-            if(wait_status == std::future_status::timeout)
+            if(wait_status == std::future_status::timeout) {
+                RCLCPP_INFO(m_impl->logger,  "[OpencvVideoReader] _check_downstreams_ready TIMEOUT");
                 return false;
-            else{
+            }
+            else if(wait_status == std::future_status::ready) {
+                RCLCPP_INFO(m_impl->logger,  "[OpencvVideoReader] _check_downstreams_ready READY");
                 auto response = result.get();
                 bool ok = response->status == ReturnCode::SUCCESS;
                 if(!ok) return false;
+            }
+            else {
+                RCLCPP_INFO(m_impl->logger,  "[OpencvVideoReader] _check_downstreams_ready DEFERRED");
+                return false;
             }
         }
         return true;
@@ -204,11 +226,13 @@ namespace FlowRos2Pipeline{
             if(!ok) return;
 
             downstream_ready = _check_downstreams_ready();
+            RCLCPP_INFO(logger,  "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
         }
         else if(m_runtime_config->read_frame_mode == RuntimeConfig::RFM_READ_IF_READY)
         {
             //query first, read frame only if all downstreams can accept new frame
             downstream_ready = _check_downstreams_ready();
+            RCLCPP_INFO(logger,  "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
 
             //some downstream can accept this frame, read it write it to v6d and send to all downstreams
             if(downstream_ready)
@@ -233,6 +257,9 @@ namespace FlowRos2Pipeline{
             }
             else
                 resized_frame = frame;
+
+            if (m_publish_image)
+                _publish_frame(resized_frame);
 
             //add frame to v6d
             auto v6d_id = _add_frame_to_shared_memory(resized_frame);
@@ -315,7 +342,20 @@ namespace FlowRos2Pipeline{
 
         RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] open SUCCESS!");
 
+        RCLCPP_INFO(m_impl->logger,
+             "[OpencvVideoReader] m_status_code from %d to %d!",
+              m_status_code, NodeStatusCode::OPENED);
         m_status_code = NodeStatusCode::OPENED;
+
+        // create step thread
+        m_impl->step_running = true;
+        m_impl->step_thread = std::make_shared<std::thread>([this](){
+            while(rclcpp::ok() && m_impl->step_running){
+                _step();
+                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+            }
+        });
+
         return ReturnCode::SUCCESS;
     }
 
@@ -344,6 +384,7 @@ namespace FlowRos2Pipeline{
               m_status_code, NodeStatusCode::STARTED);
 
         m_status_code = NodeStatusCode::STARTED;
+        return ReturnCode::SUCCESS;
     }
 
     int OpencvVideoReader::stop() {
@@ -385,6 +426,14 @@ namespace FlowRos2Pipeline{
               m_status_code, NodeStatusCode::CLOSED);
 
         m_status_code = NodeStatusCode::CLOSED;
+
+        //terminate step thread
+        m_impl->step_running = false;
+        if(m_impl->step_thread != nullptr){
+            m_impl->step_thread->join();
+            m_impl->step_thread = nullptr;
+        }
+
         return ReturnCode::SUCCESS;
     }
 
@@ -423,9 +472,9 @@ namespace FlowRos2Pipeline{
         m_status_code = NodeStatusCode::INITIALIZED;
 
         // start step timer
-        auto step_timer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(runtime_config->step_interval_ms)),
-                std::bind(&OpencvVideoReader::_step, this));
-        m_impl->step_timer = step_timer;
+        // auto step_timer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(runtime_config->step_interval_ms)),
+        //         std::bind(&OpencvVideoReader::_step, this));
+        // m_impl->step_timer = step_timer;
 
         return ReturnCode::SUCCESS;
     }
@@ -442,6 +491,10 @@ namespace FlowRos2Pipeline{
                 std::string name = it.second.status_query_service;
                 auto client = this->create_client<DownstreamReadyQueryService>(name);
                 ds->get_status = client;
+                // wait until the service server is ready
+                RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] waiting for service server %s", name.c_str());
+                client->wait_for_service();
+                RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] service server %s is ready", name.c_str());
             }
 
             // 创建accept_frame_client
@@ -484,9 +537,23 @@ namespace FlowRos2Pipeline{
         this->declare_parameter<std::string>("send_frame_action", "");
     }
 
-    void OpencvVideoReader::_create_image_topic(){
+    void OpencvVideoReader::_create_image_topic() {
         auto topic_name = get_image_topic_name();
-        m_topic_image = this->create_publisher<sensor_msgs::msg::Image>(topic_name, DEFAULT_IMAGE_TOPIC_QUEUE_LENGTH);
+        m_topic_image = this->create_publisher<MSG_IMG>(topic_name, DEFAULT_IMAGE_TOPIC_QUEUE_LENGTH);
+    }
+
+    void OpencvVideoReader::_publish_frame(const cv::Mat& frame) {
+        MSG_IMG img_msg;
+        // create sensor_msgs::msg::Image from cv::Mat
+        img_msg.header.stamp = this->now();
+        img_msg.header.frame_id = "camera";
+        img_msg.height = frame.rows;
+        img_msg.width = frame.cols;
+        img_msg.encoding = "bgr8";
+        img_msg.is_bigendian = false;
+        img_msg.step = frame.cols * frame.elemSize();
+        img_msg.data = std::vector<uint8_t>(frame.data, frame.data + frame.rows * frame.cols * frame.elemSize());
+        m_topic_image->publish(img_msg);
     }
 }
 #endif
