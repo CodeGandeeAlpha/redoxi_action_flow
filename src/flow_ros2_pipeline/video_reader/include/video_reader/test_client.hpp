@@ -24,6 +24,8 @@ namespace FlowRos2Pipeline{
     protected:
         rclcpp_action::Client<psg_actions::action::ProcessPsgDocument>::SharedPtr m_client;
         rclcpp::TimerBase::SharedPtr m_step_timer;
+        rclcpp::Clock m_clock;
+        std::shared_ptr<std::thread> m_step_thread;
     };
 
 }

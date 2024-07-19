@@ -1,5 +1,6 @@
 #include <psg_actions/action/process_psg_document.hpp>
 #include <rclcpp/client.hpp>
+#include <rclcpp/clock.hpp>
 #include <rclcpp/node.hpp>
 #include <rclcpp/service.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
@@ -22,6 +23,7 @@ namespace FlowRos2Pipeline{
 
     protected:
         rclcpp_action::Server<psg_actions::action::ProcessPsgDocument>::SharedPtr m_server;
+        rclcpp::Clock m_clock;
     };
 
 }

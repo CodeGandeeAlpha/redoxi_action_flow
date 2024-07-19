@@ -117,6 +117,7 @@ namespace FlowRos2Pipeline {
     void MasterNode::process_document_result_callback(
         const rclcpp_action::ClientGoalHandle<MasterNode::DownstreamFunctions::DocumentAction>::WrappedResult & result) {
         (void)result;
+
     }
 
 
@@ -145,14 +146,20 @@ namespace FlowRos2Pipeline {
     void MasterNode::accept_frame_accepted_callback(
         const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptFrame>> goal_handle) {
 
+        const auto& goal = goal_handle->get_goal();
+
         //cache the frame
-        const auto& frame = goal_handle->get_goal()->frame;
+        const auto& frame = goal->frame;
 
         //add to memory registry
         _add_frame_to_buffer(frame);
 
         //create tasks for all downstreams
         process_document_create_tasks(frame);
+
+
+        auto result = std::make_shared<ACT_AcceptFrame::Result>();
+        goal_handle->succeed(result);
     }
 
     void MasterNode::_add_frame_to_buffer(const MSG_Frame& frame) {
