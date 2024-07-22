@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(psg_common)
+project(example)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -9,10 +9,53 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
-find_package(vineyard REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(psg_actions REQUIRED)
+find_package(psg_services REQUIRED)
+find_package(psg_common REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(rclcpp_action)
+
+include_directories(include)
+
+install(DIRECTORY include/
+  DESTINATION include)
+
+add_executable(test_client
+  src/test_client.cpp
+)
+add_executable(test_server
+  src/test_server.cpp
+)
+
+
+ament_target_dependencies(test_client
+  rclcpp
+  rclcpp_action
+  rclpy
+  std_msgs
+  psg_actions
+  psg_services
+  psg_common
+  sensor_msgs
+)
+
+ament_target_dependencies(test_server
+  rclcpp
+  rclcpp_action
+  rclpy
+  std_msgs
+  psg_actions
+  psg_services
+  psg_common
+  sensor_msgs
+)
+
+
+install(TARGETS test_client test_server
+  DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -25,30 +68,5 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
-
-add_library(${PROJECT_NAME}
-  src/psg_common.cpp
-)
-target_include_directories(${PROJECT_NAME} PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-  ${VINEYARD_INCLUDE_DIRS}
-  )
-
-target_link_libraries(${PROJECT_NAME} ${VINEYARD_LIBRARIES})
-
-ament_python_install_package(${PROJECT_NAME})
-
-install(DIRECTORY include/
-  DESTINATION include)
-
-install(TARGETS ${PROJECT_NAME}
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-)
-
-ament_export_include_directories(include)
-ament_export_libraries(${PROJECT_NAME})
-ament_export_dependencies(rclcpp vineyard)
 
 ament_package()

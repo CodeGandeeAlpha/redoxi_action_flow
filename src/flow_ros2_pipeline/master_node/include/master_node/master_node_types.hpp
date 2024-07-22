@@ -1,18 +1,27 @@
 #pragma once
+#include <map>
 #include <string>
 
 #include <psg_private_msgs/msg/psg_document.hpp>
-#include <psg_actions/action/process_psg_document.hpp>
 
 
 namespace FlowRos2Pipeline {
     class MasterNode;
+
+    class MasterNodeDownstreamNode{
+    public:
+        virtual ~MasterNodeDownstreamNode(){}
+        std::string accept_document_action;
+    };
+
     class MasterNodeInitConfig {
     public:
         virtual ~MasterNodeInitConfig(){}
 
         //FIXME: support multiple downstreams
         std::string downstream_action_name;
+        using DownstreamNode = MasterNodeDownstreamNode;
+        std::map<std::string, DownstreamNode> downstreams;
 
         void from_parameters(MasterNode* node);
     };

@@ -1,17 +1,18 @@
-#include "master_node/memory_registry.hpp"
-#include "psg_common/psg_common.hpp"
 #include <functional>
 #include <memory>
 #include <chrono>
 #include <set>
-#include <rclcpp_action/create_client.hpp>
-
-#include <rclcpp/rclcpp.hpp>
-#include <master_node/master_node.hpp>
-#include <rclcpp_action/create_server.hpp>
 #include <stdexcept>
+
+#include <rclcpp_action/create_client.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp_action/create_server.hpp>
+#include <rcpputils/asserts.hpp>
+
+#include <master_node/master_node.hpp>
 #include <master_node/_master_node.hpp>
 
+static constexpr auto ROS_ASSERT = rcpputils::assert_true;
 
 #define COMPILE_MASTER_NODE
 #ifdef COMPILE_MASTER_NODE
@@ -34,18 +35,53 @@ namespace FlowRos2Pipeline {
         this->declare_parameter<double>("frame_internal_ms", -1);
     }
 
+    void MasterNode::_connect_to_downstreams(){
+        ROS_ASSERT(m_init_config != nullptr, "[MasterNode] m_init_config is nullptr");
+
+        m_downstreams.clear();
+        for(auto it: m_init_config->downstreams){
+            auto ds = std::make_shared<Downstream>();
+            RCLCPP_INFO(m_impl->logger, "[MasterNode] connecting to downstream %s", it.first.c_str());
+
+            // 创建accept_frame_client
+            {
+                std::string name = it.second.accept_document_action;
+                auto client = rclcpp_action::create_client<DownstreamAcceptDocumentAction>(this, name);
+
+                ds->handler = client;
+                ds->options.goal_response_callback =
+                        std::bind(&MasterNode::process_document_goal_response_callback, this, std::placeholders::_1);
+                ds->options.feedback_callback =
+                        std::bind(&MasterNode::process_document_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
+                ds->options.result_callback =
+                        std::bind(&MasterNode::process_document_result_callback, this, std::placeholders::_1);
+
+                // wait until the action server is ready
+                RCLCPP_INFO(m_impl->logger, "[MasterNode] waiting for action server %s", name.c_str());
+                client->wait_for_action_server();
+                RCLCPP_INFO(m_impl->logger, "[MasterNode] action server %s is ready", name.c_str());
+            }
+
+            m_downstreams[it.first] = ds;
+        }
+    }
+
     int MasterNode::init(const std::shared_ptr<InitConfig>& config,
                             const std::shared_ptr<RuntimeConfig>& runtime_config) {
         if (m_status_code != NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::CLOSED) {
             RCLCPP_ERROR(m_impl->logger, "[MasterNode] init FAILED! status code is not BEFORE_INIT or CLOSED");
             return ReturnCode::ERROR;
         }
+        ROS_ASSERT(m_status_code == NodeStatusCode::BEFORE_INIT,
+            "[MasterNode] init FAILED! status code is not BEFORE_INIT");
 
         m_init_config = config;
         m_runtime_config = runtime_config;
 
         m_memory_registry->connect_to_v6d("/var/run/vineyard.sock");
 
+        // setup downstreams
+        _connect_to_downstreams();
 
         // create status_query server
         std::string status_query_service = this->get_parameter("status_query_service").as_string();
@@ -63,17 +99,9 @@ namespace FlowRos2Pipeline {
             std::bind(&MasterNode::accept_frame_cancel_callback, this, std::placeholders::_1),
             std::bind(&MasterNode::accept_frame_accepted_callback, this, std::placeholders::_1));
 
-        // create downstream action client
-        m_ds_psgdocument["downstream_action"] = std::make_shared<DS_PSGDocument>();
-        m_ds_psgdocument["downstream_action"]->handler =
-                rclcpp_action::create_client<DownstreamFunctions::DocumentAction>(this, m_init_config->downstream_action_name);
-        m_ds_psgdocument["downstream_action"]->options.goal_response_callback =
-                std::bind(&MasterNode::process_document_goal_response_callback, this, std::placeholders::_1);
-        m_ds_psgdocument["downstream_action"]->options.feedback_callback =
-                std::bind(&MasterNode::process_document_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
-        m_ds_psgdocument["downstream_action"]->options.result_callback =
-                std::bind(&MasterNode::process_document_result_callback, this, std::placeholders::_1);
-
+        RCLCPP_INFO(m_impl->logger,
+             "[MasterNode] m_status_code from %d to %d!",
+              m_status_code, NodeStatusCode::INITIALIZED);
         m_status_code = NodeStatusCode::INITIALIZED;
         return ReturnCode::SUCCESS;
     }
@@ -101,7 +129,7 @@ namespace FlowRos2Pipeline {
     }
 
     void MasterNode::process_document_goal_response_callback(
-            const rclcpp_action::ClientGoalHandle<MasterNode::DownstreamFunctions::DocumentAction>::SharedPtr & goal_handle) {
+            const rclcpp_action::ClientGoalHandle<MasterNode::DownstreamAcceptDocumentAction>::SharedPtr & goal_handle) {
         if(goal_handle->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
             //TODO: here
         } else {
@@ -109,13 +137,13 @@ namespace FlowRos2Pipeline {
         }
     }
 
-    void MasterNode::process_document_feedback_callback(rclcpp_action::ClientGoalHandle<MasterNode::DownstreamFunctions::DocumentAction>::SharedPtr,
-        const std::shared_ptr<const MasterNode::DownstreamFunctions::DocumentAction::Feedback> feedback) {
+    void MasterNode::process_document_feedback_callback(rclcpp_action::ClientGoalHandle<MasterNode::DownstreamAcceptDocumentAction>::SharedPtr,
+        const std::shared_ptr<const MasterNode::DownstreamAcceptDocumentAction::Feedback> feedback) {
         (void)feedback;
     }
 
     void MasterNode::process_document_result_callback(
-        const rclcpp_action::ClientGoalHandle<MasterNode::DownstreamFunctions::DocumentAction>::WrappedResult & result) {
+        const rclcpp_action::ClientGoalHandle<MasterNode::DownstreamAcceptDocumentAction>::WrappedResult & result) {
         (void)result;
 
     }
@@ -187,7 +215,7 @@ namespace FlowRos2Pipeline {
 
     void MasterNode::process_document_create_tasks(const MSG_Frame& frame){
         //create tasks of this frame for all downstreams
-        for(auto& x : m_ds_psgdocument) {
+        for(auto& x : m_downstreams) {
             auto task = std::make_shared<DSTask_PSGDocument>();
             task->downstream = x.second;
             task->frame = frame;
@@ -202,9 +230,9 @@ namespace FlowRos2Pipeline {
         }
 
         //start timer
-        m_impl->timer = this->create_wall_timer(
-            std::chrono::milliseconds((int)m_runtime_config->frame_internal_ms),
-            std::bind(&MasterNode::_step, this));
+        // m_impl->timer = this->create_wall_timer(
+        //     std::chrono::milliseconds((int)m_runtime_config->frame_internal_ms),
+        //     std::bind(&MasterNode::_step, this));
 
         m_status_code = NodeStatusCode::STARTED;
 
@@ -252,11 +280,12 @@ namespace FlowRos2Pipeline {
 
             for(auto& it : m_psgdoc_task_waiting){
                 auto& task = it.second;
-                DownstreamFunctions::DocumentAction::Goal goal;
+                DownstreamAcceptDocumentAction::Goal goal;
                 goal.document.frame = task->frame;
                 auto ds = task->downstream;
                 auto handle = task->downstream->handler->async_send_goal(goal, ds->options);
 
+                // FIXME: add timeout condition
                 auto task_response = handle.get();
                 if(task_response != nullptr){
                     // accepted?

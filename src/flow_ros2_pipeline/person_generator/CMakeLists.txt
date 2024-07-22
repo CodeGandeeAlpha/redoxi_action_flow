@@ -1,18 +1,40 @@
 cmake_minimum_required(VERSION 3.8)
-project(psg_common)
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+project(person_generator)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(rclpy REQUIRED)
-find_package(vineyard REQUIRED)
+find_package(rclcpp_action REQUIRED)
+find_package(psg_common REQUIRED)
+find_package(psg_actions REQUIRED)
+find_package(psg_private_msgs REQUIRED)
+find_package(psg_public_msgs REQUIRED)
+find_package(pg_for_ros2 REQUIRED)
+
+include_directories(include)
+
+add_executable(${PROJECT_NAME}_node src/person_generator_node.cpp src/person_generator.cpp)
+
+ament_target_dependencies(${PROJECT_NAME}_node
+  rclcpp
+  rclcpp_action
+  psg_common
+  psg_actions
+  psg_private_msgs
+  psg_public_msgs
+  pg_for_ros2
+)
+
+install(DIRECTORY include/
+  DESTINATION include)
+install(TARGETS ${PROJECT_NAME}_node
+  DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -25,30 +47,5 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
-
-add_library(${PROJECT_NAME}
-  src/psg_common.cpp
-)
-target_include_directories(${PROJECT_NAME} PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-  ${VINEYARD_INCLUDE_DIRS}
-  )
-
-target_link_libraries(${PROJECT_NAME} ${VINEYARD_LIBRARIES})
-
-ament_python_install_package(${PROJECT_NAME})
-
-install(DIRECTORY include/
-  DESTINATION include)
-
-install(TARGETS ${PROJECT_NAME}
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-)
-
-ament_export_include_directories(include)
-ament_export_libraries(${PROJECT_NAME})
-ament_export_dependencies(rclcpp vineyard)
 
 ament_package()

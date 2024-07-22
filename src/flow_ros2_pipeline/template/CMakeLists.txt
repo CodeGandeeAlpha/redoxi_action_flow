@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(psg_common)
+project(template)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -26,26 +26,26 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-add_library(${PROJECT_NAME}
-  src/psg_common.cpp
-)
-target_include_directories(${PROJECT_NAME} PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-  ${VINEYARD_INCLUDE_DIRS}
-  )
+# add_library(${PROJECT_NAME}
+#   src/psg_common.cpp
+# )
+# target_include_directories(${PROJECT_NAME} PUBLIC
+#   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+#   $<INSTALL_INTERFACE:include>
+#   ${VINEYARD_INCLUDE_DIRS}
+#   )
 
-target_link_libraries(${PROJECT_NAME} ${VINEYARD_LIBRARIES})
+# target_link_libraries(${PROJECT_NAME} ${VINEYARD_LIBRARIES})
 
 ament_python_install_package(${PROJECT_NAME})
 
-install(DIRECTORY include/
-  DESTINATION include)
+# install(DIRECTORY include/
+#   DESTINATION include)
 
-install(TARGETS ${PROJECT_NAME}
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-)
+# install(TARGETS ${PROJECT_NAME}
+#   ARCHIVE DESTINATION lib
+#   LIBRARY DESTINATION lib
+# )
 
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})

@@ -452,7 +452,7 @@ namespace FlowRos2Pipeline{
         //     return ReturnCode::ERROR;
         // }
         ROS_ASSERT(m_status_code == NodeStatusCode::BEFORE_INIT,
-                "[OpencvVideoReader] cannot init");
+                "[OpencvVideoReader] init FAILED! status code is not BEFORE_INIT");
         m_init_config = config;
         m_runtime_config = runtime_config;
 
