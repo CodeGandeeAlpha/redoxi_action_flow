@@ -154,8 +154,10 @@ namespace FlowRos2Pipeline {
         //add to memory registry
         _add_frame_to_buffer(frame);
 
+        RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and add it to buffer", frame.cache.id_int);
+
         //create tasks for all downstreams
-        process_document_create_tasks(frame);
+        // process_document_create_tasks(frame);
 
 
         auto result = std::make_shared<ACT_AcceptFrame::Result>();
