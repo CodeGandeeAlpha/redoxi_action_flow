@@ -297,6 +297,10 @@ namespace FlowRos2Pipeline {
                         tasks_to_remove.push_back(it.first);
                     }
                 }
+                else {
+                    // rejected
+                    task->status = DSTask_PSGDocument::TASK_FAILED;
+                }
 
                 //FIXME: what if failed to send many times?
                 //you need to terminate a frame, remove it from memory registry

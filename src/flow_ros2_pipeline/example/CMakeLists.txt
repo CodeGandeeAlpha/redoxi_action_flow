@@ -9,6 +9,7 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -16,7 +17,7 @@ find_package(psg_actions REQUIRED)
 find_package(psg_services REQUIRED)
 find_package(psg_common REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(rclcpp_action)
+find_package(rclcpp_action REQUIRED)
 
 include_directories(include)
 
@@ -51,6 +52,15 @@ ament_target_dependencies(test_server
   psg_services
   psg_common
   sensor_msgs
+)
+
+ament_python_install_package(${PROJECT_NAME})
+
+# Install Python executables
+install(PROGRAMS
+  ${PROJECT_NAME}/test_py_client.py
+  ${PROJECT_NAME}/test_py_server.py
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 
