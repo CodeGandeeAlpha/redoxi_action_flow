@@ -10,7 +10,7 @@ from unique_identifier_msgs.msg import UUID
 
 from psg_actions.action import ProcessDetections, ProcessFrame
 from psg_public_msgs.msg import Frame
-from psg_public_msgs.msg import Detections
+from psg_public_msgs.msg import Detections, Detection
 from psg_common.psg_common.interfaces import IOpenCloseProtocol
 from psg_common.psg_common.constants import NodeStatusCode, ReturnCode
 from psg_common.psg_common.utilities import create_v6d_client
@@ -260,8 +260,38 @@ class ModelServer(Node, IOpenCloseProtocol):
 
 
     def _to_detections_msg(self, result):
-        # TODO: convert result to Detections message
-        return Detections()
+        """
+        {
+            'predictions' : [
+                # Each instance corresponds to an input image
+                {
+                'labels': [...],  # int list of length (N, )
+                'scores': [...],  # float list of length (N, )
+                'bboxes': [...],  # 2d list of shape (N, 4), format: [min_x, min_y, max_x, max_y]
+                },
+                ...
+            ],
+            'visualization' : [
+                array(..., dtype=uint8),
+            ]
+        }
+        """
+        detections = Detections()
+
+        for predictions in result['predictions']:
+            for label, score, bbox in zip(predictions['labels'], predictions['scores'], predictions['bboxes']):
+                detection_msg = Detection()
+                detection_msg.category = int(label)
+                detection_msg.confidence = score
+                detection_msg.bbox.x = bbox[0]
+                detection_msg.bbox.y = bbox[1]
+                detection_msg.bbox.width = bbox[2] - bbox[0]
+                detection_msg.bbox.height = bbox[3] - bbox[1]
+                detection_msg.is_detected_by_camera = True
+
+                detections.detections.append(detection_msg)
+
+        return detections
 
 
     def _accept_frame_accepted_callback(self, goal_handle):
