@@ -7,8 +7,9 @@ import rclpy
 from rclpy.action import ActionServer, ActionClient
 from rclpy.node import Node
 
-from psg_actions.action import ProcessDetections
+from psg_actions.action import ProcessDetections, ProcessFrame
 from psg_public_msgs.msg import Frame
+from unique_identifier_msgs.msg import UUID
 from psg_common.psg_common.interfaces import IOpenCloseProtocol
 from psg_common.psg_common.constants import NodeStatusCode, ReturnCode
 from psg_common.psg_common.utilities import create_v6d_client
@@ -44,14 +45,14 @@ class ModelServer(Node, IOpenCloseProtocol):
         self.m_init_config : self.InitConfig = None
         self.m_runtime_config : self.RuntimeConfig = None
         self.m_actions : dict = {}
-        self.m_action : ActionServer = {}
+        self.m_action : ActionServer = None
         self.m_downstreams : dict = {}
         self.m_logger = self.get_logger()
         # self.ready_to_infer_next_frame : bool = True
         # self.frame_timer = None
         self.m_feed_back_call : bool = False
 
-        self.m_frame_buffer : SortedDict[int, Frame] = {} # key: frame_num, value: frame_msg
+        self.m_frame_buffer : SortedDict[int, (Frame, UUID)] = {} # key: frame_num, value: (frame_msg, detections_uuid)
 
     def update_init_config(self, init_config: InitConfig) -> int:
         assert self.m_status_code == NodeStatusCode.INITIALIZED or \
@@ -141,18 +142,6 @@ class ModelServer(Node, IOpenCloseProtocol):
         # the node must be opened
         assert self.m_status_code == NodeStatusCode.OPENED, "[ModelPy] cannot start because status code is not OPENED"
 
-        # # read frame every x ms
-        # self.ready_to_infer_next_frame = True    # allow infer next frame
-        # if self.runtime_config.frame_interval_ms > 0:
-        #     # setup timer to flip the flag periodically
-        #     # the frame is read and processed in _step()
-        #     t = self.m_runtime_config.frame_interval_ms
-        #     def func():
-        #         self.ready_to_infer_next_frame = True
-        #     self.frame_timer = self.create_timer(t / 1000., func)  # second
-        # else:
-        #     self.frame_timer = None
-
         # create step thread
         self.step_running = True
 
@@ -160,7 +149,7 @@ class ModelServer(Node, IOpenCloseProtocol):
             while rclpy.ok() and self.step_running:
                 self._step()
                 if self.m_runtime_config.step_interval_ms > 0:
-                    time.sleep(self.m_runtime_config.step_interval_ms)
+                    time.sleep(self.m_runtime_config.step_interval_ms / 1000.)
 
         self.step_thread = threading.Thread(target=func)
         self.step_thread.start()
@@ -219,14 +208,14 @@ class ModelServer(Node, IOpenCloseProtocol):
             # 创建accept_frame_client
             name = us_node.action_name
 
-            client = ActionServer(self, ProcessDetections, name, self._accept_frame_accepted_callback)
+            client = ActionClient(self, ProcessDetections, name, self._accept_frame_accepted_callback)
 
             self.m_actions[us_name] = client
 
 
     def _create_action_server(self):
         assert self.m_init_config is not None, "[ModelPy] m_init_config is None"
-        self.m_action = ActionServer(self, ProcessDetections, self.m_init_config.upstream_action_name, self._accept_frame_accepted_callback)
+        self.m_action = ActionServer(self, ProcessFrame, self.m_init_config.upstream_action_name, self._accept_frame_accepted_callback)
 
 
     def _connect_to_downstreams(self):
@@ -251,8 +240,8 @@ class ModelServer(Node, IOpenCloseProtocol):
             pass
 
 
-    def _add_frame_to_buffer(self, frame_msg):
-        self.m_frame_buffer[frame_msg.frame_num] = frame_msg
+    def _add_frame_to_buffer(self, frame_msg, uuid):
+        self.m_frame_buffer[frame_msg.frame_num] = (frame_msg, uuid)
         # m_memory_registry->add_entry(frame_number, frame_msg);
         pass
 
@@ -280,15 +269,16 @@ class ModelServer(Node, IOpenCloseProtocol):
         # just accept the frame and add it to buffer, no processing
 
         frame = goal_handle.request.frame
+        uuid = goal_handle.request.detections_uuid
 
         # add to frame buffer
-        self._add_frame_to_buffer(frame)
+        self._add_frame_to_buffer(frame, uuid)
 
         self.m_logger.info("Accepted frame %ld and add it to buffer", frame.cache.id_int)
 
         goal_handle.succeed()
 
-        result = ProcessDetections.Result()
+        result = ProcessFrame.Result()
         result.return_msg = "Accepted frame"
         result.return_code = ReturnCode.SUCCESS
         return result
@@ -299,8 +289,6 @@ class ModelServer(Node, IOpenCloseProtocol):
         self.m_feed_back_call = True
 
     def _send_goal(self, goal_msg):
-        self.get_logger().info(f"当前_step线程ID: {threading.get_ident()}")
-
         self.m_action.wait_for_server()
 
         self._send_goal_future = self.m_action.send_goal_async(goal_msg,
@@ -338,14 +326,9 @@ class ModelServer(Node, IOpenCloseProtocol):
             # nothing to do if not started
             return
 
-        # # time to infer next frame?
-        # if not self.ready_to_infer_next_frame:
-        #     # not yet ready to read next frame
-        #     return
-
         if self.m_frame_buffer:
             # get the first frame in the buffer dict
-            frame_num, frame_msg = self.m_frame_buffer.popitem()
+            frame_num, (frame_msg, uuid) = self.m_frame_buffer.popitem()
             # get the image from Vineyard
             img = self._get_frame_from_v6d(frame_msg)
 
@@ -354,26 +337,30 @@ class ModelServer(Node, IOpenCloseProtocol):
 
             # send the result to downstreams
             goal_msg = ProcessDetections.Goal()
-            goal_msg.document.frame = frame_msg
-            self._send_goal(result)
+            goal_msg.detections = result
+            goal_msg.detections.uuid = uuid
+            self.get_logger().info(f'sending detections uuid: {uuid}')
+            self._send_goal(goal_msg)
+            self.get_logger().info(f'sent detections uuid: {uuid}')
 
+        else:
+            self.get_logger().info('No frame in buffer')
 
-
-
-
-
-    def execute_callback(self, goal_handle):
-        self.m_logger.info('Executing goal...')
-        result = ProcessDetections.Result()
-        return result
 
 
 def main(args=None):
     rclpy.init(args=args)
 
-    fibonacci_action_server = ModelServer()
+    model_action_server = ModelServer()
 
-    rclpy.spin(fibonacci_action_server)
+    init_config = ModelServer.InitConfig()
+    runtime_config = ModelServer.RuntimeConfig()
+    model_action_server.init(init_config, runtime_config)
+
+    model_action_server.open()
+    model_action_server.start()
+
+    rclpy.spin(model_action_server)
 
 
 if __name__ == '__main__':
