@@ -21,6 +21,7 @@ class ModelServer(Node, IOpenCloseProtocol):
         def __init__(self):
             step_interval_ms : int = -1
             frame_interval_ms : int = -1
+            pred_score_thr : float = 0.3
 
     class InitConfig:
         def __init__(self):
@@ -276,10 +277,19 @@ class ModelServer(Node, IOpenCloseProtocol):
             ]
         }
         """
+        # jugde if the prediction score threshold is set to be valid
+        if self.m_runtime_config.pred_score_thr < 0 or self.m_runtime_config.pred_score_thr > 1:
+            self.get_logger().warn("Invalid prediction score threshold: %f, we set it to 0", self.m_runtime_config.pred_score_thr)
+            pred_score_thr = 0
+        else:
+            pred_score_thr = self.m_runtime_config.pred_score_thr
+
         detections = Detections()
 
         for predictions in result['predictions']:
             for label, score, bbox in zip(predictions['labels'], predictions['scores'], predictions['bboxes']):
+                if score < pred_score_thr:
+                    continue
                 detection_msg = Detection()
                 detection_msg.category = int(label)
                 detection_msg.confidence = score
