@@ -19,26 +19,26 @@ class ModelServer(Node, IOpenCloseProtocol):
 
     class RuntimeConfig:
         def __init__(self):
-            step_interval_ms : int = -1
-            frame_interval_ms : int = -1
-            pred_score_thr : float = 0.3
+            self.step_interval_ms : int = -1
+            self.frame_interval_ms : int = -1
+            self.pred_score_thr : float = 0.3
 
     class InitConfig:
         def __init__(self):
-            model = None
-            downstream_action_name : str = ''
-            downstreams : dict = {}
-            upstream_action_name : str = ''
-            # upstreams : dict = {}
+            self.model = None
+            self.downstream_action_name : str = ''
+            self.downstreams : dict = {}
+            self.upstream_action_name : str = ''
+            # self.upstreams : dict = {}
 
     class Downstream:
         def __init__(self):
-            handler: ActionClient = None
+            self.handler: ActionClient = None
 
     class ModelDownstreamNode:
         def __init__(self):
-            action_name: str = ''
-            service_name: str = ''
+            self.action_name: str = ''
+            self.service_name: str = ''
 
 
     def __init__(self):
