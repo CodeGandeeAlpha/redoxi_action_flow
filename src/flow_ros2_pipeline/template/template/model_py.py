@@ -9,6 +9,7 @@ from rclpy.node import Node
 
 from psg_actions.action import ProcessDetections, ProcessFrame
 from psg_public_msgs.msg import Frame
+from psg_public_msgs.msg import Detections
 from unique_identifier_msgs.msg import UUID
 from psg_common.psg_common.interfaces import IOpenCloseProtocol
 from psg_common.psg_common.constants import NodeStatusCode, ReturnCode
@@ -112,13 +113,6 @@ class ModelServer(Node, IOpenCloseProtocol):
         self.m_logger.info('Initialized')
 
 
-    def _model_init(self):
-        pass
-
-    def _model_infer(self, img):
-        pass
-
-
     def open(self) -> int:
         # check status
         # you can open only if the node is initialized or closed
@@ -127,7 +121,7 @@ class ModelServer(Node, IOpenCloseProtocol):
         assert self.m_v6d_client is not None, "[ModelPy] v6d_client is nullptr"
 
         # TODO:model init
-        self.model = self._model_init()
+        self.model.init()
 
         self.m_logger.info('[ModelPy] model init SUCCESS!')
 
@@ -265,6 +259,11 @@ class ModelServer(Node, IOpenCloseProtocol):
         return image
 
 
+    def _to_detections_msg(self, result):
+        # TODO: convert result to Detections message
+        return Detections()
+
+
     def _accept_frame_accepted_callback(self, goal_handle):
         # just accept the frame and add it to buffer, no processing
 
@@ -333,11 +332,11 @@ class ModelServer(Node, IOpenCloseProtocol):
             img = self._get_frame_from_v6d(frame_msg)
 
             # process the image
-            result = self._model_infer(img)
+            result = self.model.infer(img)
 
             # send the result to downstreams
             goal_msg = ProcessDetections.Goal()
-            goal_msg.detections = result
+            goal_msg.detections = self._to_detections_msg(result)
             goal_msg.detections.uuid = uuid
             self.get_logger().info(f'sending detections uuid: {uuid}')
             self._send_goal(goal_msg)
