@@ -1,4 +1,5 @@
 # empty message: category = -1
+unique_identifier_msgs/UUID uuid
 int64 category
 float64 confidence
 Box2 bbox

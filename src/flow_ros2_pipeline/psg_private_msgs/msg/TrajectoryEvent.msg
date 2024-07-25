@@ -1,4 +1,5 @@
 # see PassengerFlow/include/PassengerFlow/Scene/EventZoneData.h for detail
+unique_identifier_msgs/UUID uuid
 int64 event_type
 string event_zone_name
 float32 start_time

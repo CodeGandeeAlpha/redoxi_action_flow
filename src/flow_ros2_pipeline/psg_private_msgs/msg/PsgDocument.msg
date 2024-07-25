@@ -1,3 +1,4 @@
+unique_identifier_msgs/UUID uuid
 std_msgs/Header header
 Persons persons
 PersonTrajectories trajectories

@@ -1,3 +1,4 @@
+unique_identifier_msgs/UUID uuid
 psg_public_msgs/Detection head
 psg_public_msgs/Detection body
 psg_public_msgs/Detection face

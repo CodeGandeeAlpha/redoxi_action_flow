@@ -7,7 +7,7 @@ import rclpy
 from rclpy.action import ActionServer, ActionClient
 from rclpy.node import Node
 
-from psg_actions.action import ProcessPsgDocument
+from psg_actions.action import ProcessDetections
 from psg_public_msgs.msg import Frame
 from psg_common.psg_common.interfaces import IOpenCloseProtocol
 from psg_common.psg_common.constants import NodeStatusCode, ReturnCode
@@ -26,7 +26,7 @@ class ModelServer(Node, IOpenCloseProtocol):
             downstream_action_name : str = ''
             downstreams : dict = {}
             upstream_action_name : str = ''
-            upstreams : dict = {}
+            # upstreams : dict = {}
 
     class Downstream:
         def __init__(self):
@@ -44,10 +44,12 @@ class ModelServer(Node, IOpenCloseProtocol):
         self.m_init_config : self.InitConfig = None
         self.m_runtime_config : self.RuntimeConfig = None
         self.m_actions : dict = {}
+        self.m_action : ActionServer = {}
         self.m_downstreams : dict = {}
         self.m_logger = self.get_logger()
         # self.ready_to_infer_next_frame : bool = True
         # self.frame_timer = None
+        self.m_feed_back_call : bool = False
 
         self.m_frame_buffer : SortedDict[int, Frame] = {} # key: frame_num, value: frame_msg
 
@@ -101,8 +103,10 @@ class ModelServer(Node, IOpenCloseProtocol):
         # setup downstreams
         self._connect_to_downstreams()
 
-        # setup upstreams
-        self._create_upstream_servers()
+        # # setup upstreams
+        # self._create_upstream_servers()
+        # setup action server
+        self._create_action_server()
 
         self.m_logger.info('Initialized')
 
@@ -215,9 +219,14 @@ class ModelServer(Node, IOpenCloseProtocol):
             # 创建accept_frame_client
             name = us_node.action_name
 
-            client = ActionServer(self, ProcessPsgDocument, name, self._accept_frame_accepted_callback)
+            client = ActionServer(self, ProcessDetections, name, self._accept_frame_accepted_callback)
 
             self.m_actions[us_name] = client
+
+
+    def _create_action_server(self):
+        assert self.m_init_config is not None, "[ModelPy] m_init_config is None"
+        self.m_action = ActionServer(self, ProcessDetections, self.m_init_config.upstream_action_name, self._accept_frame_accepted_callback)
 
 
     def _connect_to_downstreams(self):
@@ -230,7 +239,7 @@ class ModelServer(Node, IOpenCloseProtocol):
 
             # 创建accept_frame_client
             name = ds_node.action_name
-            client = ActionClient(self, ProcessPsgDocument, name)
+            client = ActionClient(self, ProcessDetections, name)
 
             self.m_downstreams[ds_name] = client
 
@@ -279,10 +288,47 @@ class ModelServer(Node, IOpenCloseProtocol):
 
         goal_handle.succeed()
 
-        result = ProcessPsgDocument.Result()
+        result = ProcessDetections.Result()
         result.return_msg = "Accepted frame"
         result.return_code = ReturnCode.SUCCESS
         return result
+
+
+    def _goal_feedback_callback(self, feedback_msg):
+        self.get_logger().info('call Feedback: {0}'.format(feedback_msg.feedback.feedback_msg))
+        self.m_feed_back_call = True
+
+    def _send_goal(self, goal_msg):
+        self.get_logger().info(f"当前_step线程ID: {threading.get_ident()}")
+
+        self.m_action.wait_for_server()
+
+        self._send_goal_future = self.m_action.send_goal_async(goal_msg,
+                                        feedback_callback=self._goal_feedback_callback)
+
+        # 等待goal被accept
+        self.get_logger().info('waiting for response...')
+        while not self._send_goal_future.done():
+            self.get_logger().info('waiting...')
+            time.sleep(0.1)
+
+        goal_handle = self._send_goal_future.result()
+        if not goal_handle.accepted:
+            self.get_logger().info('Goal rejected :(')
+        else:
+            self.get_logger().info('Goal accepted :)')
+
+        # 等待feedback
+        while not self.m_feed_back_call:
+            self.get_logger().warn('not received feedback yet, waiting...')
+            time.sleep(1)
+
+        self.m_feed_back_call = False
+        self.get_logger().info('received feedback')
+
+        # 等待最终结果
+        result = goal_handle.get_result().result  # get_result is sync method, get_result_async is async method
+        self.get_logger().info('Result: {0}'.format(result.return_msg))
 
 
     def _step(self):
@@ -299,7 +345,7 @@ class ModelServer(Node, IOpenCloseProtocol):
 
         if self.m_frame_buffer:
             # get the first frame in the buffer dict
-            frame_num, frame_msg = self.m_frame_buffer.popitem(last=False)
+            frame_num, frame_msg = self.m_frame_buffer.popitem()
             # get the image from Vineyard
             img = self._get_frame_from_v6d(frame_msg)
 
@@ -307,7 +353,9 @@ class ModelServer(Node, IOpenCloseProtocol):
             result = self._model_infer(img)
 
             # send the result to downstreams
-            ActionClient.send_goal
+            goal_msg = ProcessDetections.Goal()
+            goal_msg.document.frame = frame_msg
+            self._send_goal(result)
 
 
 
@@ -316,7 +364,7 @@ class ModelServer(Node, IOpenCloseProtocol):
 
     def execute_callback(self, goal_handle):
         self.m_logger.info('Executing goal...')
-        result = ProcessPsgDocument.Result()
+        result = ProcessDetections.Result()
         return result
 
 

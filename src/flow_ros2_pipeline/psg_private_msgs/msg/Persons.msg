@@ -1,3 +1,4 @@
+unique_identifier_msgs/UUID uuid
 Person[] persons
 psg_public_msgs/Frame frame
 

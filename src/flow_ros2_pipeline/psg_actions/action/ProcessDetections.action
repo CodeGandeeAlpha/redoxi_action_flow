@@ -1,0 +1,7 @@
+psg_public_msgs/Detections detections
+---
+string return_msg
+int64 return_code
+---
+string feedback_msg
+int64 feedback_code

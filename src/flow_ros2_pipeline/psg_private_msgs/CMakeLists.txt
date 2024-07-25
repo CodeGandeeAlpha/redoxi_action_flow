@@ -20,6 +20,7 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(psg_public_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(unique_identifier_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Person.msg"
@@ -30,7 +31,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/TrajectoryEvents.msg"
   "msg/PsgDocument.msg"
 
-  DEPENDENCIES geometry_msgs psg_public_msgs
+  DEPENDENCIES geometry_msgs psg_public_msgs unique_identifier_msgs
   # ADD_LINTER_TESTS
 )
 
