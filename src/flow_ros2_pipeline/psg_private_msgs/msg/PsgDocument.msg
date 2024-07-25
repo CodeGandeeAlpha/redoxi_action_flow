@@ -1,4 +1,8 @@
 unique_identifier_msgs/UUID uuid
+unique_identifier_msgs/UUID detections_uuid
+unique_identifier_msgs/UUID poses_uuid
+unique_identifier_msgs/UUID trajectories_uuid
+
 std_msgs/Header header
 Persons persons
 PersonTrajectories trajectories
