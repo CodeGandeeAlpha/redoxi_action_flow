@@ -6,11 +6,11 @@ from sortedcontainers.sorteddict import SortedDict
 import rclpy
 from rclpy.action import ActionServer, ActionClient
 from rclpy.node import Node
+from unique_identifier_msgs.msg import UUID
 
 from psg_actions.action import ProcessDetections, ProcessFrame
 from psg_public_msgs.msg import Frame
 from psg_public_msgs.msg import Detections
-from unique_identifier_msgs.msg import UUID
 from psg_common.psg_common.interfaces import IOpenCloseProtocol
 from psg_common.psg_common.constants import NodeStatusCode, ReturnCode
 from psg_common.psg_common.utilities import create_v6d_client
