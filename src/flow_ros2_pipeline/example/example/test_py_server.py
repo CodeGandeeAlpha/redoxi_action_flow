@@ -22,6 +22,9 @@ class MyActionServer(Node):
     def _execute_callback(self, goal_handle):
         self.get_logger().info('Executing goal...')
 
+        self.get_logger().info('sleep 2s...')
+        time.sleep(10)
+
         feedback_msg = ProcessPsgDocument.Feedback()
         feedback_msg.feedback_msg = 'feedback'
         feedback_msg.feedback_code = 0

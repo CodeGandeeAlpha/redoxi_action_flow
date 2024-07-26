@@ -5,6 +5,7 @@
 
 #include <rclcpp/utilities.hpp>
 #include <rclcpp_action/types.hpp>
+#include <unistd.h>
 #include <video_reader/test_client.hpp>
 #include <chrono>
 using namespace std::placeholders;
@@ -90,29 +91,29 @@ namespace FlowRos2Pipeline{
         RCLCPP_INFO(this->get_logger(), "Waiting for response");
         int max_try = 5;
         int n_try = 0;
-        while(rclcpp::ok() && n_try < max_try){
-            RCLCPP_INFO(this->get_logger(), "Try %d", n_try);
-            // rclcpp::sleep_for(std::chrono::milliseconds(1000));
-            RCLCPP_INFO(this->get_logger(), "Waiting for future");
-            {
-                auto status = res.wait_for(std::chrono::milliseconds(5));
-                switch(status){
-                    case std::future_status::ready:
-                        RCLCPP_INFO(this->get_logger(), "Future ready");
-                        break;
-                    case std::future_status::timeout:
-                        RCLCPP_INFO(this->get_logger(), "Future timeout");
-                        break;
-                    case std::future_status::deferred:
-                        RCLCPP_INFO(this->get_logger(), "Future deferred");
-                        break;
-                }
-            }
+        // while(rclcpp::ok() && n_try < max_try){
+            // RCLCPP_INFO(this->get_logger(), "Try %d", n_try);
+            // // rclcpp::sleep_for(std::chrono::milliseconds(1000));
+            // RCLCPP_INFO(this->get_logger(), "Waiting for future");
+            // {
+            //     auto status = res.wait_for(std::chrono::milliseconds(5));
+            //     switch(status){
+            //         case std::future_status::ready:
+            //             RCLCPP_INFO(this->get_logger(), "Future ready");
+            //             break;
+            //         case std::future_status::timeout:
+            //             RCLCPP_INFO(this->get_logger(), "Future timeout");
+            //             break;
+            //         case std::future_status::deferred:
+            //             RCLCPP_INFO(this->get_logger(), "Future deferred");
+            //             break;
+            //     }
+            // }
 
-            //wait until succeed
+            //wait until goal_response_callback return a value
             auto g = res.get();
             if(g == nullptr){
-                RCLCPP_INFO(this->get_logger(), "get nullptr");
+                RCLCPP_INFO(this->get_logger(), "rejected");
             }
             else {
                 switch (g->get_status()) {
@@ -142,7 +143,7 @@ namespace FlowRos2Pipeline{
 
             RCLCPP_INFO(this->get_logger(), "Waiting for future again");
             {
-                auto status = res.wait_for(std::chrono::milliseconds(5));
+                auto status = res.wait_for(std::chrono::milliseconds(500));
                 switch(status){
                     case std::future_status::ready:
                         RCLCPP_INFO(this->get_logger(), "Future ready");
@@ -154,13 +155,40 @@ namespace FlowRos2Pipeline{
                         RCLCPP_INFO(this->get_logger(), "Future deferred");
                         break;
                 }
+            //     if(status == std::future_status::ready){
+            //         break;
+            //     }
                 if(status == std::future_status::ready){
-                    break;
+                    RCLCPP_INFO(this->get_logger(), "Waiting 3s to see the status");
+                    sleep(3);
+                    switch (g->get_status()) {
+                        case rclcpp_action::GoalStatus::STATUS_ABORTED:
+                            RCLCPP_INFO(this->get_logger(), "STATUS_ABORTED");
+                            break;
+                        case rclcpp_action::GoalStatus::STATUS_ACCEPTED:
+                            RCLCPP_INFO(this->get_logger(), "STATUS_ACCEPTED");
+                            break;
+                        case rclcpp_action::GoalStatus::STATUS_SUCCEEDED:
+                            RCLCPP_INFO(this->get_logger(), "STATUS_SUCCEEDED");
+                            break;
+                        case rclcpp_action::GoalStatus::STATUS_CANCELED:
+                            RCLCPP_INFO(this->get_logger(), "STATUS_CANCELED");
+                            break;
+                        case rclcpp_action::GoalStatus::STATUS_UNKNOWN:
+                            RCLCPP_INFO(this->get_logger(), "STATUS_UNKNOWN");
+                            break;
+                        case rclcpp_action::GoalStatus::STATUS_EXECUTING:
+                            RCLCPP_INFO(this->get_logger(), "STATUS_EXECUTING");
+                            break;
+                        case rclcpp_action::GoalStatus::STATUS_CANCELING:
+                            RCLCPP_INFO(this->get_logger(), "STATUS_CANCELING");
+                            break;
+                    }
                 }
             }
 
-            n_try++;
-        }
+            // n_try++;
+        // }
 
         // RCLCPP_INFO(this->get_logger(), "Status = %d", status);
 

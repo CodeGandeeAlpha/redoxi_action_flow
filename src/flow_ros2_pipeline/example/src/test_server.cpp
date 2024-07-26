@@ -37,9 +37,9 @@ namespace FlowRos2Pipeline{
     {
         RCLCPP_INFO(this->get_logger(), "Received goal request with frame_id %s", goal->document.header.frame_id.c_str());
         (void)uuid;
-        rclcpp::sleep_for(std::chrono::milliseconds(1000));
-        // return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
-        return rclcpp_action::GoalResponse::REJECT;
+        // rclcpp::sleep_for(std::chrono::milliseconds(1000));
+        return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+        // return rclcpp_action::GoalResponse::REJECT;
     }
 
     rclcpp_action::CancelResponse TestServer::handle_cancel(
