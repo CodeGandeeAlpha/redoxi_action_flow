@@ -10,36 +10,42 @@ from unique_identifier_msgs.msg import UUID
 
 from psg_actions.action import ProcessDetections, ProcessFrame
 from psg_public_msgs.msg import Frame
-from psg_public_msgs.msg import Detections
+from psg_public_msgs.msg import Detections, Detection
 from psg_common.psg_common.interfaces import IOpenCloseProtocol
 from psg_common.psg_common.constants import NodeStatusCode, ReturnCode
 from psg_common.psg_common.utilities import create_v6d_client
 
-from ddq_detector import DDQDetector
+from ddq_detector import DdqDetrDetector
 
-class ModelServer(Node, IOpenCloseProtocol):
+class DdqDetectorNode(Node, IOpenCloseProtocol):
 
     class RuntimeConfig:
         def __init__(self):
-            step_interval_ms : int = -1
-            frame_interval_ms : int = -1
+            self.step_interval_ms : int = -1
+            # self.frame_interval_ms : int = -1
+            self.pred_score_thr : float = 0.3
+
+        def from_parameters(node):
+            pass
 
     class InitConfig:
         def __init__(self):
-            model = None
-            downstream_action_name : str = ''
-            downstreams : dict = {}
-            upstream_action_name : str = ''
-            # upstreams : dict = {}
+            self.model = None
+            self.downstreams : dict = {}
+            self.upstream_action_name : str = ''
+            # self.upstreams : dict = {}
+
+        def from_parameters(node):
+            pass
 
     class Downstream:
         def __init__(self):
-            handler: ActionClient = None
+            self.handler: ActionClient = None
 
     class ModelDownstreamNode:
         def __init__(self):
-            action_name: str = ''
-            service_name: str = ''
+            self.action_name: str = ''
+            self.service_name: str = ''
 
 
     def __init__(self):
@@ -261,6 +267,50 @@ class ModelServer(Node, IOpenCloseProtocol):
         return image
 
 
+    def _to_detections_msg(self, result):
+        """
+        {
+            'predictions' : [
+                # Each instance corresponds to an input image
+                {
+                'labels': [...],  # int list of length (N, )
+                'scores': [...],  # float list of length (N, )
+                'bboxes': [...],  # 2d list of shape (N, 4), format: [min_x, min_y, max_x, max_y]
+                },
+                ...
+            ],
+            'visualization' : [
+                array(..., dtype=uint8),
+            ]
+        }
+        """
+        # jugde if the prediction score threshold is set to be valid
+        if self.m_runtime_config.pred_score_thr < 0 or self.m_runtime_config.pred_score_thr > 1:
+            self.get_logger().warn("Invalid prediction score threshold: %f, we set it to 0", self.m_runtime_config.pred_score_thr)
+            pred_score_thr = 0
+        else:
+            pred_score_thr = self.m_runtime_config.pred_score_thr
+
+        detections = Detections()
+
+        for predictions in result['predictions']:
+            for label, score, bbox in zip(predictions['labels'], predictions['scores'], predictions['bboxes']):
+                if score < pred_score_thr:
+                    continue
+                detection_msg = Detection()
+                detection_msg.category = int(label)
+                detection_msg.confidence = score
+                detection_msg.bbox.x = bbox[0]
+                detection_msg.bbox.y = bbox[1]
+                detection_msg.bbox.width = bbox[2] - bbox[0]
+                detection_msg.bbox.height = bbox[3] - bbox[1]
+                detection_msg.is_detected_by_camera = True
+
+                detections.detections.append(detection_msg)
+
+        return detections
+
+
     def _accept_frame_accepted_callback(self, goal_handle):
         # just accept the frame and add it to buffer, no processing
 
@@ -284,35 +334,39 @@ class ModelServer(Node, IOpenCloseProtocol):
         self.get_logger().info('call Feedback: {0}'.format(feedback_msg.feedback.feedback_msg))
         self.m_feed_back_call = True
 
+
     def _send_goal(self, goal_msg):
-        self.m_action.wait_for_server()
+        # TODO: if not all downstreams are connected, what to do?
+        for ds_name, ds_client in self.m_downstreams.items():
+            self.get_logger().info(f'sending goal to downstream {ds_name}')
+            ds_client.wait_for_server()
 
-        self._send_goal_future = self.m_action.send_goal_async(goal_msg,
-                                        feedback_callback=self._goal_feedback_callback)
+            self._send_goal_future = ds_client.send_goal_async(goal_msg,
+                                            feedback_callback=self._goal_feedback_callback)
 
-        # 等待goal被accept
-        self.get_logger().info('waiting for response...')
-        while not self._send_goal_future.done():
-            self.get_logger().info('waiting...')
-            time.sleep(0.1)
+            # 等待goal被accept
+            self.get_logger().info('waiting for response...')
+            while not self._send_goal_future.done():
+                self.get_logger().info('waiting...')
+                time.sleep(0.1)
 
-        goal_handle = self._send_goal_future.result()
-        if not goal_handle.accepted:
-            self.get_logger().info('Goal rejected :(')
-        else:
-            self.get_logger().info('Goal accepted :)')
+            goal_handle = self._send_goal_future.result()
+            if not goal_handle.accepted:
+                self.get_logger().info('Goal rejected :(')
+            else:
+                self.get_logger().info('Goal accepted :)')
 
-        # 等待feedback
-        while not self.m_feed_back_call:
-            self.get_logger().warn('not received feedback yet, waiting...')
-            time.sleep(1)
+            # 等待feedback
+            while not self.m_feed_back_call:
+                self.get_logger().warn('not received feedback yet, waiting...')
+                time.sleep(1)
 
-        self.m_feed_back_call = False
-        self.get_logger().info('received feedback')
+            self.m_feed_back_call = False
+            self.get_logger().info('received feedback')
 
-        # 等待最终结果
-        result = goal_handle.get_result().result  # get_result is sync method, get_result_async is async method
-        self.get_logger().info('Result: {0}'.format(result.return_msg))
+            # 等待最终结果
+            result = goal_handle.get_result().result  # get_result is sync method, get_result_async is async method
+            self.get_logger().info('Result: {0}'.format(result.return_msg))
 
 
     def _step(self):
@@ -333,7 +387,7 @@ class ModelServer(Node, IOpenCloseProtocol):
 
             # send the result to downstreams
             goal_msg = ProcessDetections.Goal()
-            goal_msg.detections = result
+            goal_msg.detections = self._to_detections_msg(result)
             goal_msg.detections.uuid = uuid
             self.get_logger().info(f'sending detections uuid: {uuid}')
             self._send_goal(goal_msg)
@@ -345,18 +399,35 @@ class ModelServer(Node, IOpenCloseProtocol):
 
 
 def main(args=None):
+    # init node
     rclpy.init(args=args)
+    ddq_detector_node = DdqDetectorNode()
 
-    model_action_server = ModelServer()
+    # init model
+    ddq_model = DdqDetrDetector()
+    model_cfg = 'src/flow_ros2_pipeline/detector/configs/ddq/ddq-detr-4scale_swinl_8xb2-30e_coco.py'
+    weights = 'weights/ddq_detr_swinl_30e.pth'
+    ddq_model.init(model_cfg=model_cfg, model_path=weights, device='cuda:0', class_names=['person'])
 
-    init_config = ModelServer.InitConfig()
-    runtime_config = ModelServer.RuntimeConfig()
-    model_action_server.init(init_config, runtime_config)
+    # init config
+    init_config = DdqDetectorNode.InitConfig()
+    init_config.model = ddq_model
+    downstream = DdqDetectorNode.ModelDownstreamNode()
+    downstream.action_name = 'process_detections'
+    init_config.downstreams['downstream1'] = downstream
+    init_config.upstream_action_name = 'process_frame'
 
-    model_action_server.open()
-    model_action_server.start()
+    # runtime config
+    runtime_config = DdqDetectorNode.RuntimeConfig()
+    runtime_config.pred_score_thr = 0.3
+    runtime_config.step_interval_ms = 10
 
-    rclpy.spin(model_action_server)
+    ddq_detector_node.init(init_config, runtime_config)
+
+    ddq_detector_node.open()
+    ddq_detector_node.start()
+
+    rclpy.spin(ddq_detector_node)
 
 
 if __name__ == '__main__':

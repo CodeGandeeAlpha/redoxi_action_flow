@@ -29,7 +29,6 @@ namespace FlowRos2Pipeline{
         public:
             using DownstreamReadyQueryService = psg_services::srv::StatusQuery;
             using DownstreamAcceptFrameAction = psg_actions::action::SendFrame;
-            using DownstreamSendFrameActionGoalHandle = rclcpp_action::ClientGoalHandle<DownstreamAcceptFrameAction>;
 
             class Downstream{
             public:

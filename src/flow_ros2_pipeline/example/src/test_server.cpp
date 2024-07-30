@@ -52,6 +52,7 @@ namespace FlowRos2Pipeline{
 
     void TestServer::handle_accepted(const std::shared_ptr<rclcpp_action::ServerGoalHandle<psg_actions::action::ProcessPsgDocument>> goal_handle)
     {
+        rclcpp::sleep_for(std::chrono::milliseconds(50000000000));
         const auto goal = goal_handle->get_goal();
         auto result = std::make_shared<psg_actions::action::ProcessPsgDocument::Result>();
         auto cnow = m_clock.now();

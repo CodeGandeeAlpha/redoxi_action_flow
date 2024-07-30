@@ -4,6 +4,7 @@
 #include <memory>
 #include <rclcpp/timer.hpp>
 #include <thread>
+#include <atomic>
 
 namespace FlowRos2Pipeline {
     class MasterNodeImpl {
@@ -15,5 +16,7 @@ namespace FlowRos2Pipeline {
 
         std::shared_ptr<std::thread> step_thread;
         bool step_running = false;
+
+        std::atomic_bool accepted_flag = false;
     };
 }

@@ -38,5 +38,10 @@ design.md
 *.out
 *.app
 
+# checkpoint files
+*.ckpt
+*.pth
+*.pt
+
 build-*/
 .cache/

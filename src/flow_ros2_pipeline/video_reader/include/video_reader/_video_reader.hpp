@@ -8,7 +8,6 @@
 #include <vector>
 #include <thread>
 
-#include "common/util/uuid.h"
 #include "vineyard/client/client.h"
 #include "vineyard/client/ds/object_meta.h"
 #include "video_reader/video_reader.hpp"
@@ -30,6 +29,6 @@ namespace FlowRos2Pipeline {
         // flags to convert async call to sync call
         std::vector<bool> frame_sent_flags;
         std::shared_ptr<std::thread> step_thread;
-        bool step_running = false;
+        bool step_running = false;  // for stopping the step thread
     };
 }

@@ -7,6 +7,6 @@ namespace FlowRos2Pipeline {
     }
 
     void MasterNodeRuntimeConfig::from_parameters(MasterNode* node) {
-        frame_internal_ms = node->get_parameter("frame_internal_ms").as_double();
+        step_interval_ms = node->get_parameter("step_interval_ms").as_double();
     }
 }

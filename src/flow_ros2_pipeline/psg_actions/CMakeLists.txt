@@ -12,6 +12,7 @@ find_package(rclpy REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(psg_public_msgs REQUIRED)
 find_package(psg_private_msgs REQUIRED)
+find_package(unique_identifier_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/SendFrame.action"
@@ -20,8 +21,10 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/DropFrame.action"
   "action/SendDetections.action"
   "action/ProcessPsgDocument.action"
+  "action/ProcessFrame.action"
+  "action/ProcessDetections.action"
 
-  DEPENDENCIES psg_public_msgs psg_private_msgs
+  DEPENDENCIES psg_public_msgs psg_private_msgs unique_identifier_msgs
 )
 
 if(BUILD_TESTING)

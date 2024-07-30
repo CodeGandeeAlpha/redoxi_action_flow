@@ -23,13 +23,18 @@ class ModelServer(Node, IOpenCloseProtocol):
             self.frame_interval_ms : int = -1
             self.pred_score_thr : float = 0.3
 
+        def from_parameters(node):
+            pass
+
     class InitConfig:
         def __init__(self):
             self.model = None
-            self.downstream_action_name : str = ''
             self.downstreams : dict = {}
             self.upstream_action_name : str = ''
             # self.upstreams : dict = {}
+
+        def from_parameters(node):
+            pass
 
     class Downstream:
         def __init__(self):

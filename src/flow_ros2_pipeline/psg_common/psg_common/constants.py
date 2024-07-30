@@ -17,6 +17,6 @@ class NodeStatusCode:
     MAX_RESERVED_STATUS = 10000
 
 
-DefaultServiceTimeoutMs = 1000
+DefaultTimeoutMs = 10000
 DefaultNodeStepIntervalMs = 10
 

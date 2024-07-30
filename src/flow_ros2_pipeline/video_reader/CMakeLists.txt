@@ -16,7 +16,7 @@ find_package(psg_actions REQUIRED)
 find_package(psg_services REQUIRED)
 find_package(psg_common REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(rclcpp_action)
+find_package(rclcpp_action REQUIRED)
 
 find_package(OpenCV REQUIRED)
 find_package(vineyard REQUIRED)

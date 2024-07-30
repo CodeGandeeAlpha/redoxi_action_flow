@@ -3,6 +3,7 @@
 #include <string>
 
 #include <psg_private_msgs/msg/psg_document.hpp>
+#include <psg_common/psg_common.hpp>
 
 
 namespace FlowRos2Pipeline {
@@ -29,7 +30,10 @@ namespace FlowRos2Pipeline {
     class MasterNodeRuntimeConfig {
     public:
         virtual ~MasterNodeRuntimeConfig(){}
-        double frame_internal_ms = -1; // TODO: add more runtime configurations
+        double step_interval_ms = DefaultNodeStepIntervalMs;
+
+        double timeout_ms_send_frame_to_downstream = DefaultTimeoutMs;
+
         void from_parameters(MasterNode* node);
     };
 }

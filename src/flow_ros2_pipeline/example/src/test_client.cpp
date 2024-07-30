@@ -143,7 +143,7 @@ namespace FlowRos2Pipeline{
 
             RCLCPP_INFO(this->get_logger(), "Waiting for future again");
             {
-                auto status = res.wait_for(std::chrono::milliseconds(500));
+                auto status = res.wait_for(std::chrono::milliseconds(50000000000000000));
                 switch(status){
                     case std::future_status::ready:
                         RCLCPP_INFO(this->get_logger(), "Future ready");

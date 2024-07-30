@@ -50,7 +50,7 @@ namespace FlowRos2Pipeline {
         const int MAX_RESERVED_STATUS = 10000;
     };
 
-    const double DefaultServiceTimeoutMs = 1000;
+    const double DefaultTimeoutMs = 10000;
 
     // how many ms to wait before next _step()
     const double DefaultNodeStepIntervalMs = 10;

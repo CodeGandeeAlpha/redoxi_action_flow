@@ -46,7 +46,7 @@ namespace FlowRos2Pipeline {
             // 创建accept_frame_client
             {
                 std::string name = it.second.accept_document_action;
-                auto client = rclcpp_action::create_client<DownstreamAcceptDocumentAction>(this, name);
+                auto client = rclcpp_action::create_client<ACT_AcceptDocument>(this, name);
 
                 ds->handler = client;
                 ds->options.goal_response_callback =
@@ -87,7 +87,7 @@ namespace FlowRos2Pipeline {
         std::string status_query_service = this->get_parameter("status_query_service").as_string();
         // m_srv_status_query = this->create_service<MSG_StatusQuery>(
         //     status_query_service, &MasterNode::status_query_callback);
-        m_srv_status_query = this->create_service<MSG_StatusQuery>(
+        m_srv_status_query = this->create_service<SRV_StatusQuery>(
             status_query_service, std::bind(&MasterNode::status_query_callback, this, std::placeholders::_1, std::placeholders::_2));
 
 
@@ -115,10 +115,9 @@ namespace FlowRos2Pipeline {
     }
 
     int MasterNode::update_runtime_config(const std::shared_ptr<RuntimeConfig>& config) {
-        // if (m_status_code != NodeStatusCode::OPENED) {
-        //     RCLCPP_ERROR(m_impl->logger, "[MasterNode] update_runtime_config FAILED! status code is not OPENED");
-        //     return ReturnCode::ERROR;
-        // }
+        ROS_ASSERT(m_status_code != NodeStatusCode::STARTED &&
+                    m_status_code != NodeStatusCode::BEFORE_INIT,
+                "cannot update_runtime_config");
 
         m_runtime_config = config;
         return ReturnCode::SUCCESS;
@@ -129,7 +128,7 @@ namespace FlowRos2Pipeline {
     }
 
     void MasterNode::process_document_goal_response_callback(
-            const rclcpp_action::ClientGoalHandle<MasterNode::DownstreamAcceptDocumentAction>::SharedPtr & goal_handle) {
+            const rclcpp_action::ClientGoalHandle<MasterNode::ACT_AcceptDocument>::SharedPtr & goal_handle) {
         if(goal_handle->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
             //TODO: here
         } else {
@@ -137,20 +136,20 @@ namespace FlowRos2Pipeline {
         }
     }
 
-    void MasterNode::process_document_feedback_callback(rclcpp_action::ClientGoalHandle<MasterNode::DownstreamAcceptDocumentAction>::SharedPtr,
-        const std::shared_ptr<const MasterNode::DownstreamAcceptDocumentAction::Feedback> feedback) {
+    void MasterNode::process_document_feedback_callback(rclcpp_action::ClientGoalHandle<MasterNode::ACT_AcceptDocument>::SharedPtr,
+        const std::shared_ptr<const MasterNode::ACT_AcceptDocument::Feedback> feedback) {
         (void)feedback;
     }
 
     void MasterNode::process_document_result_callback(
-        const rclcpp_action::ClientGoalHandle<MasterNode::DownstreamAcceptDocumentAction>::WrappedResult & result) {
+        const rclcpp_action::ClientGoalHandle<MasterNode::ACT_AcceptDocument>::WrappedResult & result) {
         (void)result;
 
     }
 
 
-    void MasterNode::status_query_callback(const std::shared_ptr<MSG_StatusQuery::Request> request,
-            std::shared_ptr<MSG_StatusQuery::Response> response) {
+    void MasterNode::status_query_callback(const std::shared_ptr<SRV_StatusQuery::Request> request,
+            std::shared_ptr<SRV_StatusQuery::Response> response) {
         (void)request;  // not used
         RCLCPP_INFO(m_impl->logger, "Received status query request");
         response->status = ReturnCode::SUCCESS;
@@ -185,10 +184,11 @@ namespace FlowRos2Pipeline {
         RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and add it to buffer", frame.cache.id_int);
 
         //create tasks for all downstreams
-        // process_document_create_tasks(frame);
-
+        process_document_create_tasks(frame);
 
         auto result = std::make_shared<ACT_AcceptFrame::Result>();
+        result->return_msg = "Frame accepted";
+        result->return_code = ReturnCode::SUCCESS;
         goal_handle->succeed(result);
     }
 
@@ -224,15 +224,13 @@ namespace FlowRos2Pipeline {
     }
 
     int MasterNode::start() {
-        if (m_status_code != NodeStatusCode::INITIALIZED && m_status_code != NodeStatusCode::STOPPED) {
-            RCLCPP_ERROR(m_impl->logger, "[MasterNode] start FAILED! status code is not INITIALIZED or STOPPED");
-            return ReturnCode::ERROR;
-        }
+        // the node must be opened
+        ROS_ASSERT(m_status_code == NodeStatusCode::OPENED,
+                "cannot start because status code is not OPENED");
 
-        //start timer
-        // m_impl->timer = this->create_wall_timer(
-        //     std::chrono::milliseconds((int)m_runtime_config->frame_internal_ms),
-        //     std::bind(&MasterNode::_step, this));
+        RCLCPP_INFO(m_impl->logger,
+             "m_status_code from %d to %d!",
+              m_status_code, NodeStatusCode::STARTED);
 
         m_status_code = NodeStatusCode::STARTED;
 
@@ -241,7 +239,7 @@ namespace FlowRos2Pipeline {
             [this](){
                 while(rclcpp::ok() && m_impl->step_running){
                     _step();
-                    std::this_thread::sleep_for(std::chrono::milliseconds((int)DefaultNodeStepIntervalMs));
+                    std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
                 }
             }
         );
@@ -250,17 +248,9 @@ namespace FlowRos2Pipeline {
     }
 
     int MasterNode::stop() {
-        if (m_status_code != NodeStatusCode::STARTED) {
-            RCLCPP_ERROR(m_impl->logger, "[MasterNode] stop FAILED! status code is not STARTED");
-            return ReturnCode::ERROR;
-        }
-
-        // if(m_impl->timer)
-        //     m_impl->timer->cancel();
-        // else
-        //     throw std::runtime_error("timer is not initialized but stop() is called");
-
-        m_status_code = NodeStatusCode::STOPPED;
+        // only stoppable if the node is started
+        ROS_ASSERT(m_status_code == NodeStatusCode::STARTED,
+                "cannot stop because status code is not STARTED");
 
         //terminate step thread
         m_impl->step_running = false;
@@ -269,10 +259,19 @@ namespace FlowRos2Pipeline {
             m_impl->step_thread = nullptr;
         }
 
+        RCLCPP_INFO(m_impl->logger,
+             "m_status_code from %d to %d!",
+              m_status_code, NodeStatusCode::STOPPED);
+
+        m_status_code = NodeStatusCode::STOPPED;
         return ReturnCode::SUCCESS;
     }
 
     void MasterNode::_step() {
+        std::set<int> useful_frames;
+        std::vector<int> useless_frames;
+
+
         if(!m_psgdoc_task_waiting.empty())
         {
             // initiate all waiting tasks
@@ -280,7 +279,7 @@ namespace FlowRos2Pipeline {
 
             for(auto& it : m_psgdoc_task_waiting){
                 auto& task = it.second;
-                DownstreamAcceptDocumentAction::Goal goal;
+                ACT_AcceptDocument::Goal goal;
                 goal.document.frame = task->frame;
                 auto ds = task->downstream;
                 auto handle = task->downstream->handler->async_send_goal(goal, ds->options);
@@ -288,19 +287,25 @@ namespace FlowRos2Pipeline {
                 // FIXME: add timeout condition
                 auto task_response = handle.get();
                 if(task_response != nullptr){
-                    // accepted?
+                    // accepted
                     if(task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED){
                         //successfully sent, record this
-                        task->goal_id = task_response->get_goal_id();
-                        task->status = DSTask_PSGDocument::TASK_SENT;
-                        m_psgdoc_task_doing[task->goal_id] = task;
+                        task->goal_handle = task_response;
+                        // task->status = DSTask_PSGDocument::TASK_SENT;
+                        m_psgdoc_task_doing[task->goal_handle] = task;
+                        tasks_to_remove.push_back(it.first);
+                    }
+
+                    // succeed
+                    else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED){
+                        // task->status = DSTask_PSGDocument::TASK_DONE;
                         tasks_to_remove.push_back(it.first);
                     }
                 }
-                else {
-                    // rejected
-                    task->status = DSTask_PSGDocument::TASK_FAILED;
-                }
+                // else {
+                //     // rejected
+                //     task->status = DSTask_PSGDocument::TASK_FAILED;
+                // }
 
                 //FIXME: what if failed to send many times?
                 //you need to terminate a frame, remove it from memory registry
@@ -314,11 +319,13 @@ namespace FlowRos2Pipeline {
 
         //for on-going tasks, if it is done, remove it
         if(!m_psgdoc_task_doing.empty()){
-            std::vector<GoalID> tasks_to_remove;
+            std::vector<GoalHandle> tasks_to_remove;
             for(auto& it : m_psgdoc_task_doing){
-                auto& task = it.second;
-                if(task->status == DSTask_PSGDocument::TASK_DONE || task->status == DSTask_PSGDocument::TASK_FAILED){
-                    tasks_to_remove.push_back(it.first);
+                auto& task_response = it.first;
+                if (task_response) {
+                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                        tasks_to_remove.push_back(it.first);
+                    }
                 }
             }
 
@@ -328,8 +335,6 @@ namespace FlowRos2Pipeline {
         }
 
         //if a frame has no waiting tasks or running tasks associated with it, remove it from buffer
-        std::set<int> useful_frames;
-        std::vector<int> useless_frames;
         for(auto& it : m_psgdoc_task_waiting){
             useful_frames.insert(it.second->frame.frame_num);
         }
