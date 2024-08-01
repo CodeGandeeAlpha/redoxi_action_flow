@@ -121,8 +121,6 @@ namespace FlowRos2Pipeline{
 
             virtual void _merge_detections_and_documents();
 
-            virtual void _merge_detections_and_persons();
-
         protected:
             // member of pipeline downstreams
             std::map<std::string, std::shared_ptr<Downstream>> m_downstreams;

@@ -12,7 +12,7 @@
 
 #include <sensor_msgs/msg/image.hpp>
 #include <psg_common/psg_common.hpp>
-#include <psg_actions/action/send_frame.hpp>
+#include <psg_actions/action/process_frame.hpp>
 #include <psg_services/srv/status_query.hpp>
 
 #include <video_reader/video_reader_types.hpp>
@@ -28,7 +28,7 @@ namespace FlowRos2Pipeline{
     class OpencvVideoReader : public rclcpp::Node, public IOpenCloseProtocol {
         public:
             using DownstreamReadyQueryService = psg_services::srv::StatusQuery;
-            using DownstreamAcceptFrameAction = psg_actions::action::SendFrame;
+            using DownstreamAcceptFrameAction = psg_actions::action::ProcessFrame;
 
             class Downstream{
             public:

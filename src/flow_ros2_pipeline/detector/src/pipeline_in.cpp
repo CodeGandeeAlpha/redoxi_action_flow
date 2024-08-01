@@ -21,28 +21,21 @@ namespace FlowRos2Pipeline {
 
     int DetectorIn::init(const std::shared_ptr<InitConfig>& config,
                             const std::shared_ptr<RuntimeConfig>& runtime_config) {
-        if (m_status_code != NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::CLOSED) {
-            RCLCPP_ERROR(m_impl->logger, "init FAILED! status code is not BEFORE_INIT or CLOSED");
-            return ReturnCode::ERROR;
-        }
-        ROS_ASSERT(m_status_code == NodeStatusCode::BEFORE_INIT,
-            "init FAILED! status code is not BEFORE_INIT");
+        ROS_ASSERT(m_status_code == NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::STOPPED,
+            "init FAILED! status code is not BEFORE_INIT or STOPPED");
 
         m_init_config = config;
         m_runtime_config = runtime_config;
 
-        // setup downstreams
-        _connect_to_downstreams();
-
-
         // create server
-        std::string process_document_action = this->get_parameter(m_init_config->process_document_action).as_string();
         m_act_process_document = rclcpp_action::create_server<ACT_AcceptDocument>(
-            this, process_document_action,
+            this, m_init_config->process_document_action,
             std::bind(&DetectorIn::_accept_document_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
             std::bind(&DetectorIn::_accept_document_cancel_callback, this, std::placeholders::_1),
             std::bind(&DetectorIn::_accept_document_accepted_callback, this, std::placeholders::_1));
 
+        // setup downstreams
+        _connect_to_downstreams();
 
         RCLCPP_INFO(m_impl->logger,
              "m_status_code from %d to %d!",
@@ -71,8 +64,8 @@ namespace FlowRos2Pipeline {
 
     int DetectorIn::start() {
         // the node must be opened
-        ROS_ASSERT(m_status_code == NodeStatusCode::OPENED,
-                "cannot start because status code is not OPENED");
+        ROS_ASSERT(m_status_code == NodeStatusCode::INITIALIZED,
+                "cannot start because status code is not INITIALIZED");
 
         RCLCPP_INFO(m_impl->logger,
              "m_status_code from %d to %d!",
@@ -139,9 +132,13 @@ namespace FlowRos2Pipeline {
 
         const auto& goal = goal_handle->get_goal();
 
-        //cache the document
-        const auto& document = goal->document;
+        // FIXME: cache the document, copy it for modify it
+        auto document = goal->document;
         const auto& frame = document.frame;
+
+        //add detections_uuid to document
+        boost::uuids::uuid uuid = boost::uuids::random_generator()();
+        std::copy(uuid.begin(), uuid.end(), document.detections_uuid.uuid.begin());
 
         //add to memory registry
         _add_document_to_buffer(document);
@@ -175,6 +172,7 @@ namespace FlowRos2Pipeline {
             auto task = std::make_shared<DSTask_Frame>();
             task->downstream = x.second;
             task->frame = frame;
+            task->detections_uuid = m_document_buffer[frame.frame_num].detections_uuid;
             m_frame_task_waiting[std::make_tuple(task->downstream.get(), frame.frame_num)] = task;
         }
     }
@@ -254,6 +252,9 @@ namespace FlowRos2Pipeline {
                 auto& task = it.second;
                 ACT_AcceptFrame::Goal goal;
                 goal.frame = task->frame;
+                // add detections_uuid to goal
+                goal.detections_uuid = task->detections_uuid;
+
                 auto ds = task->downstream;
                 auto handle = task->downstream->accept_frame->async_send_goal(goal, ds->accept_frame_options);
 
@@ -396,6 +397,7 @@ namespace FlowRos2Pipeline {
 
 
     void DetectorIn::_declare_all_parameters() {
+        this->declare_parameter<std::string>("process_document_action", "");
         this->declare_parameter<double>("step_interval_ms", -1);
         this->declare_parameter<double>("timeout_ms_send_to_downstream", -1);
     }

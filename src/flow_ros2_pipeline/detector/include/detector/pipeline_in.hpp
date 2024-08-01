@@ -28,6 +28,7 @@ namespace FlowRos2Pipeline{
             using RuntimeConfig = DetectorInRuntimeConfig;
             using MSG_Frame = psg_public_msgs::msg::Frame;
             using MSG_PsgDocument = psg_private_msgs::msg::PsgDocument;
+            using MSG_UUID = unique_identifier_msgs::msg::UUID;
 
             class DownstreamPipeline{
             public:
@@ -51,6 +52,7 @@ namespace FlowRos2Pipeline{
             public:
                 MSG_Frame frame;  // frame associated with this task
                 std::shared_ptr<DownstreamModel> downstream;
+                MSG_UUID detections_uuid;
                 GoalHandle_Frame goal_handle; // downstream goal handle
             };
 

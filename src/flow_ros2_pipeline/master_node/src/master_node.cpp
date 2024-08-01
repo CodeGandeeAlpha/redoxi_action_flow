@@ -1,6 +1,8 @@
+#include "psg_common/psg_common.hpp"
 #include <functional>
 #include <memory>
 #include <chrono>
+#include <rclcpp/logging.hpp>
 #include <set>
 #include <stdexcept>
 
@@ -29,10 +31,12 @@ namespace FlowRos2Pipeline {
     }
 
     void MasterNode::_declare_all_parameters() {
+        this->declare_parameter<std::string>("process_frame_action", "");
         this->declare_parameter<std::string>("downstream_action", "");
         this->declare_parameter<std::string>("status_query_service", "");
         this->declare_parameter<std::string>("send_frame_action", "");
-        this->declare_parameter<double>("frame_internal_ms", -1);
+        this->declare_parameter<double>("step_interval_ms", -1);
+        this->declare_parameter<double>("timeout_ms_send_frame_to_downstream", -1);
     }
 
     void MasterNode::_connect_to_downstreams(){
@@ -50,11 +54,11 @@ namespace FlowRos2Pipeline {
 
                 ds->handler = client;
                 ds->options.goal_response_callback =
-                        std::bind(&MasterNode::process_document_goal_response_callback, this, std::placeholders::_1);
+                        std::bind(&MasterNode::_process_document_goal_response_callback, this, std::placeholders::_1);
                 ds->options.feedback_callback =
-                        std::bind(&MasterNode::process_document_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
+                        std::bind(&MasterNode::_process_document_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
                 ds->options.result_callback =
-                        std::bind(&MasterNode::process_document_result_callback, this, std::placeholders::_1);
+                        std::bind(&MasterNode::_process_document_result_callback, this, std::placeholders::_1);
 
                 // wait until the action server is ready
                 RCLCPP_INFO(m_impl->logger, "[MasterNode] waiting for action server %s", name.c_str());
@@ -68,36 +72,28 @@ namespace FlowRos2Pipeline {
 
     int MasterNode::init(const std::shared_ptr<InitConfig>& config,
                             const std::shared_ptr<RuntimeConfig>& runtime_config) {
-        if (m_status_code != NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::CLOSED) {
-            RCLCPP_ERROR(m_impl->logger, "[MasterNode] init FAILED! status code is not BEFORE_INIT or CLOSED");
-            return ReturnCode::ERROR;
-        }
-        ROS_ASSERT(m_status_code == NodeStatusCode::BEFORE_INIT,
-            "[MasterNode] init FAILED! status code is not BEFORE_INIT");
+        ROS_ASSERT(m_status_code == NodeStatusCode::BEFORE_INIT || m_status_code == NodeStatusCode::STOPPED,
+            "[MasterNode] init FAILED! status code is not BEFORE_INIT or STOPPED");
 
         m_init_config = config;
         m_runtime_config = runtime_config;
 
         m_memory_registry->connect_to_v6d("/var/run/vineyard.sock");
 
+        // create status_query server
+        m_srv_status_query = this->create_service<SRV_StatusQuery>(
+            m_init_config->status_query_service, std::bind(&MasterNode::_status_query_callback, this, std::placeholders::_1, std::placeholders::_2));
+
+
+        // create process_frame server
+        m_act_accept_frame = rclcpp_action::create_server<ACT_AcceptFrame>(
+            this, m_init_config->process_frame_action,
+            std::bind(&MasterNode::_accept_frame_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
+            std::bind(&MasterNode::_accept_frame_cancel_callback, this, std::placeholders::_1),
+            std::bind(&MasterNode::_accept_frame_accepted_callback, this, std::placeholders::_1));
+
         // setup downstreams
         _connect_to_downstreams();
-
-        // create status_query server
-        std::string status_query_service = this->get_parameter("status_query_service").as_string();
-        // m_srv_status_query = this->create_service<MSG_StatusQuery>(
-        //     status_query_service, &MasterNode::status_query_callback);
-        m_srv_status_query = this->create_service<SRV_StatusQuery>(
-            status_query_service, std::bind(&MasterNode::status_query_callback, this, std::placeholders::_1, std::placeholders::_2));
-
-
-        // create send_frame server
-        std::string send_frame_action = this->get_parameter("send_frame_action").as_string();
-        m_act_accept_frame = rclcpp_action::create_server<ACT_AcceptFrame>(
-            this, send_frame_action,
-            std::bind(&MasterNode::accept_frame_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
-            std::bind(&MasterNode::accept_frame_cancel_callback, this, std::placeholders::_1),
-            std::bind(&MasterNode::accept_frame_accepted_callback, this, std::placeholders::_1));
 
         RCLCPP_INFO(m_impl->logger,
              "[MasterNode] m_status_code from %d to %d!",
@@ -127,7 +123,7 @@ namespace FlowRos2Pipeline {
         return m_status_code;
     }
 
-    void MasterNode::process_document_goal_response_callback(
+    void MasterNode::_process_document_goal_response_callback(
             const rclcpp_action::ClientGoalHandle<MasterNode::ACT_AcceptDocument>::SharedPtr & goal_handle) {
         if(goal_handle->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
             //TODO: here
@@ -136,26 +132,26 @@ namespace FlowRos2Pipeline {
         }
     }
 
-    void MasterNode::process_document_feedback_callback(rclcpp_action::ClientGoalHandle<MasterNode::ACT_AcceptDocument>::SharedPtr,
+    void MasterNode::_process_document_feedback_callback(rclcpp_action::ClientGoalHandle<MasterNode::ACT_AcceptDocument>::SharedPtr,
         const std::shared_ptr<const MasterNode::ACT_AcceptDocument::Feedback> feedback) {
         (void)feedback;
     }
 
-    void MasterNode::process_document_result_callback(
+    void MasterNode::_process_document_result_callback(
         const rclcpp_action::ClientGoalHandle<MasterNode::ACT_AcceptDocument>::WrappedResult & result) {
         (void)result;
 
     }
 
 
-    void MasterNode::status_query_callback(const std::shared_ptr<SRV_StatusQuery::Request> request,
+    void MasterNode::_status_query_callback(const std::shared_ptr<SRV_StatusQuery::Request> request,
             std::shared_ptr<SRV_StatusQuery::Response> response) {
         (void)request;  // not used
         RCLCPP_INFO(m_impl->logger, "Received status query request");
         response->status = ReturnCode::SUCCESS;
     }
 
-    rclcpp_action::GoalResponse MasterNode::accept_frame_goal_callback(
+    rclcpp_action::GoalResponse MasterNode::_accept_frame_goal_callback(
         const rclcpp_action::GoalUUID & uuid,
         std::shared_ptr<const ACT_AcceptFrame::Goal> goal) {
         RCLCPP_INFO(m_impl->logger, "Received goal request with frame %ld", goal->frame.frame_num);
@@ -163,14 +159,14 @@ namespace FlowRos2Pipeline {
         return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
     }
 
-    rclcpp_action::CancelResponse MasterNode::accept_frame_cancel_callback(
+    rclcpp_action::CancelResponse MasterNode::_accept_frame_cancel_callback(
         const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptFrame>> goal_handle) {
         RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
         (void)goal_handle;  // not used
         return rclcpp_action::CancelResponse::REJECT;
     }
 
-    void MasterNode::accept_frame_accepted_callback(
+    void MasterNode::_accept_frame_accepted_callback(
         const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptFrame>> goal_handle) {
 
         const auto& goal = goal_handle->get_goal();
@@ -184,7 +180,7 @@ namespace FlowRos2Pipeline {
         RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and add it to buffer", frame.cache.id_int);
 
         //create tasks for all downstreams
-        process_document_create_tasks(frame);
+        _process_document_create_tasks(frame);
 
         auto result = std::make_shared<ACT_AcceptFrame::Result>();
         result->return_msg = "Frame accepted";
@@ -213,7 +209,7 @@ namespace FlowRos2Pipeline {
             m_memory_registry->remove_entries_by_frame(frame_number);
     }
 
-    void MasterNode::process_document_create_tasks(const MSG_Frame& frame){
+    void MasterNode::_process_document_create_tasks(const MSG_Frame& frame){
         //create tasks of this frame for all downstreams
         for(auto& x : m_downstreams) {
             auto task = std::make_shared<DSTask_PSGDocument>();
@@ -225,8 +221,8 @@ namespace FlowRos2Pipeline {
 
     int MasterNode::start() {
         // the node must be opened
-        ROS_ASSERT(m_status_code == NodeStatusCode::OPENED,
-                "cannot start because status code is not OPENED");
+        ROS_ASSERT(m_status_code == NodeStatusCode::INITIALIZED,
+                "cannot start because status code is not INITIALIZED");
 
         RCLCPP_INFO(m_impl->logger,
              "m_status_code from %d to %d!",
@@ -283,6 +279,8 @@ namespace FlowRos2Pipeline {
                 goal.document.frame = task->frame;
                 auto ds = task->downstream;
                 auto handle = task->downstream->handler->async_send_goal(goal, ds->options);
+
+                RCLCPP_INFO(m_impl->logger, "_step async_send_goal: %ld", task->frame.frame_num);
 
                 // FIXME: add timeout condition
                 auto task_response = handle.get();

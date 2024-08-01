@@ -102,7 +102,7 @@ namespace FlowRos2Pipeline{
 
         memcpy(tensor_data, frame.data, height * width * elem_size);
 
-        // 将图像数据复制到 Tensor 中
+        // // 将图像数据复制到 Tensor 中
         // for (int row = 0; row < height; ++row) {
         //     for (int col = 0; col < width; ++col) {
         //         cv::Vec3b pixel = frame.at<cv::Vec3b>(row, col);
@@ -117,7 +117,11 @@ namespace FlowRos2Pipeline{
         VINEYARD_CHECK_OK(m_impl->v6d_client->Persist(sealed->id()));
 
         auto id = sealed->id();
+        RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] Successfully sealed, ObjectID_int: %ld", id);
         RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] Successfully sealed, ObjectID: %s", ObjectIDToString(id).c_str());
+
+        // auto test = m_impl->v6d_client->GetObject(id);
+        // RCLCPP_INFO(m_impl->logger, "read v6d id : %ld", test->id());
 
         return id;
     }
@@ -269,6 +273,9 @@ namespace FlowRos2Pipeline{
             frame_msg.frame_num = m_frame_number;
             frame_msg.cache.id_int = v6d_id;
             frame_msg.cache.has_int_id = true;
+            frame_msg.cache.id_string = ObjectIDToString(v6d_id);
+
+            RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] before send, ObjectID: %ld", frame_msg.cache.id_int);
 
             //downstream actions are alreayd checked, no need to do it again
             auto frame_sent_ok = _send_frame_to_downstreams(frame_msg, false);
@@ -532,9 +539,6 @@ namespace FlowRos2Pipeline{
         this->declare_parameter<int>("image_height", -1);
 
         this->declare_parameter<double>("frame_internal_ms", -1.0);
-
-        this->declare_parameter<std::string>("status_query_service", "");
-        this->declare_parameter<std::string>("send_frame_action", "");
     }
 
     void OpencvVideoReader::_create_image_topic() {

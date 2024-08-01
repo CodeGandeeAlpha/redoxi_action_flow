@@ -17,5 +17,26 @@ def generate_launch_description():
             executable='master_node_node',
             name='master_node',
             parameters=[params_file]
+        ),
+        Node(
+            package='detector',
+            namespace='',
+            executable='pipeline_in_node',
+            name='detector_in_node',
+            parameters=[params_file]
+        ),
+        Node(
+            package='detector',
+            namespace='',
+            executable='ddq_detector_node.py',
+            name='ddq_detector_node',
+            parameters=[params_file]
+        ),
+        Node(
+            package='detector',
+            namespace='',
+            executable='pipeline_out_node',
+            name='detector_out_node',
+            parameters=[params_file]
         )
     ])

@@ -16,7 +16,7 @@ int main(int argc, char * argv[])
     init_config->from_parameters(node.get());
 
     FlowRos2Pipeline::OpencvVideoReader::InitConfig::DownstreamNode downstream_node;
-    downstream_node.accept_frame_action = "accept_frame";
+    downstream_node.accept_frame_action = "master_node_process_frame";
     downstream_node.status_query_service = "status_query";
     init_config->downstreams["master_node"] = downstream_node;
 

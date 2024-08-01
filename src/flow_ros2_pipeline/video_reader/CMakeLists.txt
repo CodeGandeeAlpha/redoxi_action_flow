@@ -32,36 +32,8 @@ add_executable(${PROJECT_NAME}_node
   src/video_reader.cpp
   src/video_reader_types.cpp
 )
-add_executable(test_client
-  src/test_client.cpp
-)
-add_executable(test_server
-  src/test_server.cpp
-)
 
 ament_target_dependencies(${PROJECT_NAME}_node
-  rclcpp
-  rclcpp_action
-  rclpy
-  std_msgs
-  psg_actions
-  psg_services
-  psg_common
-  sensor_msgs
-)
-
-ament_target_dependencies(test_client
-  rclcpp
-  rclcpp_action
-  rclpy
-  std_msgs
-  psg_actions
-  psg_services
-  psg_common
-  sensor_msgs
-)
-
-ament_target_dependencies(test_server
   rclcpp
   rclcpp_action
   rclpy
@@ -75,7 +47,7 @@ ament_target_dependencies(test_server
 
 target_link_libraries(${PROJECT_NAME}_node ${OpenCV_LIBS} ${VINEYARD_LIBRARIES} ${Boost_LIBRARIES})
 
-install(TARGETS ${PROJECT_NAME}_node test_client test_server
+install(TARGETS ${PROJECT_NAME}_node
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)

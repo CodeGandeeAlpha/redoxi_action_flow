@@ -1,3 +1,4 @@
+#include "psg_common/psg_common.hpp"
 #include <set>
 #include <boost/uuid/uuid_generators.hpp>
 
@@ -21,8 +22,8 @@ namespace FlowRos2Pipeline {
 
     int DetectorOut::init(const std::shared_ptr<InitConfig>& config,
                             const std::shared_ptr<RuntimeConfig>& runtime_config) {
-        if (m_status_code != NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::CLOSED) {
-            RCLCPP_ERROR(m_impl->logger, "init FAILED! status code is not BEFORE_INIT or CLOSED");
+        if (m_status_code != NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::STOPPED) {
+            RCLCPP_ERROR(m_impl->logger, "init FAILED! status code is not BEFORE_INIT or STOPPED");
             return ReturnCode::ERROR;
         }
         ROS_ASSERT(m_status_code == NodeStatusCode::BEFORE_INIT,
@@ -31,24 +32,23 @@ namespace FlowRos2Pipeline {
         m_init_config = config;
         m_runtime_config = runtime_config;
 
-        // setup downstreams
-        _connect_to_downstreams();
-
         // create process document server
-        std::string process_document_action = this->get_parameter(m_init_config->process_document_action).as_string();
         m_act_process_document = rclcpp_action::create_server<ACT_AcceptDocument>(
-            this, process_document_action,
+            this, m_init_config->process_document_action,
             std::bind(&DetectorOut::_accept_document_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
             std::bind(&DetectorOut::_accept_document_cancel_callback, this, std::placeholders::_1),
             std::bind(&DetectorOut::_accept_document_accepted_callback, this, std::placeholders::_1));
 
         // create process detections server
-        std::string process_detections_action = this->get_parameter(m_init_config->process_detections_action).as_string();
+        // std::string process_detections_action = this->get_parameter(m_init_config->process_detections_action).as_string();
         m_act_process_detections = rclcpp_action::create_server<ACT_AcceptDetections>(
-            this, process_detections_action,
+            this, m_init_config->process_detections_action,
             std::bind(&DetectorOut::_accept_detections_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
             std::bind(&DetectorOut::_accept_detections_cancel_callback, this, std::placeholders::_1),
             std::bind(&DetectorOut::_accept_detections_accepted_callback, this, std::placeholders::_1));
+
+        // // setup downstreams
+        // _connect_to_downstreams();
 
         RCLCPP_INFO(m_impl->logger,
              "m_status_code from %d to %d!",
@@ -77,8 +77,8 @@ namespace FlowRos2Pipeline {
 
     int DetectorOut::start() {
         // the node must be opened
-        ROS_ASSERT(m_status_code == NodeStatusCode::OPENED,
-                "cannot start because status code is not OPENED");
+        ROS_ASSERT(m_status_code == NodeStatusCode::INITIALIZED,
+                "cannot start because status code is not INITIALIZED");
 
         RCLCPP_INFO(m_impl->logger,
              "m_status_code from %d to %d!",
@@ -140,6 +140,24 @@ namespace FlowRos2Pipeline {
         return rclcpp_action::CancelResponse::REJECT;
     }
 
+    std::string uuid_to_string(const std::array<uint8_t, 16>& uuid) {
+        // std::ostringstream oss;
+        // for (const auto& byte : uuid) {
+        //     oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
+        // }
+        // return oss.str();
+
+        std::ostringstream oss;
+        for (size_t i = 0; i < uuid.size(); ++i) {
+            if (i != 0) {
+                oss << "-";
+            }
+            oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(uuid[i]);
+        }
+    return oss.str();
+    }
+
+
     void DetectorOut::_accept_document_accepted_callback(
         const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle) {
 
@@ -152,6 +170,9 @@ namespace FlowRos2Pipeline {
         _add_document_to_buffer(document);
 
         RCLCPP_INFO(m_impl->logger, "Accepted document %ld and add it to buffer", document.frame.frame_num);
+        RCLCPP_INFO(m_impl->logger, "Accepted document %ld with UUID %s and add it to buffer",
+                document.frame.frame_num, uuid_to_string(document.uuid.uuid).c_str());
+
 
         // //create tasks for all downstreams
         // _process_document_create_tasks(document);
@@ -198,6 +219,7 @@ namespace FlowRos2Pipeline {
 
 
     void DetectorOut::_process_document_create_tasks(const MSG_PsgDocument& document){
+        RCLCPP_INFO(m_impl->logger, "create tasks for document %ld", document.frame.frame_num);
         //create tasks of this frame for all downstreams
         for(auto& x : m_downstreams) {
             auto task = std::make_shared<DSTask_PsgDocument>();
@@ -208,9 +230,9 @@ namespace FlowRos2Pipeline {
     }
 
 
-    void DetectorOut::_step() {  // TODO: merge detections and documents
+    void DetectorOut::_step() {
         _merge_detections_and_documents();
-        _send_document_to_downstreams();
+        // _send_document_to_downstreams();
     }
 
     void DetectorOut::_connect_to_downstreams() {
@@ -333,6 +355,8 @@ namespace FlowRos2Pipeline {
 
 
     void DetectorOut::_declare_all_parameters() {
+        this->declare_parameter<std::string>("process_document_action", "");
+        this->declare_parameter<std::string>("process_detections_action", "");
         this->declare_parameter<double>("step_interval_ms", -1);
         this->declare_parameter<double>("timeout_ms_send_to_downstream", -1);
     }
@@ -359,6 +383,12 @@ namespace FlowRos2Pipeline {
             auto frame_num = it.first;
             if (m_detections_buffer.find(frame_num) != m_detections_buffer.end()) {
                 auto& detections = m_detections_buffer[frame_num];
+
+                RCLCPP_INFO(m_impl->logger, "_merge_detections_and_documents for frame %d", frame_num);
+                RCLCPP_INFO(m_impl->logger, "_merge document %ld with UUID %s and add it to buffer",
+                document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
+                RCLCPP_INFO(m_impl->logger, "_merge detections %ld with UUID %s and add it to buffer",
+                document.frame.frame_num, uuid_to_string(detections.uuid.uuid).c_str());
 
                 if (document.detections_uuid == detections.uuid) {
                     // merge detections and documents

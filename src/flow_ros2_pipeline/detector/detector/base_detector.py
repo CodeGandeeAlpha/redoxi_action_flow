@@ -1,13 +1,20 @@
-from abc import ABC, abstractmethod
+from attr import define, field
+import numpy as np
 
-class BaseDetector(ABC):
-    def __init__(self):
-        self.model = None
+@define(kw_only=True)
+class DetectionResult:
+    class_id : int = field()
+    class_name : str = field()
+    xyxy : np.ndarray = field()
+    score : float = field(default=0.0)
 
-    @abstractmethod
-    def init(self):
-        pass
+class BaseDetector():
+    def init(self, *args, **kwargs):
+        raise NotImplementedError()
 
-    @abstractmethod
-    def infer(self, input_data) -> dict[str, list]:
-        pass
+    def infer(self, input_data, *args, **kwargs) -> list[list[DetectionResult]]:
+        raise NotImplementedError()
+
+    # @property
+    # def model(self):
+    #     raise NotImplementedError()

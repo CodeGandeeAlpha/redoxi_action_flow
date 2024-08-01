@@ -9,6 +9,7 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -30,11 +31,11 @@ add_executable(pipeline_in_node
   src/pipeline_in.cpp
   src/pipeline_in_types.cpp
 )
-# add_executable(pipeline_out_node
-#   src/pipeline_out_node.cpp
-#   src/pipeline_out.cpp
-#   src/pipeline_out_types.cpp
-# )
+add_executable(pipeline_out_node
+  src/pipeline_out_node.cpp
+  src/pipeline_out.cpp
+  src/pipeline_out_types.cpp
+)
 
 ament_target_dependencies(pipeline_in_node
   rclcpp
@@ -47,24 +48,41 @@ ament_target_dependencies(pipeline_in_node
   sensor_msgs
 )
 
-# ament_target_dependencies(pipeline_out_node
-#   rclcpp
-#   rclcpp_action
-#   rclpy
-#   std_msgs
-#   psg_actions
-#   psg_services
-#   psg_common
-#   sensor_msgs
-# )
+ament_target_dependencies(pipeline_out_node
+  rclcpp
+  rclcpp_action
+  rclpy
+  std_msgs
+  psg_actions
+  psg_services
+  psg_common
+  sensor_msgs
+)
 
 
 target_link_libraries(pipeline_in_node ${Boost_LIBRARIES})
-# target_link_libraries(pipeline_out_node ${Boost_LIBRARIES})
+target_link_libraries(pipeline_out_node ${Boost_LIBRARIES})
 
 install(TARGETS pipeline_in_node
-# pipeline_out_node
-  DESTINATION lib/${PROJECT_NAME})
+                pipeline_out_node
+DESTINATION lib/${PROJECT_NAME})
+
+ament_python_install_package(${PROJECT_NAME})
+
+# Install Python executables
+install(PROGRAMS
+  ${PROJECT_NAME}/ddq_detector_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# # Environment hook to set PYTHONPATH
+# ament_environment_hooks(
+#   "${CMAKE_CURRENT_SOURCE_DIR}/env-hooks/${PROJECT_NAME}.dsv.in"
+# )
+
+# # Install environment hook
+# install(FILES env-hooks/${PROJECT_NAME}.dsv
+#   DESTINATION share/${PROJECT_NAME}/env-hooks)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

@@ -68,17 +68,17 @@ namespace FlowRos2Pipeline {
 
         // query service
         rclcpp::Service<SRV_StatusQuery>::SharedPtr m_srv_status_query;
-        virtual void status_query_callback(const std::shared_ptr<SRV_StatusQuery::Request> request,
+        virtual void _status_query_callback(const std::shared_ptr<SRV_StatusQuery::Request> request,
             std::shared_ptr<SRV_StatusQuery::Response> response);
 
         // accept frames from upstream
         rclcpp_action::Server<ACT_AcceptFrame>::SharedPtr m_act_accept_frame;
-        virtual rclcpp_action::GoalResponse accept_frame_goal_callback(
+        virtual rclcpp_action::GoalResponse _accept_frame_goal_callback(
             const rclcpp_action::GoalUUID & uuid,
             std::shared_ptr<const ACT_AcceptFrame::Goal> goal);
-        virtual rclcpp_action::CancelResponse accept_frame_cancel_callback(
+        virtual rclcpp_action::CancelResponse _accept_frame_cancel_callback(
             const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptFrame>> goal_handle);
-        virtual void accept_frame_accepted_callback(
+        virtual void _accept_frame_accepted_callback(
             const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptFrame>> goal_handle);
 
     protected:
@@ -87,13 +87,13 @@ namespace FlowRos2Pipeline {
         // psg document downstreams
         std::map<std::string, std::shared_ptr<Downstream>> m_downstreams;
         // virtual void process_document_send_goals();
-        virtual void process_document_goal_response_callback(
+        virtual void _process_document_goal_response_callback(
             const rclcpp_action::ClientGoalHandle<ACT_AcceptDocument>::SharedPtr & goal_handle);
-        virtual void process_document_feedback_callback(rclcpp_action::ClientGoalHandle<ACT_AcceptDocument>::SharedPtr,
+        virtual void _process_document_feedback_callback(rclcpp_action::ClientGoalHandle<ACT_AcceptDocument>::SharedPtr,
             const std::shared_ptr<const ACT_AcceptDocument::Feedback> feedback);
-        virtual void process_document_result_callback(
+        virtual void _process_document_result_callback(
             const rclcpp_action::ClientGoalHandle<ACT_AcceptDocument>::WrappedResult & result);
-        virtual void process_document_create_tasks(const MSG_Frame& frame);
+        virtual void _process_document_create_tasks(const MSG_Frame& frame);
 
         using GoalHandle = rclcpp_action::ClientGoalHandle<ACT_AcceptDocument>::SharedPtr;
         class DSTask_PSGDocument{

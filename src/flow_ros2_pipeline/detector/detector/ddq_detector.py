@@ -1,13 +1,13 @@
-from flow_ros2_pipeline.detector.detector.base_detector import BaseDetector
+from detector.base_detector import BaseDetector, DetectionResult
 from mmengine.config import Config
 from mmdet.apis import DetInferencer
 import numpy as np
 
 class DdqDetrDetector(BaseDetector):
-    def __init__(self, model_body, model_head):
+    def __init__(self):
         super().__init__()
-        self.model_body = model_body
-        self.model_head = model_head
+        self.model = None
+        self.model_head = None
 
     def init(self, model_cfg, model_path, device='cuda:0', class_names=None, palette=None, show_progress=False):
         '''
@@ -35,10 +35,30 @@ class DdqDetrDetector(BaseDetector):
                                         palette=palette, show_progress=show_progress, scope=cfg['default_scope'])
         if self.device.startswith('cuda'):
             # Warm up
-            self.inferencer(inputs=np.zeros((640, 640, 3), dtype=np.uint8))
+            self.model(inputs=np.zeros((640, 640, 3), dtype=np.uint8))
         if class_names is None:
             self.class_names = ['body', 'head', 'face']
+        else:
+            self.class_names = class_names
 
-    def infer(self, input_data: np.ndarray):
+    def infer(self, input_data: np.ndarray, pred_threshold=0.3):
         results_dict = self.model(inputs=input_data)
-        return results_dict
+        results_list = []
+        for predictions in results_dict['predictions']:
+            preds = []
+            for label, score, bbox in zip(predictions['labels'], predictions['scores'], predictions['bboxes']):
+                if score < pred_threshold or label != 0:
+                    continue
+                det_result = DetectionResult(class_id=int(label), class_name=self.class_names[int(label)], xyxy=np.array(bbox), score=score)
+                preds.append(det_result)
+            results_list.append(preds)
+        return results_list
+
+
+if __name__ == "__main__":
+    detector = DdqDetrDetector()
+    model_cfg = '../configs/ddq/ddq-detr-4scale_swinl_8xb2-30e_coco.py'
+    weights = '../models/ddq_detr_swinl_30e.pth'
+    detector.init(model_cfg=model_cfg, model_path=weights, device='cuda:0', class_names=['person'])
+    results = detector.infer(np.zeros((640, 640, 3), dtype=np.uint8), pred_threshold=0.01)
+    print(results)

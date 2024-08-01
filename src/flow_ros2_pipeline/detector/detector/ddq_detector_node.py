@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
 import numpy as np
@@ -11,18 +13,17 @@ from unique_identifier_msgs.msg import UUID
 from psg_actions.action import ProcessDetections, ProcessFrame
 from psg_public_msgs.msg import Frame
 from psg_public_msgs.msg import Detections, Detection
-from psg_common.psg_common.interfaces import IOpenCloseProtocol
-from psg_common.psg_common.constants import NodeStatusCode, ReturnCode
-from psg_common.psg_common.utilities import create_v6d_client
+from psg_common.interfaces import IOpenCloseProtocol
+from psg_common.constants import NodeStatusCode, ReturnCode
+from psg_common.utilities import create_v6d_client, get_img_by_v6d_id
 
-from ddq_detector import DdqDetrDetector
+from detector.ddq_detector import DdqDetrDetector
 
-class DdqDetectorNode(Node, IOpenCloseProtocol):
+class DetectorNode(Node, IOpenCloseProtocol):
 
     class RuntimeConfig:
         def __init__(self):
             self.step_interval_ms : int = -1
-            # self.frame_interval_ms : int = -1
             self.pred_score_thr : float = 0.3
 
         def from_parameters(node):
@@ -32,8 +33,11 @@ class DdqDetectorNode(Node, IOpenCloseProtocol):
         def __init__(self):
             self.model = None
             self.downstreams : dict = {}
-            self.upstream_action_name : str = ''
+            self.process_frame_action : str = ''
             # self.upstreams : dict = {}
+            # add multiple models support
+            self.models : list = []
+            self.model_infer_time : list = []
 
         def from_parameters(node):
             pass
@@ -48,17 +52,14 @@ class DdqDetectorNode(Node, IOpenCloseProtocol):
             self.service_name: str = ''
 
 
-    def __init__(self):
-        super().__init__('action_server')
+    def __init__(self, node_name):
+        super().__init__(node_name)
         self.m_status_code : int = NodeStatusCode.BEFORE_INIT
         self.m_init_config : self.InitConfig = None
         self.m_runtime_config : self.RuntimeConfig = None
-        self.m_actions : dict = {}
         self.m_action : ActionServer = None
         self.m_downstreams : dict = {}
         self.m_logger = self.get_logger()
-        # self.ready_to_infer_next_frame : bool = True
-        # self.frame_timer = None
         self.m_feed_back_call : bool = False
 
         self.m_frame_buffer : SortedDict[int, (Frame, UUID)] = {} # key: frame_num, value: (frame_msg, detections_uuid)
@@ -66,11 +67,11 @@ class DdqDetectorNode(Node, IOpenCloseProtocol):
     def update_init_config(self, init_config: InitConfig) -> int:
         assert self.m_status_code == NodeStatusCode.INITIALIZED or \
                     self.m_status_code != NodeStatusCode.CLOSED, \
-                    "[ModelPy] cannot update_init_config"
+                    "cannot update_init_config"
 
         # you must either specify camera index or a video file
         assert init_config.source_camera_index != -1 or not init_config.source_file == '', \
-                "[ModelPy] source_camera_index and source_file can not be both empty"
+                "source_camera_index and source_file can not be both empty"
 
 
         self.m_init_config = init_config
@@ -80,7 +81,7 @@ class DdqDetectorNode(Node, IOpenCloseProtocol):
     def update_runtime_config(self, runtime_config: RuntimeConfig) -> int:
         assert self.m_status_code != NodeStatusCode.STARTED and \
                 self.m_status_code != NodeStatusCode.BEFORE_INIT, \
-                "[ModelPy] cannot update_runtime_config"
+                "cannot update_runtime_config"
 
         self.m_runtime_config = runtime_config
         return ReturnCode.SUCCESS
@@ -100,40 +101,38 @@ class DdqDetectorNode(Node, IOpenCloseProtocol):
 
     def init(self, init_config: InitConfig, runtime_config: RuntimeConfig) -> int:
         if self.m_status_code != NodeStatusCode.BEFORE_INIT and self.m_status_code != NodeStatusCode.CLOSED:
-            self.m_logger.error("[ModelPy] init FAILED! status code is not BEFORE_INIT or CLOSED")
+            self.m_logger.error("init FAILED! status code is not BEFORE_INIT or CLOSED")
             return ReturnCode.ERROR
 
-        assert self.m_status_code == NodeStatusCode.BEFORE_INIT, "[ModelPy] init FAILED! status code is not BEFORE_INIT"
+        assert self.m_status_code == NodeStatusCode.BEFORE_INIT, "init FAILED! status code is not BEFORE_INIT"
 
-        self.init_config = init_config
-        self.runtime_config = runtime_config
+        self.m_init_config = init_config
+        self.m_runtime_config = runtime_config
 
         self.m_v6d_client = create_v6d_client()
+
+        # setup upstreams
+        self._create_action_server()
 
         # setup downstreams
         self._connect_to_downstreams()
 
-        # # setup upstreams
-        # self._create_upstream_servers()
-        # setup action server
-        self._create_action_server()
-
         self.m_logger.info('Initialized')
+        self.m_status_code = NodeStatusCode.INITIALIZED
+
+        return ReturnCode.SUCCESS
 
 
     def open(self) -> int:
         # check status
         # you can open only if the node is initialized or closed
         assert self.m_status_code == NodeStatusCode.INITIALIZED or self.m_status_code == NodeStatusCode.CLOSED, \
-                "[ModelPy] cannot open because status code is not INITIALIZED or CLOSED"
-        assert self.m_v6d_client is not None, "[ModelPy] v6d_client is nullptr"
+                "cannot open because status code is not INITIALIZED or CLOSED"
+        assert self.m_v6d_client is not None, "v6d_client is nullptr"
 
-        # TODO:model init
-        self.model.init()
+        self.m_logger.info('model init SUCCESS!')
 
-        self.m_logger.info('[ModelPy] model init SUCCESS!')
-
-        self.m_logger.info('[ModelPy] m_status_code from %d to %d!', self.m_status_code, NodeStatusCode.OPENED)
+        self.m_logger.info(f'm_status_code from {self.m_status_code} to {NodeStatusCode.OPENED}!')
 
         self.m_status_code = NodeStatusCode.OPENED
 
@@ -142,21 +141,26 @@ class DdqDetectorNode(Node, IOpenCloseProtocol):
 
     def start(self) -> int:
         # the node must be opened
-        assert self.m_status_code == NodeStatusCode.OPENED, "[ModelPy] cannot start because status code is not OPENED"
+        assert self.m_status_code == NodeStatusCode.OPENED, "cannot start because status code is not OPENED"
 
         # create step thread
         self.step_running = True
 
-        def func():
+        def func(ith_model: int):
             while rclpy.ok() and self.step_running:
-                self._step()
+                self._step(ith_model)
                 if self.m_runtime_config.step_interval_ms > 0:
                     time.sleep(self.m_runtime_config.step_interval_ms / 1000.)
 
-        self.step_thread = threading.Thread(target=func)
-        self.step_thread.start()
+        # self.step_thread = threading.Thread(target=func)
+        # self.step_thread.start()
 
-        self.m_logger.info('[ModelPy] m_status_code from %d to %d!', self.m_status_code, NodeStatusCode.STARTED)
+        # thread pool executor
+        self.m_executor = ThreadPoolExecutor(max_workers=len(self.m_init_config.models))
+        for i in range(len(self.m_init_config.models)):
+            self.m_executor.submit(func, i)
+
+        self.m_logger.info(f'm_status_code from {self.m_status_code} to {NodeStatusCode.STARTED}!')
 
         self.m_status_code = NodeStatusCode.STARTED
 
@@ -164,15 +168,15 @@ class DdqDetectorNode(Node, IOpenCloseProtocol):
 
 
     def stop(self) -> int:
-        assert self.m_status_code == NodeStatusCode.STARTED, "[ModelPy] cannot stop because status code is not STARTED"
+        assert self.m_status_code == NodeStatusCode.STARTED, "cannot stop because status code is not STARTED"
 
         # if self.frame_timer is not None:
         #     self.frame_timer.cancel()
         #     self.frame_timer = None
 
-        self.m_logger.info('[ModelPy] m_status_code from %d to %d!', self.m_status_code, NodeStatusCode.OPENED)
+        self.m_logger.info(f'm_status_code from {self.m_status_code} to {NodeStatusCode.STOPPED}!')
 
-        self.m_status_code = NodeStatusCode.OPENED
+        self.m_status_code = NodeStatusCode.STOPPED
 
         return ReturnCode.SUCCESS
 
@@ -184,49 +188,34 @@ class DdqDetectorNode(Node, IOpenCloseProtocol):
 
         # only valid if the node is opened or stopped
         assert self.m_status_code == NodeStatusCode.OPENED or self.m_status_code == NodeStatusCode.STOPPED, \
-            "[ModelPy] cannot close because status code is not OPENED or STOPPED"
+            "cannot close because status code is not OPENED or STOPPED"
 
-        self.m_logger.info('[ModelPy] m_status_code from %d to %d!', self.m_status_code, NodeStatusCode.CLOSED)
+        self.m_logger.info(f'm_status_code from {self.m_status_code} to {NodeStatusCode.CLOSED}!')
 
         self.m_status_code = NodeStatusCode.CLOSED
 
         # terminate step thread
         self.step_running = False
-        if self.step_thread is not None:
-            self.step_thread.join()
-            self.step_thread = None
+        # if self.step_thread is not None:
+        #     self.step_thread.join()
+        #     self.step_thread = None
+        self.m_executor.shutdown()
 
         return ReturnCode.SUCCESS
 
 
-    def _create_upstream_servers(self):
-        assert self.m_init_config is not None, "[ModelPy] m_init_config is None"
-
-        self.m_actions.clear()
-
-        for us_name, us_node in self.m_init_config.upstreams.items():
-            self.m_logger.info(f"[ModelPy] connecting to upstream {us_name}")
-
-            # 创建accept_frame_client
-            name = us_node.action_name
-
-            client = ActionClient(self, ProcessDetections, name, self._accept_frame_accepted_callback)
-
-            self.m_actions[us_name] = client
-
-
     def _create_action_server(self):
-        assert self.m_init_config is not None, "[ModelPy] m_init_config is None"
-        self.m_action = ActionServer(self, ProcessFrame, self.m_init_config.upstream_action_name, self._accept_frame_accepted_callback)
+        assert self.m_init_config is not None, "m_init_config is None"
+        self.m_action = ActionServer(self, ProcessFrame, self.m_init_config.process_frame_action, self._accept_frame_accepted_callback)
 
 
     def _connect_to_downstreams(self):
-        assert self.m_init_config is not None, "[ModelPy] m_init_config is None"
+        assert self.m_init_config is not None, "m_init_config is None"
 
         self.m_downstreams.clear()
 
         for ds_name, ds_node in self.m_init_config.downstreams.items():
-            self.m_logger.info(f"[ModelPy] connecting to downstream {ds_name}")
+            self.m_logger.info(f"connecting to downstream {ds_name}")
 
             # 创建accept_frame_client
             name = ds_node.action_name
@@ -253,57 +242,39 @@ class DdqDetectorNode(Node, IOpenCloseProtocol):
         v6d_int_id = frame_msg.cache.id_int
 
         # Get the blob from Vineyard
-        blob = self.m_v6d_client.get(v6d_int_id)
-        buffer = memoryview(blob)
-
-        # Convert buffer to numpy array
-        np_arr = np.frombuffer(buffer, dtype=np.uint8)
-
-        print(np_arr.shape)
-
-        # Reshape the numpy array to the original image shape
-        image = np_arr.reshape((height, width, channels))  # TODO: get height, width, channels from frame_msg?
+        image = get_img_by_v6d_id(self.m_v6d_client, v6d_int_id)
 
         return image
 
 
     def _to_detections_msg(self, result):
         """
-        {
-            'predictions' : [
-                # Each instance corresponds to an input image
-                {
-                'labels': [...],  # int list of length (N, )
-                'scores': [...],  # float list of length (N, )
-                'bboxes': [...],  # 2d list of shape (N, 4), format: [min_x, min_y, max_x, max_y]
-                },
-                ...
-            ],
-            'visualization' : [
-                array(..., dtype=uint8),
-            ]
-        }
+        [
+            # image 1
+            [ DetectionResult(), DetectionResult(), ... ],
+            ...
+        ]
         """
         # jugde if the prediction score threshold is set to be valid
         if self.m_runtime_config.pred_score_thr < 0 or self.m_runtime_config.pred_score_thr > 1:
-            self.get_logger().warn("Invalid prediction score threshold: %f, we set it to 0", self.m_runtime_config.pred_score_thr)
+            self.m_logger.warn("Invalid prediction score threshold: %f, we set it to 0", self.m_runtime_config.pred_score_thr)
             pred_score_thr = 0
         else:
             pred_score_thr = self.m_runtime_config.pred_score_thr
 
         detections = Detections()
 
-        for predictions in result['predictions']:
-            for label, score, bbox in zip(predictions['labels'], predictions['scores'], predictions['bboxes']):
-                if score < pred_score_thr:
+        for predictions in result:
+            for pred in predictions:
+                if pred.score < pred_score_thr:
                     continue
                 detection_msg = Detection()
-                detection_msg.category = int(label)
-                detection_msg.confidence = score
-                detection_msg.bbox.x = bbox[0]
-                detection_msg.bbox.y = bbox[1]
-                detection_msg.bbox.width = bbox[2] - bbox[0]
-                detection_msg.bbox.height = bbox[3] - bbox[1]
+                detection_msg.category = pred.class_id
+                detection_msg.confidence = pred.score
+                detection_msg.bbox.x = pred.xyxy[0]
+                detection_msg.bbox.y = pred.xyxy[1]
+                detection_msg.bbox.width = pred.xyxy[2] - pred.xyxy[0]
+                detection_msg.bbox.height = pred.xyxy[3] - pred.xyxy[1]
                 detection_msg.is_detected_by_camera = True
 
                 detections.detections.append(detection_msg)
@@ -320,7 +291,7 @@ class DdqDetectorNode(Node, IOpenCloseProtocol):
         # add to frame buffer
         self._add_frame_to_buffer(frame, uuid)
 
-        self.m_logger.info("Accepted frame %ld and add it to buffer", frame.cache.id_int)
+        self.m_logger.info(f"Accepted frame {frame.cache.id_int} and add it to buffer")
 
         goal_handle.succeed()
 
@@ -331,94 +302,105 @@ class DdqDetectorNode(Node, IOpenCloseProtocol):
 
 
     def _goal_feedback_callback(self, feedback_msg):
-        self.get_logger().info('call Feedback: {0}'.format(feedback_msg.feedback.feedback_msg))
+        self.m_logger.info('call Feedback: {0}'.format(feedback_msg.feedback.feedback_msg))
         self.m_feed_back_call = True
 
 
     def _send_goal(self, goal_msg):
         # TODO: if not all downstreams are connected, what to do?
         for ds_name, ds_client in self.m_downstreams.items():
-            self.get_logger().info(f'sending goal to downstream {ds_name}')
+            self.m_logger.info(f'sending goal to downstream {ds_name}')
             ds_client.wait_for_server()
 
             self._send_goal_future = ds_client.send_goal_async(goal_msg,
                                             feedback_callback=self._goal_feedback_callback)
 
             # 等待goal被accept
-            self.get_logger().info('waiting for response...')
+            self.m_logger.info('waiting for response...')
             while not self._send_goal_future.done():
-                self.get_logger().info('waiting...')
+                self.m_logger.info('waiting...')
                 time.sleep(0.1)
 
             goal_handle = self._send_goal_future.result()
             if not goal_handle.accepted:
-                self.get_logger().info('Goal rejected :(')
+                self.m_logger.info('Goal rejected :(')
             else:
-                self.get_logger().info('Goal accepted :)')
+                self.m_logger.info('Goal accepted :)')
 
-            # 等待feedback
-            while not self.m_feed_back_call:
-                self.get_logger().warn('not received feedback yet, waiting...')
-                time.sleep(1)
+            # # 等待feedback
+            # while not self.m_feed_back_call:
+            #     self.m_logger.warn('not received feedback yet, waiting...')
+            #     time.sleep(1)
 
-            self.m_feed_back_call = False
-            self.get_logger().info('received feedback')
+            # self.m_feed_back_call = False
+            # self.m_logger.info('received feedback')
 
             # 等待最终结果
             result = goal_handle.get_result().result  # get_result is sync method, get_result_async is async method
-            self.get_logger().info('Result: {0}'.format(result.return_msg))
+            self.m_logger.info('Result: {0}'.format(result.return_msg))
 
 
-    def _step(self):
+    def _step(self, ith_model: int):
 
         # check status
         if self.m_status_code != NodeStatusCode.STARTED:
             # nothing to do if not started
             return
 
-        if self.m_frame_buffer:
-            # get the first frame in the buffer dict
-            frame_num, (frame_msg, uuid) = self.m_frame_buffer.popitem()
-            # get the image from Vineyard
-            img = self._get_frame_from_v6d(frame_msg)
+        self.m_logger.info("------------------- start step -------------------")
+        self.m_logger.info(f"{self.m_frame_buffer}")
+        with threading.Lock():
+            if self.m_frame_buffer:
+                # get the first frame in the buffer dict
+                frame_num, (frame_msg, uuid) = self.m_frame_buffer.popitem()
+                self.m_logger.info(f'framenum {frame_num} popped from buffer')
+        # get the image from Vineyard
+        img = self._get_frame_from_v6d(frame_msg)
+        self.m_logger.info(f"{img.shape}")
 
-            # process the image
-            result = self.model.infer(img)
+        # process the image
+        # result = self.m_init_config.model.infer(img, 0.3)
+        result = self.m_init_config.models[ith_model].infer(img, 0.3)
 
-            # send the result to downstreams
-            goal_msg = ProcessDetections.Goal()
-            goal_msg.detections = self._to_detections_msg(result)
-            goal_msg.detections.uuid = uuid
-            self.get_logger().info(f'sending detections uuid: {uuid}')
-            self._send_goal(goal_msg)
-            self.get_logger().info(f'sent detections uuid: {uuid}')
+        # send the result to downstreams
+        goal_msg = ProcessDetections.Goal()
+        goal_msg.detections = self._to_detections_msg(result)
+        goal_msg.detections.uuid = uuid
+        goal_msg.detections.frame = frame_msg
+        self.m_logger.info(f'sending detections uuid: {uuid}')
+        self._send_goal(goal_msg)
+        self.m_logger.info(f'sent detections uuid: {uuid}')
 
-        else:
-            self.get_logger().info('No frame in buffer')
+        # else:
+            # self.m_logger.info('No frame in buffer')
 
 
 
 def main(args=None):
     # init node
     rclpy.init(args=args)
-    ddq_detector_node = DdqDetectorNode()
-
-    # init model
-    ddq_model = DdqDetrDetector()
-    model_cfg = 'src/flow_ros2_pipeline/detector/configs/ddq/ddq-detr-4scale_swinl_8xb2-30e_coco.py'
-    weights = 'weights/ddq_detr_swinl_30e.pth'
-    ddq_model.init(model_cfg=model_cfg, model_path=weights, device='cuda:0', class_names=['person'])
+    ddq_detector_node = DetectorNode('detector_node')
 
     # init config
-    init_config = DdqDetectorNode.InitConfig()
-    init_config.model = ddq_model
-    downstream = DdqDetectorNode.ModelDownstreamNode()
-    downstream.action_name = 'process_detections'
-    init_config.downstreams['downstream1'] = downstream
-    init_config.upstream_action_name = 'process_frame'
+    init_config = DetectorNode.InitConfig()
+
+    # init model
+    for i in range(4):
+        ddq_model = DdqDetrDetector()
+        model_cfg = 'src/flow_ros2_pipeline/detector/configs/ddq/ddq-detr-4scale_swinl_8xb2-30e_coco.py'
+        weights = 'src/flow_ros2_pipeline/detector/models/ddq_detr_swinl_30e.pth'
+        ddq_model.init(model_cfg=model_cfg, model_path=weights, device=f'cuda:{i}', class_names=['person'])
+
+        init_config.models.append(ddq_model)
+        ddq_detector_node.get_logger().info(f"model {i} initialized")
+    downstream = DetectorNode.ModelDownstreamNode()
+    downstream.action_name = 'detector_out_process_detections_action'
+    init_config.downstreams['detector_out'] = downstream
+
+    init_config.process_frame_action = 'model_process_frame_action'
 
     # runtime config
-    runtime_config = DdqDetectorNode.RuntimeConfig()
+    runtime_config = DetectorNode.RuntimeConfig()
     runtime_config.pred_score_thr = 0.3
     runtime_config.step_interval_ms = 10
 
