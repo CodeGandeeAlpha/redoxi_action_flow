@@ -1,21 +1,20 @@
 cmake_minimum_required(VERSION 3.8)
 project(person_generator)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(rclcpp_action REQUIRED)
-find_package(psg_common REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(psg_actions REQUIRED)
-find_package(psg_private_msgs REQUIRED)
-find_package(psg_public_msgs REQUIRED)
-find_package(pg_for_ros2 REQUIRED)
+find_package(psg_common REQUIRED)
+find_package(rclcpp_action REQUIRED)
+find_package(psg_for_ros2 REQUIRED)
 
 include_directories(include)
 
@@ -28,7 +27,7 @@ ament_target_dependencies(${PROJECT_NAME}_node
   psg_actions
   psg_private_msgs
   psg_public_msgs
-  pg_for_ros2
+  psg_for_ros2
 )
 
 install(DIRECTORY include/

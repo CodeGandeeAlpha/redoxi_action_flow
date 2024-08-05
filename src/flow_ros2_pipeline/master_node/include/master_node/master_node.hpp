@@ -25,7 +25,20 @@ namespace FlowRos2Pipeline {
 
     class MasterNode : public rclcpp::Node, public IStartStopProtocol {
     public:
+        class Downstream;
+        class DSTask_PSGDocument;
+    public:
+        using InitConfig = MasterNodeInitConfig;
+        using RuntimeConfig = MasterNodeRuntimeConfig;
+        using MSG_Frame = psg_public_msgs::msg::Frame;
+        using ACT_AcceptFrame = psg_actions::action::ProcessFrame;
         using ACT_AcceptDocument = psg_actions::action::ProcessPsgDocument;
+        using SRV_StatusQuery = psg_services::srv::StatusQuery;
+
+        using GoalHandle = rclcpp_action::ClientGoalHandle<ACT_AcceptDocument>::SharedPtr;
+
+        using Map_Document_Waiting = std::map<std::tuple<Downstream*, int>, std::shared_ptr<DSTask_PSGDocument>>;
+        using Map_Document_Doing = std::map<GoalHandle, std::shared_ptr<DSTask_PSGDocument>>;
 
         class Downstream{
         public:
@@ -35,12 +48,12 @@ namespace FlowRos2Pipeline {
             rclcpp_action::Client<ACT_AcceptDocument>::SendGoalOptions options;
         };
 
-        using InitConfig = MasterNodeInitConfig;
-        using RuntimeConfig = MasterNodeRuntimeConfig;
-        using MSG_Frame = psg_public_msgs::msg::Frame;
-        using ACT_AcceptFrame = psg_actions::action::ProcessFrame;
-        using SRV_StatusQuery = psg_services::srv::StatusQuery;
-
+        class DSTask_PSGDocument{
+        public:
+            MSG_Frame frame;  // frame associated with this task
+            std::shared_ptr<Downstream> downstream;
+            GoalHandle goal_handle; // downstream goal handle
+        };
 
     public:
         MasterNode();
@@ -95,27 +108,11 @@ namespace FlowRos2Pipeline {
             const rclcpp_action::ClientGoalHandle<ACT_AcceptDocument>::WrappedResult & result);
         virtual void _process_document_create_tasks(const MSG_Frame& frame);
 
-        using GoalHandle = rclcpp_action::ClientGoalHandle<ACT_AcceptDocument>::SharedPtr;
-        class DSTask_PSGDocument{
-        public:
-            MSG_Frame frame;  // frame associated with this task
-            std::shared_ptr<Downstream> downstream;
-            GoalHandle goal_handle; // downstream goal handle
-
-            // enum TaskStatus{
-            //     TASK_NOT_SENT = 0,
-            //     TASK_SENT = 1,
-            //     TASK_DONE = 2,
-            //     TASK_FAILED = 3,
-            // };
-            // TaskStatus status = TASK_NOT_SENT;
-        };
-
     protected:
         virtual void _declare_all_parameters();
         virtual void _step();   //called by timer periodically
         virtual void _add_frame_to_buffer(const MSG_Frame& frame);
-        virtual void _remove_frame_from_buffer(int frame_number, bool remove_memory_entry);
+        virtual void _remove_frame_from_buffer(int frame_number, std::map<int, MSG_Frame>* frame_buffer_ptr, bool remove_memory_entry);
         // find and connect to downstreams
         virtual void _connect_to_downstreams();
         // buffer
@@ -123,8 +120,8 @@ namespace FlowRos2Pipeline {
 
         // on-going tasks of psg document processing
         // indexed by (downstream, frame_number)
-        std::map<std::tuple<Downstream*, int>, std::shared_ptr<DSTask_PSGDocument>> m_psgdoc_task_waiting;
-        std::map<GoalHandle, std::shared_ptr<DSTask_PSGDocument>> m_psgdoc_task_doing;
+        Map_Document_Waiting m_psgdoc_task_waiting;
+        Map_Document_Doing m_psgdoc_task_doing;
 
         // configuration
         std::shared_ptr<InitConfig> m_init_config;

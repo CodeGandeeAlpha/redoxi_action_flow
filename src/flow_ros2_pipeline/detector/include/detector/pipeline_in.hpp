@@ -21,6 +21,12 @@ namespace FlowRos2Pipeline{
 
     class DetectorIn : public rclcpp::Node, public IStartStopProtocol {
         public:
+            class DownstreamPipeline;
+            class DownstreamModel;
+            class DSTask_PsgDocument;
+            class DSTask_Frame;
+
+        public:
             using ACT_AcceptFrame = psg_actions::action::ProcessFrame;
             using ACT_AcceptDocument = psg_actions::action::ProcessPsgDocument;
 
@@ -29,6 +35,15 @@ namespace FlowRos2Pipeline{
             using MSG_Frame = psg_public_msgs::msg::Frame;
             using MSG_PsgDocument = psg_private_msgs::msg::PsgDocument;
             using MSG_UUID = unique_identifier_msgs::msg::UUID;
+
+            using GoalHandle_PsgDocument = rclcpp_action::ClientGoalHandle<ACT_AcceptDocument>::SharedPtr;
+            using GoalHandle_Frame = rclcpp_action::ClientGoalHandle<ACT_AcceptFrame>::SharedPtr;
+
+
+            using Map_Document_Waiting = std::map<std::tuple<DownstreamPipeline*, int>, std::shared_ptr<DSTask_PsgDocument>>;
+            using Map_Document_Doing = std::map<GoalHandle_PsgDocument, std::shared_ptr<DSTask_PsgDocument>>;
+            using Map_Frame_Waiting = std::map<std::tuple<DownstreamModel*, int>, std::shared_ptr<DSTask_Frame>>;
+            using Map_Frame_Doing = std::map<GoalHandle_Frame, std::shared_ptr<DSTask_Frame>>;
 
             class DownstreamPipeline{
             public:
@@ -47,7 +62,6 @@ namespace FlowRos2Pipeline{
             };
 
 
-            using GoalHandle_Frame = rclcpp_action::ClientGoalHandle<ACT_AcceptFrame>::SharedPtr;
             class DSTask_Frame{
             public:
                 MSG_Frame frame;  // frame associated with this task
@@ -56,7 +70,6 @@ namespace FlowRos2Pipeline{
                 GoalHandle_Frame goal_handle; // downstream goal handle
             };
 
-            using GoalHandle_PsgDocument = rclcpp_action::ClientGoalHandle<ACT_AcceptDocument>::SharedPtr;
             class DSTask_PsgDocument{
             public:
                 MSG_PsgDocument document;  // frame associated with this task
@@ -124,7 +137,7 @@ namespace FlowRos2Pipeline{
 
             virtual void _add_document_to_buffer(const MSG_PsgDocument& document);
 
-            virtual void _remove_document_from_buffer(int frame_number);
+            virtual void _remove_document_from_buffer(int frame_number, std::map<int, MSG_PsgDocument>* document_buffer_ptr);
 
         protected:
             // member of pipeline downstreams
@@ -143,15 +156,16 @@ namespace FlowRos2Pipeline{
             // impl data
             std::shared_ptr<DetectorInImpl> m_impl;
 
-            // on-going tasks of psg document processing
-            // indexed by (downstream, frame_number)
-            std::map<std::tuple<DownstreamPipeline*, int>, std::shared_ptr<DSTask_PsgDocument>> m_psgdoc_task_waiting;
-            std::map<GoalHandle_PsgDocument, std::shared_ptr<DSTask_PsgDocument>> m_psgdoc_task_doing;
 
-            // on-going tasks of frame processing
-            // indexed by (downstream, frame_number)
-            std::map<std::tuple<DownstreamModel*, int>, std::shared_ptr<DSTask_Frame>> m_frame_task_waiting;
-            std::map<GoalHandle_Frame, std::shared_ptr<DSTask_Frame>> m_frame_task_doing;
+            // // on-going tasks of psg document processing
+            // // indexed by (downstream, frame_number)
+            Map_Document_Waiting m_psgdoc_task_waiting;
+            Map_Document_Doing m_psgdoc_task_doing;
+
+            // // on-going tasks of frame processing
+            // // indexed by (downstream, frame_number)
+            Map_Frame_Waiting m_frame_task_waiting;
+            Map_Frame_Doing m_frame_task_doing;
 
             // status code
             int m_status_code = NodeStatusCode::BEFORE_INIT;

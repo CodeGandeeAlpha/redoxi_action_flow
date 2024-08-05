@@ -15,7 +15,7 @@
   <depend>psg_actions</depend>
   <depend>psg_private_msgs</depend>
   <depend>psg_public_msgs</depend>
-  <depend>pg_for_ros2</depend>
+  <depend>psg_for_ros2</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

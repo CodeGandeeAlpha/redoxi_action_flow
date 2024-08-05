@@ -146,19 +146,19 @@ class DetectorNode(Node, IOpenCloseProtocol):
         # create step thread
         self.step_running = True
 
-        def func(ith_model: int):
+        def func():
             while rclpy.ok() and self.step_running:
-                self._step(ith_model)
+                self._step()
                 if self.m_runtime_config.step_interval_ms > 0:
                     time.sleep(self.m_runtime_config.step_interval_ms / 1000.)
 
-        # self.step_thread = threading.Thread(target=func)
-        # self.step_thread.start()
+        self.step_thread = threading.Thread(target=func)
+        self.step_thread.start()
 
-        # thread pool executor
-        self.m_executor = ThreadPoolExecutor(max_workers=len(self.m_init_config.models))
-        for i in range(len(self.m_init_config.models)):
-            self.m_executor.submit(func, i)
+        # # thread pool executor
+        # self.m_executor = ThreadPoolExecutor(max_workers=len(self.m_init_config.models))
+        # for i in range(len(self.m_init_config.models)):
+        #     self.m_executor.submit(func, i)
 
         self.m_logger.info(f'm_status_code from {self.m_status_code} to {NodeStatusCode.STARTED}!')
 
@@ -340,7 +340,9 @@ class DetectorNode(Node, IOpenCloseProtocol):
             self.m_logger.info('Result: {0}'.format(result.return_msg))
 
 
-    def _step(self, ith_model: int):
+    def _step(self):
+
+
 
         # check status
         if self.m_status_code != NodeStatusCode.STARTED:

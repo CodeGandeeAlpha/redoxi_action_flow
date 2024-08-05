@@ -1,4 +1,5 @@
 #include "psg_common/psg_common.hpp"
+#include <boost/thread/lock_algorithms.hpp>
 #include <functional>
 #include <memory>
 #include <chrono>
@@ -24,6 +25,10 @@ namespace FlowRos2Pipeline {
         m_impl = std::make_shared<MasterNodeImpl>(this);
 
         _declare_all_parameters();
+
+        m_impl->sync_document_waiting_map = &m_psgdoc_task_waiting;
+        m_impl->sync_document_doing_map = &m_psgdoc_task_doing;
+        m_impl->sync_frame_buffer = &m_frame_buffer;
 
         m_memory_registry = std::make_shared<MemoryRegistry>(this);
 
@@ -189,7 +194,10 @@ namespace FlowRos2Pipeline {
     }
 
     void MasterNode::_add_frame_to_buffer(const MSG_Frame& frame) {
-        m_frame_buffer[frame.frame_num] = frame;
+        {
+            auto lock_ptr_frame_buffer = m_impl->sync_frame_buffer.synchronize();
+            (**lock_ptr_frame_buffer)[frame.frame_num] = frame;
+        }
 
         //add to memory registry
         MemoryEntry e;
@@ -203,19 +211,20 @@ namespace FlowRos2Pipeline {
         m_memory_registry->add_entry(e);
     }
 
-    void MasterNode::_remove_frame_from_buffer(int frame_number, bool remove_memory_entry){
-        m_frame_buffer.erase(frame_number);
+    void MasterNode::_remove_frame_from_buffer(int frame_number, std::map<int, MSG_Frame>* frame_buffer_ptr, bool remove_memory_entry){
+        frame_buffer_ptr->erase(frame_number);
         if(remove_memory_entry)
             m_memory_registry->remove_entries_by_frame(frame_number);
     }
 
     void MasterNode::_process_document_create_tasks(const MSG_Frame& frame){
+        auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
         //create tasks of this frame for all downstreams
         for(auto& x : m_downstreams) {
             auto task = std::make_shared<DSTask_PSGDocument>();
             task->downstream = x.second;
             task->frame = frame;
-            m_psgdoc_task_waiting[std::make_tuple(task->downstream.get(), frame.frame_num)] = task;
+            (**lock_ptr_document_task_waiting)[std::make_tuple(task->downstream.get(), frame.frame_num)] = task;
         }
     }
 
@@ -267,88 +276,96 @@ namespace FlowRos2Pipeline {
         std::set<int> useful_frames;
         std::vector<int> useless_frames;
 
-
-        if(!m_psgdoc_task_waiting.empty())
         {
-            // initiate all waiting tasks
-            std::vector<decltype(m_psgdoc_task_waiting)::key_type> tasks_to_remove;
+            auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.unique_synchronize();
+            auto lock_ptr_document_task_doing = m_impl->sync_document_doing_map.unique_synchronize();
+            boost::lock(lock_ptr_document_task_waiting, lock_ptr_document_task_doing);
+            if(!(*lock_ptr_document_task_waiting)->empty())
+            {
+                // initiate all waiting tasks
+                std::vector<Map_Document_Waiting::key_type> tasks_to_remove;
 
-            for(auto& it : m_psgdoc_task_waiting){
-                auto& task = it.second;
-                ACT_AcceptDocument::Goal goal;
-                goal.document.frame = task->frame;
-                auto ds = task->downstream;
-                auto handle = task->downstream->handler->async_send_goal(goal, ds->options);
+                for(auto& it : (**lock_ptr_document_task_waiting)){
+                    auto& task = it.second;
+                    ACT_AcceptDocument::Goal goal;
+                    goal.document.frame = task->frame;
+                    auto ds = task->downstream;
+                    auto handle = task->downstream->handler->async_send_goal(goal, ds->options);
 
-                RCLCPP_INFO(m_impl->logger, "_step async_send_goal: %ld", task->frame.frame_num);
+                    RCLCPP_INFO(m_impl->logger, "_step async_send_goal: %ld", task->frame.frame_num);
 
-                // FIXME: add timeout condition
-                auto task_response = handle.get();
-                if(task_response != nullptr){
-                    // accepted
-                    if(task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED){
-                        //successfully sent, record this
-                        task->goal_handle = task_response;
-                        // task->status = DSTask_PSGDocument::TASK_SENT;
-                        m_psgdoc_task_doing[task->goal_handle] = task;
-                        tasks_to_remove.push_back(it.first);
+                    // FIXME: add timeout condition
+                    auto task_response = handle.get();
+                    if(task_response != nullptr){
+                        // accepted
+                        if(task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED){
+                            //successfully sent, record this
+                            task->goal_handle = task_response;
+                            // task->status = DSTask_PSGDocument::TASK_SENT;
+                            (**lock_ptr_document_task_doing)[task->goal_handle] = task;
+                            tasks_to_remove.push_back(it.first);
+                        }
+
+                        // succeed
+                        else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED){
+                            // task->status = DSTask_PSGDocument::TASK_DONE;
+                            tasks_to_remove.push_back(it.first);
+                        }
                     }
+                    // else {
+                    //     // rejected
+                    //     task->status = DSTask_PSGDocument::TASK_FAILED;
+                    // }
 
-                    // succeed
-                    else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED){
-                        // task->status = DSTask_PSGDocument::TASK_DONE;
-                        tasks_to_remove.push_back(it.first);
-                    }
+                    //FIXME: what if failed to send many times?
+                    //you need to terminate a frame, remove it from memory registry
                 }
-                // else {
-                //     // rejected
-                //     task->status = DSTask_PSGDocument::TASK_FAILED;
-                // }
 
-                //FIXME: what if failed to send many times?
-                //you need to terminate a frame, remove it from memory registry
-            }
-
-            // remove all sent tasks
-            for(auto& it : tasks_to_remove){
-                m_psgdoc_task_waiting.erase(it);
-            }
-        }
-
-        //for on-going tasks, if it is done, remove it
-        if(!m_psgdoc_task_doing.empty()){
-            std::vector<GoalHandle> tasks_to_remove;
-            for(auto& it : m_psgdoc_task_doing){
-                auto& task_response = it.first;
-                if (task_response) {
-                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                        tasks_to_remove.push_back(it.first);
-                    }
+                // remove all sent tasks
+                for(auto& it : tasks_to_remove){
+                    (*lock_ptr_document_task_waiting)->erase(it);
                 }
             }
 
-            for(auto& it : tasks_to_remove){
-                m_psgdoc_task_doing.erase(it);
+            //for on-going tasks, if it is done, remove it
+            if(!(*lock_ptr_document_task_doing)->empty()){
+                std::vector<GoalHandle> tasks_to_remove;
+                for(auto& it : (**lock_ptr_document_task_doing)){
+                    auto& task_response = it.first;
+                    if (task_response) {
+                        if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                            tasks_to_remove.push_back(it.first);
+                        }
+                    }
+                }
+
+                for(auto& it : tasks_to_remove){
+                    (*lock_ptr_document_task_doing)->erase(it);
+                }
+            }
+
+            //if a frame has no waiting tasks or running tasks associated with it, remove it from buffer
+            for(auto& it : (**lock_ptr_document_task_waiting)){
+                useful_frames.insert(it.second->frame.frame_num);
+            }
+            for(auto& it : (**lock_ptr_document_task_doing)){
+                useful_frames.insert(it.second->frame.frame_num);
             }
         }
 
-        //if a frame has no waiting tasks or running tasks associated with it, remove it from buffer
-        for(auto& it : m_psgdoc_task_waiting){
-            useful_frames.insert(it.second->frame.frame_num);
-        }
-        for(auto& it : m_psgdoc_task_doing){
-            useful_frames.insert(it.second->frame.frame_num);
-        }
-        for(auto& it : m_frame_buffer){
-            // if not useful, it is useless
-            if(useful_frames.find(it.first) == useful_frames.end()){
-                useless_frames.push_back(it.first);
+        {
+            auto lock_ptr_frame_buffer = m_impl->sync_frame_buffer.synchronize();
+            for(auto& it : (**lock_ptr_frame_buffer)){
+                // if not useful, it is useless
+                if(useful_frames.find(it.first) == useful_frames.end()){
+                    useless_frames.push_back(it.first);
+                }
             }
-        }
 
-        // remove useless frames
-        for(auto& it : useless_frames){
-            _remove_frame_from_buffer(it, false);
+            // remove useless frames
+            for(auto& it : useless_frames){
+                _remove_frame_from_buffer(it, *lock_ptr_frame_buffer, false);
+            }
         }
     }
 }

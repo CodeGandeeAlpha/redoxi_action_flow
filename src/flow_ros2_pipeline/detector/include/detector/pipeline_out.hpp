@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <psg_actions/action/detail/process_detections__struct.hpp>
 #include <psg_public_msgs/msg/detail/detections__struct.hpp>
 #include <string>
@@ -23,6 +24,9 @@ namespace FlowRos2Pipeline{
 
     class DetectorOut : public rclcpp::Node, public IStartStopProtocol {
         public:
+            class Downstream;
+            class DSTask_PsgDocument;
+        public:
             using ACT_AcceptDetections = psg_actions::action::ProcessDetections;
             using ACT_AcceptDocument = psg_actions::action::ProcessPsgDocument;
 
@@ -30,6 +34,11 @@ namespace FlowRos2Pipeline{
             using RuntimeConfig = DetectorOutRuntimeConfig;
             using MSG_PsgDocument = psg_private_msgs::msg::PsgDocument;
             using MSG_Detections = psg_public_msgs::msg::Detections;
+
+            using GoalHandle_PsgDocument = rclcpp_action::ClientGoalHandle<ACT_AcceptDocument>::SharedPtr;
+
+            using Map_Document_Waiting = std::map<std::tuple<Downstream*, int>, std::shared_ptr<DSTask_PsgDocument>>;
+            using Map_Document_Doing = std::map<GoalHandle_PsgDocument, std::shared_ptr<DSTask_PsgDocument>>;
 
             class Downstream{
             public:
@@ -39,7 +48,6 @@ namespace FlowRos2Pipeline{
                 rclcpp_action::Client<ACT_AcceptDocument>::SendGoalOptions accept_document_options;
             };
 
-            using GoalHandle_PsgDocument = rclcpp_action::ClientGoalHandle<ACT_AcceptDocument>::SharedPtr;
             class DSTask_PsgDocument{
             public:
                 MSG_PsgDocument document;  // frame associated with this task
@@ -88,7 +96,7 @@ namespace FlowRos2Pipeline{
                 const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle);
 
             // create tasks
-            virtual void _process_document_create_tasks(const MSG_PsgDocument& document);
+            virtual void _process_document_create_tasks(const MSG_PsgDocument& document, Map_Document_Waiting* document_waiting_map_ptr);
 
 
         protected:
@@ -117,7 +125,7 @@ namespace FlowRos2Pipeline{
             virtual void _add_document_to_buffer(const MSG_PsgDocument& document);
             virtual void _add_detections_to_buffer(const MSG_Detections& detections);
 
-            virtual void _remove_document_from_buffer(int frame_number);
+            virtual void _remove_document_from_buffer(int frame_number, std::map<int, MSG_PsgDocument>* document_buffer_ptr);
 
             virtual void _merge_detections_and_documents();
 
@@ -138,8 +146,8 @@ namespace FlowRos2Pipeline{
 
             // on-going tasks of psg document processing
             // indexed by (downstream, frame_number)
-            std::map<std::tuple<Downstream*, int>, std::shared_ptr<DSTask_PsgDocument>> m_psgdoc_task_waiting;
-            std::map<GoalHandle_PsgDocument, std::shared_ptr<DSTask_PsgDocument>> m_psgdoc_task_doing;
+            Map_Document_Waiting m_psgdoc_task_waiting;
+            Map_Document_Doing m_psgdoc_task_doing;
 
             // status code
             int m_status_code = NodeStatusCode::BEFORE_INIT;
