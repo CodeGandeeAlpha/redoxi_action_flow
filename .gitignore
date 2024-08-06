@@ -45,3 +45,5 @@ design.md
 
 build-*/
 .cache/
+
+__pycache__/

@@ -7,5 +7,7 @@
     ],
     "cmake.parallelJobs": 63,
     "clangd.path": "clangd-18",
-    "editor.formatOnSave": true
+    "[cpp]": {
+        "editor.formatOnSave": true
+    }
 }
