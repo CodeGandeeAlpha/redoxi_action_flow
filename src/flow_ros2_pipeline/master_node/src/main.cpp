@@ -1,8 +1,8 @@
-#include <rclcpp/rclcpp.hpp>
 #include <master_node/master_node.hpp>
 #include <rclcpp/executors.hpp>
+#include <rclcpp/rclcpp.hpp>
 
-int main(int argc, char * argv[])
+int main(int argc, char *argv[])
 {
     rclcpp::init(argc, argv);
 

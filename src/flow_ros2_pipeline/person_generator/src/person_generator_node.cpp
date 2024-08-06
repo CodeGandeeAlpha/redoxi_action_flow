@@ -1,5 +1,6 @@
 #include <person_generator/person_generator.hpp>
 
-int main() {
+int main()
+{
     return 0;
 }
