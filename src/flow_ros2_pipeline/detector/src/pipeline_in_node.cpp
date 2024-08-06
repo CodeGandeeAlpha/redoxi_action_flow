@@ -1,7 +1,7 @@
-#include <rclcpp/rclcpp.hpp>
 #include <detector/pipeline_in.hpp>
+#include <rclcpp/rclcpp.hpp>
 
-int main(int argc, char * argv[])
+int main(int argc, char *argv[])
 {
     rclcpp::init(argc, argv);
 

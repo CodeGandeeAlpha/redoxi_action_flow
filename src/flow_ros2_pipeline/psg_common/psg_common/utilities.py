@@ -1,5 +1,6 @@
 import vineyard
 import numpy as np
+import threading
 
 def create_v6d_client(socket : str ="/var/run/vineyard.sock") -> vineyard.Client:
     v6d_client = vineyard.connect(socket)
@@ -17,3 +18,17 @@ def get_img_by_v6d_id(v6d_client: vineyard.Client, v6d_id: int) -> np.ndarray:
     image_data = np.frombuffer(mem, dtype=np.uint8).reshape(shape)
 
     return image_data
+
+
+class SynchronizedValue:
+    def __init__(self, initial_value=None):
+        self._value = initial_value
+        self._lock = threading.RLock()
+
+    def get_value(self):
+        with self._lock:
+            return self._value
+
+    def set_value(self, new_value):
+        with self._lock:
+            self._value = new_value

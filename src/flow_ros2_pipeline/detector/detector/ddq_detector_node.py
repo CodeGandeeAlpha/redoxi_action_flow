@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
-import numpy as np
 from sortedcontainers.sorteddict import SortedDict
 
 import rclpy
@@ -15,7 +13,7 @@ from psg_public_msgs.msg import Frame
 from psg_public_msgs.msg import Detections, Detection
 from psg_common.interfaces import IOpenCloseProtocol
 from psg_common.constants import NodeStatusCode, ReturnCode
-from psg_common.utilities import create_v6d_client, get_img_by_v6d_id
+from psg_common.utilities import create_v6d_client, get_img_by_v6d_id, SynchronizedValue
 
 from detector.ddq_detector import DdqDetrDetector
 
@@ -36,8 +34,8 @@ class DetectorNode(Node, IOpenCloseProtocol):
             self.process_frame_action : str = ''
             # self.upstreams : dict = {}
             # add multiple models support
-            self.models : list = []
-            self.model_infer_time : list = []
+            self.models : dict[str, list] = {}
+            self.model_infer_time : dict[str, int] = {}
 
         def from_parameters(node):
             pass
@@ -63,6 +61,9 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self.m_feed_back_call : bool = False
 
         self.m_frame_buffer : SortedDict[int, (Frame, UUID)] = {} # key: frame_num, value: (frame_msg, detections_uuid)
+        self.m_models_task_in_queue : dict[str, list[tuple[Frame, UUID]]] = {}  # key: model_name, value: [(frame_msg, detections_uuid)]
+        self.m_models_task_out_queue : dict[str, dict[UUID, list[Detections]]] = {}  # key: model_name, value: [detections_msg]
+        self.m_models_threads : dict[str, list[threading.Thread]] = {}  # key: model_name, value: [thread...]
 
     def update_init_config(self, init_config: InitConfig) -> int:
         assert self.m_status_code == NodeStatusCode.INITIALIZED or \
@@ -109,6 +110,10 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self.m_init_config = init_config
         self.m_runtime_config = runtime_config
 
+        self.m_sync_frame_buffer = SynchronizedValue(self.m_frame_buffer)
+        self.m_sync_models_task_in_queue = SynchronizedValue(self.m_models_task_in_queue)
+        self.m_sync_models_task_out_queue = SynchronizedValue(self.m_models_task_out_queue)
+
         self.m_v6d_client = create_v6d_client()
 
         # setup upstreams
@@ -146,19 +151,27 @@ class DetectorNode(Node, IOpenCloseProtocol):
         # create step thread
         self.step_running = True
 
-        def func():
+        def func_step():
             while rclpy.ok() and self.step_running:
                 self._step()
                 if self.m_runtime_config.step_interval_ms > 0:
                     time.sleep(self.m_runtime_config.step_interval_ms / 1000.)
 
-        self.step_thread = threading.Thread(target=func)
+        self.step_thread = threading.Thread(target=func_step)
         self.step_thread.start()
 
-        # # thread pool executor
-        # self.m_executor = ThreadPoolExecutor(max_workers=len(self.m_init_config.models))
-        # for i in range(len(self.m_init_config.models)):
-        #     self.m_executor.submit(func, i)
+        # create models thread
+        for model_type, models_lst in self.m_init_config.models.items():
+            for model_idx in len(models_lst):
+                def func_model(model_type, model_idx):
+                    while rclpy.ok() and self.step_running:
+                        self._model(model_type, model_idx)
+                        if self.m_init_config.model_infer_time[model_type] > 0:
+                            time.sleep(self.m_init_config.model_infer_time[model_type] / 1000.)
+
+                model_thread = threading.Thread(target=func_model, args=(model_type, model_idx,))
+                model_thread.start()
+                self.m_models_threads[model_type].append(model_thread)
 
         self.m_logger.info(f'm_status_code from {self.m_status_code} to {NodeStatusCode.STARTED}!')
 
@@ -224,17 +237,24 @@ class DetectorNode(Node, IOpenCloseProtocol):
             self.m_downstreams[ds_name] = client
 
 
-    def _remove_frame_from_buffer(self, frame_number : int, remove_memory_entry : bool):
-        self.m_frame_buffer.pop(frame_number, None)
-        if remove_memory_entry:
-            # m_memory_registry->remove_entries_by_frame(frame_number);
-            pass
+    def _remove_frame_from_buffer(self, frame_number : int):
+        with self.m_sync_frame_buffer._lock:
+            self.m_sync_frame_buffer.get_value().pop(frame_number, None)
 
 
     def _add_frame_to_buffer(self, frame_msg, uuid):
-        self.m_frame_buffer[frame_msg.frame_num] = (frame_msg, uuid)
-        # m_memory_registry->add_entry(frame_number, frame_msg);
-        pass
+        with self.m_sync_frame_buffer._lock:
+            self.m_sync_frame_buffer.get_value()[frame_msg.frame_num] = (frame_msg, uuid)
+
+    def _process_frame_create_model_tasks(self, frame_msg, uuid):
+        with self.m_sync_models_task_in_queue._lock:
+            task_in_queue = self.m_sync_models_task_in_queue.get_value()
+            # add to every model task queue
+            for model_name in self.m_init_config.models.keys():
+                if model_name not in task_in_queue:
+                    task_in_queue[model_name] = []
+                else:
+                    task_in_queue[model_name].append((frame_msg, uuid))
 
     def _get_frame_from_v6d(self, frame_msg):
         if not frame_msg.cache.has_int_id:
@@ -291,6 +311,9 @@ class DetectorNode(Node, IOpenCloseProtocol):
         # add to frame buffer
         self._add_frame_to_buffer(frame, uuid)
 
+        # add it to every model task queue
+        self._process_frame_create_model_tasks(frame, uuid)
+
         self.m_logger.info(f"Accepted frame {frame.cache.id_int} and add it to buffer")
 
         goal_handle.succeed()
@@ -339,43 +362,84 @@ class DetectorNode(Node, IOpenCloseProtocol):
             result = goal_handle.get_result().result  # get_result is sync method, get_result_async is async method
             self.m_logger.info('Result: {0}'.format(result.return_msg))
 
+    def _merge_detections(self):
+        with self.m_sync_models_task_out_queue._lock:
+            task_out_queue = self.m_sync_models_task_out_queue.get_value()
+            # Step 1: Initialize a dictionary to store the count of each uuid
+            uuid_dict = {}
+
+            # Step 2: Iterate over each model's task queue
+            for model_type, tasks in task_out_queue.items():
+                for uuid in tasks.keys():
+                    if uuid not in uuid_dict:
+                        uuid_dict[uuid] = set()
+                    uuid_dict[uuid].add(model_type)
+
+            # Step 3: Find uuids that are present in all model task queues
+            common_uuids = [uuid for uuid, models in uuid_dict.items() if len(models) == len(task_out_queue)]
+
+            # Step 4: merge the results from all models
+            dets = Detections()
+            for uuid in common_uuids:
+                dets.uuid = uuid
+                for model_type, tasks in task_out_queue.items():
+                    for detections in tasks[uuid]:
+                        dets.detections.extend(detections.detections)
+                        dets.frame = detections.frame
+
+        return dets
 
     def _step(self):
-
-
-
         # check status
         if self.m_status_code != NodeStatusCode.STARTED:
             # nothing to do if not started
             return
 
-        self.m_logger.info("------------------- start step -------------------")
-        self.m_logger.info(f"{self.m_frame_buffer}")
-        with threading.Lock():
-            if self.m_frame_buffer:
-                # get the first frame in the buffer dict
-                frame_num, (frame_msg, uuid) = self.m_frame_buffer.popitem()
-                self.m_logger.info(f'framenum {frame_num} popped from buffer')
-        # get the image from Vineyard
-        img = self._get_frame_from_v6d(frame_msg)
-        self.m_logger.info(f"{img.shape}")
-
-        # process the image
-        # result = self.m_init_config.model.infer(img, 0.3)
-        result = self.m_init_config.models[ith_model].infer(img, 0.3)
+        # merge the results from all models
+        dets = self._merge_detections()
 
         # send the result to downstreams
         goal_msg = ProcessDetections.Goal()
-        goal_msg.detections = self._to_detections_msg(result)
-        goal_msg.detections.uuid = uuid
-        goal_msg.detections.frame = frame_msg
-        self.m_logger.info(f'sending detections uuid: {uuid}')
+        goal_msg.detections = dets
         self._send_goal(goal_msg)
-        self.m_logger.info(f'sent detections uuid: {uuid}')
 
-        # else:
-            # self.m_logger.info('No frame in buffer')
+        # remove the frame from buffer
+        self._remove_frame_from_buffer(dets.frame.frame_num)
 
+
+
+    def _model(self, model_type, model_idx):
+        assert model_type in self.m_init_config.models, "model type not found"
+        # check status
+        if self.m_status_code != NodeStatusCode.STARTED:
+            # nothing to do if not started
+            return
+
+        with self.m_sync_models_task_in_queue._lock:
+            task_in_queue = self.m_sync_models_task_in_queue.get_value()
+            if task_in_queue[model_type]:
+                # get the first frame in the buffer dict
+                frame_msg, uuid = task_in_queue[model_type].pop(0)
+                self.m_logger.info(f'framenum {frame_msg.frame_num} popped from model task queue')
+
+                # get the image from Vineyard
+                img = self._get_frame_from_v6d(frame_msg)
+                self.m_logger.info(f"{img.shape}")
+
+                # process the image
+                result = self.m_init_config.models[model_type][model_idx].infer(img, 0.3)
+
+                # convert the result to Detections msg
+                detections = self._to_detections_msg(result)
+                detections.uuid = uuid
+                detections.frame = frame_msg
+
+                with self.m_sync_models_task_out_queue._lock:
+                    task_out_queue = self.m_sync_models_task_out_queue.get_value()
+                    # add the Detections msg to downstreams queue
+                    if model_type not in task_out_queue:
+                        task_out_queue[model_type] = {}
+                    task_out_queue[model_type][detections.uuid].append(detections)
 
 
 def main(args=None):
@@ -386,14 +450,14 @@ def main(args=None):
     # init config
     init_config = DetectorNode.InitConfig()
 
-    # init model
+    # init body model
     for i in range(4):
         ddq_model = DdqDetrDetector()
         model_cfg = 'src/flow_ros2_pipeline/detector/configs/ddq/ddq-detr-4scale_swinl_8xb2-30e_coco.py'
         weights = 'src/flow_ros2_pipeline/detector/models/ddq_detr_swinl_30e.pth'
         ddq_model.init(model_cfg=model_cfg, model_path=weights, device=f'cuda:{i}', class_names=['person'])
 
-        init_config.models.append(ddq_model)
+        init_config.models['body'].append(ddq_model)
         ddq_detector_node.get_logger().info(f"model {i} initialized")
     downstream = DetectorNode.ModelDownstreamNode()
     downstream.action_name = 'detector_out_process_detections_action'
