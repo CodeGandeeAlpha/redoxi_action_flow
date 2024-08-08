@@ -1,23 +1,19 @@
 #pragma once
 #include <map>
+#include <psg_common/psg_common.hpp>
 #include <string>
-
-#include <psg_actions/action/process_psg_document.hpp>
-#include <psg_private_msgs/msg/psg_document.hpp>
-
 
 namespace FlowRos2Pipeline
 {
 class PersonGenerator;
 
-class PersonGeneratorDownstreamNode
+class PersonGeneratorDownstreamPipelineNode
 {
   public:
-    virtual ~PersonGeneratorDownstreamNode()
+    virtual ~PersonGeneratorDownstreamPipelineNode()
     {
     }
     std::string accept_document_action;
-    std::string accept_frame_service;
 };
 
 class PersonGeneratorInitConfig
@@ -28,8 +24,10 @@ class PersonGeneratorInitConfig
     }
 
     // downstream nodes, mapping node name to node configurations
-    using DownstreamNode = PersonGeneratorDownstreamNode;
-    std::map<std::string, DownstreamNode> downstreams;
+    using DownstreamPipelineNode = PersonGeneratorDownstreamPipelineNode;
+    std::map<std::string, DownstreamPipelineNode> pipeline_downstreams;
+
+    std::string process_document_action;
 
     void from_parameters(PersonGenerator *node);
 };
@@ -40,7 +38,12 @@ class PersonGeneratorRuntimeConfig
     virtual ~PersonGeneratorRuntimeConfig()
     {
     }
-    double frame_internal_ms = -1; // TODO: add more runtime configurations
+
+    // step frequency
+    double step_interval_ms = DefaultNodeStepIntervalMs;
+
+    double timeout_ms_send_to_downstream = DefaultTimeoutMs;
+
     void from_parameters(PersonGenerator *node);
 };
 } // namespace FlowRos2Pipeline

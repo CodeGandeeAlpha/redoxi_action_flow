@@ -14,21 +14,24 @@ find_package(std_msgs REQUIRED)
 find_package(psg_actions REQUIRED)
 find_package(psg_common REQUIRED)
 find_package(rclcpp_action REQUIRED)
-find_package(psg_for_ros2 REQUIRED)
+find_package(RedoxiTrack REQUIRED)
+find_package(PassengerFlow REQUIRED)
 
 include_directories(include)
 
 add_executable(${PROJECT_NAME}_node src/person_generator_node.cpp src/person_generator.cpp)
 
-ament_target_dependencies(${PROJECT_NAME}_node
-  rclcpp
-  rclcpp_action
-  psg_common
-  psg_actions
-  psg_private_msgs
-  psg_public_msgs
-  psg_for_ros2
+
+ament_target_dependencies(${PROJECT_NAME}_node PUBLIC
+rclcpp
+rclcpp_action
+psg_common
+psg_actions
+psg_private_msgs
+psg_public_msgs
 )
+
+target_link_libraries(${PROJECT_NAME}_node PUBLIC PassengerFlow::PassengerFlow)
 
 install(DIRECTORY include/
   DESTINATION include)

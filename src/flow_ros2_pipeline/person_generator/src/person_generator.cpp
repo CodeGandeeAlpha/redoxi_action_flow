@@ -1,65 +1,348 @@
+#include <boost/thread/synchronized_value.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <set>
+
 #include <person_generator/_person_generator.hpp>
 #include <person_generator/person_generator.hpp>
+#include <rcpputils/asserts.hpp>
 
-// namespace FlowRos2Pipeline {
-//     PersonGenerator::PersonGenerator() : Node("master_node")
-//     {
-//         m_impl = std::make_shared<PersonGeneratorImpl>(this);
+static constexpr auto ROS_ASSERT = rcpputils::assert_true;
 
-//         _declare_all_parameters();
+using namespace std::chrono_literals;
 
-//         RCLCPP_INFO(m_impl->logger, "[PersonGenerator] constraction success!");
-//     }
+namespace FlowRos2Pipeline
+{
+PersonGenerator::PersonGenerator()
+    : Node("person_generator_node")
+{
+    m_impl = std::make_shared<PersonGeneratorImpl>(this);
 
-//     void PersonGenerator::_declare_all_parameters() {
-//         this->declare_parameter<std::string>("downstream_action", "");
-//         this->declare_parameter<std::string>("status_query_service", "");
-//         this->declare_parameter<std::string>("send_frame_action", "");
-//         this->declare_parameter<double>("frame_internal_ms", -1);
-//     }
+    _declare_all_parameters();
 
-//     int PersonGenerator::init(const std::shared_ptr<InitConfig>& config,
-//                             const std::shared_ptr<RuntimeConfig>& runtime_config) {
-//         if (m_status_code != NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::CLOSED) {
-//             RCLCPP_ERROR(m_impl->logger, "[MasterNode] init FAILED! status code is not BEFORE_INIT or CLOSED");
-//             return ReturnCode::ERROR;
-//         }
+    // init impl members
+    m_impl->sync_document_waiting_map = &m_psgdoc_task_waiting;
+    m_impl->sync_document_doing_map = &m_psgdoc_task_doing;
 
-//         m_init_config = config;
-//         m_runtime_config = runtime_config;
+    m_impl->sync_document_buffer = &m_document_buffer;
 
-//         m_memory_registry->connect_to_v6d("/var/run/vineyard.sock");
+    RCLCPP_INFO(m_impl->logger, "constraction success!");
+}
+
+int PersonGenerator::init(const std::shared_ptr<InitConfig> &config,
+                          const std::shared_ptr<RuntimeConfig> &runtime_config)
+{
+    ROS_ASSERT(m_status_code == NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::STOPPED,
+               "init FAILED! status code is not BEFORE_INIT or STOPPED");
+
+    m_init_config = config;
+    m_runtime_config = runtime_config;
+
+    // setup downstreams
+    _connect_to_downstreams();
+
+    // create server
+    m_act_process_document = rclcpp_action::create_server<ACT_AcceptDocument>(
+        this, m_init_config->process_document_action,
+        std::bind(&PersonGenerator::_accept_document_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
+        std::bind(&PersonGenerator::_accept_document_cancel_callback, this, std::placeholders::_1),
+        std::bind(&PersonGenerator::_accept_document_accepted_callback, this, std::placeholders::_1));
+
+    RCLCPP_INFO(m_impl->logger,
+                "m_status_code from %d to %d!",
+                m_status_code, NodeStatusCode::INITIALIZED);
+    m_status_code = NodeStatusCode::INITIALIZED;
+    return ReturnCode::SUCCESS;
+}
+
+const std::shared_ptr<PersonGenerator::InitConfig> &PersonGenerator::get_init_config() const
+{
+    return m_init_config;
+}
+
+int PersonGenerator::update_runtime_config(const std::shared_ptr<RuntimeConfig> &config)
+{
+    ROS_ASSERT(m_status_code != NodeStatusCode::STARTED &&
+                   m_status_code != NodeStatusCode::BEFORE_INIT,
+               "cannot update_runtime_config");
+
+    m_runtime_config = config;
+    return ReturnCode::SUCCESS;
+}
+
+const std::shared_ptr<PersonGenerator::RuntimeConfig> &PersonGenerator::get_runtime_config() const
+{
+    return m_runtime_config;
+}
 
 
-//         // create status_query server
-//         std::string status_query_service = this->get_parameter("status_query_service").as_string();
-//         // m_srv_status_query = this->create_service<MSG_StatusQuery>(
-//         //     status_query_service, &MasterNode::status_query_callback);
-//         m_srv_status_query = this->create_service<MSG_StatusQuery>(
-//             status_query_service, std::bind(&MasterNode::status_query_callback, this, std::placeholders::_1, std::placeholders::_2));
+int PersonGenerator::start()
+{
+    // the node must be opened
+    ROS_ASSERT(m_status_code == NodeStatusCode::INITIALIZED,
+               "cannot start because status code is not INITIALIZED");
+
+    RCLCPP_INFO(m_impl->logger,
+                "m_status_code from %d to %d!",
+                m_status_code, NodeStatusCode::STARTED);
+
+    m_status_code = NodeStatusCode::STARTED;
+
+    m_impl->step_running = true;
+    m_impl->step_thread = std::make_shared<std::thread>(
+        [this]() {
+            while (rclcpp::ok() && m_impl->step_running) {
+                _step();
+                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+            }
+        });
+
+    return ReturnCode::SUCCESS;
+}
+
+int PersonGenerator::stop()
+{
+    // only stoppable if the node is started
+    ROS_ASSERT(m_status_code == NodeStatusCode::STARTED,
+               "cannot stop because status code is not STARTED");
+
+    // terminate step thread
+    m_impl->step_running = false;
+    if (m_impl->step_thread) {
+        m_impl->step_thread->join();
+        m_impl->step_thread = nullptr;
+    }
+
+    RCLCPP_INFO(m_impl->logger,
+                "m_status_code from %d to %d!",
+                m_status_code, NodeStatusCode::STOPPED);
+
+    m_status_code = NodeStatusCode::STOPPED;
+    return ReturnCode::SUCCESS;
+}
 
 
-//         // create send_frame server
-//         std::string send_frame_action = this->get_parameter("send_frame_action").as_string();
-//         m_act_accept_frame = rclcpp_action::create_server<ACT_AcceptFrame>(
-//             this, send_frame_action,
-//             std::bind(&MasterNode::accept_frame_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
-//             std::bind(&MasterNode::accept_frame_cancel_callback, this, std::placeholders::_1),
-//             std::bind(&MasterNode::accept_frame_accepted_callback, this, std::placeholders::_1));
+int PersonGenerator::get_status_code() const
+{
+    return m_status_code;
+}
 
-//         // create downstream action client
-//         m_ds_psgdocument["downstream_action"] = std::make_shared<DS_PSGDocument>();
-//         m_ds_psgdocument["downstream_action"]->handler =
-//                 rclcpp_action::create_client<DownstreamFunctions::DocumentAction>(this, m_init_config->downstream_action_name);
-//         m_ds_psgdocument["downstream_action"]->options.goal_response_callback =
-//                 std::bind(&MasterNode::process_document_goal_response_callback, this, std::placeholders::_1);
-//         m_ds_psgdocument["downstream_action"]->options.feedback_callback =
-//                 std::bind(&MasterNode::process_document_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
-//         m_ds_psgdocument["downstream_action"]->options.result_callback =
-//                 std::bind(&MasterNode::process_document_result_callback, this, std::placeholders::_1);
 
-//         m_status_code = NodeStatusCode::INITIALIZED;
-//         return ReturnCode::SUCCESS;
-//     }
+rclcpp_action::GoalResponse PersonGenerator::_accept_document_goal_callback(
+    const rclcpp_action::GoalUUID &uuid,
+    std::shared_ptr<const ACT_AcceptDocument::Goal> goal)
+{
+    RCLCPP_INFO(m_impl->logger, "Received goal request with psg document %ld", goal->document.frame.frame_num);
+    (void)uuid; // not used
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+}
 
-// }
+rclcpp_action::CancelResponse PersonGenerator::_accept_document_cancel_callback(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle)
+{
+    RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
+    (void)goal_handle; // not used
+    return rclcpp_action::CancelResponse::REJECT;
+}
+
+void PersonGenerator::_accept_document_accepted_callback(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle)
+{
+
+    const auto &goal = goal_handle->get_goal();
+
+    // FIXME: cache the document, copy it for modify it
+    auto document = goal->document;
+    const auto &frame = document.frame;
+
+    // add detections_uuid to document
+    boost::uuids::uuid uuid = boost::uuids::random_generator()();
+    std::copy(uuid.begin(), uuid.end(), document.detections_uuid.uuid.begin());
+
+    // add to memory registry
+    _add_document_to_buffer(document);
+
+    RCLCPP_INFO(m_impl->logger, "Accepted document %ld and add it to buffer", document.frame.frame_num);
+
+    // create tasks for all downstreams
+    _process_document_create_tasks(document);
+
+    auto result = std::make_shared<ACT_AcceptDocument::Result>();
+    result->return_msg = "Document accepted";
+    result->return_code = ReturnCode::SUCCESS;
+    goal_handle->succeed(result);
+}
+
+
+void PersonGenerator::_process_document_create_tasks(const MSG_PsgDocument &document)
+{
+    auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+    // create tasks of this frame for all downstreams
+    for (auto &x : m_pipeline_downstreams) {
+
+        auto task = std::make_shared<DSTask_PsgDocument>();
+        task->downstream = x.second;
+        task->document = document;
+        (**lock_ptr_psgdoc_task_waiting)[std::make_tuple(task->downstream.get(), document.frame.frame_num)] = task;
+    }
+}
+
+
+void PersonGenerator::_step()
+{
+    _send_document_to_downstreams();
+}
+
+void PersonGenerator::_connect_to_downstreams()
+{
+    ROS_ASSERT(m_init_config != nullptr, "m_init_config is nullptr");
+
+    m_pipeline_downstreams.clear();
+
+    for (auto it : m_init_config->pipeline_downstreams) {
+        auto ds = std::make_shared<Downstream>();
+        RCLCPP_INFO(m_impl->logger, "connecting to pipeline downstream %s", it.first.c_str());
+
+        // 创建pipeline downstream
+        {
+            std::string name = it.second.accept_document_action;
+            auto client = rclcpp_action::create_client<ACT_AcceptDocument>(this, name);
+
+            ds->accept_document = client;
+            // ds->accept_document_options.goal_response_callback =
+            //         std::bind(&PersonGenerator::process_document_goal_response_callback, this, std::placeholders::_1);
+            // ds->accept_document_options.feedback_callback =
+            //         std::bind(&PersonGenerator::process_document_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
+            // ds->accept_document_options.result_callback =
+            //         std::bind(&PersonGenerator::process_document_result_callback, this, std::placeholders::_1);
+
+            // wait until the action server is ready
+            RCLCPP_INFO(m_impl->logger, "waiting for pipeline action server %s", name.c_str());
+            client->wait_for_action_server();
+            RCLCPP_INFO(m_impl->logger, "pipeline action server %s is ready", name.c_str());
+        }
+
+        m_pipeline_downstreams[it.first] = ds;
+    }
+}
+
+void PersonGenerator::_send_document_to_downstreams()
+{
+    std::set<int> useful_documents;
+    std::vector<int> useless_documents;
+
+    {
+        auto locks = boost::synchronize(m_impl->sync_document_waiting_map, m_impl->sync_document_doing_map);
+        auto &lock_ptr_psgdoc_task_waiting = std::get<0>(locks);
+        auto &lock_ptr_psgdoc_task_doing = std::get<1>(locks);
+
+        if (!(*lock_ptr_psgdoc_task_waiting)->empty()) {
+            // initiate all waiting tasks
+            std::vector<Map_Document_Waiting::key_type> tasks_to_remove;
+
+            for (auto &it : **lock_ptr_psgdoc_task_waiting) {
+                auto &task = it.second;
+                ACT_AcceptDocument::Goal goal;
+                goal.document = task->document;
+                auto ds = task->downstream;
+                auto handle = task->downstream->accept_document->async_send_goal(goal, ds->accept_document_options);
+                RCLCPP_INFO(m_impl->logger, "_step document async_send_goal: %ld", task->document.frame.frame_num);
+
+                // FIXME: add timeout condition
+                auto task_response = handle.get();
+                RCLCPP_INFO(m_impl->logger, "_step document async_send_goal: %ld SUCCESS", task->document.frame.frame_num);
+                if (task_response != nullptr) {
+                    // accepted
+                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
+                        // successfully sent, record this
+                        task->goal_handle = task_response;
+                        // task->status = DSTask_PSGDocument::TASK_SENT;
+                        (**lock_ptr_psgdoc_task_doing)[task->goal_handle] = task;
+                        tasks_to_remove.push_back(it.first);
+                    }
+
+                    // succeed
+                    else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                        // task->status = DSTask_PSGDocument::TASK_DONE;
+                        tasks_to_remove.push_back(it.first);
+                    }
+                }
+                // else {
+                //     // rejected
+                //     task->status = DSTask_PSGDocument::TASK_FAILED;
+                // }
+
+                // FIXME: what if failed to send many times?
+                // you need to terminate a frame, remove it from memory registry
+            }
+
+            // remove all sent tasks
+            for (auto &it : tasks_to_remove) {
+                (*lock_ptr_psgdoc_task_waiting)->erase(it);
+            }
+        }
+
+        // for on-going tasks, if it is done, remove it
+        if (!(*lock_ptr_psgdoc_task_doing)->empty()) {
+            std::vector<GoalHandle_PsgDocument> tasks_to_remove;
+            for (auto &it : (**lock_ptr_psgdoc_task_doing)) {
+                auto &task_response = it.first;
+                if (task_response) {
+                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                        tasks_to_remove.push_back(it.first);
+                    }
+                }
+            }
+
+            for (auto &it : tasks_to_remove) {
+                (*lock_ptr_psgdoc_task_doing)->erase(it);
+            }
+        }
+
+        // if a frame has no waiting tasks or running tasks associated with it, remove it from buffer
+        for (auto &it : (**lock_ptr_psgdoc_task_waiting)) {
+            useful_documents.insert(it.second->document.frame.frame_num);
+        }
+
+        for (auto &it : (**lock_ptr_psgdoc_task_doing)) {
+            useful_documents.insert(it.second->document.frame.frame_num);
+        }
+    }
+
+    {
+        auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
+        for (auto &it : (**lock_ptr_document_buffer)) {
+            // if not useful, it is useless
+            if (useful_documents.find(it.first) == useful_documents.end()) {
+                useless_documents.push_back(it.first);
+            }
+        }
+        // remove useless documents
+        for (auto &it : useless_documents) {
+            _remove_document_from_buffer(it, *lock_ptr_document_buffer);
+        }
+    }
+}
+
+
+void PersonGenerator::_declare_all_parameters()
+{
+    this->declare_parameter<std::string>("process_document_action", "");
+    this->declare_parameter<double>("step_interval_ms", -1);
+    this->declare_parameter<double>("timeout_ms_send_to_downstream", -1);
+}
+
+
+void PersonGenerator::_add_document_to_buffer(const MSG_PsgDocument &document)
+{
+    auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
+    (**lock_ptr_document_buffer)[document.frame.frame_num] = document;
+}
+
+void PersonGenerator::_remove_document_from_buffer(int frame_number, std::map<int, MSG_PsgDocument> *document_buffer_ptr)
+{
+    // if frame_number is not in buffer, do nothing
+    if (document_buffer_ptr->find(frame_number) != document_buffer_ptr->end()) {
+        document_buffer_ptr->erase(frame_number);
+    }
+}
+} // namespace FlowRos2Pipeline
