@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <memory>
 #include <string>
 
@@ -44,8 +45,10 @@ class DetectorIn : public rclcpp::Node, public IStartStopProtocol
 
     using Map_Document_Waiting = std::map<std::tuple<DownstreamPipeline *, int>, std::shared_ptr<DSTask_PsgDocument>>;
     using Map_Document_Doing = std::map<GoalHandle_PsgDocument, std::shared_ptr<DSTask_PsgDocument>>;
+    using Vec_Document_Done = std::vector<std::shared_ptr<DSTask_PsgDocument>>;
     using Map_Frame_Waiting = std::map<std::tuple<DownstreamModel *, int>, std::shared_ptr<DSTask_Frame>>;
     using Map_Frame_Doing = std::map<GoalHandle_Frame, std::shared_ptr<DSTask_Frame>>;
+    using Vec_Frame_Done = std::vector<std::shared_ptr<DSTask_Frame>>;
 
     class DownstreamPipeline
     {
@@ -128,8 +131,8 @@ class DetectorIn : public rclcpp::Node, public IStartStopProtocol
         const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle);
 
     // create tasks
-    virtual void _process_document_create_tasks(const MSG_PsgDocument &document);
-    virtual void _process_frame_create_tasks(const MSG_Frame &frame);
+    virtual void _process_document_create_tasks(const MSG_PsgDocument &document, Map_Document_Waiting *document_waiting_map_ptr);
+    virtual void _process_frame_create_tasks(const MSG_Frame &frame, const MSG_UUID &detections_uuid, Map_Frame_Waiting *frame_waiting_map_ptr);
 
   protected:
     virtual void _step();
@@ -144,10 +147,6 @@ class DetectorIn : public rclcpp::Node, public IStartStopProtocol
     virtual void _send_document_to_downstreams();
 
     virtual void _declare_all_parameters();
-
-    virtual void _add_document_to_buffer(const MSG_PsgDocument &document);
-
-    virtual void _remove_document_from_buffer(int frame_number, std::map<int, MSG_PsgDocument> *document_buffer_ptr);
 
   protected:
     // member of pipeline downstreams
@@ -171,16 +170,16 @@ class DetectorIn : public rclcpp::Node, public IStartStopProtocol
     // // indexed by (downstream, frame_number)
     Map_Document_Waiting m_psgdoc_task_waiting;
     Map_Document_Doing m_psgdoc_task_doing;
+    Vec_Document_Done m_psgdoc_task_done;
 
     // // on-going tasks of frame processing
     // // indexed by (downstream, frame_number)
     Map_Frame_Waiting m_frame_task_waiting;
     Map_Frame_Doing m_frame_task_doing;
+    Vec_Frame_Done m_frame_task_done;
+
 
     // status code
     int m_status_code = NodeStatusCode::BEFORE_INIT;
-
-    // buffer
-    std::map<int, MSG_PsgDocument> m_document_buffer; // indexed by frame number
 };
 } // namespace FlowRos2Pipeline

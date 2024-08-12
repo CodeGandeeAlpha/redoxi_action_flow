@@ -1,6 +1,6 @@
 #include <boost/thread/synchronized_value.hpp>
 #include <boost/uuid/uuid_generators.hpp>
-#include <set>
+#include <rclcpp/utilities.hpp>
 
 #include <detector/_pipeline_in.hpp>
 #include <detector/pipeline_in.hpp>
@@ -25,8 +25,6 @@ DetectorIn::DetectorIn()
     m_impl->sync_frame_waiting_map = &m_frame_task_waiting;
     m_impl->sync_frame_doing_map = &m_frame_task_doing;
 
-    m_impl->sync_document_buffer = &m_document_buffer;
-
     RCLCPP_INFO(m_impl->logger, "constraction success!");
 }
 
@@ -39,15 +37,15 @@ int DetectorIn::init(const std::shared_ptr<InitConfig> &config,
     m_init_config = config;
     m_runtime_config = runtime_config;
 
+    // setup downstreams
+    _connect_to_downstreams();
+
     // create server
     m_act_process_document = rclcpp_action::create_server<ACT_AcceptDocument>(
         this, m_init_config->process_document_action,
         std::bind(&DetectorIn::_accept_document_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
         std::bind(&DetectorIn::_accept_document_cancel_callback, this, std::placeholders::_1),
         std::bind(&DetectorIn::_accept_document_accepted_callback, this, std::placeholders::_1));
-
-    // setup downstreams
-    _connect_to_downstreams();
 
     RCLCPP_INFO(m_impl->logger,
                 "m_status_code from %d to %d!",
@@ -152,7 +150,7 @@ void DetectorIn::_accept_document_accepted_callback(
 
     const auto &goal = goal_handle->get_goal();
 
-    // FIXME: cache the document, copy it for modify it
+    // cache the document, copy it for modify it
     auto document = goal->document;
     const auto &frame = document.frame;
 
@@ -160,14 +158,15 @@ void DetectorIn::_accept_document_accepted_callback(
     boost::uuids::uuid uuid = boost::uuids::random_generator()();
     std::copy(uuid.begin(), uuid.end(), document.detections_uuid.uuid.begin());
 
-    // add to memory registry
-    _add_document_to_buffer(document);
-
-    RCLCPP_INFO(m_impl->logger, "Accepted document %ld and add it to buffer", document.frame.frame_num);
-
     // create tasks for all downstreams
-    _process_document_create_tasks(document);
-    _process_frame_create_tasks(frame);
+    {
+        auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+        _process_document_create_tasks(document, *lock_ptr_psgdoc_task_waiting);
+    }
+    {
+        auto lock_ptr_frame_task_waiting = m_impl->sync_frame_waiting_map.synchronize();
+        _process_frame_create_tasks(frame, document.detections_uuid, *lock_ptr_frame_task_waiting);
+    }
 
     auto result = std::make_shared<ACT_AcceptDocument::Result>();
     result->return_msg = "Document accepted";
@@ -176,30 +175,31 @@ void DetectorIn::_accept_document_accepted_callback(
 }
 
 
-void DetectorIn::_process_document_create_tasks(const MSG_PsgDocument &document)
+void DetectorIn::_process_document_create_tasks(const MSG_PsgDocument &document, Map_Document_Waiting *psgdoc_task_waiting_ptr)
 {
-    auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
     // create tasks of this frame for all downstreams
     for (auto &x : m_pipeline_downstreams) {
 
         auto task = std::make_shared<DSTask_PsgDocument>();
         task->downstream = x.second;
         task->document = document;
-        (**lock_ptr_psgdoc_task_waiting)[std::make_tuple(task->downstream.get(), document.frame.frame_num)] = task;
+        (*psgdoc_task_waiting_ptr)[std::make_tuple(task->downstream.get(), document.frame.frame_num)] = task;
     }
 }
 
-void DetectorIn::_process_frame_create_tasks(const MSG_Frame &frame)
+void DetectorIn::_process_frame_create_tasks(const MSG_Frame &frame, const MSG_UUID &detections_uuid, Map_Frame_Waiting *frame_waiting_map_ptr)
 {
-    auto lock_ptr_frame_task_waiting = m_impl->sync_frame_waiting_map.synchronize();
-    auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
+    RCLCPP_INFO(m_impl->logger, "create frame %ld detections uuid %s tasks for downstreams", frame.frame_num,
+                uuid_to_string(detections_uuid.uuid).c_str());
+
     // create tasks of this frame for all downstreams
     for (auto &x : m_model_downstreams) {
         auto task = std::make_shared<DSTask_Frame>();
         task->downstream = x.second;
         task->frame = frame;
-        task->detections_uuid = (**lock_ptr_document_buffer)[frame.frame_num].detections_uuid;
-        (**lock_ptr_frame_task_waiting)[std::make_tuple(task->downstream.get(), frame.frame_num)] = task;
+
+        task->detections_uuid = detections_uuid;
+        (*frame_waiting_map_ptr)[std::make_tuple(task->downstream.get(), frame.frame_num)] = task;
     }
 }
 
@@ -272,129 +272,151 @@ void DetectorIn::_connect_to_downstreams()
 
 void DetectorIn::_send_frame_to_downstreams()
 {
-    auto lock_ptr_frame_task_waiting = m_impl->sync_frame_waiting_map.unique_synchronize();
-    auto lock_ptr_frame_task_doing = m_impl->sync_frame_doing_map.unique_synchronize();
-    boost::lock(lock_ptr_frame_task_waiting, lock_ptr_frame_task_doing); // dead-lock free algorithm
+    std::vector<decltype(m_frame_task_waiting)::value_type> frame_task_waiting_;
+    {
+        auto lock_ptr_frame_task_waiting = m_impl->sync_frame_waiting_map.synchronize();
 
-    if (!(*lock_ptr_frame_task_waiting)->empty()) {
-        // initiate all waiting tasks
-        std::vector<Map_Frame_Waiting::key_type> tasks_to_remove;
+        for (auto const &it : (**lock_ptr_frame_task_waiting)) {
+            frame_task_waiting_.push_back(it);
+        }
+    }
 
-        for (auto &it : (**lock_ptr_frame_task_waiting)) {
-            auto &task = it.second;
-            ACT_AcceptFrame::Goal goal;
-            goal.frame = task->frame;
-            // add detections_uuid to goal
-            goal.detections_uuid = task->detections_uuid;
+    std::vector<Map_Frame_Waiting::key_type> tasks_to_remove;
 
-            auto ds = task->downstream;
-            auto handle = task->downstream->accept_frame->async_send_goal(goal, ds->accept_frame_options);
+    for (auto &it : frame_task_waiting_) {
+        auto &task = it.second;
+        ACT_AcceptFrame::Goal goal;
+        goal.frame = task->frame;
+        // add detections_uuid to goal
+        goal.detections_uuid = task->detections_uuid;
 
-            // FIXME: add timeout condition
-            auto task_response = handle.get();
-            if (task_response != nullptr) {
-                // accepted
-                if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
-                    // successfully sent, record this
-                    task->goal_handle = task_response;
-                    // task->status = DSTask_PSGDocument::TASK_SENT;
+        auto ds = task->downstream;
+        auto handle = task->downstream->accept_frame->async_send_goal(goal, ds->accept_frame_options);
+
+        RCLCPP_INFO(m_impl->logger, "[Request Send]framenum: %ld, detections_uuid: %s", goal.frame.frame_num,
+                    uuid_to_string(goal.detections_uuid.uuid).c_str());
+
+        // FIXME: add timeout condition
+        auto task_response = handle.get();
+        RCLCPP_INFO(m_impl->logger, "_step frame async_send_goal: %ld SUCCESS", task->frame.frame_num);
+        if (task_response != nullptr) {
+            // accepted
+            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
+                // successfully sent, record this
+                task->goal_handle = task_response;
+                {
+                    auto lock_ptr_frame_task_doing = m_impl->sync_frame_doing_map.synchronize();
                     (**lock_ptr_frame_task_doing)[task->goal_handle] = task;
-                    tasks_to_remove.push_back(it.first);
                 }
-
-                // succeed
-                else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                    // task->status = DSTask_PSGDocument::TASK_DONE;
-                    tasks_to_remove.push_back(it.first);
-                }
+                tasks_to_remove.push_back(it.first);
             }
-            // else {
-            //     // rejected
-            //     task->status = DSTask_PSGDocument::TASK_FAILED;
-            // }
 
-            // FIXME: what if failed to send many times?
-            // you need to terminate a frame, remove it from memory registry
+            // succeed
+            else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                m_frame_task_done.push_back(task);
+                tasks_to_remove.push_back(it.first);
+            }
         }
 
-        // remove all sent tasks
+        // FIXME: what if failed to send many times?
+        // you need to terminate a frame, remove it from memory registry
+    }
+
+    // remove all sent tasks
+    {
+        auto lock_ptr_frame_task_waiting = m_impl->sync_frame_waiting_map.synchronize();
         for (auto &it : tasks_to_remove) {
             (*lock_ptr_frame_task_waiting)->erase(it);
         }
     }
 
-    // for on-going tasks, if it is done, remove it
-    if (!(*lock_ptr_frame_task_doing)->empty()) {
-        std::vector<GoalHandle_Frame> tasks_to_remove;
-        for (auto &it : (**lock_ptr_frame_task_doing)) {
-            auto &task_response = it.first;
-            if (task_response) {
-                if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                    tasks_to_remove.push_back(it.first);
+    {
+        auto lock_ptr_frame_task_doing = m_impl->sync_frame_doing_map.synchronize();
+        // for on-going tasks, if it is done, remove it
+        if (!(*lock_ptr_frame_task_doing)->empty()) {
+            std::vector<GoalHandle_Frame> tasks_to_remove;
+            for (auto &it : (**lock_ptr_frame_task_doing)) {
+                auto &task_response = it.first;
+                if (task_response) {
+                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                        m_frame_task_done.push_back(it.second);
+                        tasks_to_remove.push_back(it.first);
+                    }
                 }
             }
-        }
 
-        for (auto &it : tasks_to_remove) {
-            (*lock_ptr_frame_task_doing)->erase(it);
+            for (auto &it : tasks_to_remove) {
+                (*lock_ptr_frame_task_doing)->erase(it);
+            }
         }
     }
+
+    // for all done tasks, remove them from memory
+    m_frame_task_done.clear();
 }
 
 void DetectorIn::_send_document_to_downstreams()
 {
-    std::set<int> useful_documents;
-    std::vector<int> useless_documents;
+    // initiate all waiting tasks
+    std::vector<Map_Document_Waiting::key_type> tasks_to_remove;
 
+    std::vector<decltype(m_psgdoc_task_waiting)::value_type> psgdoc_task_waiting_;
     {
-        auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.unique_synchronize();
-        auto lock_ptr_psgdoc_task_doing = m_impl->sync_document_doing_map.unique_synchronize();
-        boost::lock(lock_ptr_psgdoc_task_waiting, lock_ptr_psgdoc_task_doing); // dead-lock free algorithm
+        auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
 
-        if (!(*lock_ptr_psgdoc_task_waiting)->empty()) {
-            // initiate all waiting tasks
-            std::vector<Map_Document_Waiting::key_type> tasks_to_remove;
+        for (auto const &it : (**lock_ptr_psgdoc_task_waiting)) {
+            psgdoc_task_waiting_.push_back(it);
+        }
+    }
 
-            for (auto &it : **lock_ptr_psgdoc_task_waiting) {
-                auto &task = it.second;
-                ACT_AcceptDocument::Goal goal;
-                goal.document = task->document;
-                auto ds = task->downstream;
-                auto handle = task->downstream->accept_document->async_send_goal(goal, ds->accept_document_options);
+    for (auto &it : psgdoc_task_waiting_) {
+        auto &task = it.second;
+        ACT_AcceptDocument::Goal goal;
+        goal.document = task->document;
+        auto ds = task->downstream;
+        auto handle = task->downstream->accept_document->async_send_goal(goal, ds->accept_document_options);
+        RCLCPP_INFO(m_impl->logger, "_step document async_send_goal: %ld", task->document.frame.frame_num);
 
-                // FIXME: add timeout condition
-                auto task_response = handle.get();
-                if (task_response != nullptr) {
-                    // accepted
-                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
-                        // successfully sent, record this
-                        task->goal_handle = task_response;
-                        // task->status = DSTask_PSGDocument::TASK_SENT;
-                        (**lock_ptr_psgdoc_task_doing)[task->goal_handle] = task;
-                        tasks_to_remove.push_back(it.first);
-                    }
-
-                    // succeed
-                    else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                        // task->status = DSTask_PSGDocument::TASK_DONE;
-                        tasks_to_remove.push_back(it.first);
-                    }
+        // FIXME: add timeout condition
+        auto task_response = handle.get();
+        RCLCPP_INFO(m_impl->logger, "_step document async_send_goal: %ld SUCCESS", task->document.frame.frame_num);
+        if (task_response != nullptr) {
+            // accepted
+            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
+                // successfully sent, record this
+                task->goal_handle = task_response;
+                {
+                    auto lock_ptr_psgdoc_task_doing = m_impl->sync_document_doing_map.synchronize();
+                    (**lock_ptr_psgdoc_task_doing)[task->goal_handle] = task;
                 }
-                // else {
-                //     // rejected
-                //     task->status = DSTask_PSGDocument::TASK_FAILED;
-                // }
-
-                // FIXME: what if failed to send many times?
-                // you need to terminate a frame, remove it from memory registry
+                tasks_to_remove.push_back(it.first);
             }
 
-            // remove all sent tasks
-            for (auto &it : tasks_to_remove) {
-                (*lock_ptr_psgdoc_task_waiting)->erase(it);
+            // succeed
+            else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                m_psgdoc_task_done.push_back(task);
+                tasks_to_remove.push_back(it.first);
             }
         }
+        // else {
+        //     // rejected
+        //     task->status = DSTask_PSGDocument::TASK_FAILED;
+        // }
 
+        // FIXME: what if failed to send many times?
+        // you need to terminate a frame, remove it from memory registry
+    }
+
+    // remove all sent tasks
+    {
+        auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+        for (auto &it : tasks_to_remove) {
+            (*lock_ptr_psgdoc_task_waiting)->erase(it);
+        }
+    }
+
+    {
+        auto lock_ptr_psgdoc_task_doing = m_impl->sync_document_doing_map.synchronize();
         // for on-going tasks, if it is done, remove it
         if (!(*lock_ptr_psgdoc_task_doing)->empty()) {
             std::vector<GoalHandle_PsgDocument> tasks_to_remove;
@@ -402,6 +424,7 @@ void DetectorIn::_send_document_to_downstreams()
                 auto &task_response = it.first;
                 if (task_response) {
                     if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                        m_psgdoc_task_done.push_back(it.second);
                         tasks_to_remove.push_back(it.first);
                     }
                 }
@@ -411,30 +434,10 @@ void DetectorIn::_send_document_to_downstreams()
                 (*lock_ptr_psgdoc_task_doing)->erase(it);
             }
         }
-
-        // if a frame has no waiting tasks or running tasks associated with it, remove it from buffer
-        for (auto &it : (**lock_ptr_psgdoc_task_waiting)) {
-            useful_documents.insert(it.second->document.frame.frame_num);
-        }
-
-        for (auto &it : (**lock_ptr_psgdoc_task_doing)) {
-            useful_documents.insert(it.second->document.frame.frame_num);
-        }
     }
 
-    {
-        auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
-        for (auto &it : (**lock_ptr_document_buffer)) {
-            // if not useful, it is useless
-            if (useful_documents.find(it.first) == useful_documents.end()) {
-                useless_documents.push_back(it.first);
-            }
-        }
-        // remove useless documents
-        for (auto &it : useless_documents) {
-            _remove_document_from_buffer(it, *lock_ptr_document_buffer);
-        }
-    }
+    // for all done tasks, remove them from memory
+    m_psgdoc_task_done.clear();
 }
 
 
@@ -443,20 +446,5 @@ void DetectorIn::_declare_all_parameters()
     this->declare_parameter<std::string>("process_document_action", "");
     this->declare_parameter<double>("step_interval_ms", -1);
     this->declare_parameter<double>("timeout_ms_send_to_downstream", -1);
-}
-
-
-void DetectorIn::_add_document_to_buffer(const MSG_PsgDocument &document)
-{
-    auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
-    (**lock_ptr_document_buffer)[document.frame.frame_num] = document;
-}
-
-void DetectorIn::_remove_document_from_buffer(int frame_number, std::map<int, MSG_PsgDocument> *document_buffer_ptr)
-{
-    // if frame_number is not in buffer, do nothing
-    if (document_buffer_ptr->find(frame_number) != document_buffer_ptr->end()) {
-        document_buffer_ptr->erase(frame_number);
-    }
 }
 } // namespace FlowRos2Pipeline

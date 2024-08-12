@@ -1,6 +1,5 @@
 #include "psg_common/psg_common.hpp"
 #include <boost/thread/lock_algorithms.hpp>
-#include <boost/uuid/uuid_generators.hpp>
 #include <set>
 
 #include <detector/_pipeline_out.hpp>
@@ -158,25 +157,6 @@ rclcpp_action::CancelResponse DetectorOut::_accept_document_cancel_callback(
     return rclcpp_action::CancelResponse::REJECT;
 }
 
-std::string uuid_to_string(const std::array<uint8_t, 16> &uuid)
-{
-    // std::ostringstream oss;
-    // for (const auto& byte : uuid) {
-    //     oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
-    // }
-    // return oss.str();
-
-    std::ostringstream oss;
-    for (size_t i = 0; i < uuid.size(); ++i) {
-        if (i != 0) {
-            oss << "-";
-        }
-        oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(uuid[i]);
-    }
-    return oss.str();
-}
-
-
 void DetectorOut::_accept_document_accepted_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle)
 {
@@ -187,11 +167,13 @@ void DetectorOut::_accept_document_accepted_callback(
     const auto &document = goal->document;
 
     // add to buffer
-    _add_document_to_buffer(document);
+    {
+        auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
+        _add_document_to_buffer(document, *lock_ptr_document_buffer);
+    }
 
-    RCLCPP_INFO(m_impl->logger, "Accepted document %ld and add it to buffer", document.frame.frame_num);
     RCLCPP_INFO(m_impl->logger, "Accepted document %ld with UUID %s and add it to buffer",
-                document.frame.frame_num, uuid_to_string(document.uuid.uuid).c_str());
+                document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
 
     auto result = std::make_shared<ACT_AcceptDocument::Result>();
     result->return_msg = "Document accepted";
@@ -226,9 +208,14 @@ void DetectorOut::_accept_detections_accepted_callback(
     const auto &detections = goal->detections;
 
     // add to buffer
-    _add_detections_to_buffer(detections);
+    {
+        auto lock_ptr_detections_buffer = m_impl->sync_detections_buffer.synchronize();
+        _add_detections_to_buffer(detections, *lock_ptr_detections_buffer);
+    }
 
     RCLCPP_INFO(m_impl->logger, "add detections to buffer");
+    RCLCPP_INFO(m_impl->logger, "Accepted detections %ld with UUID %s and add it to buffer",
+                detections.frame.frame_num, uuid_to_string(detections.uuid.uuid).c_str());
 
     auto result = std::make_shared<ACT_AcceptDetections::Result>();
     result->return_msg = "Detections accepted";
@@ -293,57 +280,64 @@ void DetectorOut::_connect_to_downstreams()
 
 void DetectorOut::_send_document_to_downstreams()
 {
-    std::set<int> useful_documents;
-    std::vector<int> useless_documents;
-
+    std::vector<Map_Document_Waiting::key_type> tasks_to_remove;
+    std::vector<decltype(m_psgdoc_task_waiting)::value_type> psgdoc_task_waiting_;
     {
-        auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.unique_synchronize();
-        auto lock_ptr_document_task_doing = m_impl->sync_document_doing_map.unique_synchronize();
-        boost::lock(lock_ptr_document_task_waiting, lock_ptr_document_task_doing);
-        if (!(*lock_ptr_document_task_waiting)->empty()) {
-            // initiate all waiting tasks
-            std::vector<Map_Document_Waiting::key_type> tasks_to_remove;
+        auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
 
-            for (auto &it : (**lock_ptr_document_task_waiting)) {
-                auto &task = it.second;
-                ACT_AcceptDocument::Goal goal;
-                goal.document = task->document;
-                auto ds = task->downstream;
-                auto handle = task->downstream->accept_document->async_send_goal(goal, ds->accept_document_options);
+        for (auto const &it : (**lock_ptr_document_task_waiting)) {
+            psgdoc_task_waiting_.push_back(it);
+        }
+    }
 
-                // FIXME: add timeout condition
-                auto task_response = handle.get();
-                if (task_response != nullptr) {
-                    // accepted
-                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
-                        // successfully sent, record this
-                        task->goal_handle = task_response;
-                        // task->status = DSTask_PSGDocument::TASK_SENT;
-                        (**lock_ptr_document_task_doing)[task->goal_handle] = task;
-                        tasks_to_remove.push_back(it.first);
-                    }
+    for (auto &it : psgdoc_task_waiting_) {
+        auto &task = it.second;
+        ACT_AcceptDocument::Goal goal;
+        goal.document = task->document;
+        auto ds = task->downstream;
+        auto handle = task->downstream->accept_document->async_send_goal(goal, ds->accept_document_options);
 
-                    // succeed
-                    else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                        // task->status = DSTask_PSGDocument::TASK_DONE;
-                        tasks_to_remove.push_back(it.first);
-                    }
+        // FIXME: add timeout condition
+        auto task_response = handle.get();
+        if (task_response != nullptr) {
+            // accepted
+            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
+                // successfully sent, record this
+                task->goal_handle = task_response;
+                // task->status = DSTask_PSGDocument::TASK_SENT;
+                {
+                    auto lock_ptr_document_task_doing = m_impl->sync_document_doing_map.synchronize();
+                    (**lock_ptr_document_task_doing)[task->goal_handle] = task;
                 }
-                // else {
-                //     // rejected
-                //     task->status = DSTask_PSGDocument::TASK_FAILED;
-                // }
-
-                // FIXME: what if failed to send many times?
-                // you need to terminate a frame, remove it from memory registry
+                tasks_to_remove.push_back(it.first);
             }
 
-            // remove all sent tasks
-            for (auto &it : tasks_to_remove) {
-                (*lock_ptr_document_task_waiting)->erase(it);
+            // succeed
+            else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                // task->status = DSTask_PSGDocument::TASK_DONE;
+                m_psgdoc_task_done.push_back(task);
+                tasks_to_remove.push_back(it.first);
             }
         }
+        // else {
+        //     // rejected
+        //     task->status = DSTask_PSGDocument::TASK_FAILED;
+        // }
 
+        // FIXME: what if failed to send many times?
+        // you need to terminate a frame, remove it from memory registry
+    }
+
+    // remove all sent tasks
+    {
+        auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+        for (auto &it : tasks_to_remove) {
+            (*lock_ptr_document_task_waiting)->erase(it);
+        }
+    }
+
+    {
+        auto lock_ptr_document_task_doing = m_impl->sync_document_doing_map.synchronize();
         // for on-going tasks, if it is done, remove it
         if (!(*lock_ptr_document_task_doing)->empty()) {
             std::vector<GoalHandle_PsgDocument> tasks_to_remove;
@@ -351,6 +345,7 @@ void DetectorOut::_send_document_to_downstreams()
                 auto &task_response = it.first;
                 if (task_response) {
                     if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                        m_psgdoc_task_done.push_back(it.second);
                         tasks_to_remove.push_back(it.first);
                     }
                 }
@@ -360,29 +355,18 @@ void DetectorOut::_send_document_to_downstreams()
                 (*lock_ptr_document_task_doing)->erase(it);
             }
         }
-
-        // if a frame has no waiting tasks or running tasks associated with it, remove it from buffer
-        for (auto &it : (**lock_ptr_document_task_waiting)) {
-            useful_documents.insert(it.second->document.frame.frame_num);
-        }
-        for (auto &it : (**lock_ptr_document_task_doing)) {
-            useful_documents.insert(it.second->document.frame.frame_num);
-        }
     }
 
     {
         auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
-        for (auto &it : (**lock_ptr_document_buffer)) {
-            // if not useful, it is useless
-            if (useful_documents.find(it.first) == useful_documents.end()) {
-                useless_documents.push_back(it.first);
-            }
-        }
-        // remove useless documents
-        for (auto &it : useless_documents) {
-            _remove_document_from_buffer(it, *lock_ptr_document_buffer);
+        // remove task done documents
+        for (auto &it : m_psgdoc_task_done) {
+            _remove_document_from_buffer(it->document.frame.frame_num, *lock_ptr_document_buffer);
         }
     }
+
+    // for all done tasks, remove them from memory
+    m_psgdoc_task_done.clear();
 }
 
 
@@ -395,16 +379,14 @@ void DetectorOut::_declare_all_parameters()
 }
 
 
-void DetectorOut::_add_document_to_buffer(const MSG_PsgDocument &document)
+void DetectorOut::_add_document_to_buffer(const MSG_PsgDocument &document, std::map<int, DetectorOut::MSG_PsgDocument> *document_buffer_ptr)
 {
-    auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
-    (**lock_ptr_document_buffer)[document.frame.frame_num] = document;
+    (*document_buffer_ptr)[document.frame.frame_num] = document;
 }
 
-void DetectorOut::_add_detections_to_buffer(const MSG_Detections &detections)
+void DetectorOut::_add_detections_to_buffer(const MSG_Detections &detections, std::map<int, DetectorOut::MSG_Detections> *detections_buffer_ptr)
 {
-    auto lock_ptr_detections_buffer = m_impl->sync_detections_buffer.synchronize();
-    (**lock_ptr_detections_buffer)[detections.frame.frame_num] = detections;
+    (*detections_buffer_ptr)[detections.frame.frame_num] = detections;
 }
 
 void DetectorOut::_remove_document_from_buffer(int frame_number, std::map<int, DetectorOut::MSG_PsgDocument> *document_buffer_ptr)
@@ -415,32 +397,61 @@ void DetectorOut::_remove_document_from_buffer(int frame_number, std::map<int, D
     }
 }
 
+void DetectorOut::_remove_detections_from_buffer(int frame_number, std::map<int, DetectorOut::MSG_Detections> *detections_buffer_ptr)
+{
+    // if frame_number is not in buffer, do nothing
+    if (detections_buffer_ptr->find(frame_number) != detections_buffer_ptr->end()) {
+        detections_buffer_ptr->erase(frame_number);
+    }
+}
+
 void DetectorOut::_merge_detections_and_documents()
 {
-    auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.unique_synchronize();
-    auto lock_ptr_document_buffer = m_impl->sync_document_buffer.unique_synchronize();
-    auto lock_ptr_detections_buffer = m_impl->sync_detections_buffer.unique_synchronize();
-    boost::lock(lock_ptr_document_buffer, lock_ptr_detections_buffer);
+    std::vector<decltype(m_document_buffer)::value_type> document_buffer_;
 
-    for (auto &it : (**lock_ptr_document_buffer)) {
+    {
+        auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
+        for (auto const &it : (**lock_ptr_document_buffer)) {
+            document_buffer_.push_back(it);
+        }
+    }
+
+    for (auto &it : document_buffer_) {
         auto &document = it.second;
         auto frame_num = it.first;
-        if ((*lock_ptr_detections_buffer)->find(frame_num) != (*lock_ptr_detections_buffer)->end()) {
-            auto &detections = (**lock_ptr_detections_buffer)[frame_num];
 
-            RCLCPP_INFO(m_impl->logger, "_merge_detections_and_documents for frame %d", frame_num);
-            RCLCPP_INFO(m_impl->logger, "_merge document %ld with UUID %s and add it to buffer",
-                        document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
-            RCLCPP_INFO(m_impl->logger, "_merge detections %ld with UUID %s and add it to buffer",
-                        document.frame.frame_num, uuid_to_string(detections.uuid.uuid).c_str());
+        MSG_Detections detections;
+        bool has_detections = false;
+        {
+            auto lock_ptr_detections_buffer = m_impl->sync_detections_buffer.synchronize();
+            if ((*lock_ptr_detections_buffer)->find(frame_num) != (*lock_ptr_detections_buffer)->end()) {
+                detections = (**lock_ptr_detections_buffer)[frame_num];
+                has_detections = true;
+            }
+        }
 
-            if (document.detections_uuid == detections.uuid) {
-                // merge detections and documents
-                document.detections = detections;
+        if (!has_detections) {
+            continue;
+        }
+
+        RCLCPP_INFO(m_impl->logger, "_merge_detections_and_documents for frame %d", frame_num);
+        RCLCPP_INFO(m_impl->logger, "_merge document %ld with UUID %s",
+                    document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
+        RCLCPP_INFO(m_impl->logger, "_merge detections %ld with UUID %s",
+                    detections.frame.frame_num, uuid_to_string(detections.uuid.uuid).c_str());
+
+        if (document.detections_uuid == detections.uuid) {
+            // merge detections and documents
+            document.detections = detections;
+            {
+                auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
                 _process_document_create_tasks(document, *lock_ptr_document_task_waiting);
+            }
 
-                // remove detections from buffer
-                (*lock_ptr_detections_buffer)->erase(frame_num);
+            // remove detections from buffer
+            {
+                auto lock_ptr_detections_buffer = m_impl->sync_detections_buffer.synchronize();
+                _remove_detections_from_buffer(frame_num, *lock_ptr_detections_buffer);
             }
         }
     }

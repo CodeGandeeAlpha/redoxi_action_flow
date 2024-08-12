@@ -8,6 +8,7 @@ class Client;
 };
 
 std::shared_ptr<vineyard::Client> create_v6d_client(const std::string &socket = "");
+std::string uuid_to_string(const std::array<uint8_t, 16> &uuid);
 
 namespace FlowRos2Pipeline
 {

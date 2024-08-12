@@ -20,8 +20,9 @@ find_package(sensor_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
 
 find_package(Boost REQUIRED)
+find_package(vineyard REQUIRED)
 
-include_directories(include ${Boost_INCLUDE_DIRS})
+include_directories(include ${Boost_INCLUDE_DIRS} ${VINEYARD_INCLUDE_DIRS})
 
 install(DIRECTORY include/
   DESTINATION include)
@@ -60,8 +61,8 @@ ament_target_dependencies(pipeline_out_node
 )
 
 
-target_link_libraries(pipeline_in_node ${Boost_LIBRARIES})
-target_link_libraries(pipeline_out_node ${Boost_LIBRARIES})
+target_link_libraries(pipeline_in_node ${Boost_LIBRARIES} ${VINEYARD_LIBRARIES})
+target_link_libraries(pipeline_out_node ${Boost_LIBRARIES} ${VINEYARD_LIBRARIES})
 
 install(TARGETS pipeline_in_node
                 pipeline_out_node

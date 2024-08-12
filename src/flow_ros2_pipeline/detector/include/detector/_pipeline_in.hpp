@@ -26,9 +26,6 @@ class DetectorInImpl
     boost::synchronized_value<DetectorIn::Map_Frame_Waiting *> sync_frame_waiting_map;
     boost::synchronized_value<DetectorIn::Map_Frame_Doing *> sync_frame_doing_map;
 
-    boost::synchronized_value<std::map<int, DetectorIn::MSG_PsgDocument> *> sync_document_buffer;
-
-
     std::shared_ptr<std::thread> step_thread;
     bool step_running = false; // for stopping the step thread
 };

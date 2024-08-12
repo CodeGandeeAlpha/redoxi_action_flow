@@ -42,7 +42,7 @@ class MasterNode : public rclcpp::Node, public IStartStopProtocol
 
     using Map_Document_Waiting = std::map<std::tuple<Downstream *, int>, std::shared_ptr<DSTask_PSGDocument>>;
     using Map_Document_Doing = std::map<GoalHandle, std::shared_ptr<DSTask_PSGDocument>>;
-
+    using Vec_Document_Done = std::vector<std::shared_ptr<DSTask_PSGDocument>>;
     class Downstream
     {
       public:
@@ -115,12 +115,12 @@ class MasterNode : public rclcpp::Node, public IStartStopProtocol
                                                      const std::shared_ptr<const ACT_AcceptDocument::Feedback> feedback);
     virtual void _process_document_result_callback(
         const rclcpp_action::ClientGoalHandle<ACT_AcceptDocument>::WrappedResult &result);
-    virtual void _process_document_create_tasks(const MSG_Frame &frame);
+    virtual void _process_document_create_tasks(const MSG_Frame &frame, Map_Document_Waiting *document_waiting_map_ptr);
 
   protected:
     virtual void _declare_all_parameters();
     virtual void _step(); // called by timer periodically
-    virtual void _add_frame_to_buffer(const MSG_Frame &frame);
+    virtual void _add_frame_to_buffer(const MSG_Frame &frame, std::map<int, MasterNode::MSG_Frame> *frame_buffer_ptr);
     virtual void _remove_frame_from_buffer(int frame_number, std::map<int, MSG_Frame> *frame_buffer_ptr, bool remove_memory_entry);
     // find and connect to downstreams
     virtual void _connect_to_downstreams();
@@ -131,6 +131,7 @@ class MasterNode : public rclcpp::Node, public IStartStopProtocol
     // indexed by (downstream, frame_number)
     Map_Document_Waiting m_psgdoc_task_waiting;
     Map_Document_Doing m_psgdoc_task_doing;
+    Vec_Document_Done m_psgdoc_task_done;
 
     // configuration
     std::shared_ptr<InitConfig> m_init_config;

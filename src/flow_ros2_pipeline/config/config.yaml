@@ -13,13 +13,13 @@
     end_frame_number: -1
     image_width: 1920
     image_height: 1080
-    frame_internal_ms: 40.0
+    frame_internal_ms: 1.0
 
 /master_node:
   ros__parameters:
     status_query_service: "status_query"
     process_frame_action: "master_node_process_frame"
-    step_interval_ms: 10.0
+    step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 1000.0
 
 
