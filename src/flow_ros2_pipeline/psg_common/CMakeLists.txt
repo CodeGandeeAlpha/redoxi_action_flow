@@ -12,6 +12,10 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
+find_package(psg_private_msgs REQUIRED)
+find_package(psg_public_msgs REQUIRED)
+
+find_package(PassengerFlow REQUIRED)
 find_package(vineyard REQUIRED)
 
 if(BUILD_TESTING)
@@ -28,6 +32,7 @@ endif()
 
 add_library(${PROJECT_NAME}
   src/psg_common.cpp
+  src/msg_converter.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -35,7 +40,14 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   ${VINEYARD_INCLUDE_DIRS}
   )
 
-target_link_libraries(${PROJECT_NAME} ${VINEYARD_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PUBLIC ${VINEYARD_LIBRARIES} PassengerFlow::PassengerFlow)
+
+ament_target_dependencies(${PROJECT_NAME} PUBLIC
+  rclcpp
+  rclpy
+  psg_private_msgs
+  psg_public_msgs
+  )
 
 ament_python_install_package(${PROJECT_NAME})
 

@@ -12,7 +12,8 @@
 
   <depend>rclcpp</depend>
   <depend>rclpy</depend>
-  <depend>vineyard</depend>
+  <depend>psg_private_msgs</depend>
+  <depend>psg_public_msgs</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
