@@ -14,7 +14,6 @@ find_package(std_msgs REQUIRED)
 find_package(psg_actions REQUIRED)
 find_package(psg_common REQUIRED)
 find_package(rclcpp_action REQUIRED)
-find_package(RedoxiTrack REQUIRED)
 find_package(PassengerFlow REQUIRED)
 
 include_directories(include)

@@ -47,10 +47,11 @@ int DetectorIn::init(const std::shared_ptr<InitConfig> &config,
         std::bind(&DetectorIn::_accept_document_cancel_callback, this, std::placeholders::_1),
         std::bind(&DetectorIn::_accept_document_accepted_callback, this, std::placeholders::_1));
 
+    auto status_before = m_status_code;
+    m_status_code = NodeStatusCode::INITIALIZED;
     RCLCPP_INFO(m_impl->logger,
                 "m_status_code from %d to %d!",
-                m_status_code, NodeStatusCode::INITIALIZED);
-    m_status_code = NodeStatusCode::INITIALIZED;
+                status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -81,11 +82,11 @@ int DetectorIn::start()
     ROS_ASSERT(m_status_code == NodeStatusCode::INITIALIZED,
                "cannot start because status code is not INITIALIZED");
 
+    auto status_before = m_status_code;
+    m_status_code = NodeStatusCode::STARTED;
     RCLCPP_INFO(m_impl->logger,
                 "m_status_code from %d to %d!",
-                m_status_code, NodeStatusCode::STARTED);
-
-    m_status_code = NodeStatusCode::STARTED;
+                status_before, m_status_code);
 
     m_impl->step_running = true;
     m_impl->step_thread = std::make_shared<std::thread>(
@@ -112,11 +113,11 @@ int DetectorIn::stop()
         m_impl->step_thread = nullptr;
     }
 
+    auto status_before = m_status_code;
+    m_status_code = NodeStatusCode::STOPPED;
     RCLCPP_INFO(m_impl->logger,
                 "m_status_code from %d to %d!",
-                m_status_code, NodeStatusCode::STOPPED);
-
-    m_status_code = NodeStatusCode::STOPPED;
+                status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 

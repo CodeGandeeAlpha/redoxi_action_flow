@@ -1,6 +1,5 @@
 #include "psg_common/psg_common.hpp"
 #include <boost/thread/lock_algorithms.hpp>
-#include <set>
 
 #include <detector/_pipeline_out.hpp>
 #include <detector/pipeline_out.hpp>
@@ -25,6 +24,8 @@ DetectorOut::DetectorOut()
 
     m_impl->sync_document_buffer = &m_document_buffer;
     m_impl->sync_detections_buffer = &m_detections_buffer;
+
+
 
     RCLCPP_INFO(m_impl->logger, "constraction success!");
 }

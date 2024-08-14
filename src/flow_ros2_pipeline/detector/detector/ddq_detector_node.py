@@ -4,6 +4,11 @@ import time
 from sortedcontainers.sorteddict import SortedDict
 import queue
 import uuid as pyuuid
+import numpy as np
+import torch
+
+# for easy test visualization
+import cv2
 
 import rclpy
 from rclpy.action import ActionServer, ActionClient
@@ -92,10 +97,6 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self.m_downstreams : dict[str, ActionClient] = {}
         self.m_logger = self.get_logger()
 
-        # self.m_frame_buffer : queue.Queue[(Frame, UUID)] = {} # queue( (frame_msg, detections_uuid) )
-        # self.m_models_task_in_queue : dict[str, queue.Queue[tuple[Frame, UUID]]] = {}  # key: model_name, value: queue.Queue[(frame_msg, detections_uuid)]
-        # self.m_models_task_out_queue : dict[str, queue.Queue[Detections]] = {}  # key: model_name, value: queue.Queue[detections_msg]
-        # self.m_models_threads : dict[str, list[threading.Thread]] = {}  # key: model_name, value: [thread...]
         self.m_model_groups_data : dict[str, DetectorNode.ModelGroupData] = {}  # key: model_name, value: [ModelGroupData...]
 
 
@@ -103,6 +104,10 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self.m_step_thread : threading.Thread = None
         self._log = self.get_logger().info
 
+        # test only
+        self._out_video = cv2.VideoWriter('/mnt/chengxiao/detector_test_out.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30, (1920, 1080))
+        self._start_time = None
+        self._end_time = None
     # for easy test
     def listener_callback(self, msg):
         self.get_logger().info('I heard: "%s"' % msg.data)
@@ -254,6 +259,9 @@ class DetectorNode(Node, IOpenCloseProtocol):
         # only valid if the node is opened or stopped
         assert self.m_status_code == NodeStatusCode.OPENED or self.m_status_code == NodeStatusCode.STOPPED, \
             "cannot close because status code is not OPENED or STOPPED"
+
+        self._out_video.release()
+        self.m_logger.info(f"close(): test out video released")
 
         status_code_before = self.m_status_code
         self.m_status_code = NodeStatusCode.CLOSED
@@ -416,6 +424,25 @@ class DetectorNode(Node, IOpenCloseProtocol):
             self.m_logger.info('_send_goal(): Result: {0}'.format(result.return_msg))
 
 
+    def _visialize(self, goal: ProcessDetections.Goal):
+        detections = goal.detections
+        frame = detections.frame
+        img = self._get_frame_from_v6d(frame)
+        img = np.copy(img)  # make a copy to avoid modifying the original image
+        self.m_logger.info(f"_visialize(): frame {frame.frame_num} img shape {img.shape}")
+        for det in detections.detections:
+            x, y, w, h = int(det.bbox.x), int(det.bbox.y), int(det.bbox.width), int(det.bbox.height)
+            self.m_logger.info(f"_visialize(): frame {frame.frame_num} bbox {x} {y} {w} {h}")
+            cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        self._out_video.write(img)
+        self.m_logger.info(f"_visialize(): frame {frame.frame_num} visualized")
+
+        # for test only
+        if frame.frame_num >= 87:
+            self._out_video.release()
+            self.m_logger.info(f"_visialize(): test out video released")
+
+
     def _merge_detections(self):
         # Step 1: Initialize a dictionary to store the count of each uuid
         # uuid_mapping = {}
@@ -442,7 +469,6 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         # Step 3: Find uuids that are present in all model task queues
         common_uuid_tuples = [uuid_tuple for uuid_tuple, count in uuid_dict.items() if count == len(self.m_model_groups_data)]
-
 
         # Step 4: Put the non-common elements back into their respective queues, and merge the common elements
         for model_group_name, temp_list in temp_lists.items():
@@ -479,6 +505,8 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 self._send_goal(goal_msg)
                 self.m_logger.info(f"_step(): sent to downstream {pyuuid.UUID(bytes=bytes(det.uuid.uuid))}")
 
+                self._visialize(goal_msg)  # test only
+
                 # # remove the frame from buffer
                 # self._remove_frame_from_buffer(det.frame.frame_num)
 
@@ -496,19 +524,31 @@ class DetectorNode(Node, IOpenCloseProtocol):
             frame_msg, uuid = self.m_model_groups_data[model_group_name].in_queue.get()
             self.m_logger.info(f'_model_step(): framenum {frame_msg.frame_num} uuid {pyuuid.UUID(bytes=bytes(uuid.uuid))} popped from model task queue')
 
+            # for time test
+            if self._start_time is None:
+                self._start_time = time.time()
+
             # get the image from Vineyard
             img = self._get_frame_from_v6d(frame_msg)
-            self.m_logger.debug(f"_model_step(): framenum {frame_msg.frame_num} img shape {img.shape}")
+            self.m_logger.info(f"_model_step(): framenum {frame_msg.frame_num} img shape {img.shape}")
 
             # process the image
+            # img = torch.from_numpy(img).float().to(self.m_model_groups_data[model_group_name].group_models[model_idx].model.device).mean(dim=(0, 1))
             result = self.m_model_groups_data[model_group_name].group_models[model_idx].model.infer(img, 0.3)
             # time.sleep(0.001)
+
+            # for time test
+            self._end_time = time.time()
+            self.m_logger.info(f"Total inference time for the video: {self._end_time - self._start_time} seconds")
+            self.m_logger.info(f"Average inference time per frame: {(self._end_time - self._start_time) / frame_msg.frame_num} seconds")
 
             # convert the result to Detections msg
             detections = self._to_detections_msg(result)
             # detections = Detections()
             detections.uuid = uuid
             detections.frame = frame_msg
+
+            # self.m_logger.info(f"_model_step(): framenum {frame_msg.frame_num} detections {detections}")
 
             # add the Detections msg to downstreams queue
             self.m_model_groups_data[model_group_name].out_queue.put(detections)
@@ -550,7 +590,6 @@ def main(args=None):
     ddq_detector_node.start()
 
     rclpy.spin(ddq_detector_node)
-
 
 if __name__ == '__main__':
     main()

@@ -26,8 +26,8 @@ class PersonGeneratorImpl
 
     boost::synchronized_value<std::map<int, PersonGenerator::MSG_PsgDocument> *> sync_document_buffer;
 
-
     std::shared_ptr<std::thread> step_thread;
+    std::shared_ptr<std::thread> process_thread;
     bool step_running = false; // for stopping the step thread
 };
 } // namespace FlowRos2Pipeline

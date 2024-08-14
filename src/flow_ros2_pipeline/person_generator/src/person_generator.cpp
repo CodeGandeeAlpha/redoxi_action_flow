@@ -1,6 +1,5 @@
 #include <boost/thread/synchronized_value.hpp>
 #include <boost/uuid/uuid_generators.hpp>
-#include <set>
 
 #include <person_generator/_person_generator.hpp>
 #include <person_generator/person_generator.hpp>
@@ -47,10 +46,11 @@ int PersonGenerator::init(const std::shared_ptr<InitConfig> &config,
         std::bind(&PersonGenerator::_accept_document_cancel_callback, this, std::placeholders::_1),
         std::bind(&PersonGenerator::_accept_document_accepted_callback, this, std::placeholders::_1));
 
+    auto status_before = m_status_code;
+    m_status_code = NodeStatusCode::INITIALIZED;
     RCLCPP_INFO(m_impl->logger,
                 "m_status_code from %d to %d!",
-                m_status_code, NodeStatusCode::INITIALIZED);
-    m_status_code = NodeStatusCode::INITIALIZED;
+                status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -81,11 +81,11 @@ int PersonGenerator::start()
     ROS_ASSERT(m_status_code == NodeStatusCode::INITIALIZED,
                "cannot start because status code is not INITIALIZED");
 
+    auto status_before = m_status_code;
+    m_status_code = NodeStatusCode::STARTED;
     RCLCPP_INFO(m_impl->logger,
                 "m_status_code from %d to %d!",
-                m_status_code, NodeStatusCode::STARTED);
-
-    m_status_code = NodeStatusCode::STARTED;
+                status_before, m_status_code);
 
     m_impl->step_running = true;
     m_impl->step_thread = std::make_shared<std::thread>(
@@ -93,6 +93,13 @@ int PersonGenerator::start()
             while (rclcpp::ok() && m_impl->step_running) {
                 _step();
                 std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+            }
+        });
+
+    m_impl->process_thread = std::make_shared<std::thread>(
+        [this]() {
+            while (rclcpp::ok() && m_impl->step_running) {
+                _process();
             }
         });
 
@@ -112,11 +119,16 @@ int PersonGenerator::stop()
         m_impl->step_thread = nullptr;
     }
 
+    if (m_impl->process_thread) {
+        m_impl->process_thread->join();
+        m_impl->process_thread = nullptr;
+    }
+
+    auto status_before = m_status_code;
+    m_status_code = NodeStatusCode::STOPPED;
     RCLCPP_INFO(m_impl->logger,
                 "m_status_code from %d to %d!",
-                m_status_code, NodeStatusCode::STOPPED);
-
-    m_status_code = NodeStatusCode::STOPPED;
+                status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -150,21 +162,16 @@ void PersonGenerator::_accept_document_accepted_callback(
 
     const auto &goal = goal_handle->get_goal();
 
-    // FIXME: cache the document, copy it for modify it
-    auto document = goal->document;
-    const auto &frame = document.frame;
+    // cache the document, copy it for modify it
+    const auto &document = goal->document;
 
-    // add detections_uuid to document
-    boost::uuids::uuid uuid = boost::uuids::random_generator()();
-    std::copy(uuid.begin(), uuid.end(), document.detections_uuid.uuid.begin());
+    // add to memory buffer
+    {
+        auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
+        _add_document_to_buffer(document, *lock_ptr_document_buffer);
+    }
 
-    // add to memory registry
-    _add_document_to_buffer(document);
-
-    RCLCPP_INFO(m_impl->logger, "Accepted document %ld and add it to buffer", document.frame.frame_num);
-
-    // create tasks for all downstreams
-    _process_document_create_tasks(document);
+    RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): Accepted document %ld and add it to buffer", document.frame.frame_num);
 
     auto result = std::make_shared<ACT_AcceptDocument::Result>();
     result->return_msg = "Document accepted";
@@ -173,16 +180,15 @@ void PersonGenerator::_accept_document_accepted_callback(
 }
 
 
-void PersonGenerator::_process_document_create_tasks(const MSG_PsgDocument &document)
+void PersonGenerator::_process_document_create_tasks(const MSG_PsgDocument &document, Map_Document_Waiting *psgdoc_task_waiting_ptr)
 {
-    auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
     // create tasks of this frame for all downstreams
     for (auto &x : m_pipeline_downstreams) {
 
         auto task = std::make_shared<DSTask_PsgDocument>();
         task->downstream = x.second;
         task->document = document;
-        (**lock_ptr_psgdoc_task_waiting)[std::make_tuple(task->downstream.get(), document.frame.frame_num)] = task;
+        (*psgdoc_task_waiting_ptr)[std::make_tuple(task->downstream.get(), document.frame.frame_num)] = task;
     }
 }
 
@@ -191,6 +197,32 @@ void PersonGenerator::_step()
 {
     _send_document_to_downstreams();
 }
+
+
+void PersonGenerator::_process()
+{   std::vector <MSG_PsgDocument> documents_;
+    {
+        auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
+        for (auto &it : **lock_ptr_document_buffer) {
+            documents_.push_back(it.second);
+        }
+    }
+    // from buffer, extract person
+    for (auto &document : documents_) {
+        // process document
+        // extract person
+        m_person_extractor.extract_persons(const std::vector<DetectionPtr> &detections)
+        // create tasks
+        _process_document_create_tasks(document, &m_psgdoc_task_waiting);
+    }
+
+
+    // auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
+    // for (auto &it : *lock_ptr_document_buffer) {
+    //     _process_document_create_tasks(it.second, &m_psgdoc_task_waiting);
+    // }
+}
+
 
 void PersonGenerator::_connect_to_downstreams()
 {
@@ -227,60 +259,66 @@ void PersonGenerator::_connect_to_downstreams()
 
 void PersonGenerator::_send_document_to_downstreams()
 {
-    std::set<int> useful_documents;
-    std::vector<int> useless_documents;
+    // initiate all waiting tasks
+    std::vector<Map_Document_Waiting::key_type> tasks_to_remove;
 
+    std::vector<decltype(m_psgdoc_task_waiting)::value_type> psgdoc_task_waiting_;
     {
-        auto locks = boost::synchronize(m_impl->sync_document_waiting_map, m_impl->sync_document_doing_map);
-        auto &lock_ptr_psgdoc_task_waiting = std::get<0>(locks);
-        auto &lock_ptr_psgdoc_task_doing = std::get<1>(locks);
+        auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
 
-        if (!(*lock_ptr_psgdoc_task_waiting)->empty()) {
-            // initiate all waiting tasks
-            std::vector<Map_Document_Waiting::key_type> tasks_to_remove;
+        for (auto const &it : (**lock_ptr_psgdoc_task_waiting)) {
+            psgdoc_task_waiting_.push_back(it);
+        }
+    }
 
-            for (auto &it : **lock_ptr_psgdoc_task_waiting) {
-                auto &task = it.second;
-                ACT_AcceptDocument::Goal goal;
-                goal.document = task->document;
-                auto ds = task->downstream;
-                auto handle = task->downstream->accept_document->async_send_goal(goal, ds->accept_document_options);
-                RCLCPP_INFO(m_impl->logger, "_step document async_send_goal: %ld", task->document.frame.frame_num);
+    for (auto &it : psgdoc_task_waiting_) {
+        auto &task = it.second;
+        ACT_AcceptDocument::Goal goal;
+        goal.document = task->document;
+        auto ds = task->downstream;
+        auto handle = task->downstream->accept_document->async_send_goal(goal, ds->accept_document_options);
+        RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): document async_send_goal: %ld", task->document.frame.frame_num);
 
-                // FIXME: add timeout condition
-                auto task_response = handle.get();
-                RCLCPP_INFO(m_impl->logger, "_step document async_send_goal: %ld SUCCESS", task->document.frame.frame_num);
-                if (task_response != nullptr) {
-                    // accepted
-                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
-                        // successfully sent, record this
-                        task->goal_handle = task_response;
-                        // task->status = DSTask_PSGDocument::TASK_SENT;
-                        (**lock_ptr_psgdoc_task_doing)[task->goal_handle] = task;
-                        tasks_to_remove.push_back(it.first);
-                    }
-
-                    // succeed
-                    else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                        // task->status = DSTask_PSGDocument::TASK_DONE;
-                        tasks_to_remove.push_back(it.first);
-                    }
+        // FIXME: add timeout condition
+        auto task_response = handle.get();
+        RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): document async_send_goal: %ld SUCCESS", task->document.frame.frame_num);
+        if (task_response != nullptr) {
+            // accepted
+            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
+                // successfully sent, record this
+                task->goal_handle = task_response;
+                {
+                    auto lock_ptr_psgdoc_task_doing = m_impl->sync_document_doing_map.synchronize();
+                    (**lock_ptr_psgdoc_task_doing)[task->goal_handle] = task;
                 }
-                // else {
-                //     // rejected
-                //     task->status = DSTask_PSGDocument::TASK_FAILED;
-                // }
-
-                // FIXME: what if failed to send many times?
-                // you need to terminate a frame, remove it from memory registry
+                tasks_to_remove.push_back(it.first);
             }
 
-            // remove all sent tasks
-            for (auto &it : tasks_to_remove) {
-                (*lock_ptr_psgdoc_task_waiting)->erase(it);
+            // succeed
+            else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                // task->status = DSTask_PSGDocument::TASK_DONE;
+                tasks_to_remove.push_back(it.first);
             }
         }
+        // else {
+        //     // rejected
+        //     task->status = DSTask_PSGDocument::TASK_FAILED;
+        // }
 
+        // FIXME: what if failed to send many times?
+        // you need to terminate a frame, remove it from memory registry
+    }
+
+    // remove all sent tasks
+    {
+        auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+        for (auto &it : tasks_to_remove) {
+            (*lock_ptr_psgdoc_task_waiting)->erase(it);
+        }
+    }
+
+    {
+        auto lock_ptr_psgdoc_task_doing = m_impl->sync_document_doing_map.synchronize();
         // for on-going tasks, if it is done, remove it
         if (!(*lock_ptr_psgdoc_task_doing)->empty()) {
             std::vector<GoalHandle_PsgDocument> tasks_to_remove;
@@ -297,30 +335,18 @@ void PersonGenerator::_send_document_to_downstreams()
                 (*lock_ptr_psgdoc_task_doing)->erase(it);
             }
         }
-
-        // if a frame has no waiting tasks or running tasks associated with it, remove it from buffer
-        for (auto &it : (**lock_ptr_psgdoc_task_waiting)) {
-            useful_documents.insert(it.second->document.frame.frame_num);
-        }
-
-        for (auto &it : (**lock_ptr_psgdoc_task_doing)) {
-            useful_documents.insert(it.second->document.frame.frame_num);
-        }
     }
 
     {
         auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
-        for (auto &it : (**lock_ptr_document_buffer)) {
-            // if not useful, it is useless
-            if (useful_documents.find(it.first) == useful_documents.end()) {
-                useless_documents.push_back(it.first);
-            }
-        }
-        // remove useless documents
-        for (auto &it : useless_documents) {
-            _remove_document_from_buffer(it, *lock_ptr_document_buffer);
+        // remove task done documents
+        for (auto &it : m_psgdoc_task_done) {
+            _remove_document_from_buffer(it->document.frame.frame_num, *lock_ptr_document_buffer);
         }
     }
+
+    // for all done tasks, remove them from memory
+    m_psgdoc_task_done.clear();
 }
 
 
@@ -332,10 +358,9 @@ void PersonGenerator::_declare_all_parameters()
 }
 
 
-void PersonGenerator::_add_document_to_buffer(const MSG_PsgDocument &document)
+void PersonGenerator::_add_document_to_buffer(const MSG_PsgDocument &document, std::map<int, MSG_PsgDocument> *document_buffer_ptr)
 {
-    auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
-    (**lock_ptr_document_buffer)[document.frame.frame_num] = document;
+    (*document_buffer_ptr)[document.frame.frame_num] = document;
 }
 
 void PersonGenerator::_remove_document_from_buffer(int frame_number, std::map<int, MSG_PsgDocument> *document_buffer_ptr)

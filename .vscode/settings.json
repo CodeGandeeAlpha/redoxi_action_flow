@@ -9,5 +9,26 @@
     "clangd.path": "clangd-18",
     "[cpp]": {
         "editor.formatOnSave": true
-    }
+    },
+    "files.associations": {
+        "functional": "cpp"
+    },
+    "python.autoComplete.extraPaths": [
+        "/mnt/chengxiao/code/psf_ros2_ws/install/detector/lib/python3.10/site-packages",
+        "/mnt/chengxiao/code/psf_ros2_ws/install/psg_services/lib/python3.10/site-packages",
+        "/mnt/chengxiao/code/psf_ros2_ws/install/psg_actions/lib/python3.10/site-packages",
+        "/mnt/chengxiao/code/psf_ros2_ws/install/psg_private_msgs/lib/python3.10/site-packages",
+        "/mnt/chengxiao/code/psf_ros2_ws/install/psg_public_msgs/lib/python3.10/site-packages",
+        "/mnt/chengxiao/code/psf_ros2_ws/install/psg_common/lib/python3.10/site-packages",
+        "/opt/ros/iron/lib/python3.10/site-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/mnt/chengxiao/code/psf_ros2_ws/install/detector/lib/python3.10/site-packages",
+        "/mnt/chengxiao/code/psf_ros2_ws/install/psg_services/lib/python3.10/site-packages",
+        "/mnt/chengxiao/code/psf_ros2_ws/install/psg_actions/lib/python3.10/site-packages",
+        "/mnt/chengxiao/code/psf_ros2_ws/install/psg_private_msgs/lib/python3.10/site-packages",
+        "/mnt/chengxiao/code/psf_ros2_ws/install/psg_public_msgs/lib/python3.10/site-packages",
+        "/mnt/chengxiao/code/psf_ros2_ws/install/psg_common/lib/python3.10/site-packages",
+        "/opt/ros/iron/lib/python3.10/site-packages"
+    ]
 }

@@ -38,6 +38,7 @@ class PersonGenerator : public rclcpp::Node, public IStartStopProtocol
 
     using Map_Document_Waiting = std::map<std::tuple<Downstream *, int>, std::shared_ptr<DSTask_PsgDocument>>;
     using Map_Document_Doing = std::map<GoalHandle_PsgDocument, std::shared_ptr<DSTask_PsgDocument>>;
+    using Vec_Document_Done = std::vector<std::shared_ptr<DSTask_PsgDocument>>;
 
     class Downstream
     {
@@ -99,10 +100,11 @@ class PersonGenerator : public rclcpp::Node, public IStartStopProtocol
         const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle);
 
     // create tasks
-    virtual void _process_document_create_tasks(const MSG_PsgDocument &document);
+    virtual void _process_document_create_tasks(const MSG_PsgDocument &document, Map_Document_Waiting *psgdoc_task_waiting_ptr);
 
   protected:
     virtual void _step();
+    virtual void _process();
 
     // find and connect to downstreams
     virtual void _connect_to_downstreams();
@@ -112,7 +114,7 @@ class PersonGenerator : public rclcpp::Node, public IStartStopProtocol
 
     virtual void _declare_all_parameters();
 
-    virtual void _add_document_to_buffer(const MSG_PsgDocument &document);
+    virtual void _add_document_to_buffer(const MSG_PsgDocument &document, std::map<int, MSG_PsgDocument> *document_buffer_ptr);
 
     virtual void _remove_document_from_buffer(int frame_number, std::map<int, MSG_PsgDocument> *document_buffer_ptr);
 
@@ -135,6 +137,7 @@ class PersonGenerator : public rclcpp::Node, public IStartStopProtocol
     // // indexed by (downstream, frame_number)
     Map_Document_Waiting m_psgdoc_task_waiting;
     Map_Document_Doing m_psgdoc_task_doing;
+    Vec_Document_Done m_psgdoc_task_done;
 
     // status code
     int m_status_code = NodeStatusCode::BEFORE_INIT;

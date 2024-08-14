@@ -2,7 +2,6 @@
 
 #include <boost/thread/synchronized_value.hpp>
 #include <detector/pipeline_in.hpp>
-#include <map>
 #include <memory>
 #include <thread>
 
