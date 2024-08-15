@@ -11,6 +11,9 @@ namespace FlowRos2Pipeline
     void convert_detection_to_msg(PassengerFlow::Detection& det, psg_public_msgs::msg::Detection& msg);
     void convert_msg_to_detection(const psg_public_msgs::msg::Detection& msg, PassengerFlow::DetectionPtr& det);
 
+    void convert_detections_to_msg(const std::vector<PassengerFlow::DetectionPtr>& dets, psg_public_msgs::msg::Detections& msg);
+    void convert_msg_to_detections(const psg_public_msgs::msg::Detections& msg, std::vector<PassengerFlow::DetectionPtr>& dets);
+
     void convert_person_to_msg(const PassengerFlow::PersonPtr& person, psg_private_msgs::msg::Person& msg);
     void convert_msg_to_person(const psg_private_msgs::msg::Person& msg, PassengerFlow::PersonPtr& person);
 
