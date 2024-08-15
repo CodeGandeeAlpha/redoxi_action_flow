@@ -526,6 +526,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
             # for time test
             if self._start_time is None:
+                torch.cuda.synchronize(model_idx)
                 self._start_time = time.time()
 
             # get the image from Vineyard
@@ -538,6 +539,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
             # time.sleep(0.001)
 
             # for time test
+            torch.cuda.synchronize(model_idx)
             self._end_time = time.time()
             self.m_logger.info(f"Total inference time for the video: {self._end_time - self._start_time} seconds")
             self.m_logger.info(f"Average inference time per frame: {(self._end_time - self._start_time) / frame_msg.frame_num} seconds")
