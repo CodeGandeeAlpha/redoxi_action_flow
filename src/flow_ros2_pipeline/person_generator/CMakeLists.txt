@@ -18,7 +18,7 @@ find_package(PassengerFlow REQUIRED)
 
 include_directories(include)
 
-add_executable(${PROJECT_NAME}_node src/person_generator_node.cpp src/person_generator.cpp)
+add_executable(${PROJECT_NAME}_node src/person_generator_node.cpp src/person_generator.cpp src/person_generator_types.cpp)
 
 
 ament_target_dependencies(${PROJECT_NAME}_node PUBLIC

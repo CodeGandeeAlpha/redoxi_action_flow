@@ -1,9 +1,10 @@
 #include <boost/thread/synchronized_value.hpp>
-#include <boost/uuid/uuid_generators.hpp>
 
 #include <person_generator/_person_generator.hpp>
 #include <person_generator/person_generator.hpp>
+#include <psg_common/msg_converter.hpp>
 #include <rcpputils/asserts.hpp>
+#include <vector>
 
 static constexpr auto ROS_ASSERT = rcpputils::assert_true;
 
@@ -23,7 +24,6 @@ PersonGenerator::PersonGenerator()
     m_impl->sync_document_doing_map = &m_psgdoc_task_doing;
 
     m_impl->sync_document_buffer = &m_document_buffer;
-
     RCLCPP_INFO(m_impl->logger, "constraction success!");
 }
 
@@ -200,7 +200,8 @@ void PersonGenerator::_step()
 
 
 void PersonGenerator::_process()
-{   std::vector <MSG_PsgDocument> documents_;
+{
+    std::vector<MSG_PsgDocument> documents_;
     {
         auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
         for (auto &it : **lock_ptr_document_buffer) {
@@ -210,17 +211,29 @@ void PersonGenerator::_process()
     // from buffer, extract person
     for (auto &document : documents_) {
         // process document
+        std::vector<PassengerFlow::DetectionPtr> v_detections;
+        convert_msg_to_detections(document.detections, v_detections);
         // extract person
-        m_person_extractor.extract_persons(const std::vector<DetectionPtr> &detections)
+        auto v_persons = m_person_extractor.extract_persons(v_detections);
+
+        RCLCPP_INFO(m_impl->logger, "_process(): frame %ld extracted %ld persons", document.frame.frame_num, v_persons.size());
+
+        // convert to msg
+        psg_private_msgs::msg::Persons persons_msg;
+        convert_persons_to_msg(v_persons, persons_msg);
         // create tasks
-        _process_document_create_tasks(document, &m_psgdoc_task_waiting);
+        document.persons = persons_msg;
+        {
+            auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+            _process_document_create_tasks(document, *lock_ptr_psgdoc_task_waiting);
+        }
+
+        // remove from buffer
+        {
+            auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
+            _remove_document_from_buffer(document.frame.frame_num, *lock_ptr_document_buffer);
+        }
     }
-
-
-    // auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
-    // for (auto &it : *lock_ptr_document_buffer) {
-    //     _process_document_create_tasks(it.second, &m_psgdoc_task_waiting);
-    // }
 }
 
 
@@ -337,13 +350,13 @@ void PersonGenerator::_send_document_to_downstreams()
         }
     }
 
-    {
-        auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
-        // remove task done documents
-        for (auto &it : m_psgdoc_task_done) {
-            _remove_document_from_buffer(it->document.frame.frame_num, *lock_ptr_document_buffer);
-        }
-    }
+    // {
+    //     auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
+    //     // remove task done documents
+    //     for (auto &it : m_psgdoc_task_done) {
+    //         _remove_document_from_buffer(it->document.frame.frame_num, *lock_ptr_document_buffer);
+    //     }
+    // }
 
     // for all done tasks, remove them from memory
     m_psgdoc_task_done.clear();
