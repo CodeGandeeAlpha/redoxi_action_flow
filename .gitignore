@@ -42,6 +42,7 @@ design.md
 *.ckpt
 *.pth
 *.pt
+*.onnx
 
 build-*/
 .cache/

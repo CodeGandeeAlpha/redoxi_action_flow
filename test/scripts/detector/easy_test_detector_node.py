@@ -31,7 +31,6 @@ class SharedTestCases(ABC):
             v6d_id = v6d_client.put(frame)
             int_id = int(v6d_id)
 
-            frame_num += 1
             goal_msg = ProcessFrame.Goal()
 
             goal_msg.frame.cache.id_int = int_id
@@ -47,6 +46,7 @@ class SharedTestCases(ABC):
                                                                          timeout_get_result=100000)
             # logging.info(f"test_action_by_video() got feedbacks {feedbacks}")
             # logging.info(f"test_action_by_video() got result {result}")
+            frame_num += 1
 
         cap.release()
 

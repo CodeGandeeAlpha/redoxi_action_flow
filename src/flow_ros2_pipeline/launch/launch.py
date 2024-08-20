@@ -38,5 +38,33 @@ def generate_launch_description():
             executable='pipeline_out_node',
             name='detector_out_node',
             parameters=[params_file]
-        )
+        ),
+        Node(
+            package='person_generator',
+            namespace='',
+            executable='person_generator_node',
+            name='person_generator_node',
+            parameters=[params_file]
+        ),
+        Node(
+            package='pose_detector',
+            namespace='',
+            executable='pipeline_in_node',
+            name='pose_detector_in_node',
+            parameters=[params_file]
+        ),
+        Node(
+            package='pose_detector',
+            namespace='',
+            executable='rtm_pose_detector_node.py',
+            name='pose_detector_node',
+            parameters=[params_file]
+        ),
+        Node(
+            package='pose_detector',
+            namespace='',
+            executable='pipeline_out_node',
+            name='pose_detector_out_node',
+            parameters=[params_file]
+        ),
     ])

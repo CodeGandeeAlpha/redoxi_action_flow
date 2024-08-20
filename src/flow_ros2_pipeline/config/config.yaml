@@ -42,3 +42,29 @@
     process_detections_action: "detector_out_process_detections_action"
     step_interval_ms: 10.0
     timeout_ms_send_to_downstream: 1000.0
+
+/person_generator_node:
+  ros__parameters:
+    process_document_action: "person_generator_process_document_action"
+    step_interval_ms: 10.0
+    timeout_ms_send_to_downstream: 1000.0
+
+
+/pose_detector_in_node:
+  ros__parameters:
+    process_document_action: "pose_detector_in_process_document_action"
+    step_interval_ms: 10.0
+    timeout_ms_send_to_downstream: 1000.0
+
+/pose_detector_node:
+  ros__parameters:
+    process_detections_action: "model_process_detections_action"
+    step_interval_ms: 10.0
+    pred_score_thr: 0.3
+
+/pose_detector_out_node:
+  ros__parameters:
+    process_document_action: "pose_detector_out_process_document_action"
+    process_bodyposes_action: "pose_detector_out_process_bodyposes_action"
+    step_interval_ms: 10.0
+    timeout_ms_send_to_downstream: 1000.0
