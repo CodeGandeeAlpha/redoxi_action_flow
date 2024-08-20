@@ -303,7 +303,8 @@ void PoseDetectorIn::_send_detections_to_downstreams()
         RCLCPP_INFO(m_impl->logger, "_step frame async_send_goal: %ld SUCCESS", task->detections.frame.frame_num);
         if (task_response != nullptr) {
             // accepted
-            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
+            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
+                task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
                 // successfully sent, record this
                 task->goal_handle = task_response;
                 {
@@ -384,7 +385,8 @@ void PoseDetectorIn::_send_document_to_downstreams()
         RCLCPP_INFO(m_impl->logger, "_step document async_send_goal: %ld SUCCESS", task->document.frame.frame_num);
         if (task_response != nullptr) {
             // accepted
-            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
+            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
+                task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
                 // successfully sent, record this
                 task->goal_handle = task_response;
                 {

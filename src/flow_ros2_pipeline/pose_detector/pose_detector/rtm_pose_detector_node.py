@@ -409,10 +409,12 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
 
             keypoints = body_pose.keypoints_2
             scores = body_pose.confidence
-            # to numpy array
-            keypoints = np.array([[kp.x, kp.y] for kp in keypoints])
-            scores = np.array(scores)
-            draw_skeleton(img, keypoints, scores)
+            for kpt in keypoints:
+                cv2.circle(img, (int(kpt.x), int(kpt.y)), 4, (0, 255, 255), -1)
+            # # to numpy array
+            # keypoints = np.array([[kp.x, kp.y] for kp in keypoints])
+            # scores = np.array(scores)
+            # draw_skeleton(img, keypoints, scores)
 
         self._out_video.write(img)
         self.m_logger.info(f"_visialize(): frame {frame.frame_num} visualized")
@@ -485,7 +487,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
                 self._send_goal(goal_msg)
                 self.m_logger.info(f"_step(): sent to downstream {bodyposes[0].frame.frame_num}")
 
-                # self._visialize(goal_msg)  # test only
+                self._visialize(goal_msg)  # test only
 
                 # # remove the frame from buffer
                 # self._remove_frame_from_buffer(det.frame.frame_num)

@@ -300,7 +300,8 @@ void PoseDetectorOut::_send_document_to_downstreams()
         auto task_response = handle.get();
         if (task_response != nullptr) {
             // accepted
-            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
+            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
+                task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
                 // successfully sent, record this
                 task->goal_handle = task_response;
                 // task->status = DSTask_PSGDocument::TASK_SENT;

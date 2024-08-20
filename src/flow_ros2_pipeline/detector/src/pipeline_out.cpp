@@ -287,10 +287,12 @@ void DetectorOut::_send_document_to_downstreams()
 
         for (auto const &it : (**lock_ptr_document_task_waiting)) {
             psgdoc_task_waiting_.push_back(it);
+            RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): psgdoc_task_waiting_ push_back framenumber %d", std::get<1>(it.first));
         }
     }
 
     for (auto &it : psgdoc_task_waiting_) {
+        RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): psgdoc_task_waiting_ framenumber %d", std::get<1>(it.first));
         auto &task = it.second;
         ACT_AcceptDocument::Goal goal;
         goal.document = task->document;
@@ -300,8 +302,11 @@ void DetectorOut::_send_document_to_downstreams()
         // FIXME: add timeout condition
         auto task_response = handle.get();
         if (task_response != nullptr) {
+            RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): document async_send_goal: %ld task_response is %d",
+                        task->document.frame.frame_num, task_response->get_status());
             // accepted
-            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
+            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
+                task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
                 // successfully sent, record this
                 task->goal_handle = task_response;
                 // task->status = DSTask_PSGDocument::TASK_SENT;
@@ -310,6 +315,7 @@ void DetectorOut::_send_document_to_downstreams()
                     (**lock_ptr_document_task_doing)[task->goal_handle] = task;
                 }
                 tasks_to_remove.push_back(it.first);
+                RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): STATUS_ACCEPTED tasks_to_remove push_back framenumber %d", std::get<1>(it.first));
             }
 
             // succeed
@@ -317,12 +323,14 @@ void DetectorOut::_send_document_to_downstreams()
                 // task->status = DSTask_PSGDocument::TASK_DONE;
                 m_psgdoc_task_done.push_back(task);
                 tasks_to_remove.push_back(it.first);
+                RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %d", std::get<1>(it.first));
+            } else {
+                RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): OTHER framenumber %d task_response is %d", std::get<1>(it.first), task_response->get_status());
             }
+        } else {
+            // rejected
+            RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): STATUS_REJECTED framenumber %d", std::get<1>(it.first));
         }
-        // else {
-        //     // rejected
-        //     task->status = DSTask_PSGDocument::TASK_FAILED;
-        // }
 
         // FIXME: what if failed to send many times?
         // you need to terminate a frame, remove it from memory registry
@@ -332,6 +340,7 @@ void DetectorOut::_send_document_to_downstreams()
     {
         auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
         for (auto &it : tasks_to_remove) {
+            RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): tasks_to_remove framenumber %d", std::get<1>(it));
             (*lock_ptr_document_task_waiting)->erase(it);
         }
     }

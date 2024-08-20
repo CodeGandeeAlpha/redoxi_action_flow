@@ -7,7 +7,7 @@
 
 /video_reader:
   ros__parameters:
-    source_file: "/mnt/chengxiao/20240222-194919.mp4"
+    source_file: "/mnt/chengxiao/test.mp4"
     source_camera_index: -1
     start_frame_number: -1
     end_frame_number: -1

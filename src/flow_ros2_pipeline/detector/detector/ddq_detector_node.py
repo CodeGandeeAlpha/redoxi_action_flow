@@ -397,7 +397,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
     def _send_goal(self, goal_msg):
         # TODO: if not all downstreams are connected, what to do?
         for ds_name, ds_client in self.m_downstreams.items():
-            self.m_logger.info(f'_send_goal(): before sending goal to downstream {ds_name}')
+            self.m_logger.info(f'_send_goal(): before sending goal framenumber {goal_msg.detections.frame.frame_num}')
             ds_client.wait_for_server()
 
             self._send_goal_future = ds_client.send_goal_async(goal_msg,
