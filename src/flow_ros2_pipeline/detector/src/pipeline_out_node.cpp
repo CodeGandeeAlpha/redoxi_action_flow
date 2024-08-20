@@ -13,8 +13,8 @@ int main(int argc, char *argv[])
 
     // init_config->process_document_action = "detector_out_process_document_action";
     FlowRos2Pipeline::DetectorOutInitConfig::DownstreamNode downstream_pipeline_node;
-    downstream_pipeline_node.accept_document_action = "person_generator_accept_document_action";
-    init_config->downstreams["detector_out"] = downstream_pipeline_node;
+    downstream_pipeline_node.accept_document_action = "person_generator_process_document_action";
+    init_config->downstreams["person_generator"] = downstream_pipeline_node;
 
     runtime_config->from_parameters(node.get());
 

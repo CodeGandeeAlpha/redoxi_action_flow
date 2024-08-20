@@ -26,7 +26,6 @@ DetectorOut::DetectorOut()
     m_impl->sync_detections_buffer = &m_detections_buffer;
 
 
-
     RCLCPP_INFO(m_impl->logger, "constraction success!");
 }
 
@@ -58,8 +57,8 @@ int DetectorOut::init(const std::shared_ptr<InitConfig> &config,
         std::bind(&DetectorOut::_accept_detections_cancel_callback, this, std::placeholders::_1),
         std::bind(&DetectorOut::_accept_detections_accepted_callback, this, std::placeholders::_1));
 
-    // // setup downstreams
-    // _connect_to_downstreams();
+    // setup downstreams
+    _connect_to_downstreams();
 
     RCLCPP_INFO(m_impl->logger,
                 "m_status_code from %d to %d!",
@@ -243,7 +242,7 @@ void DetectorOut::_process_document_create_tasks(const MSG_PsgDocument &document
 void DetectorOut::_step()
 {
     _merge_detections_and_documents();
-    // _send_document_to_downstreams();
+    _send_document_to_downstreams();
 }
 
 void DetectorOut::_connect_to_downstreams()
@@ -358,14 +357,6 @@ void DetectorOut::_send_document_to_downstreams()
         }
     }
 
-    {
-        auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
-        // remove task done documents
-        for (auto &it : m_psgdoc_task_done) {
-            _remove_document_from_buffer(it->document.frame.frame_num, *lock_ptr_document_buffer);
-        }
-    }
-
     // for all done tasks, remove them from memory
     m_psgdoc_task_done.clear();
 }
@@ -453,6 +444,12 @@ void DetectorOut::_merge_detections_and_documents()
             {
                 auto lock_ptr_detections_buffer = m_impl->sync_detections_buffer.synchronize();
                 _remove_detections_from_buffer(frame_num, *lock_ptr_detections_buffer);
+            }
+
+            // remove documents from buffer
+            {
+                auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
+                _remove_document_from_buffer(frame_num, *lock_ptr_document_buffer);
             }
         }
     }

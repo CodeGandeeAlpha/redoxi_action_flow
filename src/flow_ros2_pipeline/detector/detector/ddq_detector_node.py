@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import threading
 import time
-from sortedcontainers.sorteddict import SortedDict
 import queue
 import uuid as pyuuid
 import numpy as np
@@ -14,7 +13,6 @@ import rclpy
 from rclpy.action import ActionServer, ActionClient
 from rclpy.node import Node
 from unique_identifier_msgs.msg import UUID
-from std_msgs.msg import String
 from attr import field, define
 
 from psg_actions.action import ProcessDetections, ProcessFrame
@@ -108,9 +106,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self._out_video = cv2.VideoWriter('/mnt/chengxiao/detector_test_out.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30, (1920, 1080))
         self._start_time = None
         self._end_time = None
-    # for easy test
-    def listener_callback(self, msg):
-        self.get_logger().info('I heard: "%s"' % msg.data)
+        self._time_test = False
 
     def _func_step(self):
         while rclpy.ok() and self.m_step_running:
@@ -525,9 +521,10 @@ class DetectorNode(Node, IOpenCloseProtocol):
             self.m_logger.info(f'_model_step(): framenum {frame_msg.frame_num} uuid {pyuuid.UUID(bytes=bytes(uuid.uuid))} popped from model task queue')
 
             # for time test
-            if self._start_time is None:
-                torch.cuda.synchronize(model_idx)
-                self._start_time = time.time()
+            if self._time_test:
+                if self._start_time is None:
+                    torch.cuda.synchronize(model_idx)
+                    self._start_time = time.time()
 
             # get the image from Vineyard
             img = self._get_frame_from_v6d(frame_msg)
@@ -539,10 +536,11 @@ class DetectorNode(Node, IOpenCloseProtocol):
             # time.sleep(0.001)
 
             # for time test
-            torch.cuda.synchronize(model_idx)
-            self._end_time = time.time()
-            self.m_logger.info(f"Total inference time for the video: {self._end_time - self._start_time} seconds")
-            self.m_logger.info(f"Average inference time per frame: {(self._end_time - self._start_time) / frame_msg.frame_num} seconds")
+            if self._time_test:
+                torch.cuda.synchronize(model_idx)
+                self._end_time = time.time()
+                self.m_logger.info(f"Total inference time for the video: {self._end_time - self._start_time} seconds")
+                self.m_logger.info(f"Average inference time per frame: {(self._end_time - self._start_time) / (frame_msg.frame_num + 1)} seconds")
 
             # convert the result to Detections msg
             detections = self._to_detections_msg(result)
