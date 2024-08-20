@@ -1,0 +1,8 @@
+psg_public_msgs/BodyPose[] body_poses
+psg_public_msgs/Frame frame
+---
+string return_msg
+int64 return_code
+---
+string feedback_msg
+int64 feedback_code

@@ -23,6 +23,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/ProcessPsgDocument.action"
   "action/ProcessFrame.action"
   "action/ProcessDetections.action"
+  "action/ProcessBodyPoses.action"
 
   DEPENDENCIES psg_public_msgs psg_private_msgs unique_identifier_msgs
 )
