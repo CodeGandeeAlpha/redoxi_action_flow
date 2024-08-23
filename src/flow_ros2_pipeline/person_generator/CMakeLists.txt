@@ -16,7 +16,10 @@ find_package(psg_common REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(PassengerFlow REQUIRED)
 
-include_directories(include)
+find_package(vineyard REQUIRED)
+find_package(OpenCV REQUIRED)
+
+include_directories(include ${OpenCV_INCLUDE_DIRS} ${VINEYARD_INCLUDE_DIRS})
 
 add_executable(${PROJECT_NAME}_node src/person_generator_node.cpp src/person_generator.cpp src/person_generator_types.cpp)
 
@@ -30,7 +33,7 @@ psg_private_msgs
 psg_public_msgs
 )
 
-target_link_libraries(${PROJECT_NAME}_node PUBLIC PassengerFlow::PassengerFlow)
+target_link_libraries(${PROJECT_NAME}_node PUBLIC ${VINEYARD_LIBRARIES} ${OpenCV_LIBS} PassengerFlow::PassengerFlow)
 
 install(DIRECTORY include/
   DESTINATION include)

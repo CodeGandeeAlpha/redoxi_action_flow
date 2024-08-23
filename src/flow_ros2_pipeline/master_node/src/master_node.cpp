@@ -258,11 +258,11 @@ int MasterNode::start()
     ROS_ASSERT(m_status_code == NodeStatusCode::INITIALIZED,
                "cannot start because status code is not INITIALIZED");
 
+    auto status_before = m_status_code;
+    m_status_code = NodeStatusCode::STARTED;
     RCLCPP_INFO(m_impl->logger,
                 "m_status_code from %d to %d!",
-                m_status_code, NodeStatusCode::STARTED);
-
-    m_status_code = NodeStatusCode::STARTED;
+                status_before, m_status_code);
 
     m_impl->step_running = true;
     m_impl->step_thread = std::make_shared<std::thread>(
@@ -289,11 +289,11 @@ int MasterNode::stop()
         m_impl->step_thread = nullptr;
     }
 
+    auto status_before = m_status_code;
+    m_status_code = NodeStatusCode::STOPPED;
     RCLCPP_INFO(m_impl->logger,
                 "m_status_code from %d to %d!",
-                m_status_code, NodeStatusCode::STOPPED);
-
-    m_status_code = NodeStatusCode::STOPPED;
+                status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 

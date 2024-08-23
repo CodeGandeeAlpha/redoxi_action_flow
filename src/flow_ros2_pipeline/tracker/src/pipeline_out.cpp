@@ -1,9 +1,9 @@
 #include <boost/thread/lock_algorithms.hpp>
 #include <psg_common/psg_common.hpp>
 
-#include <pose_detector/_pipeline_out.hpp>
-#include <pose_detector/pipeline_out.hpp>
 #include <rcpputils/asserts.hpp>
+#include <tracker/_pipeline_out.hpp>
+#include <tracker/pipeline_out.hpp>
 
 static constexpr auto ROS_ASSERT = rcpputils::assert_true;
 
@@ -11,10 +11,10 @@ using namespace std::chrono_literals;
 
 namespace FlowRos2Pipeline
 {
-PoseDetectorOut::PoseDetectorOut()
-    : Node("pose_detector_out_node")
+TrackerOut::TrackerOut()
+    : Node("tracker_out_node")
 {
-    m_impl = std::make_shared<PoseDetectorOutImpl>(this);
+    m_impl = std::make_shared<TrackerOutImpl>(this);
 
     _declare_all_parameters();
 
@@ -29,8 +29,8 @@ PoseDetectorOut::PoseDetectorOut()
     RCLCPP_INFO(m_impl->logger, "constraction success!");
 }
 
-int PoseDetectorOut::init(const std::shared_ptr<InitConfig> &config,
-                          const std::shared_ptr<RuntimeConfig> &runtime_config)
+int TrackerOut::init(const std::shared_ptr<InitConfig> &config,
+                     const std::shared_ptr<RuntimeConfig> &runtime_config)
 {
     if (m_status_code != NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::STOPPED) {
         RCLCPP_ERROR(m_impl->logger, "init FAILED! status code is not BEFORE_INIT or STOPPED");
@@ -45,17 +45,17 @@ int PoseDetectorOut::init(const std::shared_ptr<InitConfig> &config,
     // create process document server
     m_act_process_document = rclcpp_action::create_server<ACT_AcceptDocument>(
         this, m_init_config->process_document_action,
-        std::bind(&PoseDetectorOut::_accept_document_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
-        std::bind(&PoseDetectorOut::_accept_document_cancel_callback, this, std::placeholders::_1),
-        std::bind(&PoseDetectorOut::_accept_document_accepted_callback, this, std::placeholders::_1));
+        std::bind(&TrackerOut::_accept_document_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
+        std::bind(&TrackerOut::_accept_document_cancel_callback, this, std::placeholders::_1),
+        std::bind(&TrackerOut::_accept_document_accepted_callback, this, std::placeholders::_1));
 
     // create process bodyposes server
     // std::string process_detections_action = this->get_parameter(m_init_config->process_detections_action).as_string();
     m_act_process_bodyposes = rclcpp_action::create_server<ACT_AcceptBodyposes>(
         this, m_init_config->process_bodyposes_action,
-        std::bind(&PoseDetectorOut::_accept_bodyposes_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
-        std::bind(&PoseDetectorOut::_accept_bodyposes_cancel_callback, this, std::placeholders::_1),
-        std::bind(&PoseDetectorOut::_accept_bodyposes_accepted_callback, this, std::placeholders::_1));
+        std::bind(&TrackerOut::_accept_bodyposes_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
+        std::bind(&TrackerOut::_accept_bodyposes_cancel_callback, this, std::placeholders::_1),
+        std::bind(&TrackerOut::_accept_bodyposes_accepted_callback, this, std::placeholders::_1));
 
     // setup downstreams
     // _connect_to_downstreams();
@@ -68,12 +68,12 @@ int PoseDetectorOut::init(const std::shared_ptr<InitConfig> &config,
     return ReturnCode::SUCCESS;
 }
 
-const std::shared_ptr<PoseDetectorOut::InitConfig> &PoseDetectorOut::get_init_config() const
+const std::shared_ptr<TrackerOut::InitConfig> &TrackerOut::get_init_config() const
 {
     return m_init_config;
 }
 
-int PoseDetectorOut::update_runtime_config(const std::shared_ptr<RuntimeConfig> &config)
+int TrackerOut::update_runtime_config(const std::shared_ptr<RuntimeConfig> &config)
 {
     ROS_ASSERT(m_status_code != NodeStatusCode::STARTED &&
                    m_status_code != NodeStatusCode::BEFORE_INIT,
@@ -83,13 +83,13 @@ int PoseDetectorOut::update_runtime_config(const std::shared_ptr<RuntimeConfig> 
     return ReturnCode::SUCCESS;
 }
 
-const std::shared_ptr<PoseDetectorOut::RuntimeConfig> &PoseDetectorOut::get_runtime_config() const
+const std::shared_ptr<TrackerOut::RuntimeConfig> &TrackerOut::get_runtime_config() const
 {
     return m_runtime_config;
 }
 
 
-int PoseDetectorOut::start()
+int TrackerOut::start()
 {
     // the node must be opened
     ROS_ASSERT(m_status_code == NodeStatusCode::INITIALIZED,
@@ -113,7 +113,7 @@ int PoseDetectorOut::start()
     return ReturnCode::SUCCESS;
 }
 
-int PoseDetectorOut::stop()
+int TrackerOut::stop()
 {
     // only stoppable if the node is started
     ROS_ASSERT(m_status_code == NodeStatusCode::STARTED,
@@ -131,17 +131,19 @@ int PoseDetectorOut::stop()
     RCLCPP_INFO(m_impl->logger,
                 "m_status_code from %d to %d!",
                 status_before, m_status_code);
+
+    m_status_code = NodeStatusCode::STOPPED;
     return ReturnCode::SUCCESS;
 }
 
 
-int PoseDetectorOut::get_status_code() const
+int TrackerOut::get_status_code() const
 {
     return m_status_code;
 }
 
 
-rclcpp_action::GoalResponse PoseDetectorOut::_accept_document_goal_callback(
+rclcpp_action::GoalResponse TrackerOut::_accept_document_goal_callback(
     const rclcpp_action::GoalUUID &uuid,
     std::shared_ptr<const ACT_AcceptDocument::Goal> goal)
 {
@@ -150,7 +152,7 @@ rclcpp_action::GoalResponse PoseDetectorOut::_accept_document_goal_callback(
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
-rclcpp_action::CancelResponse PoseDetectorOut::_accept_document_cancel_callback(
+rclcpp_action::CancelResponse TrackerOut::_accept_document_cancel_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle)
 {
     RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
@@ -158,7 +160,7 @@ rclcpp_action::CancelResponse PoseDetectorOut::_accept_document_cancel_callback(
     return rclcpp_action::CancelResponse::REJECT;
 }
 
-void PoseDetectorOut::_accept_document_accepted_callback(
+void TrackerOut::_accept_document_accepted_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle)
 {
 
@@ -182,16 +184,16 @@ void PoseDetectorOut::_accept_document_accepted_callback(
     goal_handle->succeed(result);
 }
 
-rclcpp_action::GoalResponse PoseDetectorOut::_accept_bodyposes_goal_callback(
+rclcpp_action::GoalResponse TrackerOut::_accept_bodyposes_goal_callback(
     const rclcpp_action::GoalUUID &uuid,
     std::shared_ptr<const ACT_AcceptBodyposes::Goal> goal)
 {
-    RCLCPP_INFO(m_impl->logger, "Received goal request with bodyposes with frame_num %ld", goal->frame.frame_num);
+    RCLCPP_INFO(m_impl->logger, "Received goal request with detections with frame_num %ld", goal->frame.frame_num);
     (void)uuid; // not used
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
-rclcpp_action::CancelResponse PoseDetectorOut::_accept_bodyposes_cancel_callback(
+rclcpp_action::CancelResponse TrackerOut::_accept_bodyposes_cancel_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptBodyposes>> goal_handle)
 {
     RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
@@ -199,13 +201,13 @@ rclcpp_action::CancelResponse PoseDetectorOut::_accept_bodyposes_cancel_callback
     return rclcpp_action::CancelResponse::REJECT;
 }
 
-void PoseDetectorOut::_accept_bodyposes_accepted_callback(
+void TrackerOut::_accept_bodyposes_accepted_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptBodyposes>> goal_handle)
 {
 
     const auto &goal = goal_handle->get_goal();
 
-    // cache the bodyposes
+    // cache the detections
     const auto &body_poses = goal->body_poses;
     const auto &frame = goal->frame;
 
@@ -224,8 +226,8 @@ void PoseDetectorOut::_accept_bodyposes_accepted_callback(
 }
 
 
-void PoseDetectorOut::_process_document_create_tasks(const MSG_PsgDocument &document,
-                                                     PoseDetectorOut::Map_Document_Waiting *document_waiting_map_ptr)
+void TrackerOut::_process_document_create_tasks(const MSG_PsgDocument &document,
+                                                TrackerOut::Map_Document_Waiting *document_waiting_map_ptr)
 {
     RCLCPP_INFO(m_impl->logger, "_process_document_create_tasks(): create tasks for document %ld", document.frame.frame_num);
 
@@ -239,13 +241,13 @@ void PoseDetectorOut::_process_document_create_tasks(const MSG_PsgDocument &docu
 }
 
 
-void PoseDetectorOut::_step()
+void TrackerOut::_step()
 {
     _merge_bodyposes_and_documents();
     // _send_document_to_downstreams();
 }
 
-void PoseDetectorOut::_connect_to_downstreams()
+void TrackerOut::_connect_to_downstreams()
 {
     ROS_ASSERT(m_init_config != nullptr, "m_init_config is nullptr");
 
@@ -262,11 +264,11 @@ void PoseDetectorOut::_connect_to_downstreams()
 
             ds->accept_document = client;
             // ds->accept_document_options.goal_response_callback =
-            //         std::bind(&PoseDetectorOut::process_document_goal_response_callback, this, std::placeholders::_1);
+            //         std::bind(&TrackerOut::process_document_goal_response_callback, this, std::placeholders::_1);
             // ds->accept_document_options.feedback_callback =
-            //         std::bind(&PoseDetectorOut::process_document_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
+            //         std::bind(&TrackerOut::process_document_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
             // ds->accept_document_options.result_callback =
-            //         std::bind(&PoseDetectorOut::process_document_result_callback, this, std::placeholders::_1);
+            //         std::bind(&TrackerOut::process_document_result_callback, this, std::placeholders::_1);
 
             // wait until the action server is ready
             RCLCPP_INFO(m_impl->logger, "waiting for pipeline action server %s", name.c_str());
@@ -278,7 +280,7 @@ void PoseDetectorOut::_connect_to_downstreams()
     }
 }
 
-void PoseDetectorOut::_send_document_to_downstreams()
+void TrackerOut::_send_document_to_downstreams()
 {
     std::vector<Map_Document_Waiting::key_type> tasks_to_remove;
     std::vector<decltype(m_psgdoc_task_waiting)::value_type> psgdoc_task_waiting_;
@@ -371,7 +373,7 @@ void PoseDetectorOut::_send_document_to_downstreams()
 }
 
 
-void PoseDetectorOut::_declare_all_parameters()
+void TrackerOut::_declare_all_parameters()
 {
     this->declare_parameter<std::string>("process_document_action", "");
     this->declare_parameter<std::string>("process_bodyposes_action", "");
@@ -380,17 +382,17 @@ void PoseDetectorOut::_declare_all_parameters()
 }
 
 
-void PoseDetectorOut::_add_document_to_buffer(const MSG_PsgDocument &document, std::map<int, PoseDetectorOut::MSG_PsgDocument> *document_buffer_ptr)
+void TrackerOut::_add_document_to_buffer(const MSG_PsgDocument &document, std::map<int, TrackerOut::MSG_PsgDocument> *document_buffer_ptr)
 {
     (*document_buffer_ptr)[document.frame.frame_num] = document;
 }
 
-void PoseDetectorOut::_add_bodyposes_to_buffer(const MSG_Bodyposes &bodyposes, const int frame_number, std::map<int, PoseDetectorOut::MSG_Bodyposes> *bodyposes_buffer_ptr)
+void TrackerOut::_add_bodyposes_to_buffer(const MSG_Bodyposes &bodyposes, const int frame_number, std::map<int, TrackerOut::MSG_Bodyposes> *bodyposes_buffer_ptr)
 {
     (*bodyposes_buffer_ptr)[frame_number] = bodyposes;
 }
 
-void PoseDetectorOut::_remove_document_from_buffer(int frame_number, std::map<int, PoseDetectorOut::MSG_PsgDocument> *document_buffer_ptr)
+void TrackerOut::_remove_document_from_buffer(int frame_number, std::map<int, TrackerOut::MSG_PsgDocument> *document_buffer_ptr)
 {
     RCLCPP_INFO(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d", frame_number);
     // if frame_number is not in buffer, do nothing
@@ -400,7 +402,7 @@ void PoseDetectorOut::_remove_document_from_buffer(int frame_number, std::map<in
     }
 }
 
-void PoseDetectorOut::_remove_bodyposes_from_buffer(int frame_number, std::map<int, PoseDetectorOut::MSG_Bodyposes> *bodyposes_buffer_ptr)
+void TrackerOut::_remove_bodyposes_from_buffer(int frame_number, std::map<int, TrackerOut::MSG_Bodyposes> *bodyposes_buffer_ptr)
 {
     RCLCPP_INFO(m_impl->logger, "_remove_bodyposes_from_buffer(): remove bodyposes with frame_num %d", frame_number);
     // if frame_number is not in buffer, do nothing
@@ -410,7 +412,7 @@ void PoseDetectorOut::_remove_bodyposes_from_buffer(int frame_number, std::map<i
     }
 }
 
-void PoseDetectorOut::_merge_bodyposes_and_documents()
+void TrackerOut::_merge_bodyposes_and_documents()
 {
     std::vector<decltype(m_document_buffer)::value_type> document_buffer_;
 

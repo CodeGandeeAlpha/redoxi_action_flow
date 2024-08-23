@@ -19,6 +19,7 @@ find_package(psg_public_msgs REQUIRED)
 
 find_package(PassengerFlow REQUIRED)
 find_package(vineyard REQUIRED)
+find_package(OpenCV REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -40,16 +41,17 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
   ${VINEYARD_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
   )
-
-target_link_libraries(${PROJECT_NAME} PUBLIC ${VINEYARD_LIBRARIES} PassengerFlow::PassengerFlow)
 
 ament_target_dependencies(${PROJECT_NAME} PUBLIC
   rclcpp
   rclpy
   psg_private_msgs
   psg_public_msgs
-  )
+)
+
+target_link_libraries(${PROJECT_NAME} PUBLIC ${VINEYARD_LIBRARIES} ${OpenCV_LIBS} PassengerFlow::PassengerFlow)
 
 ament_python_install_package(${PROJECT_NAME})
 

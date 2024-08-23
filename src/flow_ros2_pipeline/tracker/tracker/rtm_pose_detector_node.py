@@ -23,8 +23,8 @@ from psg_common.interfaces import IOpenCloseProtocol
 from psg_common.constants import NodeStatusCode, ReturnCode
 from psg_common.utilities import create_v6d_client, get_img_by_v6d_id
 
-from pose_detector.rtm_pose_detector import RTMPoseDetector
-from pose_detector.base_pose_detector import BasePoseDetector
+from tracker.rtm_pose_detector import RTMPoseDetector
+from tracker.base_pose_detector import BasePoseDetector
 
 class PoseDetectorNode(Node, IOpenCloseProtocol):
     @define(kw_only=True)
@@ -547,10 +547,9 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         bboxes = []
         uuids = []
         for det in detections_msg.detections:
-            if det.category == 0:
-                bbox = [det.bbox.x, det.bbox.y, det.bbox.x + det.bbox.width, det.bbox.y + det.bbox.height]
-                bboxes.append(bbox)
-                uuids.append(det.uuid)
+            bbox = [det.bbox.x, det.bbox.y, det.bbox.x + det.bbox.width, det.bbox.y + det.bbox.height]
+            bboxes.append(bbox)
+            uuids.append(det.uuid)
         return bboxes, uuids
 
 

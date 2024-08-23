@@ -431,6 +431,10 @@ int OpencvVideoReader::close()
     // closing, release video capture
     m_impl->video_capture = nullptr;
 
+    // closing, release v6d client
+    m_impl->v6d_client->Disconnect();
+    m_impl->v6d_client = nullptr;
+
     // reset frame number
     m_frame_number = -1;
 

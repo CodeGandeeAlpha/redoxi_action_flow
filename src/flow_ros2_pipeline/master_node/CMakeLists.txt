@@ -18,7 +18,7 @@ find_package(psg_common REQUIRED)
 find_package(psg_private_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
 
-
+find_package(OpenCV REQUIRED)
 find_package(vineyard REQUIRED)
 
 if(BUILD_TESTING)
@@ -34,7 +34,7 @@ if(BUILD_TESTING)
 endif()
 
 
-include_directories(include ${VINEYARD_INCLUDE_DIRS})
+include_directories(include ${VINEYARD_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
 add_executable(${PROJECT_NAME}_node src/main.cpp src/master_node.cpp src/memory_registry.cpp src/master_node_types.cpp)
 
 ament_target_dependencies(${PROJECT_NAME}_node
@@ -48,7 +48,7 @@ ament_target_dependencies(${PROJECT_NAME}_node
   psg_private_msgs
 )
 
-target_link_libraries(${PROJECT_NAME}_node ${VINEYARD_LIBRARIES})
+target_link_libraries(${PROJECT_NAME}_node ${VINEYARD_LIBRARIES} ${OpenCV_LIBS})
 
 install(TARGETS ${PROJECT_NAME}_node
   DESTINATION lib/${PROJECT_NAME})

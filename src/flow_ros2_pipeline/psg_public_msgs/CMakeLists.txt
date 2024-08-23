@@ -21,6 +21,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Detection.msg"
   "msg/Detections.msg"
   "msg/Frame.msg"
+  "msg/TrackTarget.msg"
 
   DEPENDENCIES geometry_msgs std_msgs unique_identifier_msgs
   # ADD_LINTER_TESTS

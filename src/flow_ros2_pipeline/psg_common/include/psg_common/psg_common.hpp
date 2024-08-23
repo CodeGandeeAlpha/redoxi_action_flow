@@ -1,6 +1,9 @@
 #pragma once
 #include <memory>
+#include <opencv2/opencv.hpp>
 #include <string>
+#include <vineyard/basic/ds/tensor.h>
+#include <vineyard/client/client.h>
 
 namespace vineyard
 {
@@ -8,6 +11,8 @@ class Client;
 };
 
 std::shared_ptr<vineyard::Client> create_v6d_client(const std::string &socket = "");
+auto get_tensor_by_v6d_id(uint64_t id, std::shared_ptr<vineyard::Client> &client);
+cv::Mat from_v6d_tensor_to_cvmat(const std::shared_ptr<vineyard::Tensor<uint8_t>> &tensor);
 std::string uuid_to_string(const std::array<uint8_t, 16> &uuid);
 
 namespace FlowRos2Pipeline

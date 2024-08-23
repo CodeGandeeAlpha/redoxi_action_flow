@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(pose_detector)
+project(tracker)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -21,9 +21,11 @@ find_package(rclcpp_action REQUIRED)
 
 find_package(Boost REQUIRED)
 find_package(vineyard REQUIRED)
+find_package(RedoxiTrack REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(PassengerFlow REQUIRED)
 
-include_directories(include ${Boost_INCLUDE_DIRS} ${VINEYARD_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
+include_directories(include ${OpenCV_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${VINEYARD_INCLUDE_DIRS})
 
 install(DIRECTORY include/
   DESTINATION include)
@@ -37,6 +39,12 @@ add_executable(pipeline_out_node
   src/pipeline_out_node.cpp
   src/pipeline_out.cpp
   src/pipeline_out_types.cpp
+)
+
+add_executable(tracker_node
+  src/tracker_node.cpp
+  src/tracker.cpp
+  src/tracker_types.cpp
 )
 
 ament_target_dependencies(pipeline_in_node
@@ -61,21 +69,34 @@ ament_target_dependencies(pipeline_out_node
   sensor_msgs
 )
 
+ament_target_dependencies(tracker_node PUBLIC
+  rclcpp
+  rclcpp_action
+  rclpy
+  std_msgs
+  psg_actions
+  psg_services
+  psg_common
+  sensor_msgs
+)
+
 
 target_link_libraries(pipeline_in_node ${Boost_LIBRARIES} ${VINEYARD_LIBRARIES} ${OpenCV_LIBS})
 target_link_libraries(pipeline_out_node ${Boost_LIBRARIES} ${VINEYARD_LIBRARIES} ${OpenCV_LIBS})
+target_link_libraries(tracker_node PUBLIC ${Boost_LIBRARIES} ${VINEYARD_LIBRARIES} ${OpenCV_LIBS} RedoxiTrack::RedoxiTrack PassengerFlow::PassengerFlow)
 
 install(TARGETS pipeline_in_node
                 pipeline_out_node
+                tracker_node
 DESTINATION lib/${PROJECT_NAME})
 
-ament_python_install_package(${PROJECT_NAME})
+# ament_python_install_package(${PROJECT_NAME})
 
-# Install Python executables
-install(PROGRAMS
-  ${PROJECT_NAME}/rtm_pose_detector_node.py
-  DESTINATION lib/${PROJECT_NAME}
-)
+# # Install Python executables
+# install(PROGRAMS
+#   ${PROJECT_NAME}/rtm_pose_detector_node.py
+#   DESTINATION lib/${PROJECT_NAME}
+# )
 
 # # Environment hook to set PYTHONPATH
 # ament_environment_hooks(

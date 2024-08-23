@@ -15,15 +15,11 @@ find_package(psg_private_msgs REQUIRED)
 find_package(unique_identifier_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "action/SendFrame.action"
-  "action/AddFrame.action"
-  "action/DelFrame.action"
-  "action/DropFrame.action"
-  "action/SendDetections.action"
   "action/ProcessPsgDocument.action"
   "action/ProcessFrame.action"
   "action/ProcessDetections.action"
   "action/ProcessBodyPoses.action"
+  "action/ProcessTrackTargets.action"
 
   DEPENDENCIES psg_public_msgs psg_private_msgs unique_identifier_msgs
 )
