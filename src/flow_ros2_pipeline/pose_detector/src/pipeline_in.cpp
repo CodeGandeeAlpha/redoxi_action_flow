@@ -153,17 +153,21 @@ void PoseDetectorIn::_accept_document_accepted_callback(
 
     // cache the document, copy it for modify it
     auto document = goal->document;
-    auto &detections = document.detections;
+    auto &persons = document.persons;
 
-    // generate uuid for every detection and Person
-    for (size_t i = 0; i < detections.detections.size(); i++) {
-        auto &detection = detections.detections[i];
+    // generate uuid for every Person and then generate body detections from person body
+    MSG_Detections detections;
+    for (size_t i = 0; i < persons.persons.size(); i++) {
         boost::uuids::uuid uuid = boost::uuids::random_generator()();
-        std::copy(uuid.begin(), uuid.end(), detection.uuid.uuid.begin());
 
         auto &person = document.persons.persons[i];
         std::copy(uuid.begin(), uuid.end(), person.uuid.uuid.begin());
+
+        auto &body = person.body;
+        body.uuid = person.uuid;
+        detections.detections.push_back(body);
     }
+    detections.frame = document.frame;
 
     // create tasks for all downstreams
     {

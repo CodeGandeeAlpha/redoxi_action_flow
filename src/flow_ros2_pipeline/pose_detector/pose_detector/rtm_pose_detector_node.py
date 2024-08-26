@@ -547,10 +547,9 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         bboxes = []
         uuids = []
         for det in detections_msg.detections:
-            if det.category == 0:
-                bbox = [det.bbox.x, det.bbox.y, det.bbox.x + det.bbox.width, det.bbox.y + det.bbox.height]
-                bboxes.append(bbox)
-                uuids.append(det.uuid)
+            bbox = [det.bbox.x, det.bbox.y, det.bbox.x + det.bbox.width, det.bbox.y + det.bbox.height]
+            bboxes.append(bbox)
+            uuids.append(det.uuid)
         return bboxes, uuids
 
 

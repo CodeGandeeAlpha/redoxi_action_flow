@@ -28,7 +28,7 @@ class TrackerOutInitConfig
     std::map<std::string, DownstreamNode> downstreams;
 
     std::string process_document_action;
-    std::string process_bodyposes_action;
+    std::string process_track_targets_action;
 
     void from_parameters(TrackerOut *node);
 };

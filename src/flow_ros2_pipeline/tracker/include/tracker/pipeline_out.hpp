@@ -2,8 +2,8 @@
 
 #include <map>
 #include <memory>
-#include <psg_actions/action/process_body_poses.hpp>
 #include <psg_actions/action/process_psg_document.hpp>
+#include <psg_actions/action/process_track_targets.hpp>
 #include <psg_common/psg_common.hpp>
 #include <rclcpp/client.hpp>
 #include <rclcpp/node.hpp>
@@ -23,14 +23,17 @@ class TrackerOut : public rclcpp::Node, public IStartStopProtocol
     class DSTask_PsgDocument;
 
   public:
-    using ACT_AcceptBodyposes = psg_actions::action::ProcessBodyPoses;
+    using ACT_AcceptTrackTargets = psg_actions::action::ProcessTrackTargets;
     using ACT_AcceptDocument = psg_actions::action::ProcessPsgDocument;
 
     using InitConfig = TrackerOutInitConfig;
     using RuntimeConfig = TrackerOutRuntimeConfig;
     using MSG_PsgDocument = psg_private_msgs::msg::PsgDocument;
-    using MSG_Bodypose = psg_public_msgs::msg::BodyPose;
-    using MSG_Bodyposes = ACT_AcceptBodyposes::Goal::_body_poses_type;
+    using MSG_TrackTarget = psg_public_msgs::msg::TrackTarget;
+    using MSG_TrackTargets = ACT_AcceptTrackTargets::Goal::_track_targets_type;
+    using MSG_UUID = unique_identifier_msgs::msg::UUID;
+    using MSG_Person = psg_private_msgs::msg::Person;
+    using MSG_Trajectory = psg_private_msgs::msg::PersonTrajectory;
 
     using GoalHandle_PsgDocument = rclcpp_action::ClientGoalHandle<ACT_AcceptDocument>::SharedPtr;
 
@@ -102,13 +105,13 @@ class TrackerOut : public rclcpp::Node, public IStartStopProtocol
 
   protected:
     // accept detections from upstream
-    virtual rclcpp_action::GoalResponse _accept_bodyposes_goal_callback(
+    virtual rclcpp_action::GoalResponse _accept_track_targets_goal_callback(
         const rclcpp_action::GoalUUID &uuid,
-        std::shared_ptr<const ACT_AcceptBodyposes::Goal> goal);
-    virtual rclcpp_action::CancelResponse _accept_bodyposes_cancel_callback(
-        const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptBodyposes>> goal_handle);
-    virtual void _accept_bodyposes_accepted_callback(
-        const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptBodyposes>> goal_handle);
+        std::shared_ptr<const ACT_AcceptTrackTargets::Goal> goal);
+    virtual rclcpp_action::CancelResponse _accept_track_targets_cancel_callback(
+        const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptTrackTargets>> goal_handle);
+    virtual void _accept_track_targets_accepted_callback(
+        const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptTrackTargets>> goal_handle);
 
 
   protected:
@@ -124,14 +127,17 @@ class TrackerOut : public rclcpp::Node, public IStartStopProtocol
 
     virtual void _add_document_to_buffer(const MSG_PsgDocument &document,
                                          std::map<int, MSG_PsgDocument> *document_buffer_ptr);
-    virtual void _add_bodyposes_to_buffer(const MSG_Bodyposes &bodyposes, const int frame_number,
-                                          std::map<int, MSG_Bodyposes> *bodyposes_buffer_ptr);
+    virtual void _add_track_targets_to_buffer(const MSG_TrackTargets &track_targets, const int frame_number,
+                                              std::map<int, MSG_TrackTargets> *track_targets_buffer_ptr);
+    virtual void _add_person_to_buffer(const MSG_Person &person, std::map<MSG_UUID, MSG_Person> *person_buffer_ptr);
 
     virtual void _remove_document_from_buffer(int frame_number, std::map<int, MSG_PsgDocument> *document_buffer_ptr);
 
-    void _remove_bodyposes_from_buffer(int frame_number, std::map<int, MSG_Bodyposes> *bodyposes_buffer_ptr);
+    void _remove_track_targets_from_buffer(int frame_number, std::map<int, MSG_TrackTargets> *track_targets_buffer_ptr);
 
-    virtual void _merge_bodyposes_and_documents();
+    void _remove_person_from_buffer(const MSG_UUID &uuid, std::map<MSG_UUID, MSG_Person> *person_buffer_ptr);
+    // virtual void _merge_track_targets_and_documents();
+    virtual void _get_closed_trajectory();
 
   protected:
     // member of pipeline downstreams
@@ -139,7 +145,7 @@ class TrackerOut : public rclcpp::Node, public IStartStopProtocol
 
     // action to be called by upstreams
     rclcpp_action::Server<ACT_AcceptDocument>::SharedPtr m_act_process_document;
-    rclcpp_action::Server<ACT_AcceptBodyposes>::SharedPtr m_act_process_bodyposes;
+    rclcpp_action::Server<ACT_AcceptTrackTargets>::SharedPtr m_act_process_track_targets;
 
     // configuration
     std::shared_ptr<InitConfig> m_init_config;
@@ -158,7 +164,9 @@ class TrackerOut : public rclcpp::Node, public IStartStopProtocol
     int m_status_code = NodeStatusCode::BEFORE_INIT;
 
     // buffer
-    std::map<int, MSG_PsgDocument> m_document_buffer; // indexed by frame number
-    std::map<int, MSG_Bodyposes> m_bodyposes_buffer;  // indexed by frame number
+    std::map<int, MSG_PsgDocument> m_document_buffer;                // indexed by frame number
+    std::map<int, MSG_TrackTargets> m_track_targets_buffer;          // indexed by frame number
+    std::map<MSG_UUID, MSG_Person> m_person_buffer;                  // indexed by uuid
+    std::map<int, std::vector<MSG_UUID>> m_closed_trajectory_buffer; // indexed by track id
 };
 } // namespace FlowRos2Pipeline

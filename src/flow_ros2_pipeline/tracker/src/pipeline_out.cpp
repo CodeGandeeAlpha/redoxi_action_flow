@@ -1,6 +1,5 @@
 #include <boost/thread/lock_algorithms.hpp>
 #include <psg_common/psg_common.hpp>
-
 #include <rcpputils/asserts.hpp>
 #include <tracker/_pipeline_out.hpp>
 #include <tracker/pipeline_out.hpp>
@@ -23,8 +22,8 @@ TrackerOut::TrackerOut()
     m_impl->sync_document_doing_map = &m_psgdoc_task_doing;
 
     m_impl->sync_document_buffer = &m_document_buffer;
-    m_impl->sync_bodyposes_buffer = &m_bodyposes_buffer;
-
+    m_impl->sync_track_targets_buffer = &m_track_targets_buffer;
+    m_impl->sync_person_buffer = &m_person_buffer;
 
     RCLCPP_INFO(m_impl->logger, "constraction success!");
 }
@@ -49,13 +48,13 @@ int TrackerOut::init(const std::shared_ptr<InitConfig> &config,
         std::bind(&TrackerOut::_accept_document_cancel_callback, this, std::placeholders::_1),
         std::bind(&TrackerOut::_accept_document_accepted_callback, this, std::placeholders::_1));
 
-    // create process bodyposes server
+    // create process track_targets server
     // std::string process_detections_action = this->get_parameter(m_init_config->process_detections_action).as_string();
-    m_act_process_bodyposes = rclcpp_action::create_server<ACT_AcceptBodyposes>(
-        this, m_init_config->process_bodyposes_action,
-        std::bind(&TrackerOut::_accept_bodyposes_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
-        std::bind(&TrackerOut::_accept_bodyposes_cancel_callback, this, std::placeholders::_1),
-        std::bind(&TrackerOut::_accept_bodyposes_accepted_callback, this, std::placeholders::_1));
+    m_act_process_track_targets = rclcpp_action::create_server<ACT_AcceptTrackTargets>(
+        this, m_init_config->process_track_targets_action,
+        std::bind(&TrackerOut::_accept_track_targets_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
+        std::bind(&TrackerOut::_accept_track_targets_cancel_callback, this, std::placeholders::_1),
+        std::bind(&TrackerOut::_accept_track_targets_accepted_callback, this, std::placeholders::_1));
 
     // setup downstreams
     // _connect_to_downstreams();
@@ -175,7 +174,15 @@ void TrackerOut::_accept_document_accepted_callback(
         _add_document_to_buffer(document, *lock_ptr_document_buffer);
     }
 
-    RCLCPP_INFO(m_impl->logger, "Accepted document %ld with UUID %s and add it to buffer",
+    // add person to buffer
+    {
+        auto lock_ptr_person_buffer = m_impl->sync_person_buffer.synchronize();
+        for (const auto &person : document.persons.persons) {
+            _add_person_to_buffer(person, *lock_ptr_person_buffer);
+        }
+    }
+
+    RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): Accepted document %ld with UUID %s and add it to buffer",
                 document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
 
     auto result = std::make_shared<ACT_AcceptDocument::Result>();
@@ -184,43 +191,43 @@ void TrackerOut::_accept_document_accepted_callback(
     goal_handle->succeed(result);
 }
 
-rclcpp_action::GoalResponse TrackerOut::_accept_bodyposes_goal_callback(
+rclcpp_action::GoalResponse TrackerOut::_accept_track_targets_goal_callback(
     const rclcpp_action::GoalUUID &uuid,
-    std::shared_ptr<const ACT_AcceptBodyposes::Goal> goal)
+    std::shared_ptr<const ACT_AcceptTrackTargets::Goal> goal)
 {
-    RCLCPP_INFO(m_impl->logger, "Received goal request with detections with frame_num %ld", goal->frame.frame_num);
+    RCLCPP_INFO(m_impl->logger, "_accept_track_targets_goal_callback(): Received goal request with frame_num %ld", goal->frame.frame_num);
     (void)uuid; // not used
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
-rclcpp_action::CancelResponse TrackerOut::_accept_bodyposes_cancel_callback(
-    const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptBodyposes>> goal_handle)
+rclcpp_action::CancelResponse TrackerOut::_accept_track_targets_cancel_callback(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptTrackTargets>> goal_handle)
 {
-    RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
+    RCLCPP_INFO(m_impl->logger, "_accept_track_targets_cancel_callback(): Received request to cancel goal");
     (void)goal_handle; // not used
     return rclcpp_action::CancelResponse::REJECT;
 }
 
-void TrackerOut::_accept_bodyposes_accepted_callback(
-    const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptBodyposes>> goal_handle)
+void TrackerOut::_accept_track_targets_accepted_callback(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptTrackTargets>> goal_handle)
 {
 
     const auto &goal = goal_handle->get_goal();
 
     // cache the detections
-    const auto &body_poses = goal->body_poses;
+    const auto &track_targets = goal->track_targets;
     const auto &frame = goal->frame;
 
     // add to buffer
     {
-        auto lock_ptr_bodyposes_buffer = m_impl->sync_bodyposes_buffer.synchronize();
-        _add_bodyposes_to_buffer(body_poses, frame.frame_num, *lock_ptr_bodyposes_buffer);
+        auto lock_ptr_track_targets_buffer = m_impl->sync_track_targets_buffer.synchronize();
+        _add_track_targets_to_buffer(track_targets, frame.frame_num, *lock_ptr_track_targets_buffer);
     }
 
-    RCLCPP_INFO(m_impl->logger, "_accept_bodyposes_accepted_callback(): Accepted frame_number %ld and add it to buffer", frame.frame_num);
+    RCLCPP_INFO(m_impl->logger, "_accept_track_targets_accepted_callback(): Accepted frame_number %ld and add it to buffer", frame.frame_num);
 
-    auto result = std::make_shared<ACT_AcceptBodyposes::Result>();
-    result->return_msg = "Bodyposes accepted";
+    auto result = std::make_shared<ACT_AcceptTrackTargets::Result>();
+    result->return_msg = "TrackTargets accepted";
     result->return_code = ReturnCode::SUCCESS;
     goal_handle->succeed(result);
 }
@@ -243,8 +250,9 @@ void TrackerOut::_process_document_create_tasks(const MSG_PsgDocument &document,
 
 void TrackerOut::_step()
 {
-    _merge_bodyposes_and_documents();
-    // _send_document_to_downstreams();
+    // _merge_track_targets_and_documents();
+    _get_closed_trajectory();
+    _send_document_to_downstreams();
 }
 
 void TrackerOut::_connect_to_downstreams()
@@ -376,7 +384,7 @@ void TrackerOut::_send_document_to_downstreams()
 void TrackerOut::_declare_all_parameters()
 {
     this->declare_parameter<std::string>("process_document_action", "");
-    this->declare_parameter<std::string>("process_bodyposes_action", "");
+    this->declare_parameter<std::string>("process_track_targets_action", "");
     this->declare_parameter<double>("step_interval_ms", -1);
     this->declare_parameter<double>("timeout_ms_send_to_downstream", -1);
 }
@@ -387,9 +395,14 @@ void TrackerOut::_add_document_to_buffer(const MSG_PsgDocument &document, std::m
     (*document_buffer_ptr)[document.frame.frame_num] = document;
 }
 
-void TrackerOut::_add_bodyposes_to_buffer(const MSG_Bodyposes &bodyposes, const int frame_number, std::map<int, TrackerOut::MSG_Bodyposes> *bodyposes_buffer_ptr)
+void TrackerOut::_add_track_targets_to_buffer(const MSG_TrackTargets &track_targets, const int frame_number, std::map<int, TrackerOut::MSG_TrackTargets> *track_targets_buffer_ptr)
 {
-    (*bodyposes_buffer_ptr)[frame_number] = bodyposes;
+    (*track_targets_buffer_ptr)[frame_number] = track_targets;
+}
+
+void TrackerOut::_add_person_to_buffer(const MSG_Person &person, std::map<TrackerOut::MSG_UUID, TrackerOut::MSG_Person> *person_buffer_ptr)
+{
+    (*person_buffer_ptr)[person.uuid] = person;
 }
 
 void TrackerOut::_remove_document_from_buffer(int frame_number, std::map<int, TrackerOut::MSG_PsgDocument> *document_buffer_ptr)
@@ -402,89 +415,104 @@ void TrackerOut::_remove_document_from_buffer(int frame_number, std::map<int, Tr
     }
 }
 
-void TrackerOut::_remove_bodyposes_from_buffer(int frame_number, std::map<int, TrackerOut::MSG_Bodyposes> *bodyposes_buffer_ptr)
+void TrackerOut::_remove_track_targets_from_buffer(int frame_number, std::map<int, TrackerOut::MSG_TrackTargets> *track_targets_buffer_ptr)
 {
-    RCLCPP_INFO(m_impl->logger, "_remove_bodyposes_from_buffer(): remove bodyposes with frame_num %d", frame_number);
+    RCLCPP_INFO(m_impl->logger, "_remove_track_targets_from_buffer(): remove track_targets with frame_num %d", frame_number);
     // if frame_number is not in buffer, do nothing
-    if (bodyposes_buffer_ptr->find(frame_number) != bodyposes_buffer_ptr->end()) {
-        bodyposes_buffer_ptr->erase(frame_number);
-        RCLCPP_INFO(m_impl->logger, "_remove_bodyposes_from_buffer(): remove bodyposes with frame_num %d SUCCESS", frame_number);
+    if (track_targets_buffer_ptr->find(frame_number) != track_targets_buffer_ptr->end()) {
+        track_targets_buffer_ptr->erase(frame_number);
+        RCLCPP_INFO(m_impl->logger, "_remove_track_targets_from_buffer(): remove track_targets with frame_num %d SUCCESS", frame_number);
     }
 }
 
-void TrackerOut::_merge_bodyposes_and_documents()
+void TrackerOut::_remove_person_from_buffer(const MSG_UUID &uuid, std::map<MSG_UUID, MSG_Person> *person_buffer_ptr)
 {
-    std::vector<decltype(m_document_buffer)::value_type> document_buffer_;
+    RCLCPP_INFO(m_impl->logger, "_remove_person_from_buffer(): remove person with uuid %s", uuid_to_string(uuid.uuid).c_str());
+    // if uuid is not in buffer, do nothing
+    if (person_buffer_ptr->find(uuid) != person_buffer_ptr->end()) {
+        person_buffer_ptr->erase(uuid);
+        RCLCPP_INFO(m_impl->logger, "_remove_person_from_buffer(): remove person with uuid %s SUCCESS", uuid_to_string(uuid.uuid).c_str());
+    }
+}
+
+void TrackerOut::_get_closed_trajectory()
+{
+    std::vector<decltype(m_track_targets_buffer)::value_type> track_targets_buffer_;
 
     {
-        auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
-        for (auto const &it : (**lock_ptr_document_buffer)) {
-            document_buffer_.push_back(it);
+        auto lock_ptr_track_targets_buffer = m_impl->sync_track_targets_buffer.synchronize();
+        for (auto const &it : (**lock_ptr_track_targets_buffer)) {
+            track_targets_buffer_.push_back(it);
         }
     }
 
-    for (auto &it : document_buffer_) {
-        auto &document = it.second;
+    for (auto &it : track_targets_buffer_) {
+        auto &track_targets = it.second;
         const auto frame_num = it.first;
-
-
-        MSG_Bodyposes bodyposes;
-        bool has_bodyposes = false;
+        MSG_PsgDocument document;
         {
-            auto lock_ptr_bodyposes_buffer = m_impl->sync_bodyposes_buffer.synchronize();
-            // // test
-            // for (auto const &it : (**lock_ptr_bodyposes_buffer)) {
-            //     RCLCPP_INFO(m_impl->logger, "_merge_bodyposes_and_documents(): bodyposes_buffer frame_num %d", it.first);
-            // }
-
-            if ((*lock_ptr_bodyposes_buffer)->find(frame_num) != (*lock_ptr_bodyposes_buffer)->end()) {
-                bodyposes = (**lock_ptr_bodyposes_buffer)[frame_num];
-                has_bodyposes = true;
-            }
+            auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
+            document = (**lock_ptr_document_buffer)[frame_num];
         }
 
-        if (!has_bodyposes) {
-            continue;
-        }
-
-        RCLCPP_INFO(m_impl->logger, "_merge_bodyposes_and_documents(): for frame %d", frame_num);
-        RCLCPP_INFO(m_impl->logger, "_merge_bodyposes_and_documents(): _merge framenum %ld document and bodyposes", document.frame.frame_num);
-
-        // merge bodyposes and document's persons
-        bool is_merged = false;
-        for (auto &bodypose : bodyposes) {
-            // find the corresponding persons
-            auto &persons = document.persons;
-            for (auto &person : persons.persons) {
-                if (bodypose.uuid == person.uuid) {
-                    // merge bodypose and person
-                    person.pose = bodypose;
-                    is_merged = true;
-                    // RCLCPP_INFO(m_impl->logger, "_merge_bodyposes_and_documents(): merged bodypose and person with uuid %s", uuid_to_string(person.uuid.uuid).c_str());
-                    break;
+        for (auto &track_target : track_targets) {
+            // copy track_target info to person
+            {
+                auto lock_ptr_person_buffer = m_impl->sync_person_buffer.synchronize();
+                if (*lock_ptr_person_buffer->find(track_target.uuid) != lock_ptr_person_buffer->end()) {
+                    auto &person = (*lock_ptr_person_buffer)[track_target.uuid];
+                    person.track_id = track_target.track_id;
                 }
             }
+
+            // if track_target is new, create a new trajectory
+            if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::New) {
+                m_closed_trajectory_buffer[track_target.track_id] = std::vector<MSG_UUID>();
+                m_closed_trajectory_buffer[track_target.track_id].push_back(track_target.uuid);
+            }
+            // if track_target is open, add it to trajectory
+            else if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::Open) {
+                m_closed_trajectory_buffer[track_target.track_id].push_back(track_target.uuid);
+            }
+            // if track_target is close, get trajectory and remove it from buffer
+            else if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::Close) {
+                // get closed trajectory uuids
+                auto closed_trajectory_uuids = m_closed_trajectory_buffer[track_target.track_id];
+                // remove closed trajectory from buffer
+                m_closed_trajectory_buffer.erase(track_target.track_id);
+                // get closed trajectory
+                MSG_Trajectory closed_trajectory;
+                closed_trajectory.track_id = track_target.track_id;
+                {
+                    auto lock_ptr_person_buffer = m_impl->sync_person_buffer.synchronize();
+                    for (auto &uuid : closed_trajectory_uuids) {
+                        closed_trajectory.persons.push_back((**lock_ptr_person_buffer)[uuid]);
+                        _remove_person_from_buffer(uuid, *lock_ptr_person_buffer);
+                    }
+                }
+                // put closed trajectory to document
+                document.trajectories.push_back(closed_trajectory);
+            } else
+                continue;
         }
 
-        if (is_merged) {
-            // create task for document
-            {
-                auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
-                _process_document_create_tasks(document, *lock_ptr_document_task_waiting);
-            }
+        // create task for this frame
+        {
+            auto lock_ptr_document_waiting_map = m_impl->sync_document_waiting_map.synchronize();
+            _process_document_create_tasks(document, lock_ptr_document_waiting_map);
+        }
 
-            // remove bodypose from buffer
-            {
-                auto lock_ptr_bodyposes_buffer = m_impl->sync_bodyposes_buffer.synchronize();
-                _remove_bodyposes_from_buffer(frame_num, *lock_ptr_bodyposes_buffer);
-            }
+        // remove document from buffer
+        {
+            auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
+            _remove_document_from_buffer(frame_num, *lock_ptr_document_buffer);
+        }
 
-            // remove document from buffer
-            {
-                auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
-                _remove_document_from_buffer(frame_num, *lock_ptr_document_buffer);
-            }
+        // remove track_targets from buffer
+        {
+            auto lock_ptr_track_targets_buffer = m_impl->sync_track_targets_buffer.synchronize();
+            _remove_track_targets_from_buffer(frame_num, *lock_ptr_track_targets_buffer);
         }
     }
-}
+
 } // namespace FlowRos2Pipeline

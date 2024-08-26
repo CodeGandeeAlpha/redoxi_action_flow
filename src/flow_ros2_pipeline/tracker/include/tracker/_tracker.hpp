@@ -111,34 +111,6 @@ class TrackEventHandler : public RedoxiTrack::TrackingEventHandler
 using TrackEventHandlerPtr = std::shared_ptr<TrackEventHandler>;
 
 
-class TrackerImpl
-{
-  public:
-    virtual ~TrackerImpl()
-    {
-    }
-    TrackerImpl(Tracker *node)
-        : logger(node->get_logger())
-    {
-    }
-    rclcpp::Logger logger;
-    std::shared_ptr<vineyard::Client> v6d_client;
-
-    boost::synchronized_value<Tracker::Map_TrackTargets_Waiting *> sync_track_targets_waiting_map;
-    boost::synchronized_value<Tracker::Map_TrackTargets_Doing *> sync_track_targets_doing_map;
-
-    boost::synchronized_value<Tracker::Map_Detections *> sync_detections_map;
-    boost::synchronized_value<Tracker::Map_TrackTargets *> sync_track_targets_map;
-
-    RedoxiTrack::TrackerBasePtr tracker;
-    RedoxiTrack::TrackerParamPtr tracker_param;
-
-    std::shared_ptr<std::thread> step_thread;
-    std::shared_ptr<std::thread> process_thread;
-    bool step_running = false; // for stopping the step thread
-};
-
-
 namespace ROSTrackEvent
 {
 class ROSTrackEventData
@@ -221,10 +193,57 @@ class ROSTrackEventHandler
 using ROSTrackEventHandlerPtr = std::shared_ptr<ROSTrackEventHandler>;
 
 
+class MyROSTrackEventHandler : public ROSTrackEventHandler
+{
+  public:
+    int evt_ROS_track_association_after(ROSTracker *sender, const ROSTrackEvent::ROSAssociation &evt_data) override
+    {
+        m_target_associate.push_back(evt_data.to);
+        return 0;
+    };
+
+    int evt_ROS_track_create_after(ROSTracker *sender, const ROSTrackEvent::ROSAssociation &evt_data) override
+    {
+        m_target_create.push_back(evt_data.to);
+        return 0;
+    };
+
+    int evt_trajectory_closed_after(ROSTracker *sender, const ROSTrackEvent::ROSClosed &evt_data) override
+    {
+        m_target_closed.push_back(evt_data.target);
+        return 0;
+    };
+
+    int evt_ROS_motion_predict_after(ROSTracker *sender, const ROSTrackEvent::ROSMotionPredict &evt_data) override
+    {
+        m_target_motion_predict.push_back(evt_data.target);
+        return 0;
+    };
+
+    void clear()
+    {
+        m_target_create.clear();
+        m_target_associate.clear();
+        m_target_closed.clear();
+        m_target_motion_predict.clear();
+    }
+
+  public:
+    std::vector<Tracker::MSG_TrackTarget> m_target_create;
+
+    std::vector<Tracker::MSG_TrackTarget> m_target_associate;
+
+    std::vector<Tracker::MSG_TrackTarget> m_target_closed;
+
+    std::vector<Tracker::MSG_TrackTarget> m_target_motion_predict;
+};
+using MyROSTrackEventHandlerPtr = std::shared_ptr<MyROSTrackEventHandler>;
+
+
 class ROSTracker
 {
   public:
-    virtual void init(const RedoxiTrack::TrackerParam &param);
+    virtual void init(const RedoxiTrack::TrackerBasePtr &tracker_ptr);
 
     virtual void begin_track(const cv::Mat &img,
                              const Tracker::MSG_Detections &detections,
@@ -259,6 +278,34 @@ class ROSTracker
     std::map<int, RedoxiTrack::TrackTargetPtr> m_tracked_targets;
 };
 using ROSTrackerPtr = std::shared_ptr<ROSTracker>;
+
+
+class TrackerImpl
+{
+  public:
+    virtual ~TrackerImpl()
+    {
+    }
+    TrackerImpl(Tracker *node)
+        : logger(node->get_logger())
+    {
+    }
+    rclcpp::Logger logger;
+    std::shared_ptr<vineyard::Client> v6d_client;
+
+    boost::synchronized_value<Tracker::Map_TrackTargets_Waiting *> sync_track_targets_waiting_map;
+    boost::synchronized_value<Tracker::Map_TrackTargets_Doing *> sync_track_targets_doing_map;
+
+    boost::synchronized_value<Tracker::Map_Detections *> sync_detections_map;
+    boost::synchronized_value<Tracker::Map_TrackTargets *> sync_track_targets_map;
+
+    ROSTrackerPtr tracker;
+    MyROSTrackEventHandlerPtr ros_track_event_handler;
+
+    std::shared_ptr<std::thread> step_thread;
+    std::shared_ptr<std::thread> process_thread;
+    bool step_running = false; // for stopping the step thread
+};
 
 
 } // namespace FlowRos2Pipeline

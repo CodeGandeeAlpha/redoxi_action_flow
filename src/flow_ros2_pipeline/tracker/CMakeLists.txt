@@ -58,7 +58,7 @@ ament_target_dependencies(pipeline_in_node
   sensor_msgs
 )
 
-ament_target_dependencies(pipeline_out_node
+ament_target_dependencies(pipeline_out_node PUBLIC
   rclcpp
   rclcpp_action
   rclpy
@@ -82,7 +82,7 @@ ament_target_dependencies(tracker_node PUBLIC
 
 
 target_link_libraries(pipeline_in_node ${Boost_LIBRARIES} ${VINEYARD_LIBRARIES} ${OpenCV_LIBS})
-target_link_libraries(pipeline_out_node ${Boost_LIBRARIES} ${VINEYARD_LIBRARIES} ${OpenCV_LIBS})
+target_link_libraries(pipeline_out_node PUBLIC ${Boost_LIBRARIES} ${VINEYARD_LIBRARIES} ${OpenCV_LIBS} RedoxiTrack::RedoxiTrack)
 target_link_libraries(tracker_node PUBLIC ${Boost_LIBRARIES} ${VINEYARD_LIBRARIES} ${OpenCV_LIBS} RedoxiTrack::RedoxiTrack PassengerFlow::PassengerFlow)
 
 install(TARGETS pipeline_in_node

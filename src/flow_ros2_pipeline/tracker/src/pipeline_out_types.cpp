@@ -6,11 +6,11 @@ namespace FlowRos2Pipeline
 void TrackerOutInitConfig::from_parameters(TrackerOut *node)
 {
     process_document_action = node->get_parameter("process_document_action").as_string();
-    process_bodyposes_action = node->get_parameter("process_bodyposes_action").as_string();
+    process_track_targets_action = node->get_parameter("process_track_targets_action").as_string();
 
     const auto &logger = node->get_logger();
     RCLCPP_INFO(logger, "process_document_action: %s", this->process_document_action.c_str());
-    RCLCPP_INFO(logger, "process_bodyposes_action: %s", this->process_bodyposes_action.c_str());
+    RCLCPP_INFO(logger, "process_track_targets_action: %s", this->process_track_targets_action.c_str());
 }
 
 void TrackerOutRuntimeConfig::from_parameters(TrackerOut *node)

@@ -93,17 +93,26 @@ int Tracker::open()
     ROS_ASSERT(m_init_config->tracker_type == TrackerTypes::DEEPSORT || m_init_config->tracker_type == TrackerTypes::BOTSORT,
                "unsupported tracker type");
 
+    m_impl->tracker = std::make_shared<ROSTracker>();
+    m_impl->ros_track_event_handler = std::make_shared<MyROSTrackEventHandler>();
+    m_impl->tracker->add_event_handler(m_impl->ros_track_event_handler);
     if (m_init_config->tracker_type == TrackerTypes::DEEPSORT) {
-        m_impl->tracker = std::make_shared<RedoxiTrack::DeepSortTracker>();
-        m_impl->tracker_param = std::make_shared<RedoxiTrack::DeepSortTrackerParam>();
-        m_impl->tracker->init(*m_impl->tracker_param);
-        // not implemented event handler
+        auto deepsort_tracker_ptr = std::make_shared<RedoxiTrack::DeepSortTracker>();
+        auto param = RedoxiTrack::DeepSortTrackerParam();
+        deepsort_tracker_ptr->init(param);
+        auto track_event_handler = std::make_shared<TrackEventHandler>();
+        deepsort_tracker_ptr->add_event_handler(track_event_handler);
+
+        m_impl->tracker->init(deepsort_tracker_ptr);
 
     } else if (m_init_config->tracker_type == TrackerTypes::BOTSORT) {
-        m_impl->tracker = std::make_shared<RedoxiTrack::BotsortTracker>();
-        m_impl->tracker_param = std::make_shared<RedoxiTrack::BotsortTrackerParam>();
-        m_impl->tracker->init(*m_impl->tracker_param);
-        // not implemented event handler
+        auto botsort_tracker_ptr = std::make_shared<RedoxiTrack::BotsortTracker>();
+        auto param = RedoxiTrack::BotsortTrackerParam();
+        botsort_tracker_ptr->init(param);
+        auto track_event_handler = std::make_shared<TrackEventHandler>();
+        botsort_tracker_ptr->add_event_handler(track_event_handler);
+
+        m_impl->tracker->init(botsort_tracker_ptr);
     }
 
     auto status_before = m_status_code;
@@ -263,7 +272,19 @@ void Tracker::_process_track_targets_create_tasks(const MSG_TrackTargets &track_
 
 void Tracker::_step()
 {
-
+    std::vector<std::tuple<MSG_TrackTargets, MSG_Frame>> track_targets_frames_;
+    {
+        auto lock_ptr_track_targets_map = m_impl->sync_track_targets_map.synchronize();
+        for (auto &it : **lock_ptr_track_targets_map) {
+            track_targets_frames_.push_back(it.second);
+        }
+    }
+    for (auto &it : track_targets_frames_) {
+        auto &track_targets = std::get<0>(it);
+        auto &frame = std::get<1>(it);
+        auto lock_ptr_track_targets_task_waiting = m_impl->sync_track_targets_waiting_map.synchronize();
+        _process_track_targets_create_tasks(track_targets, frame, *lock_ptr_track_targets_task_waiting);
+    }
     _send_track_targets_to_downstreams();
 }
 
@@ -279,6 +300,10 @@ void Tracker::_process_step()
     // sort detections by frame number
     std::sort(detections_.begin(), detections_.end(),
               [](std::pair<int, MSG_Detections> &a, std::pair<int, MSG_Detections> &b) {
+                  if (a.first == -1)
+                      return false;
+                  if (b.first == -1)
+                      return true;
                   return a.first < b.first;
               });
 
@@ -289,17 +314,54 @@ void Tracker::_process_step()
 
         auto &frame = detections.frame;
 
-        // // get frame from shared memory
-        // auto img = get_img_by_v6d_id(frame.cache.id_int, m_impl->v6d_client);
+        // get frame from shared memory
+        auto tensor = get_tensor_by_v6d_id(frame.cache.id_int, m_impl->v6d_client);
+        auto img = from_v6d_tensor_to_cvmat(tensor);
 
-        // // track by detections
-        // if (frame_num == 0) { // first frame
-        //     std::vector<PassengerFlow::DetectionPtr> body_detections;
-        //     convert_msg_to_detections(detections.detections, body_detections);
-        //     m_impl->tracker->begin_track(img, body_detections, frame_num);
-
-        //     auto all_open_targets = m_impl->tracker->get_all_open_targets();
-        // }
+        // track by detections
+        if (frame_num == 0) { // first frame
+            m_impl->tracker->begin_track(img, detections, frame_num + 1);
+            // put it in std::map<int, std::tuple<MSG_TrackTargets, MSG_Frame>>
+            MSG_TrackTargets cur_track_targets;
+            for (auto &track_target_msg : m_impl->ros_track_event_handler->m_target_create) {
+                cur_track_targets.push_back(track_target_msg);
+            }
+            auto track_targets_frame = std::make_tuple(cur_track_targets, frame);
+            {
+                auto lock_ptr_track_targets_map = m_impl->sync_track_targets_map.synchronize();
+                _add_track_targets_to_buffer(cur_track_targets, frame, *lock_ptr_track_targets_map);
+            }
+        } else if (frame_num != -1) { // track
+            m_impl->tracker->track(img, detections, frame_num + 1);
+            // put it in std::map<int, std::tuple<MSG_TrackTargets, MSG_Frame>>
+            MSG_TrackTargets cur_track_targets;
+            for (auto &track_target_msg : m_impl->ros_track_event_handler->m_target_create) {
+                cur_track_targets.push_back(track_target_msg);
+            }
+            for (auto &track_target_msg : m_impl->ros_track_event_handler->m_target_associate) {
+                cur_track_targets.push_back(track_target_msg);
+            }
+            for (auto &track_target_msg : m_impl->ros_track_event_handler->m_target_closed) {
+                cur_track_targets.push_back(track_target_msg);
+            }
+            auto track_targets_frame = std::make_tuple(cur_track_targets, frame);
+            {
+                auto lock_ptr_track_targets_map = m_impl->sync_track_targets_map.synchronize();
+                _add_track_targets_to_buffer(cur_track_targets, frame, *lock_ptr_track_targets_map);
+            }
+        } else { // last frame
+            m_impl->tracker->finish_track();
+            // put it in std::map<int, std::tuple<MSG_TrackTargets, MSG_Frame>>
+            MSG_TrackTargets cur_track_targets;
+            for (auto &track_target_msg : m_impl->ros_track_event_handler->m_target_closed) {
+                cur_track_targets.push_back(track_target_msg);
+            }
+            auto track_targets_frame = std::make_tuple(cur_track_targets, frame);
+            {
+                auto lock_ptr_track_targets_map = m_impl->sync_track_targets_map.synchronize();
+                _add_track_targets_to_buffer(cur_track_targets, frame, *lock_ptr_track_targets_map);
+            }
+        }
     }
 }
 
@@ -451,12 +513,9 @@ void Tracker::_add_track_targets_to_buffer(const MSG_TrackTargets &track_targets
 }
 
 
-void ROSTracker::init(const RedoxiTrack::TrackerParam &param)
+void ROSTracker::init(const RedoxiTrack::TrackerBasePtr &tracker_ptr)
 {
-    m_tracker = std::make_shared<RedoxiTrack::BotsortTracker>();
-    m_tracker->init(param);
-    m_track_event_handler = std::make_shared<TrackEventHandler>();
-    m_tracker->add_event_handler(m_track_event_handler);
+    m_tracker = tracker_ptr;
 }
 
 void ROSTracker::begin_track(const cv::Mat &img, const Tracker::MSG_Detections &detections, int frame_number)
@@ -627,14 +686,14 @@ void ROSTracker::finish_track()
     m_tracked_targets = m_tracker->get_all_open_targets();
 }
 
-void ROSTracker::add_event_handler(const ROSTrackEventHandlerPtr &person_event_handler)
+void ROSTracker::add_event_handler(const ROSTrackEventHandlerPtr &ros_event_handler)
 {
-    m_ros_track_event_handler_set.insert(person_event_handler);
+    m_ros_track_event_handler_set.insert(ros_event_handler);
 }
 
-void ROSTracker::remove_event_handler(const ROSTrackEventHandlerPtr &person_event_handler)
+void ROSTracker::remove_event_handler(const ROSTrackEventHandlerPtr &ros_event_handler)
 {
-    m_ros_track_event_handler_set.erase(person_event_handler);
+    m_ros_track_event_handler_set.erase(ros_event_handler);
 }
 
 void ROSTracker::_msg_dets_to_body_dets(const Tracker::MSG_Detections &detections,

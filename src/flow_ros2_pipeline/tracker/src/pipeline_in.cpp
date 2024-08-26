@@ -126,7 +126,7 @@ int TrackerIn::get_status_code() const
 }
 
 
-rclcpp_action::GoalResponse TrackerIn::_accept_document_goal_callback(
+rclcpp_action::GoalResponse TrackerIn::_accept_document_gal_callback(
     const rclcpp_action::GoalUUID &uuid,
     std::shared_ptr<const ACT_AcceptDocument::Goal> goal)
 {
@@ -151,7 +151,15 @@ void TrackerIn::_accept_document_accepted_callback(
 
     // cache the document, copy it for modify it
     auto document = goal->document;
-    auto &detections = document.detections;
+    auto &persons = document.persons;
+
+    MSG_Detections detections;
+    for (size_t i = 0; i < persons.persons.size(); i++) {
+        auto &person = document.persons.persons[i];
+        auto &body = person.body;
+        detections.detections.push_back(body);
+    }
+    detections.frame = document.frame;
 
     // create tasks for all downstreams
     {
