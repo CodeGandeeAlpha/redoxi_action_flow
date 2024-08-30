@@ -220,7 +220,7 @@ void PersonGenerator::_process()
 
         // convert to msg
         psg_private_msgs::msg::Persons persons_msg;
-        convert_persons_to_msg(v_persons, persons_msg);
+        convert_persons_to_msg(v_persons, document.frame, persons_msg);
         // create tasks
         document.persons = persons_msg;
         {

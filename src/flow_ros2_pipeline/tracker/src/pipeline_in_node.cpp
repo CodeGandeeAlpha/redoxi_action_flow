@@ -16,8 +16,8 @@ int main(int argc, char *argv[])
     tracker_out_pipeline_node.accept_document_action = "tracker_out_process_document_action";
     init_config->pipeline_downstreams["tracker_out"] = tracker_out_pipeline_node;
     FlowRos2Pipeline::TrackerInInitConfig::DownstreamModelNode model_node;
-    model_node.accept_detections_action = "model_process_detections_action";
-    init_config->model_downstreams["rtmpose"] = model_node;
+    model_node.accept_detections_action = "tracker_process_detections_action";
+    init_config->model_downstreams["tracker"] = model_node;
 
     runtime_config->from_parameters(node.get());
 

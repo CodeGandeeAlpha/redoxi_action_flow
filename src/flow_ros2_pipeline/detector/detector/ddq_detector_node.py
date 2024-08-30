@@ -428,7 +428,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self.m_logger.info(f"_visialize(): frame {frame.frame_num} img shape {img.shape}")
         for det in detections.detections:
             x, y, w, h = int(det.bbox.x), int(det.bbox.y), int(det.bbox.width), int(det.bbox.height)
-            self.m_logger.info(f"_visialize(): frame {frame.frame_num} bbox {x} {y} {w} {h}")
+            self.m_logger.info(f"_visialize(): frame {frame.frame_num} bbox {x} {y} {w} {h} catgory {det.category} confidence {det.confidence}")
             cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
         self._out_video.write(img)
         self.m_logger.info(f"_visialize(): frame {frame.frame_num} visualized")

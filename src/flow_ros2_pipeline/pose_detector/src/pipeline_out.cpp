@@ -58,7 +58,7 @@ int PoseDetectorOut::init(const std::shared_ptr<InitConfig> &config,
         std::bind(&PoseDetectorOut::_accept_bodyposes_accepted_callback, this, std::placeholders::_1));
 
     // setup downstreams
-    // _connect_to_downstreams();
+    _connect_to_downstreams();
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::INITIALIZED;
@@ -242,7 +242,7 @@ void PoseDetectorOut::_process_document_create_tasks(const MSG_PsgDocument &docu
 void PoseDetectorOut::_step()
 {
     _merge_bodyposes_and_documents();
-    // _send_document_to_downstreams();
+    _send_document_to_downstreams();
 }
 
 void PoseDetectorOut::_connect_to_downstreams()

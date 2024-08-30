@@ -26,7 +26,7 @@ class TrackerOutImpl
 
     boost::synchronized_value<std::map<int, TrackerOut::MSG_PsgDocument> *> sync_document_buffer;
     boost::synchronized_value<std::map<int, TrackerOut::MSG_TrackTargets> *> sync_track_targets_buffer;
-    boost::synchronized_value<std::map<TrackerOut::MSG_UUID, TrackerOut::MSG_Person> *> sync_person_buffer;
+    boost::synchronized_value<std::map<TrackerOut::UUID, TrackerOut::MSG_Person> *> sync_person_buffer;
 
     std::shared_ptr<std::thread> step_thread;
     bool step_running = false; // for stopping the step thread

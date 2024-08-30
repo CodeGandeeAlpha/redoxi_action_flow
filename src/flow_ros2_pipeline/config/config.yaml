@@ -68,3 +68,22 @@
     process_bodyposes_action: "pose_detector_out_process_bodyposes_action"
     step_interval_ms: 10.0
     timeout_ms_send_to_downstream: 1000.0
+
+
+/tracker_in_node:
+  ros__parameters:
+    process_document_action: "tracker_in_process_document_action"
+    step_interval_ms: 10.0
+    timeout_ms_send_to_downstream: 1000.0
+
+/tracker_node:
+  ros__parameters:
+    process_detections_action: "tracker_process_detections_action"
+    step_interval_ms: 10.0
+
+/tracker_out_node:
+  ros__parameters:
+    process_document_action: "tracker_out_process_document_action"
+    process_track_targets_action: "tracker_out_process_track_targets_action"
+    step_interval_ms: 10.0
+    timeout_ms_send_to_downstream: 1000.0

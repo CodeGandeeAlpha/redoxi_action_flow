@@ -31,7 +31,7 @@ class TrackerOut : public rclcpp::Node, public IStartStopProtocol
     using MSG_PsgDocument = psg_private_msgs::msg::PsgDocument;
     using MSG_TrackTarget = psg_public_msgs::msg::TrackTarget;
     using MSG_TrackTargets = ACT_AcceptTrackTargets::Goal::_track_targets_type;
-    using MSG_UUID = unique_identifier_msgs::msg::UUID;
+    using UUID = std::array<uint8_t, 16>;
     using MSG_Person = psg_private_msgs::msg::Person;
     using MSG_Trajectory = psg_private_msgs::msg::PersonTrajectory;
 
@@ -129,13 +129,13 @@ class TrackerOut : public rclcpp::Node, public IStartStopProtocol
                                          std::map<int, MSG_PsgDocument> *document_buffer_ptr);
     virtual void _add_track_targets_to_buffer(const MSG_TrackTargets &track_targets, const int frame_number,
                                               std::map<int, MSG_TrackTargets> *track_targets_buffer_ptr);
-    virtual void _add_person_to_buffer(const MSG_Person &person, std::map<MSG_UUID, MSG_Person> *person_buffer_ptr);
+    virtual void _add_person_to_buffer(const MSG_Person &person, std::map<UUID, MSG_Person> *person_buffer_ptr);
 
     virtual void _remove_document_from_buffer(int frame_number, std::map<int, MSG_PsgDocument> *document_buffer_ptr);
 
-    void _remove_track_targets_from_buffer(int frame_number, std::map<int, MSG_TrackTargets> *track_targets_buffer_ptr);
+    virtual void _remove_track_targets_from_buffer(int frame_number, std::map<int, MSG_TrackTargets> *track_targets_buffer_ptr);
 
-    void _remove_person_from_buffer(const MSG_UUID &uuid, std::map<MSG_UUID, MSG_Person> *person_buffer_ptr);
+    virtual void _remove_person_from_buffer(const UUID &uuid, std::map<UUID, MSG_Person> *person_buffer_ptr);
     // virtual void _merge_track_targets_and_documents();
     virtual void _get_closed_trajectory();
 
@@ -164,9 +164,9 @@ class TrackerOut : public rclcpp::Node, public IStartStopProtocol
     int m_status_code = NodeStatusCode::BEFORE_INIT;
 
     // buffer
-    std::map<int, MSG_PsgDocument> m_document_buffer;                // indexed by frame number
-    std::map<int, MSG_TrackTargets> m_track_targets_buffer;          // indexed by frame number
-    std::map<MSG_UUID, MSG_Person> m_person_buffer;                  // indexed by uuid
-    std::map<int, std::vector<MSG_UUID>> m_closed_trajectory_buffer; // indexed by track id
+    std::map<int, MSG_PsgDocument> m_document_buffer;            // indexed by frame number
+    std::map<int, MSG_TrackTargets> m_track_targets_buffer;      // indexed by frame number
+    std::map<UUID, MSG_Person> m_person_buffer;                  // indexed by uuid
+    std::map<int, std::vector<UUID>> m_closed_trajectory_buffer; // indexed by track id
 };
 } // namespace FlowRos2Pipeline

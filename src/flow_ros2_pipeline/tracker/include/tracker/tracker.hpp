@@ -121,6 +121,10 @@ class Tracker : public rclcpp::Node, public IOpenCloseProtocol
     virtual void _add_detections_to_buffer(const MSG_Detections &detections, Map_Detections *detections_map_ptr);
     virtual void _add_track_targets_to_buffer(const MSG_TrackTargets &track_targets, const MSG_Frame &frame, Map_TrackTargets *track_targets_map_ptr);
 
+    // remove buffer
+    virtual void _remove_detections_from_buffer(int frame_number, Map_Detections *detections_map_ptr);
+    virtual void _remove_track_targets_from_buffer(int frame_number, Map_TrackTargets *track_targets_map_ptr);
+
   protected:
     virtual void _step();
     virtual void _process_step();
@@ -157,6 +161,9 @@ class Tracker : public rclcpp::Node, public IOpenCloseProtocol
     Map_Detections m_detections_buffer;
     // buffer for track targets
     Map_TrackTargets m_track_targets_buffer;
+
+    // waiting framenumer
+    int m_waiting_frame_number = 0;
 
 
     // status code

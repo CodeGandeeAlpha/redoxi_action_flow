@@ -10,6 +10,47 @@ using namespace std::chrono_literals;
 
 namespace FlowRos2Pipeline
 {
+std::string bbox_msg_to_string(const psg_public_msgs::msg::Box2 &bbox)
+{
+    std::string str = "(";
+    str += std::to_string(bbox.x) + ", ";
+    str += std::to_string(bbox.y) + ", ";
+    str += std::to_string(bbox.width) + ", ";
+    str += std::to_string(bbox.height) + ")";
+
+    return str;
+}
+
+std::string track_target_msg_to_string(const TrackerOut::MSG_TrackTarget &track_target)
+{
+    std::string str = "TrackTarget: {\n";
+    str += "frame_num: " + std::to_string(track_target.frame.frame_num) + "\n";
+    str += "uuid: " + uuid_to_string(track_target.uuid.uuid) + "\n";
+    str += "track_id: " + std::to_string(track_target.track_id) + "\n";
+    str += "track_status: " + std::to_string(track_target.track_status) + "\n";
+    str += "confidence: " + std::to_string(track_target.confidence) + "\n";
+    str += "track_bbox: " + bbox_msg_to_string(track_target.track_bbox) + "\n";
+    str += "detection_bbox: " + bbox_msg_to_string(track_target.detection.bbox) + "\n";
+    str += "}";
+
+    return str;
+}
+
+std::string person_msg_to_string(const TrackerOut::MSG_Person &person)
+{
+    std::string str = "Person: {\n";
+    str += "frame_num: " + std::to_string(person.frame.frame_num) + "\n";
+    str += "uuid: " + uuid_to_string(person.uuid.uuid) + "\n";
+    str += "track_id: " + std::to_string(person.track_id) + "\n";
+    str += "body_bbox: " + bbox_msg_to_string(person.body.bbox) + "\n";
+    str += "face_bbox: " + bbox_msg_to_string(person.face.bbox) + "\n";
+    str += "head_bbox: " + bbox_msg_to_string(person.head.bbox) + "\n";
+    str += "}";
+
+    return str;
+}
+
+
 TrackerOut::TrackerOut()
     : Node("tracker_out_node")
 {
@@ -178,6 +219,10 @@ void TrackerOut::_accept_document_accepted_callback(
     {
         auto lock_ptr_person_buffer = m_impl->sync_person_buffer.synchronize();
         for (const auto &person : document.persons.persons) {
+            // // test log
+            // RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): Accepted person %s",
+            //             person_msg_to_string(person).c_str());
+            // add to buffer
             _add_person_to_buffer(person, *lock_ptr_person_buffer);
         }
     }
@@ -218,6 +263,13 @@ void TrackerOut::_accept_track_targets_accepted_callback(
     const auto &track_targets = goal->track_targets;
     const auto &frame = goal->frame;
 
+    // test log
+    RCLCPP_INFO(m_impl->logger, "_accept_track_targets_accepted_callback(): Accepted frame %ld with %ld track_targets", frame.frame_num, track_targets.size());
+    for (const auto &track_target : track_targets) {
+        RCLCPP_INFO(m_impl->logger, "_accept_track_targets_accepted_callback(): Accepted track_target %s",
+                    track_target_msg_to_string(track_target).c_str());
+    }
+
     // add to buffer
     {
         auto lock_ptr_track_targets_buffer = m_impl->sync_track_targets_buffer.synchronize();
@@ -250,9 +302,8 @@ void TrackerOut::_process_document_create_tasks(const MSG_PsgDocument &document,
 
 void TrackerOut::_step()
 {
-    // _merge_track_targets_and_documents();
     _get_closed_trajectory();
-    _send_document_to_downstreams();
+    // _send_document_to_downstreams();
 }
 
 void TrackerOut::_connect_to_downstreams()
@@ -400,9 +451,9 @@ void TrackerOut::_add_track_targets_to_buffer(const MSG_TrackTargets &track_targ
     (*track_targets_buffer_ptr)[frame_number] = track_targets;
 }
 
-void TrackerOut::_add_person_to_buffer(const MSG_Person &person, std::map<TrackerOut::MSG_UUID, TrackerOut::MSG_Person> *person_buffer_ptr)
+void TrackerOut::_add_person_to_buffer(const MSG_Person &person, std::map<TrackerOut::UUID, TrackerOut::MSG_Person> *person_buffer_ptr)
 {
-    (*person_buffer_ptr)[person.uuid] = person;
+    (*person_buffer_ptr)[person.uuid.uuid] = person;
 }
 
 void TrackerOut::_remove_document_from_buffer(int frame_number, std::map<int, TrackerOut::MSG_PsgDocument> *document_buffer_ptr)
@@ -425,13 +476,13 @@ void TrackerOut::_remove_track_targets_from_buffer(int frame_number, std::map<in
     }
 }
 
-void TrackerOut::_remove_person_from_buffer(const MSG_UUID &uuid, std::map<MSG_UUID, MSG_Person> *person_buffer_ptr)
+void TrackerOut::_remove_person_from_buffer(const UUID &uuid, std::map<UUID, MSG_Person> *person_buffer_ptr)
 {
-    RCLCPP_INFO(m_impl->logger, "_remove_person_from_buffer(): remove person with uuid %s", uuid_to_string(uuid.uuid).c_str());
+    RCLCPP_INFO(m_impl->logger, "_remove_person_from_buffer(): remove person with uuid %s", uuid_to_string(uuid).c_str());
     // if uuid is not in buffer, do nothing
     if (person_buffer_ptr->find(uuid) != person_buffer_ptr->end()) {
         person_buffer_ptr->erase(uuid);
-        RCLCPP_INFO(m_impl->logger, "_remove_person_from_buffer(): remove person with uuid %s SUCCESS", uuid_to_string(uuid.uuid).c_str());
+        RCLCPP_INFO(m_impl->logger, "_remove_person_from_buffer(): remove person with uuid %s SUCCESS", uuid_to_string(uuid).c_str());
     }
 }
 
@@ -456,23 +507,28 @@ void TrackerOut::_get_closed_trajectory()
         }
 
         for (auto &track_target : track_targets) {
+            // // test log
+            // RCLCPP_INFO(m_impl->logger, "_get_closed_trajectory(): track_target %s", track_target_msg_to_string(track_target).c_str());
+
             // copy track_target info to person
             {
                 auto lock_ptr_person_buffer = m_impl->sync_person_buffer.synchronize();
-                if (*lock_ptr_person_buffer->find(track_target.uuid) != lock_ptr_person_buffer->end()) {
-                    auto &person = (*lock_ptr_person_buffer)[track_target.uuid];
+                if ((*lock_ptr_person_buffer)->find(track_target.uuid.uuid) != (*lock_ptr_person_buffer)->end()) {
+                    auto &person = (**lock_ptr_person_buffer)[track_target.uuid.uuid];
                     person.track_id = track_target.track_id;
                 }
             }
 
             // if track_target is new, create a new trajectory
             if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::New) {
-                m_closed_trajectory_buffer[track_target.track_id] = std::vector<MSG_UUID>();
-                m_closed_trajectory_buffer[track_target.track_id].push_back(track_target.uuid);
+                m_closed_trajectory_buffer[track_target.track_id] = std::vector<UUID>();
+                m_closed_trajectory_buffer[track_target.track_id].push_back(track_target.uuid.uuid);
+                RCLCPP_INFO(m_impl->logger, "_get_closed_trajectory(): create new trajectory with track_id %d", track_target.track_id);
             }
             // if track_target is open, add it to trajectory
             else if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::Open) {
-                m_closed_trajectory_buffer[track_target.track_id].push_back(track_target.uuid);
+                m_closed_trajectory_buffer[track_target.track_id].push_back(track_target.uuid.uuid);
+                RCLCPP_INFO(m_impl->logger, "_get_closed_trajectory(): add track_target to trajectory with track_id %d and frame number %ld", track_target.track_id, frame_num);
             }
             // if track_target is close, get trajectory and remove it from buffer
             else if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::Close) {
@@ -491,7 +547,17 @@ void TrackerOut::_get_closed_trajectory()
                     }
                 }
                 // put closed trajectory to document
-                document.trajectories.push_back(closed_trajectory);
+                document.trajectories.person_trajectories.push_back(closed_trajectory);
+
+                // test log
+                RCLCPP_INFO(m_impl->logger, "_get_closed_trajectory(): get closed trajectory with track_id %d", track_target.track_id);
+                RCLCPP_INFO(m_impl->logger, "_get_closed_trajectory(): total closed trajectory %ld", document.trajectories.person_trajectories.size());
+                for (auto &traj : document.trajectories.person_trajectories) {
+                    RCLCPP_INFO(m_impl->logger, "_get_closed_trajectory(): closed trajectory %d", traj.track_id);
+                    for (auto &person : traj.persons) {
+                        RCLCPP_INFO(m_impl->logger, "_get_closed_trajectory(): person %s", person_msg_to_string(person).c_str());
+                    }
+                }
             } else
                 continue;
         }
@@ -499,7 +565,7 @@ void TrackerOut::_get_closed_trajectory()
         // create task for this frame
         {
             auto lock_ptr_document_waiting_map = m_impl->sync_document_waiting_map.synchronize();
-            _process_document_create_tasks(document, lock_ptr_document_waiting_map);
+            _process_document_create_tasks(document, *lock_ptr_document_waiting_map);
         }
 
         // remove document from buffer
@@ -514,5 +580,6 @@ void TrackerOut::_get_closed_trajectory()
             _remove_track_targets_from_buffer(frame_num, *lock_ptr_track_targets_buffer);
         }
     }
+}
 
 } // namespace FlowRos2Pipeline

@@ -67,4 +67,25 @@ def generate_launch_description():
             name='pose_detector_out_node',
             parameters=[params_file]
         ),
+        Node(
+            package='tracker',
+            namespace='',
+            executable='pipeline_in_node',
+            name='tracker_in_node',
+            parameters=[params_file]
+        ),
+        Node(
+            package='tracker',
+            namespace='',
+            executable='tracker_node',
+            name='tracker_node',
+            parameters=[params_file]
+        ),
+        Node(
+            package='tracker',
+            namespace='',
+            executable='pipeline_out_node',
+            name='tracker_out_node',
+            parameters=[params_file]
+        ),
     ])

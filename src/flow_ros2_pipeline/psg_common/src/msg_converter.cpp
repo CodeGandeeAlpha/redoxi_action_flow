@@ -2,16 +2,19 @@
 
 namespace FlowRos2Pipeline
 {
-void convert_detection_to_msg(PassengerFlow::Detection &det, psg_public_msgs::msg::Detection &msg)
+void convert_detection_to_msg(PassengerFlow::Detection &det, const psg_public_msgs::msg::Frame &msg_frame, psg_public_msgs::msg::Detection &msg)
 {
+    // msg Detection {0: body, 1: head, 2: face} PassengerFlow::Detection {0: None, 1: head, 2: face, 3:body}
+    std::vector<int> class_id_mapping = {-1, 1, 2, 0};
+
     auto bbox = det.get_bbox();
     msg.bbox.x = bbox.x;
     msg.bbox.y = bbox.y;
     msg.bbox.width = bbox.width;
     msg.bbox.height = bbox.height;
-    msg.category = det.get_type();
+    msg.category = class_id_mapping[det.get_type()];
     msg.confidence = det.get_confidence();
-    msg.frame.frame_num = det.get_frame_number();
+    msg.frame = msg_frame;
 
     if (det.get_type() == RedoxiTrack::DetectionTypes::PersonBody) {
         RedoxiTrack::fVECTOR feature;
@@ -28,7 +31,8 @@ void convert_msg_to_detection(const psg_public_msgs::msg::Detection &msg, Passen
     det->set_bbox(bbox);
     det->set_confidence(msg.confidence);
 
-    if (msg.category == RedoxiTrack::DetectionTypes::PersonBody) {
+    // msg.category {body, head, face}
+    if (msg.category == 0) {
         RedoxiTrack::fVECTOR single_feature;
         single_feature.resize(128, 1);
         for (int j = 0; j < msg.feature.size(); j++) {
@@ -36,7 +40,7 @@ void convert_msg_to_detection(const psg_public_msgs::msg::Detection &msg, Passen
         }
         det->set_type(RedoxiTrack::DetectionTypes::PersonBody);
         det->set_feature(single_feature);
-    } else if (msg.category == RedoxiTrack::DetectionTypes::PersonFace) {
+    } else if (msg.category == 2) {
         det->set_type(RedoxiTrack::DetectionTypes::PersonFace);
     } else {
         det->set_type(RedoxiTrack::DetectionTypes::PersonHead);
@@ -47,13 +51,13 @@ void convert_msg_to_detection(const psg_public_msgs::msg::Detection &msg, Passen
 }
 
 
-void convert_detections_to_msg(const std::vector<PassengerFlow::DetectionPtr> &dets, psg_public_msgs::msg::Detections &msg)
+void convert_detections_to_msg(const std::vector<PassengerFlow::DetectionPtr> &dets, const psg_public_msgs::msg::Frame &msg_frame, psg_public_msgs::msg::Detections &msg)
 {
     for (auto &det : dets) {
         psg_public_msgs::msg::Detection msg_det;
-        convert_detection_to_msg(*det, msg_det);
+        convert_detection_to_msg(*det, msg_frame, msg_det);
         msg.detections.push_back(msg_det);
-        msg.frame = msg_det.frame;
+        msg.frame = msg_frame;
     }
 }
 
@@ -68,31 +72,28 @@ void convert_msg_to_detections(const psg_public_msgs::msg::Detections &msg, std:
 }
 
 
-void convert_person_to_msg(const PassengerFlow::PersonPtr &person, psg_private_msgs::msg::Person &msg)
+void convert_person_to_msg(const PassengerFlow::PersonPtr &person, const psg_public_msgs::msg::Frame &msg_frame, psg_private_msgs::msg::Person &msg)
 {
     msg.body.category = -1;
     msg.face.category = -1;
     msg.head.category = -1;
-    // msg.has_pose = false;
-    // msg.has_foot_position = false;
-    // msg.has_head_position = false;
 
     if (person->body()) {
         psg_public_msgs::msg::Detection msg_body;
         auto *body_ptr = RedoxiTrack::dyncast_with_check<PassengerFlow::Detection>(person->body().get());
-        convert_detection_to_msg(*body_ptr, msg_body);
+        convert_detection_to_msg(*body_ptr, msg_frame, msg_body);
         msg.body = msg_body;
     }
     if (person->head()) {
         psg_public_msgs::msg::Detection msg_head;
         auto *head_ptr = RedoxiTrack::dyncast_with_check<PassengerFlow::Detection>(person->head().get());
-        convert_detection_to_msg(*head_ptr, msg_head);
+        convert_detection_to_msg(*head_ptr, msg_frame, msg_head);
         msg.head = msg_head;
     }
     if (person->face()) {
         psg_public_msgs::msg::Detection msg_face;
         auto *face_ptr = RedoxiTrack::dyncast_with_check<PassengerFlow::Detection>(person->face().get());
-        convert_detection_to_msg(*face_ptr, msg_face);
+        convert_detection_to_msg(*face_ptr, msg_frame, msg_face);
         msg.face = msg_face;
     }
 
@@ -115,7 +116,7 @@ void convert_person_to_msg(const PassengerFlow::PersonPtr &person, psg_private_m
     }
 
     msg.track_id = person->get_person_id();
-    msg.frame.frame_num = person->get_frame_number();
+    msg.frame = msg_frame;
     msg.body_height = person->get_body_height().m_body_height;
     msg.body_height_conf = person->get_body_height().m_body_height_conf;
     PassengerFlow::POINT3 position;
@@ -192,13 +193,13 @@ void convert_msg_to_person(const psg_private_msgs::msg::Person &msg, PassengerFl
 }
 
 
-void convert_persons_to_msg(const std::vector<PassengerFlow::PersonPtr> &persons, psg_private_msgs::msg::Persons &msg)
+void convert_persons_to_msg(const std::vector<PassengerFlow::PersonPtr> &persons, const psg_public_msgs::msg::Frame &msg_frame, psg_private_msgs::msg::Persons &msg)
 {
     for (auto &person : persons) {
         psg_private_msgs::msg::Person msg_person;
-        convert_person_to_msg(person, msg_person);
+        msg_person.frame = msg_frame;
+        convert_person_to_msg(person, msg_frame, msg_person);
         msg.persons.push_back(msg_person);
-        msg.frame = msg_person.frame;
     }
 }
 
@@ -220,7 +221,9 @@ void convert_traj_to_msg(const PassengerFlow::PersonTrajectory &traj, psg_privat
 
     for (auto &person : traj.m_person_list) {
         psg_private_msgs::msg::Person msg_person;
-        convert_person_to_msg(person, msg_person);
+        psg_public_msgs::msg::Frame msg_frame;
+        msg_frame.frame_num = person->get_frame_number();
+        convert_person_to_msg(person, msg_frame, msg_person);
         msg.persons.push_back(msg_person);
     }
 }

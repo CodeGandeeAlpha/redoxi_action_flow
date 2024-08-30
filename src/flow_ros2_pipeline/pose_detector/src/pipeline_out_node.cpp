@@ -13,8 +13,8 @@ int main(int argc, char *argv[])
 
     // init_config->process_document_action = "pose_detector_out_process_document_action";
     FlowRos2Pipeline::PoseDetectorOutInitConfig::DownstreamNode downstream_pipeline_node;
-    downstream_pipeline_node.accept_document_action = "tracker_process_document_action";
-    init_config->downstreams["tracker"] = downstream_pipeline_node;
+    downstream_pipeline_node.accept_document_action = "tracker_in_process_document_action";
+    init_config->downstreams["tracker_in"] = downstream_pipeline_node;
 
     runtime_config->from_parameters(node.get());
 

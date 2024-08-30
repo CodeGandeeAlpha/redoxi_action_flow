@@ -1,1 +1,1 @@
-1. passengerflow生成的so文件路径需要添加到LD_LIBRARY_PATH中
+1. 整个pipeline没有停下来的设计，需要修改videoreader中，read frame为空或者失败的情况，发送一个frame_number = -1的frame msg，其他所有节点都对-1的这个msg做特殊处理
