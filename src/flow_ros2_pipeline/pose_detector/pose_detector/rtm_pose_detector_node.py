@@ -564,7 +564,7 @@ def main(args=None):
     # init body model
     for i in range(2):
         rtm_pose_model = RTMPoseDetector()
-        onnx_model_path = f'/mnt/chengxiao/code/psf_ros2_ws/src/flow_ros2_pipeline/pose_detector/models/rtmpose-s_simcc-body7_pt-body7_420e-256x192-acd4a1ef_20230504/end2end.onnx'
+        onnx_model_path = f'/3d/chengxiao/code/psf_ros2_ws/src/flow_ros2_pipeline/pose_detector/models/rtmpose-s_simcc-body7_pt-body7_420e-256x192-acd4a1ef_20230504/end2end.onnx'
         rclpy.logging.get_logger('pose_detector_node').info(f"model {i} loading {onnx_model_path}")
         rtm_pose_model.init(onnx_model=onnx_model_path, model_input_size=(192, 256), device='cuda')
 

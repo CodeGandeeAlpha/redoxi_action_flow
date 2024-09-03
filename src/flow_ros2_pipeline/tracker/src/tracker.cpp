@@ -88,17 +88,20 @@ std::string psg_track_target_to_string(const RedoxiTrack::TrackTargetPtr &track_
 cv::Scalar _get_color(const int id)
 {
     int idx = id * 3;
-    return cv::Scalar((37 * idx) % 255, (17 * idx) % 255, (29 * idx) % 255);
+    cv::Scalar color((37 * idx) % 255, (17 * idx) % 255, (29 * idx) % 255);
+    return color;
 }
 
-void draw_track_targets_msg_on_img(cv::Mat &img, const Tracker::MSG_TrackTargets &targets)
+void draw_track_targets_msg_on_img(cv::Mat& img, const Tracker::MSG_TrackTargets &targets)
 {
     RCLCPP_INFO(rclcpp::get_logger("tracker_node"), "draw_track_targets_msg_on_img()");
     for (const auto &target : targets) {
-        cv::Rect bbox(target.track_bbox.x, target.track_bbox.y,
-                      target.track_bbox.width, target.track_bbox.height);
-        cv::rectangle(img, bbox, _get_color(target.track_id), 3);
-        cv::Point2d position(bbox.x, bbox.y);
+        cv::Rect2i bbox(int(target.track_bbox.x), int(target.track_bbox.y),
+                      int(target.track_bbox.width), int(target.track_bbox.height));
+        const auto color = _get_color(target.track_id);
+        cv::rectangle(img, bbox, color, 3);
+
+        cv::Point2i position(int(bbox.x), int(bbox.y));
         cv::putText(img, std::to_string(target.track_id), position, cv::FONT_HERSHEY_SIMPLEX, 1.2,
                     cv::Scalar(0, 0, 255), 2);
     }
@@ -462,6 +465,12 @@ void Tracker::_process_step()
             //                 track_target_msg_to_string(track_target).c_str());
             // }
 
+            // visiualize
+            cv::Mat img_clone = img.clone();
+            draw_track_targets_msg_on_img(img_clone, cur_track_targets);
+            m_impl->out_video_writer.write(img_clone);
+            RCLCPP_INFO(m_impl->logger, "_process_step(): write frame %d to video", frame_num);
+
             auto track_targets_frame = std::make_tuple(cur_track_targets, frame);
             {
                 auto lock_ptr_track_targets_map = m_impl->sync_track_targets_map.synchronize();
@@ -478,6 +487,13 @@ void Tracker::_process_step()
             for (auto &track_target_msg : m_impl->ros_track_event_handler->m_target_associate) {
                 cur_track_targets.push_back(track_target_msg);
             }
+
+            // visiualize
+            cv::Mat img_clone = img.clone();
+            draw_track_targets_msg_on_img(img_clone, cur_track_targets);
+            m_impl->out_video_writer.write(img_clone);
+            RCLCPP_INFO(m_impl->logger, "_process_step(): write frame %d to video", frame_num);
+
             for (auto &track_target_msg : m_impl->ros_track_event_handler->m_target_closed) {
                 cur_track_targets.push_back(track_target_msg);
             }
@@ -516,11 +532,6 @@ void Tracker::_process_step()
                 _add_track_targets_to_buffer(cur_track_targets, frame, *lock_ptr_track_targets_map);
             }
         }
-
-        draw_track_targets_msg_on_img(img, cur_track_targets);
-        cv::imwrite("/mnt/chengxiao/tracker_test_out.jpg", img);
-        m_impl->out_video_writer.write(img);
-        RCLCPP_INFO(m_impl->logger, "_process_step(): write frame %d to video", frame_num);
 
         if (frame_num == 86) {
             m_impl->out_video_writer.release();
@@ -961,6 +972,7 @@ Tracker::MSG_TrackTarget ROSTracker::_track_target_to_msg(RedoxiTrack::TrackTarg
     track_target_msg.track_bbox.width = track_bbox.width;
     track_target_msg.track_bbox.height = track_bbox.height;
     track_target_msg.track_status = track_target->get_path_state();
+    track_target_msg.frame.frame_num = track_target->get_end_frame_number();
 
     return track_target_msg;
 }
