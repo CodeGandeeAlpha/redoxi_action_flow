@@ -23,6 +23,7 @@ from psg_common.constants import NodeStatusCode, ReturnCode
 from psg_common.utilities import create_v6d_client, get_img_by_v6d_id
 
 from detector.ddq_detector import DdqDetrDetector
+from detector.yolov8_head_detector import YOLOv8HeadDetector
 from detector.base_detector import BaseDetector
 
 class DetectorNode(Node, IOpenCloseProtocol):
@@ -287,6 +288,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
     def _init_model_groups_data(self):
         self.m_model_groups_data.clear()
         for model_group_name, models in self.m_init_config.model_groups.items():
+            assert model_group_name in ['body', 'head', 'face', 'all'], "model group name not found"
             model_group_data = DetectorNode.ModelGroupData()
             model_group_data.group_models = []
             model_group_data.in_queue = queue.Queue()
@@ -354,6 +356,8 @@ class DetectorNode(Node, IOpenCloseProtocol):
             for pred in predictions:
                 if pred.score < pred_score_thr:
                     continue
+
+                self.m_logger.info(f"_to_detections_msg(): category {pred.class_id}, confidence {pred.score}, bbox {pred.xyxy}")
                 detection_msg = Detection()
                 detection_msg.category = pred.class_id
                 detection_msg.confidence = pred.score
@@ -429,12 +433,15 @@ class DetectorNode(Node, IOpenCloseProtocol):
         for det in detections.detections:
             x, y, w, h = int(det.bbox.x), int(det.bbox.y), int(det.bbox.width), int(det.bbox.height)
             self.m_logger.info(f"_visialize(): frame {frame.frame_num} bbox {x} {y} {w} {h} catgory {det.category} confidence {det.confidence}")
-            cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+            if det.category == 0:
+                cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+            if det.category == 1:
+                cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
         self._out_video.write(img)
         self.m_logger.info(f"_visialize(): frame {frame.frame_num} visualized")
 
         # for test only
-        if frame.frame_num >= 87:
+        if frame.frame_num == 86:
             self._out_video.release()
             self.m_logger.info(f"_visialize(): test out video released")
 
@@ -515,6 +522,9 @@ class DetectorNode(Node, IOpenCloseProtocol):
             # nothing to do if not started
             return
 
+        assert model_idx < len(self.m_model_groups_data[model_group_name].group_models), "model index out of range"
+        assert model_group_name in self.m_model_groups_data, "model group name not found"
+
         if model_group_name in self.m_model_groups_data:
             # get the first frame in the buffer dict
             frame_msg, uuid = self.m_model_groups_data[model_group_name].in_queue.get()
@@ -532,7 +542,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
             # process the image
             # img = torch.from_numpy(img).float().to(self.m_model_groups_data[model_group_name].group_models[model_idx].model.device).mean(dim=(0, 1))
-            result = self.m_model_groups_data[model_group_name].group_models[model_idx].model.infer(img, 0.3)
+            result = self.m_model_groups_data[model_group_name].group_models[model_idx].model.infer(img, pred_threshold=0.3)
             # time.sleep(0.001)
 
             # for time test
@@ -566,7 +576,8 @@ def main(args=None):
     init_config = DetectorNode.InitConfig(process_frame_action='model_process_frame_action')
 
     # init body model
-    for i in range(2):
+    num_body_models = 2
+    for i in range(num_body_models):
         ddq_model = DdqDetrDetector()
         model_cfg = 'src/flow_ros2_pipeline/detector/configs/ddq/ddq-detr-4scale_swinl_8xb2-30e_coco.py'
         weights = 'src/flow_ros2_pipeline/detector/models/ddq_detr_swinl_30e.pth'
@@ -575,7 +586,19 @@ def main(args=None):
         if 'body' not in init_config.model_groups:
             init_config.model_groups['body'] = []
         init_config.model_groups['body'].append(ddq_model)
-        ddq_detector_node.get_logger().info(f"model {i} initialized")
+        ddq_detector_node.get_logger().info(f"body model {i} initialized")
+
+    # init head model
+    num_head_models = 2
+    for i in range(num_head_models):
+        yolo_model = YOLOv8HeadDetector()
+        yolo_model.init(weights_path='src/flow_ros2_pipeline/detector/models/head_yolov8_best.pt', task='detect', device=f'cuda:{i + num_body_models}')
+
+        if 'head' not in init_config.model_groups:
+            init_config.model_groups['head'] = []
+        init_config.model_groups['head'].append(yolo_model)
+        ddq_detector_node.get_logger().info(f"head model {i} initialized")
+
     downstream = DetectorNode.ModelDownstreamNode(action_name='detector_out_process_detections_action')
     init_config.downstreams['detector_out'] = downstream
 
