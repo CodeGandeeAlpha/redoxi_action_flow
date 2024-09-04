@@ -164,8 +164,10 @@ void PoseDetectorIn::_accept_document_accepted_callback(
         std::copy(uuid.begin(), uuid.end(), person.uuid.uuid.begin());
 
         auto &body = person.body;
-        body.uuid = person.uuid;
-        detections.detections.push_back(body);
+        if (body.category != -1) { // not empty
+            body.uuid = person.uuid;
+            detections.detections.push_back(body);
+        }
     }
     detections.frame = document.frame;
 

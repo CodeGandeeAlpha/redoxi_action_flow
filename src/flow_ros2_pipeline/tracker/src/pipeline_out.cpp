@@ -98,7 +98,7 @@ int TrackerOut::init(const std::shared_ptr<InitConfig> &config,
         std::bind(&TrackerOut::_accept_track_targets_accepted_callback, this, std::placeholders::_1));
 
     // setup downstreams
-    // _connect_to_downstreams();
+    _connect_to_downstreams();
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::INITIALIZED;
@@ -303,7 +303,7 @@ void TrackerOut::_process_document_create_tasks(const MSG_PsgDocument &document,
 void TrackerOut::_step()
 {
     _get_closed_trajectory();
-    // _send_document_to_downstreams();
+    _send_document_to_downstreams();
 }
 
 void TrackerOut::_connect_to_downstreams()

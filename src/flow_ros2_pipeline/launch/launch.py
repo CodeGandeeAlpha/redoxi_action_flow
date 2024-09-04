@@ -88,4 +88,11 @@ def generate_launch_description():
             name='tracker_out_node',
             parameters=[params_file]
         ),
+        Node(
+            package='psg_count',
+            namespace='',
+            executable='psg_count_node',
+            name='psg_count_node',
+            parameters=[params_file]
+        ),
     ])

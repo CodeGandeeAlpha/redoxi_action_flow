@@ -51,8 +51,8 @@ int PSGCount::init(const std::shared_ptr<InitConfig> &config,
         m_impl->trajectory_analyzer->set_event_zone(iter.first, iter.second);
     }
 
-    // setup downstreams
-    _connect_to_downstreams();
+    // // setup downstreams
+    // _connect_to_downstreams();
 
     // create server
     m_act_process_document = rclcpp_action::create_server<ACT_AcceptDocument>(
@@ -231,7 +231,7 @@ void PSGCount::_remove_document_from_buffer(int frame_number, Map_Documents *doc
 
 void PSGCount::_step()
 {
-    _send_document_to_downstreams();
+    // _send_document_to_downstreams();
 }
 
 void PSGCount::_connect_to_downstreams()
@@ -389,7 +389,6 @@ void PSGCount::_process_step()
         auto &frame_num = it.first;
         auto &document = it.second;
 
-        auto &frame = document.frame;
         auto &trajectories = document.trajectories;
 
         // count people
@@ -413,6 +412,17 @@ void PSGCount::_process_step()
 
         for (auto &traj: v_trajs) {
             auto events = m_impl->trajectory_analyzer->process(traj);
+
+            // test log
+            for (auto &person: traj.m_person_list) {
+                if (person->body()) {
+                    PassengerFlow::POINT3 foot_position;
+                    bool position_valid;
+                    person->get_foot_position(&foot_position, &position_valid);
+                    RCLCPP_INFO(m_impl->logger, "_process_step(): person id: %d, person height: %lf, foot position: (%lf, %lf, %lf)",
+                                person->get_person_id(), person->get_body_height().m_body_height, foot_position.x, foot_position.y, foot_position.z);
+                }
+            }
 
             for (auto &iter: events) {
                 for (auto &event: iter.second) {

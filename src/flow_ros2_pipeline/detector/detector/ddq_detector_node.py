@@ -357,7 +357,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 if pred.score < pred_score_thr:
                     continue
 
-                self.m_logger.info(f"_to_detections_msg(): category {pred.class_id}, confidence {pred.score}, bbox {pred.xyxy}")
+                # self.m_logger.info(f"_to_detections_msg(): category {pred.class_id}, confidence {pred.score}, bbox {pred.xyxy}")
                 detection_msg = Detection()
                 detection_msg.category = pred.class_id
                 detection_msg.confidence = pred.score
@@ -432,7 +432,6 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self.m_logger.info(f"_visialize(): frame {frame.frame_num} img shape {img.shape}")
         for det in detections.detections:
             x, y, w, h = int(det.bbox.x), int(det.bbox.y), int(det.bbox.width), int(det.bbox.height)
-            self.m_logger.info(f"_visialize(): frame {frame.frame_num} bbox {x} {y} {w} {h} catgory {det.category} confidence {det.confidence}")
             if det.category == 0:
                 cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
             if det.category == 1:
