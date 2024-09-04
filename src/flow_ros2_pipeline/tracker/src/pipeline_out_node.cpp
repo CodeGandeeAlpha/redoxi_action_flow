@@ -13,8 +13,8 @@ int main(int argc, char *argv[])
 
     // init_config->process_document_action = "tracker_out_process_document_action";
     FlowRos2Pipeline::TrackerOutInitConfig::DownstreamNode downstream_pipeline_node;
-    downstream_pipeline_node.accept_document_action = "passengerflow_process_document_action";
-    init_config->downstreams["passengerflow"] = downstream_pipeline_node;
+    downstream_pipeline_node.accept_document_action = "passengerflow_count_process_document_action";
+    init_config->downstreams["passengerflow_count"] = downstream_pipeline_node;
 
     runtime_config->from_parameters(node.get());
 

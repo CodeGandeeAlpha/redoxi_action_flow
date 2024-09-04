@@ -1,1 +1,1 @@
-colcon build --packages-select video_reader master_node detector person_generator pose_detector tracker --cmake-args -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug
+colcon build --packages-select video_reader master_node detector person_generator pose_detector tracker psg_count --cmake-args -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug

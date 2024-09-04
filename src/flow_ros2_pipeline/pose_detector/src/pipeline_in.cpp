@@ -312,8 +312,8 @@ void PoseDetectorIn::_send_detections_to_downstreams()
                 // successfully sent, record this
                 task->goal_handle = task_response;
                 {
-                    auto lock_ptr_frame_task_doing = m_impl->sync_detections_doing_map.synchronize();
-                    (**lock_ptr_frame_task_doing)[task->goal_handle] = task;
+                    auto lock_ptr_detections_task_doing = m_impl->sync_detections_doing_map.synchronize();
+                    (**lock_ptr_detections_task_doing)[task->goal_handle] = task;
                 }
                 tasks_to_remove.push_back(it.first);
             }
@@ -338,11 +338,11 @@ void PoseDetectorIn::_send_detections_to_downstreams()
     }
 
     {
-        auto lock_ptr_frame_task_doing = m_impl->sync_detections_doing_map.synchronize();
+        auto lock_ptr_detections_task_doing = m_impl->sync_detections_doing_map.synchronize();
         // for on-going tasks, if it is done, remove it
-        if (!(*lock_ptr_frame_task_doing)->empty()) {
+        if (!(*lock_ptr_detections_task_doing)->empty()) {
             std::vector<GoalHandle_Detections> tasks_to_remove;
-            for (auto &it : (**lock_ptr_frame_task_doing)) {
+            for (auto &it : (**lock_ptr_detections_task_doing)) {
                 auto &task_response = it.first;
                 if (task_response) {
                     if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
@@ -353,7 +353,7 @@ void PoseDetectorIn::_send_detections_to_downstreams()
             }
 
             for (auto &it : tasks_to_remove) {
-                (*lock_ptr_frame_task_doing)->erase(it);
+                (*lock_ptr_detections_task_doing)->erase(it);
             }
         }
     }
