@@ -15,6 +15,7 @@ void convert_detection_to_msg(PassengerFlow::Detection &det, const psg_public_ms
     msg.category = class_id_mapping[det.get_type()];
     msg.confidence = det.get_confidence();
     msg.frame = msg_frame;
+    msg.is_detected_by_camera = det.detected_by_camera();
 
     if (det.get_type() == RedoxiTrack::DetectionTypes::PersonBody) {
         RedoxiTrack::fVECTOR feature;
