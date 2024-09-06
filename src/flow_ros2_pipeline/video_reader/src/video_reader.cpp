@@ -221,6 +221,7 @@ void OpencvVideoReader::_step()
         if (!success || frame.empty()) {
             // end of video sequence
             RCLCPP_INFO(logger, "[OpencvVideoReader] end of video reached");
+            m_impl->is_video_end = true;
             stop();
             return false;
         }
@@ -229,52 +230,60 @@ void OpencvVideoReader::_step()
 
     // read a frame and check if all downstreams ready
     bool downstream_ready = false;
-    if (m_runtime_config->read_frame_mode == RuntimeConfig::RFM_READ_ALL) {
-        auto ok = read_next_frame();
-        if (!ok)
-            return;
-
-        downstream_ready = _check_downstreams_ready();
-        RCLCPP_INFO(logger, "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
-    } else if (m_runtime_config->read_frame_mode == RuntimeConfig::RFM_READ_IF_READY) {
-        // query first, read frame only if all downstreams can accept new frame
-        downstream_ready = _check_downstreams_ready();
-        RCLCPP_INFO(logger, "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
-
-        // some downstream can accept this frame, read it write it to v6d and send to all downstreams
-        if (downstream_ready) {
+    if (!(m_impl->is_video_end)) {
+        if (m_runtime_config->read_frame_mode == RuntimeConfig::RFM_READ_ALL) {
             auto ok = read_next_frame();
-            if (!ok)
-                return;
+            // if (!ok) {// read failed, but not end of video
+            //     return;
+            // }
+
+            downstream_ready = _check_downstreams_ready();
+            RCLCPP_INFO(logger, "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
+
+        } else if (m_runtime_config->read_frame_mode == RuntimeConfig::RFM_READ_IF_READY) {
+            // query first, read frame only if all downstreams can accept new frame
+            downstream_ready = _check_downstreams_ready();
+            RCLCPP_INFO(logger, "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
+
+            // some downstream can accept this frame, read it write it to v6d and send to all downstreams
+            if (downstream_ready) {
+                auto ok = read_next_frame();
+                // if (!ok)
+                //     return;
+            }
         }
     }
 
     // send to downstreams
     if (downstream_ready) {
-        auto h = m_runtime_config->image_height;
-        auto w = m_runtime_config->image_width;
-        cv::Mat resized_frame;
+        MSG_Frame frame_msg;
+        if (!(m_impl->is_video_end)) {
+            auto h = m_runtime_config->image_height;
+            auto w = m_runtime_config->image_width;
+            cv::Mat resized_frame;
 
-        if (h > 0 && w > 0) {
-            // FIXME: if h<0 or w<0, resize by preserving aspect ratio
-            cv::resize(frame, m_impl->resized_frame, cv::Size(w, h));
-            resized_frame = m_impl->resized_frame;
-        } else
-            resized_frame = frame;
+            if (h > 0 && w > 0) {
+                // FIXME: if h<0 or w<0, resize by preserving aspect ratio
+                cv::resize(frame, m_impl->resized_frame, cv::Size(w, h));
+                resized_frame = m_impl->resized_frame;
+            } else
+                resized_frame = frame;
 
-        if (m_publish_image)
-            _publish_frame(resized_frame);
+            if (m_publish_image)
+                _publish_frame(resized_frame);
 
-        // add frame to v6d
-        auto v6d_id = _add_frame_to_shared_memory(resized_frame);
+            // add frame to v6d
+            auto v6d_id = _add_frame_to_shared_memory(resized_frame);
+            frame_msg.cache.id_int = v6d_id;
+            frame_msg.cache.has_int_id = true;
+            frame_msg.cache.id_string = ObjectIDToString(v6d_id);
+            frame_msg.frame_num = m_frame_number;
+        }
+        else {
+            frame_msg.frame_num = -1;
+        }
 
         // send frame to downstreams
-        MSG_Frame frame_msg;
-        frame_msg.frame_num = m_frame_number;
-        frame_msg.cache.id_int = v6d_id;
-        frame_msg.cache.has_int_id = true;
-        frame_msg.cache.id_string = ObjectIDToString(v6d_id);
-
         RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] before send, ObjectID: %ld", frame_msg.cache.id_int);
 
         // downstream actions are alreayd checked, no need to do it again
@@ -282,9 +291,9 @@ void OpencvVideoReader::_step()
 
         if (!frame_sent_ok) {
             // not sent to any downstream, the frame can be deleted
-            auto del_ok = m_impl->v6d_client->DelData(v6d_id);
+            auto del_ok = m_impl->v6d_client->DelData(frame_msg.cache.id_int);
             if (!del_ok.ok())
-                RCLCPP_WARN(logger, "[OpencvVideoReader] failed to delete v6d data %lu", v6d_id);
+                RCLCPP_WARN(logger, "[OpencvVideoReader] failed to delete v6d data %lu", frame_msg.cache.id_int);
         }
     }
 }
@@ -554,7 +563,7 @@ void OpencvVideoReader::_declare_all_parameters()
     this->declare_parameter<int>("image_width", -1);
     this->declare_parameter<int>("image_height", -1);
 
-    this->declare_parameter<double>("frame_internal_ms", -1.0);
+    this->declare_parameter<double>("frame_interval_ms", -1.0);
 }
 
 void OpencvVideoReader::_create_image_topic()

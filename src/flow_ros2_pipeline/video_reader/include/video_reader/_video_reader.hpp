@@ -30,6 +30,7 @@ class OpencvVideoReaderImpl
     rclcpp::TimerBase::SharedPtr step_timer;
     rclcpp::TimerBase::SharedPtr frame_timer;
     bool ready_to_read_next_frame = true;
+    bool is_video_end = false;
     cv::Mat src_frame;     // last read frame, avoid creating cv::Mat object every time
     cv::Mat resized_frame; // resized frame
 

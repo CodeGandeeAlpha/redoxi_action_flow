@@ -21,8 +21,8 @@ void OpencvVideoReaderInitConfig::from_parameters(OpencvVideoReader *node)
 void OpencvVideoReaderRuntimeConfig::from_parameters(OpencvVideoReader *node)
 {
     auto logger_ = node->get_logger();
-    this->frame_interval_ms = node->get_parameter("frame_internal_ms").as_double();
-    RCLCPP_INFO(logger_, "frame_internal_ms: %f", this->frame_interval_ms);
+    this->frame_interval_ms = node->get_parameter("frame_interval_ms").as_double();
+    RCLCPP_INFO(logger_, "frame_interval_ms: %f", this->frame_interval_ms);
 
     this->image_width = node->get_parameter("image_width").as_int();
     RCLCPP_INFO(logger_, "image_width: %d", this->image_width);
