@@ -11,6 +11,89 @@ using namespace std::chrono_literals;
 
 namespace FlowRos2Pipeline
 {
+cv::Scalar _get_color(const int id)
+{
+    int idx = id * 3;
+    cv::Scalar color((37 * idx) % 255, (17 * idx) % 255, (29 * idx) % 255);
+    return color;
+}
+
+void draw_person(const PassengerFlow::CameraModelPtr& cam, const PassengerFlow::GroundPtr& ground,
+            cv::Mat& img, const PassengerFlow::PersonPtr& person){
+    const std::string person_id = std::to_string(person->get_person_id());
+    auto c = _get_color(person->get_person_id());
+    if(person->body()){
+        cv::rectangle(img, person->body()->get_bbox(), c, 2,1,0);
+
+        cv::Point2i text_origin(person->body()->get_bbox().x, person->body()->get_bbox().y);
+        cv::putText(img, person_id, text_origin, cv::FONT_HERSHEY_SIMPLEX, 2, cv::Scalar(0,0,255),2);
+    }
+    if(person->head()){
+        cv::rectangle(img, person->head()->get_bbox(), c, 2,1,0);
+    }
+    if(person->face()){
+        cv::rectangle(img, person->face()->get_bbox(), c, 2,1,0);
+    }
+
+    PassengerFlow::POINT3 foot_position_in_world;
+    bool position_valid;
+    person->get_foot_position(&foot_position_in_world, &position_valid);
+    if(position_valid) {
+        PassengerFlow::fVECTOR_3 foot_position_vec{foot_position_in_world.x, foot_position_in_world.y,
+                                                    foot_position_in_world.z};
+        auto foot_position_uv = cam->project_points(foot_position_vec);
+        int u = foot_position_uv[0], v = foot_position_uv[1];
+        cv::Point2i foot_position_in_img{u, v};
+        // cv::putText(img, person_id, foot_position_in_img, cv::FONT_HERSHEY_SIMPLEX, 1, c, 1);
+        cv::circle(img, foot_position_in_img, 2, c, 4);
+    }
+
+}
+
+void draw_region_points(cv::Mat& img, const cv::Scalar& region_color, const std::string &region_name,
+                    const std::vector<PassengerFlow::POINT> &region_points,
+                        const PassengerFlow::GroundPtr &ground, const PassengerFlow::CameraModelPtr &camera) {
+    std::vector<cv::Point2i> region_points_on_img;
+    int center_u=0, center_v=0;
+    for(auto& point : region_points){
+        auto point_in_world = ground->ground_to_world(point);
+        PassengerFlow::fVECTOR_3 point_in_world_vec(point_in_world.x, point_in_world.y, point_in_world.z);
+        auto point_on_img = camera->project_points(point_in_world_vec);
+        int u = point_on_img[0], v = point_on_img[1];
+        center_u += u;
+        center_v += v;
+        region_points_on_img.push_back({u, v});
+    }
+
+    center_u /= region_points_on_img.size();
+    center_v /= region_points_on_img.size();
+    PassengerFlow::POINT pre_point=region_points_on_img[0], next_point;
+    for(int i = 1; i<region_points_on_img.size();++i){
+        next_point = region_points_on_img[i];
+        cv::line(img, pre_point, next_point, region_color);
+        pre_point = next_point;
+    }
+    next_point = region_points_on_img[0];
+    cv::line(img, pre_point, next_point, region_color);
+    cv::putText(img, region_name, cv::Point2i(center_u, center_v), cv::FONT_HERSHEY_SIMPLEX, 1, region_color,2);
+}
+
+void draw_event_zone(cv::Mat& img, const std::map<std::string, PassengerFlow::EventZonePtr> &event_zones,
+                const PassengerFlow::GroundPtr &ground, const PassengerFlow::CameraModelPtr &camera){
+    int rand_seed = 0;
+    for(auto& iter:event_zones){
+        srand(rand_seed);
+        rand_seed +=10;
+        int r = rand() % 255;
+        int b = rand() % 255;
+        cv::Scalar event_zone_color(b, 0, r);
+        auto event_regions = iter.second->get_region_points();
+        for(auto&region:event_regions){
+            draw_region_points(img, event_zone_color, region.first, region.second, ground, camera);
+        }
+    }
+}
+
 PSGCount::PSGCount()
     : Node("psg_count_node")
 {
@@ -34,6 +117,9 @@ int PSGCount::init(const std::shared_ptr<InitConfig> &config,
 
     m_init_config = config;
     m_runtime_config = runtime_config;
+
+    // connect to v6d
+    m_impl->v6d_client = create_v6d_client();
 
     // setup analyzers
     m_impl->spatial_analyzer = std::make_shared<PassengerFlow::SingleGroundSpatialAnalyzer3>();
@@ -139,6 +225,10 @@ int PSGCount::stop()
         m_impl->process_thread->join();
         m_impl->process_thread = nullptr;
     }
+
+    // closing, release v6d client
+    m_impl->v6d_client->Disconnect();
+    m_impl->v6d_client = nullptr;
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::STOPPED;
@@ -390,6 +480,7 @@ void PSGCount::_process_step()
         auto &document = it.second;
 
         auto &trajectories = document.trajectories;
+        auto &frame = document.frame;
 
         // count people
         // spatial analysis
@@ -405,6 +496,13 @@ void PSGCount::_process_step()
             }
         }
         m_impl->spatial_analyzer->process_inplace(v_trajs);
+
+        // get frame from shared memory
+        auto tensor = get_tensor_by_v6d_id(frame.cache.id_int, m_impl->v6d_client);
+        auto img = from_v6d_tensor_to_cvmat(tensor);
+        auto draw_img = img.clone();
+        // draw event zones
+        draw_event_zone(draw_img, m_impl->event_zones, m_impl->ground, m_impl->camera);
 
         // trajectory analysis
         std::vector<PassengerFlow::TrajectoryEvent> v_traj_event;
@@ -422,6 +520,9 @@ void PSGCount::_process_step()
                     RCLCPP_INFO(m_impl->logger, "_process_step(): person id: %d, person height: %lf, foot position: (%lf, %lf, %lf)",
                                 person->get_person_id(), person->get_body_height().m_body_height, foot_position.x, foot_position.y, foot_position.z);
                 }
+
+                // draw person test
+                draw_person(m_impl->camera, m_impl->ground, draw_img, person);
             }
 
             for (auto &iter: events) {
@@ -433,6 +534,9 @@ void PSGCount::_process_step()
                 }
             }
         }
+
+        // test visualization output
+        cv::imwrite("/mnt/chengxiao/traj_framenum_" + std::to_string(frame.frame_num) + "_out.jpg", draw_img);
 
         convert_events_to_msg(v_traj_event, msg_traj_events);
         document.trajectory_events = msg_traj_events;

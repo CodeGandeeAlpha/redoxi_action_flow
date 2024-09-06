@@ -7,6 +7,9 @@
 #include <fstream>
 #include <psg_count/psg_count.hpp>
 #include <PassengerFlow/PassengerFlow.h>
+#include <vineyard/client/client.h>
+#include <vineyard/client/ds/object_meta.h>
+
 
 namespace FlowRos2Pipeline
 {
@@ -91,6 +94,7 @@ class PSGCountImpl
         else {
             nlohmann::json config;
             fr >> config;
+
             output.m_camera_fx = config["camera_fx"];
             output.m_camera_fy = config["camera_fy"];
             output.m_camera_ux = config["camera_ux"];
@@ -291,6 +295,8 @@ class PSGCountImpl
         passing_in_out_event_zone->set_name(region_info->m_name);
         return passing_in_out_event_zone;
     }
+
+    std::shared_ptr<vineyard::Client> v6d_client;
 
     PassengerFlow::ScenePtr scene;
     PassengerFlow::GroundPtr ground;
