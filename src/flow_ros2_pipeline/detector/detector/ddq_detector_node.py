@@ -429,7 +429,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
         frame = detections.frame
         img = self._get_frame_from_v6d(frame)
         img = np.copy(img)  # make a copy to avoid modifying the original image
-        self.m_logger.info(f"_visialize(): frame {frame.frame_num} img shape {img.shape}")
+        # self.m_logger.info(f"_visialize(): frame {frame.frame_num} img shape {img.shape}")
         for det in detections.detections:
             x, y, w, h = int(det.bbox.x), int(det.bbox.y), int(det.bbox.width), int(det.bbox.height)
             if det.category == 0:
@@ -437,7 +437,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
             if det.category == 1:
                 cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
         self._out_video.write(img)
-        self.m_logger.info(f"_visialize(): frame {frame.frame_num} visualized")
+        # self.m_logger.info(f"_visialize(): frame {frame.frame_num} visualized")
 
         # for test only
         if frame.frame_num == 86:
@@ -541,7 +541,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
             # process the image
             # img = torch.from_numpy(img).float().to(self.m_model_groups_data[model_group_name].group_models[model_idx].model.device).mean(dim=(0, 1))
-            result = self.m_model_groups_data[model_group_name].group_models[model_idx].model.infer(img, pred_threshold=0.3)
+            result = self.m_model_groups_data[model_group_name].group_models[model_idx].model.infer(img, pred_threshold=self.m_runtime_config.pred_score_thr)
             # time.sleep(0.001)
 
             # for time test

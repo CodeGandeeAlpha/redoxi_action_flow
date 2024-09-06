@@ -400,11 +400,11 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         frame = body_poses[0].frame
         img = self._get_frame_from_v6d(frame)
         img = np.copy(img)  # make a copy to avoid modifying the original image
-        self.m_logger.info(f"_visialize(): frame {frame.frame_num} img shape {img.shape}")
+        # self.m_logger.info(f"_visialize(): frame {frame.frame_num} img shape {img.shape}")
         for body_pose in body_poses:
             bbox = body_pose.bbox
             x, y, w, h = int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height)
-            self.m_logger.info(f"_visialize(): frame {frame.frame_num} bbox {x} {y} {w} {h}")
+            # self.m_logger.info(f"_visialize(): frame {frame.frame_num} bbox {x} {y} {w} {h}")
             cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
             keypoints = body_pose.keypoints_2
@@ -417,10 +417,10 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
             # draw_skeleton(img, keypoints, scores)
 
         self._out_video.write(img)
-        self.m_logger.info(f"_visialize(): frame {frame.frame_num} visualized")
+        # self.m_logger.info(f"_visialize(): frame {frame.frame_num} visualized")
 
         # for test only
-        if frame.frame_num >= 68:
+        if frame.frame_num >= 86:
             self._out_video.release()
             self.m_logger.info(f"_visialize(): test out video released")
 

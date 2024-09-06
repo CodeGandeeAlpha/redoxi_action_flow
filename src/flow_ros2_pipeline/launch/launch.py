@@ -95,4 +95,11 @@ def generate_launch_description():
             name='psg_count_node',
             parameters=[params_file]
         ),
+        # Node(
+        #     package='psg_collector',
+        #     namespace='',
+        #     executable='psg_collector_node.py',
+        #     name='psg_collector_node',
+        #     parameters=[params_file]
+        # ),
     ])

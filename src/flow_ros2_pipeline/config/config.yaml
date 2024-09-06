@@ -8,14 +8,15 @@
 /video_reader:
   ros__parameters:
     # source_file: "/mnt/chengxiao/test.mp4"
-    source_file: "/mnt/chengxiao/20.22.7.164-2023-06-18-17-00-00-00.00.00.000-00.00.04.240.mp4"
+    # source_file: "/mnt/chengxiao/20.22.7.164-2023-06-18-17-00-00-00.00.00.000-00.00.04.240.mp4"
+    source_file: "/mnt/chengxiao/20.22.6.30-2023-06-18-15-00-02_27908_28658-00.00.00.000-00.00.06.926.mp4"
     # source_file: "/mnt/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.7.164-2023-06-18-17-00-00.mp4"
     source_camera_index: -1
     start_frame_number: -1
     end_frame_number: -1
     image_width: 1920
     image_height: 1080
-    frame_internal_ms: 1.0
+    frame_interval_ms: 1.0
 
 /master_node:
   ros__parameters:
@@ -28,13 +29,13 @@
 /detector_in_node:
   ros__parameters:
     process_document_action: "detector_in_process_document_action"
-    step_interval_ms: 10.0
+    step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 1000.0
 
 /detector_node:
   ros__parameters:
     process_frame_action: "model_process_frame_action"
-    step_interval_ms: 10.0
+    step_interval_ms: 1.0
     pred_score_thr: 0.3
 
 
@@ -55,13 +56,13 @@
 /pose_detector_in_node:
   ros__parameters:
     process_document_action: "pose_detector_in_process_document_action"
-    step_interval_ms: 10.0
+    step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 1000.0
 
 /pose_detector_node:
   ros__parameters:
     process_detections_action: "model_process_detections_action"
-    step_interval_ms: 10.0
+    step_interval_ms: 1.0
     pred_score_thr: 0.3
 
 /pose_detector_out_node:
@@ -75,24 +76,25 @@
 /tracker_in_node:
   ros__parameters:
     process_document_action: "tracker_in_process_document_action"
-    step_interval_ms: 10.0
+    step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 1000.0
 
 /tracker_node:
   ros__parameters:
     process_detections_action: "tracker_process_detections_action"
-    step_interval_ms: 10.0
+    step_interval_ms: 1.0
 
 /tracker_out_node:
   ros__parameters:
     process_document_action: "tracker_out_process_document_action"
     process_track_targets_action: "tracker_out_process_track_targets_action"
-    step_interval_ms: 10.0
+    step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 1000.0
 
 /psg_count_node:
   ros__parameters:
     process_document_action: "psg_count_process_document_action"
-    step_interval_ms: 10.0
+    step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 1000.0
-    passengerflow_config_path: "/mnt/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.7.164.json"
+    passengerflow_config_path: "/3d/chengxiao/data/passengerflow/fairmot_train_230907/psg_configs/20.22.6.30.json"
+    # passengerflow_config_path: "/mnt/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.7.164.json"
