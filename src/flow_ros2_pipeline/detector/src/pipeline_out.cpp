@@ -165,16 +165,15 @@ void DetectorOut::_accept_document_accepted_callback(
     const auto &goal = goal_handle->get_goal();
 
     // cache the document
-    const auto &document = goal->document;
+    auto document = goal->document;
 
-    // add to buffer
     {
         auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
         _add_document_to_buffer(document, *lock_ptr_document_buffer);
-    }
 
-    RCLCPP_INFO(m_impl->logger, "Accepted document %ld with UUID %s and add it to buffer",
-                document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
+        RCLCPP_INFO(m_impl->logger, "Accepted document %ld with UUID %s and add it to buffer",
+                    document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
+    }
 
     auto result = std::make_shared<ACT_AcceptDocument::Result>();
     result->return_msg = "Document accepted";

@@ -278,9 +278,11 @@ void OpencvVideoReader::_step()
             frame_msg.cache.has_int_id = true;
             frame_msg.cache.id_string = ObjectIDToString(v6d_id);
             frame_msg.frame_num = m_frame_number;
+            frame_msg.signal_code = SignalCode::RUN;
         }
         else {
-            frame_msg.frame_num = -1;
+            frame_msg.frame_num = INT_MAX;
+            frame_msg.signal_code = SignalCode::FLUSH;
         }
 
         // send frame to downstreams

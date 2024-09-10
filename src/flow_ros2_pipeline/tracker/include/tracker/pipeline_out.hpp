@@ -100,7 +100,7 @@ class TrackerOut : public rclcpp::Node, public IStartStopProtocol
         const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle);
 
     // create tasks
-    virtual void _process_document_create_tasks(const MSG_PsgDocument &document, Map_Document_Waiting *document_waiting_map_ptr);
+    virtual void _process_document_create_tasks(MSG_PsgDocument &document, Map_Document_Waiting *document_waiting_map_ptr);
 
 
   protected:
@@ -125,7 +125,7 @@ class TrackerOut : public rclcpp::Node, public IStartStopProtocol
 
     virtual void _declare_all_parameters();
 
-    virtual void _add_document_to_buffer(const MSG_PsgDocument &document,
+    virtual void _add_document_to_buffer(MSG_PsgDocument &document,
                                          std::map<int, MSG_PsgDocument> *document_buffer_ptr);
     virtual void _add_track_targets_to_buffer(const MSG_TrackTargets &track_targets, const int frame_number,
                                               std::map<int, MSG_TrackTargets> *track_targets_buffer_ptr);

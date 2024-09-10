@@ -196,6 +196,7 @@ void convert_msg_to_person(const psg_private_msgs::msg::Person &msg, PassengerFl
 
 void convert_persons_to_msg(const std::vector<PassengerFlow::PersonPtr> &persons, const psg_public_msgs::msg::Frame &msg_frame, psg_private_msgs::msg::Persons &msg)
 {
+    msg.frame = msg_frame;
     for (auto &person : persons) {
         psg_private_msgs::msg::Person msg_person;
         msg_person.frame = msg_frame;

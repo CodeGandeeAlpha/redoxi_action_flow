@@ -197,12 +197,12 @@ void MasterNode::_accept_frame_accepted_callback(
     const auto &frame = goal->frame;
 
     // add to memory registry
-    {
+    if (frame.signal_code == SignalCode::RUN) {
         auto lock_ptr_frame_buffer = m_impl->sync_frame_buffer.synchronize();
         _add_frame_to_buffer(frame, *lock_ptr_frame_buffer);
     }
 
-    RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and add it to buffer", frame.cache.id_int);
+    RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and add it to buffer", frame.frame_num);
 
     // create tasks for all downstreams
     {
@@ -214,7 +214,7 @@ void MasterNode::_accept_frame_accepted_callback(
     result->return_msg = "Frame accepted";
     result->return_code = ReturnCode::SUCCESS;
     goal_handle->succeed(result);
-    RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and succeed", frame.cache.id_int);
+    RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and succeed", frame.frame_num);
 }
 
 void MasterNode::_add_frame_to_buffer(const MSG_Frame &frame, std::map<int, MasterNode::MSG_Frame> *frame_buffer_ptr)
@@ -313,6 +313,8 @@ void MasterNode::_step()
         auto &task = it.second;
         ACT_AcceptDocument::Goal goal;
         goal.document.frame = task->frame;
+        goal.document.signal_code = task->frame.signal_code;
+        goal.document.header.stamp = this->now();
         auto ds = task->downstream;
         auto handle = task->downstream->handler->async_send_goal(goal, ds->options);
 

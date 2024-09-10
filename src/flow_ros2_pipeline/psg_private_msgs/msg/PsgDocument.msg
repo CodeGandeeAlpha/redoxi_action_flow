@@ -9,3 +9,4 @@ psg_public_msgs/Detections detections
 PersonTrajectories trajectories
 TrajectoryEvents trajectory_events
 psg_public_msgs/Frame frame
+int64 signal_code

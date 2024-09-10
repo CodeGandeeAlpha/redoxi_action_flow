@@ -20,7 +20,7 @@ from rtmlib import draw_skeleton
 from psg_actions.action import ProcessDetections, ProcessBodyPoses
 from psg_public_msgs.msg import BodyPose, Detections
 from psg_common.interfaces import IOpenCloseProtocol
-from psg_common.constants import NodeStatusCode, ReturnCode
+from psg_common.constants import NodeStatusCode, ReturnCode, SignalCode
 from psg_common.utilities import create_v6d_client, get_img_by_v6d_id
 
 from pose_detector.rtm_pose_detector import RTMPoseDetector
@@ -487,7 +487,8 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
                 self._send_goal(goal_msg)
                 self.m_logger.info(f"_step(): sent to downstream {bodyposes[0].frame.frame_num}")
 
-                self._visialize(goal_msg)  # test only
+                if goal_msg.frame.signal_code == SignalCode.RUN:
+                    self._visialize(goal_msg)  # test only
 
                 # # remove the frame from buffer
                 # self._remove_frame_from_buffer(det.frame.frame_num)
@@ -513,6 +514,17 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
                 if self._start_time is None:
                     # cp.cuda.Device().synchronize()
                     self._start_time = time.time()
+
+            # if frame is FLUSH OR TERMINATE, send it to downstreams
+            if frame_msg.signal_code == SignalCode.FLUSH or frame_msg.signal_code == SignalCode.TERMINATE:
+                bodyposes = []
+                bodypose_msg = BodyPose()
+                bodypose_msg.frame = frame_msg
+                bodyposes.append(bodypose_msg)
+                self.m_model_groups_data[model_group_name].out_queue.put(bodyposes)
+                self.m_logger.info(f"_model_step(): framenum {frame_msg.frame_num}" +
+                                   f"added to model {model_group_name} task out queue")
+                return
 
             # get the image from Vineyard
             img = self._get_frame_from_v6d(frame_msg)

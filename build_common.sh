@@ -1,1 +1,2 @@
-colcon build --packages-select psg_common psg_public_msgs psg_private_msgs psg_actions psg_services --cmake-args -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug
+colcon build --packages-select psg_common psg_public_msgs psg_private_msgs psg_actions psg_services --cmake-args -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+#  -DCMAKE_BUILD_TYPE=Debug

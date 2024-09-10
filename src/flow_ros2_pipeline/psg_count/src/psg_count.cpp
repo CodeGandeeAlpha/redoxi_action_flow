@@ -137,8 +137,8 @@ int PSGCount::init(const std::shared_ptr<InitConfig> &config,
         m_impl->trajectory_analyzer->set_event_zone(iter.first, iter.second);
     }
 
-    // // setup downstreams
-    // _connect_to_downstreams();
+    // setup downstreams
+    _connect_to_downstreams();
 
     // create server
     m_act_process_document = rclcpp_action::create_server<ACT_AcceptDocument>(
@@ -274,10 +274,6 @@ void PSGCount::_accept_document_accepted_callback(
     // add it to documents buffer
     {
         auto lock_ptr_documents_map = m_impl->sync_documents_map.synchronize();
-        // if is empty frame, mark it as INT_MAX
-        if (document.frame.frame_num == -1) {
-            document.frame.frame_num = INT_MAX;
-        }
         _add_document_to_buffer(document, *lock_ptr_documents_map);
     }
 
@@ -321,7 +317,7 @@ void PSGCount::_remove_document_from_buffer(int frame_number, Map_Documents *doc
 
 void PSGCount::_step()
 {
-    // _send_document_to_downstreams();
+    _send_document_to_downstreams();
 }
 
 void PSGCount::_connect_to_downstreams()
@@ -464,7 +460,7 @@ void PSGCount::_process_step()
 
         for (auto &it : **lock_ptr_documents_map) {
             auto &frame_num = it.first;
-            if (frame_num == m_waiting_frame_number) {
+            if (frame_num == m_waiting_frame_number || frame_num == INT_MAX) {
                 m_waiting_frame_number++;
                 documents_.push_back(it);
                 RCLCPP_INFO(m_impl->logger, "_process_step(): framenum %d document push_back to documents_", it.first);
@@ -486,6 +482,7 @@ void PSGCount::_process_step()
         // spatial analysis
         std::vector<PassengerFlow::PersonTrajectory> v_trajs;
         convert_msg_to_trajs(trajectories, v_trajs);
+        RCLCPP_INFO(m_impl->logger, "_process_step(): frame_num: %d, v_trajs size: %d", frame_num, v_trajs.size());
         for (auto &traj: v_trajs) {
             for (auto &person: traj.m_person_list) {
                 person->set_ground(m_impl->ground);
@@ -496,17 +493,27 @@ void PSGCount::_process_step()
             }
         }
         m_impl->spatial_analyzer->process_inplace(v_trajs);
+        RCLCPP_INFO(m_impl->logger, "_process_step(): spatial analysis success!");
 
-        // get frame from shared memory
-        auto tensor = get_tensor_by_v6d_id(frame.cache.id_int, m_impl->v6d_client);
-        auto img = from_v6d_tensor_to_cvmat(tensor);
-        auto draw_img = img.clone();
+        cv::Mat draw_img;
+        if (frame.signal_code == SignalCode::RUN) {
+            // get frame from shared memory
+            auto tensor = get_tensor_by_v6d_id(frame.cache.id_int, m_impl->v6d_client);
+            auto img = from_v6d_tensor_to_cvmat(tensor);
+            draw_img = img.clone();
+        }
+        else {
+            // black image
+            draw_img = cv::Mat::zeros(1080, 1920, CV_8UC3);
+        }
         // draw event zones
         draw_event_zone(draw_img, m_impl->event_zones, m_impl->ground, m_impl->camera);
 
         // trajectory analysis
         std::vector<PassengerFlow::TrajectoryEvent> v_traj_event;
         MSG_TrajectoryEvents msg_traj_events;
+
+        bool has_traj = false;
 
         for (auto &traj: v_trajs) {
             auto events = m_impl->trajectory_analyzer->process(traj);
@@ -523,6 +530,7 @@ void PSGCount::_process_step()
 
                 // draw person test
                 draw_person(m_impl->camera, m_impl->ground, draw_img, person);
+                has_traj = true;
             }
 
             for (auto &iter: events) {
@@ -536,7 +544,9 @@ void PSGCount::_process_step()
         }
 
         // test visualization output
-        cv::imwrite("/mnt/chengxiao/traj_framenum_" + std::to_string(frame.frame_num) + "_out.jpg", draw_img);
+        if (has_traj) {
+            cv::imwrite("/mnt/chengxiao/traj_framenum_" + std::to_string(frame.frame_num) + "_out.jpg", draw_img);
+        }
 
         convert_events_to_msg(v_traj_event, msg_traj_events);
         document.trajectory_events = msg_traj_events;

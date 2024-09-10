@@ -171,10 +171,10 @@ void PoseDetectorOut::_accept_document_accepted_callback(
     {
         auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
         _add_document_to_buffer(document, *lock_ptr_document_buffer);
-    }
 
-    RCLCPP_INFO(m_impl->logger, "Accepted document %ld with UUID %s and add it to buffer",
-                document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
+        RCLCPP_INFO(m_impl->logger, "Accepted document %ld with UUID %s and add it to buffer",
+                    document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
+    }
 
     auto result = std::make_shared<ACT_AcceptDocument::Result>();
     result->return_msg = "Document accepted";
@@ -425,7 +425,6 @@ void PoseDetectorOut::_merge_bodyposes_and_documents()
         auto &document = it.second;
         const auto frame_num = it.first;
 
-
         MSG_Bodyposes bodyposes;
         bool has_bodyposes = false;
         {
@@ -447,6 +446,29 @@ void PoseDetectorOut::_merge_bodyposes_and_documents()
 
         RCLCPP_INFO(m_impl->logger, "_merge_bodyposes_and_documents(): for frame %d", frame_num);
         RCLCPP_INFO(m_impl->logger, "_merge_bodyposes_and_documents(): _merge framenum %ld document and bodyposes", document.frame.frame_num);
+
+        // after bodypose in buffer, if signal code is FLUSH OR TERMINATE
+        if (document.signal_code == SignalCode::FLUSH || document.signal_code == SignalCode::TERMINATE) {
+            // create task for document
+            {
+                auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+                _process_document_create_tasks(document, *lock_ptr_document_task_waiting);
+            }
+
+            // remove bodypose from buffer
+            {
+                auto lock_ptr_bodyposes_buffer = m_impl->sync_bodyposes_buffer.synchronize();
+                _remove_bodyposes_from_buffer(frame_num, *lock_ptr_bodyposes_buffer);
+            }
+
+            // remove document from buffer
+            {
+                auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
+                _remove_document_from_buffer(frame_num, *lock_ptr_document_buffer);
+            }
+            continue;
+        }
+
 
         // merge bodyposes and document's persons
         bool is_merged = false;

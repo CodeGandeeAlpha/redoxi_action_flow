@@ -16,7 +16,11 @@ class NodeStatusCode:
     CLOSED = 5
     MAX_RESERVED_STATUS = 10000
 
+class SignalCode:
+    RUN = 0
+    FLUSH = 1
+    TERMINATE = 2
+
 
 DefaultTimeoutMs = 10000
 DefaultNodeStepIntervalMs = 10
-

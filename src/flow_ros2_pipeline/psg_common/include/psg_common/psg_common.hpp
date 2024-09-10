@@ -66,6 +66,14 @@ const int CLOSED = 5;
 const int MAX_RESERVED_STATUS = 10000;
 }; // namespace NodeStatusCode
 
+namespace SignalCode
+{
+  const int RUN = 0;
+  const int FLUSH = 1;
+  const int TERMINATE = 2;
+}; // namespace SignalCode
+
+
 const double DefaultTimeoutMs = 10000;
 
 // how many ms to wait before next _step()

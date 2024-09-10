@@ -13,7 +13,7 @@ int main(int argc, char *argv[])
 
     // init_config->process_document_action = "detector_in_process_document_action";
     FlowRos2Pipeline::PSGCountInitConfig::DownstreamPipelineNode event_pipeline_node;
-    event_pipeline_node.accept_document_action = "event_process_document_action";
+    event_pipeline_node.accept_document_action = "psg_collector_process_document_action";
     init_config->pipeline_downstreams["event"] = event_pipeline_node;
 
     runtime_config->from_parameters(node.get());

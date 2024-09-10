@@ -6,11 +6,27 @@ import queue
 import rclpy
 from rclpy.action import ActionServer
 from rclpy.node import Node
+from rclpy.time import Time
 from attr import field, define
 
 from psg_actions.action import ProcessPsgDocument
 from psg_common.interfaces import IStartStopProtocol
-from psg_common.constants import NodeStatusCode, ReturnCode
+from psg_common.constants import NodeStatusCode, ReturnCode, SignalCode
+
+INT_MAX = 2147483647
+
+EventTyp2String = {
+                0: "None",
+                1: "Disappear",
+                2: "DoorIn",
+                3: "DoorOut",
+                4: "DoorIgnore",
+                5: "DoorSpeedOut",
+                6: "DoorSpeedIn",
+                7: "PassingIn",
+                8: "PassingOut",
+                9: "PassingIgnore"
+            }
 
 
 class PSGCollectorNode(Node, IStartStopProtocol):
@@ -45,9 +61,10 @@ class PSGCollectorNode(Node, IStartStopProtocol):
         self.m_doc_buffer = queue.Queue()
 
         # test only
-        self._start_time = None
-        self._end_time = None
-        self._time_test = False
+        self._is_first = True
+        self._accepted_count = 0
+        self._total_accepted_time = 0
+
 
     def _func_step(self):
         while rclpy.ok() and self.m_step_running:
@@ -163,16 +180,29 @@ class PSGCollectorNode(Node, IStartStopProtocol):
     def _accept_document_accepted_callback(self, goal_handle):
         # accept the document, and collect events
         doc = goal_handle.request.document
+
+        # test time
+        if self._is_first:
+            self._is_first = False
+        else:
+            current_time = self.get_clock().now()
+            self._total_accepted_time += (current_time - Time.from_msg(doc.header.stamp)).nanoseconds / 1e6
+            self._accepted_count += 1
+
         frame = doc.frame
         self.m_logger.info(f'_accept_document_accepted_callback(): frame_num: {frame.frame_num}')
 
+        self.m_logger.info(f'---------------------------------------')
+        self.m_logger.info(f'accpeted_count: {self._accepted_count}')
+        self.m_logger.info(f'total_accepted_time: {self._total_accepted_time} ms')
+        self.m_logger.info(f'average_time: {self._total_accepted_time / self._accepted_count} ms')
+        self.m_logger.info(f'---------------------------------------')
+
         # collect events
-        for event in doc.trajectory_events:
+        for event in doc.trajectory_events.trajectory_events:
             if event.event_type not in self.m_events:
                 self.m_events[event.event_type] = 0
             self.m_events[event.event_type] += 1
-
-        se
 
         # add to doc buffer
         self.m_doc_buffer.put(doc)
@@ -200,6 +230,10 @@ class PSGCollectorNode(Node, IStartStopProtocol):
             doc = self.m_doc_buffer.get()
             # TODO: process the doc
 
+            if doc.frame.signal_code == SignalCode.FLUSH or doc.frame.signal_code == SignalCode.TERMINATE:
+                for event, count in self.m_events.items():
+                    self.m_logger.info(f'_step(): FINAL event: {EventTyp2String[event]}, count: {count}')
+
 
 def main(args=None):
     # init node
@@ -207,11 +241,11 @@ def main(args=None):
     ddq_detector_node = PSGCollectorNode('psg_collector_node')
 
     # init config
-    init_config = PSGCollectorNode.InitConfig(process_doc_action='psg_collector_process_doc_action')
+    init_config = PSGCollectorNode.InitConfig(process_doc_action='psg_collector_process_document_action')
 
     # runtime config
     runtime_config = PSGCollectorNode.RuntimeConfig()
-    runtime_config.step_interval_ms = 10
+    runtime_config.step_interval_ms = 1
 
     ddq_detector_node.init(init_config, runtime_config)
     ddq_detector_node.start()

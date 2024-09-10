@@ -207,7 +207,7 @@ void TrackerOut::_accept_document_accepted_callback(
     const auto &goal = goal_handle->get_goal();
 
     // cache the document
-    const auto &document = goal->document;
+    auto document = goal->document;
 
     // add to buffer
     {
@@ -261,12 +261,12 @@ void TrackerOut::_accept_track_targets_accepted_callback(
 
     // cache the detections
     const auto &track_targets = goal->track_targets;
-    const auto &frame = goal->frame;
+    auto frame = goal->frame;
 
     // test log
     RCLCPP_INFO(m_impl->logger, "_accept_track_targets_accepted_callback(): Accepted frame %ld with %ld track_targets", frame.frame_num, track_targets.size());
     for (const auto &track_target : track_targets) {
-        RCLCPP_INFO(m_impl->logger, "_accept_track_targets_accepted_callback(): Accepted track_target %s",
+        RCLCPP_DEBUG(m_impl->logger, "_accept_track_targets_accepted_callback(): Accepted track_target %s",
                     track_target_msg_to_string(track_target).c_str());
     }
 
@@ -285,11 +285,10 @@ void TrackerOut::_accept_track_targets_accepted_callback(
 }
 
 
-void TrackerOut::_process_document_create_tasks(const MSG_PsgDocument &document,
+void TrackerOut::_process_document_create_tasks(MSG_PsgDocument &document,
                                                 TrackerOut::Map_Document_Waiting *document_waiting_map_ptr)
 {
     RCLCPP_INFO(m_impl->logger, "_process_document_create_tasks(): create tasks for document %ld", document.frame.frame_num);
-
     // create tasks of this frame for all downstreams
     for (auto &x : m_downstreams) {
         auto task = std::make_shared<DSTask_PsgDocument>();
@@ -441,7 +440,7 @@ void TrackerOut::_declare_all_parameters()
 }
 
 
-void TrackerOut::_add_document_to_buffer(const MSG_PsgDocument &document, std::map<int, TrackerOut::MSG_PsgDocument> *document_buffer_ptr)
+void TrackerOut::_add_document_to_buffer(MSG_PsgDocument &document, std::map<int, TrackerOut::MSG_PsgDocument> *document_buffer_ptr)
 {
     (*document_buffer_ptr)[document.frame.frame_num] = document;
 }
@@ -523,12 +522,12 @@ void TrackerOut::_get_closed_trajectory()
             if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::New) {
                 m_closed_trajectory_buffer[track_target.track_id] = std::vector<UUID>();
                 m_closed_trajectory_buffer[track_target.track_id].push_back(track_target.uuid.uuid);
-                RCLCPP_INFO(m_impl->logger, "_get_closed_trajectory(): create new trajectory with track_id %d", track_target.track_id);
+                RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): create new trajectory with track_id %ld", track_target.track_id);
             }
             // if track_target is open, add it to trajectory
             else if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::Open) {
                 m_closed_trajectory_buffer[track_target.track_id].push_back(track_target.uuid.uuid);
-                RCLCPP_INFO(m_impl->logger, "_get_closed_trajectory(): add track_target to trajectory with track_id %d and frame number %ld", track_target.track_id, frame_num);
+                RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): add track_target to trajectory with track_id %d and frame number %ld", track_target.track_id, frame_num);
             }
             // if track_target is close, get trajectory and remove it from buffer
             else if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::Close) {
@@ -550,12 +549,12 @@ void TrackerOut::_get_closed_trajectory()
                 document.trajectories.person_trajectories.push_back(closed_trajectory);
 
                 // test log
-                RCLCPP_INFO(m_impl->logger, "_get_closed_trajectory(): get closed trajectory with track_id %d", track_target.track_id);
-                RCLCPP_INFO(m_impl->logger, "_get_closed_trajectory(): total closed trajectory %ld", document.trajectories.person_trajectories.size());
+                RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): get closed trajectory with track_id %ld in frame_number %ld", track_target.track_id, frame_num);
+                RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): total closed trajectory %ld", document.trajectories.person_trajectories.size());
                 for (auto &traj : document.trajectories.person_trajectories) {
-                    RCLCPP_INFO(m_impl->logger, "_get_closed_trajectory(): closed trajectory %d", traj.track_id);
+                    RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): closed trajectory %ld", traj.track_id);
                     for (auto &person : traj.persons) {
-                        RCLCPP_INFO(m_impl->logger, "_get_closed_trajectory(): person %s", person_msg_to_string(person).c_str());
+                        RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): person %s", person_msg_to_string(person).c_str());
                     }
                 }
             } else

@@ -166,12 +166,17 @@ void PersonGenerator::_accept_document_accepted_callback(
     const auto &document = goal->document;
 
     // add to memory buffer
+    if (document.signal_code == SignalCode::RUN)
     {
         auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
         _add_document_to_buffer(document, *lock_ptr_document_buffer);
+        RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): Accepted document %ld and add it to buffer", document.frame.frame_num);
     }
-
-    RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): Accepted document %ld and add it to buffer", document.frame.frame_num);
+    else {
+        auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+        _process_document_create_tasks(document, *lock_ptr_psgdoc_task_waiting);
+        RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): Accepted document %ld and create task", document.frame.frame_num);
+    }
 
     auto result = std::make_shared<ACT_AcceptDocument::Result>();
     result->return_msg = "Document accepted";

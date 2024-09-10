@@ -19,7 +19,7 @@ from psg_actions.action import ProcessDetections, ProcessFrame
 from psg_public_msgs.msg import Frame
 from psg_public_msgs.msg import Detections, Detection
 from psg_common.interfaces import IOpenCloseProtocol
-from psg_common.constants import NodeStatusCode, ReturnCode
+from psg_common.constants import NodeStatusCode, ReturnCode, SignalCode
 from psg_common.utilities import create_v6d_client, get_img_by_v6d_id
 
 from detector.ddq_detector import DdqDetrDetector
@@ -507,7 +507,8 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 self._send_goal(goal_msg)
                 self.m_logger.info(f"_step(): sent to downstream {pyuuid.UUID(bytes=bytes(det.uuid.uuid))}")
 
-                self._visialize(goal_msg)  # test only
+                if det.frame.signal_code == SignalCode.RUN:
+                    self._visialize(goal_msg)  # test only
 
                 # # remove the frame from buffer
                 # self._remove_frame_from_buffer(det.frame.frame_num)
@@ -534,6 +535,16 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 if self._start_time is None:
                     torch.cuda.synchronize(model_idx)
                     self._start_time = time.time()
+
+            # if frame is FLUSH OR TERMINATE, send it to downstreams
+            if frame_msg.signal_code == SignalCode.FLUSH or frame_msg.signal_code == SignalCode.TERMINATE:
+                detections = Detections()
+                detections.uuid = uuid
+                detections.frame = frame_msg
+                self.m_model_groups_data[model_group_name].out_queue.put(detections)
+                self.m_logger.info(f"_model_step(): framenum {frame_msg.frame_num} uuid {pyuuid.UUID(bytes=bytes(detections.uuid.uuid))}" +
+                                   f"added to model {model_group_name} task out queue")
+                return
 
             # get the image from Vineyard
             img = self._get_frame_from_v6d(frame_msg)
