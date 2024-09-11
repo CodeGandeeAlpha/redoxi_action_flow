@@ -190,8 +190,8 @@ void DetectorIn::_process_document_create_tasks(const MSG_PsgDocument &document,
 
 void DetectorIn::_process_frame_create_tasks(const MSG_Frame &frame, const MSG_UUID &detections_uuid, Map_Frame_Waiting *frame_waiting_map_ptr)
 {
-    RCLCPP_INFO(m_impl->logger, "create frame %ld detections uuid %s tasks for downstreams", frame.frame_num,
-                uuid_to_string(detections_uuid.uuid).c_str());
+    RCLCPP_DEBUG(m_impl->logger, "create frame %ld detections uuid %s tasks for downstreams", frame.frame_num,
+                 uuid_to_string(detections_uuid.uuid).c_str());
 
     // create tasks of this frame for all downstreams
     for (auto &x : m_model_downstreams) {

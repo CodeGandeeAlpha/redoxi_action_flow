@@ -165,9 +165,9 @@ void MasterNode::_status_query_callback(const std::shared_ptr<SRV_StatusQuery::R
                                         std::shared_ptr<SRV_StatusQuery::Response> response)
 {
     (void)request; // not used
-    RCLCPP_INFO(m_impl->logger, "Received status query request");
+    RCLCPP_DEBUG(m_impl->logger, "Received status query request");
     response->status = ReturnCode::SUCCESS;
-    RCLCPP_INFO(m_impl->logger, "Response status query request");
+    RCLCPP_DEBUG(m_impl->logger, "Response status query request");
 }
 
 rclcpp_action::GoalResponse MasterNode::_accept_frame_goal_callback(
@@ -249,7 +249,7 @@ void MasterNode::_process_document_create_tasks(const MSG_Frame &frame, Map_Docu
         task->frame = frame;
         (*document_waiting_map_ptr)[std::make_tuple(task->downstream.get(), frame.frame_num)] = task;
     }
-    RCLCPP_INFO(m_impl->logger, "_process_document_create_tasks: %ld, end", frame.frame_num);
+    RCLCPP_DEBUG(m_impl->logger, "_process_document_create_tasks: %ld, end", frame.frame_num);
 }
 
 int MasterNode::start()

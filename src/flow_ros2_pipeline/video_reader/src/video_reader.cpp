@@ -118,8 +118,8 @@ uint64_t OpencvVideoReader::_add_frame_to_shared_memory(const cv::Mat &frame)
     VINEYARD_CHECK_OK(m_impl->v6d_client->Persist(sealed->id()));
 
     auto id = sealed->id();
-    RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] Successfully sealed, ObjectID_int: %ld", id);
-    RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] Successfully sealed, ObjectID: %s", ObjectIDToString(id).c_str());
+    RCLCPP_DEBUG(m_impl->logger, "[OpencvVideoReader] Successfully sealed, ObjectID_int: %ld", id);
+    RCLCPP_DEBUG(m_impl->logger, "[OpencvVideoReader] Successfully sealed, ObjectID: %s", ObjectIDToString(id).c_str());
 
     // auto test = m_impl->v6d_client->GetObject(id);
     // RCLCPP_INFO(m_impl->logger, "read v6d id : %ld", test->id());
@@ -176,16 +176,16 @@ bool OpencvVideoReader::_check_downstreams_ready()
         auto wait_status =
             result.wait_for(std::chrono::milliseconds((long)timeout_ms));
         if (wait_status == std::future_status::timeout) {
-            RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] _check_downstreams_ready TIMEOUT");
+            RCLCPP_DEBUG(m_impl->logger, "[OpencvVideoReader] _check_downstreams_ready TIMEOUT");
             return false;
         } else if (wait_status == std::future_status::ready) {
-            RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] _check_downstreams_ready READY");
+            RCLCPP_DEBUG(m_impl->logger, "[OpencvVideoReader] _check_downstreams_ready READY");
             auto response = result.get();
             bool ok = response->status == ReturnCode::SUCCESS;
             if (!ok)
                 return false;
         } else {
-            RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] _check_downstreams_ready DEFERRED");
+            RCLCPP_DEBUG(m_impl->logger, "[OpencvVideoReader] _check_downstreams_ready DEFERRED");
             return false;
         }
     }
@@ -279,8 +279,7 @@ void OpencvVideoReader::_step()
             frame_msg.cache.id_string = ObjectIDToString(v6d_id);
             frame_msg.frame_num = m_frame_number;
             frame_msg.signal_code = SignalCode::RUN;
-        }
-        else {
+        } else {
             frame_msg.frame_num = INT_MAX;
             frame_msg.signal_code = SignalCode::FLUSH;
         }

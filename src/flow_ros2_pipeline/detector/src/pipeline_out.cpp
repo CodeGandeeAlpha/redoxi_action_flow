@@ -171,8 +171,8 @@ void DetectorOut::_accept_document_accepted_callback(
         auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
         _add_document_to_buffer(document, *lock_ptr_document_buffer);
 
-        RCLCPP_INFO(m_impl->logger, "Accepted document %ld with UUID %s and add it to buffer",
-                    document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
+        RCLCPP_DEBUG(m_impl->logger, "Accepted document %ld with UUID %s and add it to buffer",
+                     document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
     }
 
     auto result = std::make_shared<ACT_AcceptDocument::Result>();
@@ -227,7 +227,7 @@ void DetectorOut::_accept_detections_accepted_callback(
 void DetectorOut::_process_document_create_tasks(const MSG_PsgDocument &document,
                                                  DetectorOut::Map_Document_Waiting *document_waiting_map_ptr)
 {
-    RCLCPP_INFO(m_impl->logger, "create tasks for document %ld", document.frame.frame_num);
+    RCLCPP_DEBUG(m_impl->logger, "create tasks for document %ld", document.frame.frame_num);
 
     // create tasks of this frame for all downstreams
     for (auto &x : m_downstreams) {
@@ -302,8 +302,8 @@ void DetectorOut::_send_document_to_downstreams()
         // FIXME: add timeout condition
         auto task_response = handle.get();
         if (task_response != nullptr) {
-            RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): document async_send_goal: %ld task_response is %d",
-                        task->document.frame.frame_num, task_response->get_status());
+            RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): document async_send_goal: %ld task_response is %d",
+                         task->document.frame.frame_num, task_response->get_status());
             // accepted
             if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
                 task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
@@ -315,7 +315,7 @@ void DetectorOut::_send_document_to_downstreams()
                     (**lock_ptr_document_task_doing)[task->goal_handle] = task;
                 }
                 tasks_to_remove.push_back(it.first);
-                RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): STATUS_ACCEPTED tasks_to_remove push_back framenumber %d", std::get<1>(it.first));
+                RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_ACCEPTED tasks_to_remove push_back framenumber %d", std::get<1>(it.first));
             }
 
             // succeed
@@ -323,13 +323,13 @@ void DetectorOut::_send_document_to_downstreams()
                 // task->status = DSTask_PSGDocument::TASK_DONE;
                 m_psgdoc_task_done.push_back(task);
                 tasks_to_remove.push_back(it.first);
-                RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %d", std::get<1>(it.first));
+                RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %d", std::get<1>(it.first));
             } else {
-                RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): OTHER framenumber %d task_response is %d", std::get<1>(it.first), task_response->get_status());
+                RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): OTHER framenumber %d task_response is %d", std::get<1>(it.first), task_response->get_status());
             }
         } else {
             // rejected
-            RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): STATUS_REJECTED framenumber %d", std::get<1>(it.first));
+            RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_REJECTED framenumber %d", std::get<1>(it.first));
         }
 
         // FIXME: what if failed to send many times?
@@ -340,7 +340,7 @@ void DetectorOut::_send_document_to_downstreams()
     {
         auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
         for (auto &it : tasks_to_remove) {
-            RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): tasks_to_remove framenumber %d", std::get<1>(it));
+            RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): tasks_to_remove framenumber %d", std::get<1>(it));
             (*lock_ptr_document_task_waiting)->erase(it);
         }
     }
@@ -435,11 +435,11 @@ void DetectorOut::_merge_detections_and_documents()
             continue;
         }
 
-        RCLCPP_INFO(m_impl->logger, "_merge_detections_and_documents for frame %d", frame_num);
-        RCLCPP_INFO(m_impl->logger, "_merge document %ld with UUID %s",
-                    document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
-        RCLCPP_INFO(m_impl->logger, "_merge detections %ld with UUID %s",
-                    detections.frame.frame_num, uuid_to_string(detections.uuid.uuid).c_str());
+        RCLCPP_DEBUG(m_impl->logger, "_merge_detections_and_documents for frame %d", frame_num);
+        RCLCPP_DEBUG(m_impl->logger, "_merge document %ld with UUID %s",
+                     document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
+        RCLCPP_DEBUG(m_impl->logger, "_merge detections %ld with UUID %s",
+                     detections.frame.frame_num, uuid_to_string(detections.uuid.uuid).c_str());
 
         if (document.detections_uuid == detections.uuid) {
             // merge detections and documents

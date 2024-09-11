@@ -166,13 +166,11 @@ void PersonGenerator::_accept_document_accepted_callback(
     const auto &document = goal->document;
 
     // add to memory buffer
-    if (document.signal_code == SignalCode::RUN)
-    {
+    if (document.signal_code == SignalCode::RUN) {
         auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
         _add_document_to_buffer(document, *lock_ptr_document_buffer);
         RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): Accepted document %ld and add it to buffer", document.frame.frame_num);
-    }
-    else {
+    } else {
         auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
         _process_document_create_tasks(document, *lock_ptr_psgdoc_task_waiting);
         RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): Accepted document %ld and create task", document.frame.frame_num);
@@ -221,7 +219,7 @@ void PersonGenerator::_process()
         // extract person
         auto v_persons = m_person_extractor.extract_persons(v_detections);
 
-        RCLCPP_INFO(m_impl->logger, "_process(): frame %ld extracted %ld persons", document.frame.frame_num, v_persons.size());
+        RCLCPP_DEBUG(m_impl->logger, "_process(): frame %ld extracted %ld persons", document.frame.frame_num, v_persons.size());
 
         // convert to msg
         psg_private_msgs::msg::Persons persons_msg;
@@ -231,7 +229,7 @@ void PersonGenerator::_process()
         {
             auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
             _process_document_create_tasks(document, *lock_ptr_psgdoc_task_waiting);
-            RCLCPP_INFO(m_impl->logger, "_process(): frame %ld create tasks", document.frame.frame_num);
+            RCLCPP_DEBUG(m_impl->logger, "_process(): frame %ld create tasks", document.frame.frame_num);
         }
 
         // remove from buffer
@@ -287,12 +285,12 @@ void PersonGenerator::_send_document_to_downstreams()
 
         for (auto const &it : (**lock_ptr_psgdoc_task_waiting)) {
             psgdoc_task_waiting_.push_back(it);
-            RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): psgdoc_task_waiting_ push_back framenumber %d", std::get<1>(it.first));
+            RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): psgdoc_task_waiting_ push_back framenumber %d", std::get<1>(it.first));
         }
     }
 
     for (auto &it : psgdoc_task_waiting_) {
-        RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): psgdoc_task_waiting_ framenumber %d", std::get<1>(it.first));
+        RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): psgdoc_task_waiting_ framenumber %d", std::get<1>(it.first));
         auto &task = it.second;
         ACT_AcceptDocument::Goal goal;
         goal.document = task->document;
@@ -302,10 +300,10 @@ void PersonGenerator::_send_document_to_downstreams()
 
         // FIXME: add timeout condition
         auto task_response = handle.get();
-        RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): document async_send_goal: %ld SUCCESS", task->document.frame.frame_num);
+        RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): document async_send_goal: %ld SUCCESS", task->document.frame.frame_num);
         if (task_response != nullptr) {
-            RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): document async_send_goal: %ld task_response is %d",
-                        task->document.frame.frame_num, task_response->get_status());
+            RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): document async_send_goal: %ld task_response is %d",
+                         task->document.frame.frame_num, task_response->get_status());
             // accepted
             if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
                 task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
@@ -316,20 +314,20 @@ void PersonGenerator::_send_document_to_downstreams()
                     (**lock_ptr_psgdoc_task_doing)[task->goal_handle] = task;
                 }
                 tasks_to_remove.push_back(it.first);
-                RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): STATUS_ACCEPTED tasks_to_remove push_back framenumber %d", std::get<1>(it.first));
+                RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_ACCEPTED tasks_to_remove push_back framenumber %d", std::get<1>(it.first));
             }
 
             // succeed
             else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
                 // task->status = DSTask_PSGDocument::TASK_DONE;
                 tasks_to_remove.push_back(it.first);
-                RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %d", std::get<1>(it.first));
+                RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %d", std::get<1>(it.first));
             } else {
-                RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): OTHER framenumber %d task_response is %d", std::get<1>(it.first), task_response->get_status());
+                RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): OTHER framenumber %d task_response is %d", std::get<1>(it.first), task_response->get_status());
             }
         } else {
             // rejected
-            RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): STATUS_REJECTED framenumber %d", std::get<1>(it.first));
+            RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_REJECTED framenumber %d", std::get<1>(it.first));
         }
 
         // FIXME: what if failed to send many times?
@@ -340,7 +338,7 @@ void PersonGenerator::_send_document_to_downstreams()
     {
         auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
         for (auto &it : tasks_to_remove) {
-            RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): tasks_to_remove framenumber %d", std::get<1>(it));
+            RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): tasks_to_remove framenumber %d", std::get<1>(it));
             (*lock_ptr_psgdoc_task_waiting)->erase(it);
         }
     }

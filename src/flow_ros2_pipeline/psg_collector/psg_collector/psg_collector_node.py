@@ -64,6 +64,8 @@ class PSGCollectorNode(Node, IStartStopProtocol):
         self._is_first = True
         self._accepted_count = 0
         self._total_accepted_time = 0
+        self._current_time = None
+        self._start_time = None
 
 
     def _func_step(self):
@@ -185,17 +187,25 @@ class PSGCollectorNode(Node, IStartStopProtocol):
         if self._is_first:
             self._is_first = False
         else:
-            current_time = self.get_clock().now()
-            self._total_accepted_time += (current_time - Time.from_msg(doc.header.stamp)).nanoseconds / 1e6
+            if self._start_time is None:
+                self._start_time = Time.from_msg(doc.header.stamp)
+            self._current_time = self.get_clock().now()
+            self._total_accepted_time += (self._current_time - Time.from_msg(doc.header.stamp)).nanoseconds / 1e6
             self._accepted_count += 1
+
+            pipeline_total_time = (self._current_time - self._start_time).nanoseconds / 1e6
 
         frame = doc.frame
         self.m_logger.info(f'_accept_document_accepted_callback(): frame_num: {frame.frame_num}')
 
         self.m_logger.info(f'---------------------------------------')
+        self.m_logger.info(f'current_time: {self._current_time}')
+        self.m_logger.info(f'msg_created_time: {Time.from_msg(doc.header.stamp)}')
         self.m_logger.info(f'accpeted_count: {self._accepted_count}')
         self.m_logger.info(f'total_accepted_time: {self._total_accepted_time} ms')
         self.m_logger.info(f'average_time: {self._total_accepted_time / self._accepted_count} ms')
+        self.m_logger.info(f'pipeline_total_time: {pipeline_total_time} ms')
+        self.m_logger.info(f'pipeline_average_time: {pipeline_total_time / self._accepted_count} ms')
         self.m_logger.info(f'---------------------------------------')
 
         # collect events

@@ -392,21 +392,21 @@ void PoseDetectorOut::_add_bodyposes_to_buffer(const MSG_Bodyposes &bodyposes, c
 
 void PoseDetectorOut::_remove_document_from_buffer(int frame_number, std::map<int, PoseDetectorOut::MSG_PsgDocument> *document_buffer_ptr)
 {
-    RCLCPP_INFO(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d", frame_number);
+    RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d", frame_number);
     // if frame_number is not in buffer, do nothing
     if (document_buffer_ptr->find(frame_number) != document_buffer_ptr->end()) {
         document_buffer_ptr->erase(frame_number);
-        RCLCPP_INFO(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d SUCCESS", frame_number);
+        RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d SUCCESS", frame_number);
     }
 }
 
 void PoseDetectorOut::_remove_bodyposes_from_buffer(int frame_number, std::map<int, PoseDetectorOut::MSG_Bodyposes> *bodyposes_buffer_ptr)
 {
-    RCLCPP_INFO(m_impl->logger, "_remove_bodyposes_from_buffer(): remove bodyposes with frame_num %d", frame_number);
+    RCLCPP_DEBUG(m_impl->logger, "_remove_bodyposes_from_buffer(): remove bodyposes with frame_num %d", frame_number);
     // if frame_number is not in buffer, do nothing
     if (bodyposes_buffer_ptr->find(frame_number) != bodyposes_buffer_ptr->end()) {
         bodyposes_buffer_ptr->erase(frame_number);
-        RCLCPP_INFO(m_impl->logger, "_remove_bodyposes_from_buffer(): remove bodyposes with frame_num %d SUCCESS", frame_number);
+        RCLCPP_DEBUG(m_impl->logger, "_remove_bodyposes_from_buffer(): remove bodyposes with frame_num %d SUCCESS", frame_number);
     }
 }
 
@@ -444,8 +444,8 @@ void PoseDetectorOut::_merge_bodyposes_and_documents()
             continue;
         }
 
-        RCLCPP_INFO(m_impl->logger, "_merge_bodyposes_and_documents(): for frame %d", frame_num);
-        RCLCPP_INFO(m_impl->logger, "_merge_bodyposes_and_documents(): _merge framenum %ld document and bodyposes", document.frame.frame_num);
+        RCLCPP_DEBUG(m_impl->logger, "_merge_bodyposes_and_documents(): for frame %d", frame_num);
+        RCLCPP_DEBUG(m_impl->logger, "_merge_bodyposes_and_documents(): _merge framenum %ld document and bodyposes", document.frame.frame_num);
 
         // after bodypose in buffer, if signal code is FLUSH OR TERMINATE
         if (document.signal_code == SignalCode::FLUSH || document.signal_code == SignalCode::TERMINATE) {

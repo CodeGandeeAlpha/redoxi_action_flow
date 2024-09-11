@@ -202,7 +202,7 @@ void PoseDetectorIn::_process_document_create_tasks(const MSG_PsgDocument &docum
 
 void PoseDetectorIn::_process_detections_create_tasks(const MSG_Detections &detections, Map_Detections_Waiting *detections_waiting_map_ptr)
 {
-    RCLCPP_INFO(m_impl->logger, "create frame %ld detections tasks for downstreams", detections.frame.frame_num);
+    RCLCPP_DEBUG(m_impl->logger, "create frame %ld detections tasks for downstreams", detections.frame.frame_num);
 
     // create tasks of this frame for all downstreams
     for (auto &x : m_model_downstreams) {

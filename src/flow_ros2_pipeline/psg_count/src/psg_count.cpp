@@ -1,9 +1,9 @@
 #include <rclcpp/utilities.hpp>
 
-#include <rcpputils/asserts.hpp>
+#include <psg_common/msg_converter.hpp>
 #include <psg_count/_psg_count.hpp>
 #include <psg_count/psg_count.hpp>
-#include <psg_common/msg_converter.hpp>
+#include <rcpputils/asserts.hpp>
 
 static constexpr auto ROS_ASSERT = rcpputils::assert_true;
 
@@ -18,44 +18,45 @@ cv::Scalar _get_color(const int id)
     return color;
 }
 
-void draw_person(const PassengerFlow::CameraModelPtr& cam, const PassengerFlow::GroundPtr& ground,
-            cv::Mat& img, const PassengerFlow::PersonPtr& person){
+void draw_person(const PassengerFlow::CameraModelPtr &cam, const PassengerFlow::GroundPtr &ground,
+                 cv::Mat &img, const PassengerFlow::PersonPtr &person)
+{
     const std::string person_id = std::to_string(person->get_person_id());
     auto c = _get_color(person->get_person_id());
-    if(person->body()){
-        cv::rectangle(img, person->body()->get_bbox(), c, 2,1,0);
+    if (person->body()) {
+        cv::rectangle(img, person->body()->get_bbox(), c, 2, 1, 0);
 
         cv::Point2i text_origin(person->body()->get_bbox().x, person->body()->get_bbox().y);
-        cv::putText(img, person_id, text_origin, cv::FONT_HERSHEY_SIMPLEX, 2, cv::Scalar(0,0,255),2);
+        cv::putText(img, person_id, text_origin, cv::FONT_HERSHEY_SIMPLEX, 2, cv::Scalar(0, 0, 255), 2);
     }
-    if(person->head()){
-        cv::rectangle(img, person->head()->get_bbox(), c, 2,1,0);
+    if (person->head()) {
+        cv::rectangle(img, person->head()->get_bbox(), c, 2, 1, 0);
     }
-    if(person->face()){
-        cv::rectangle(img, person->face()->get_bbox(), c, 2,1,0);
+    if (person->face()) {
+        cv::rectangle(img, person->face()->get_bbox(), c, 2, 1, 0);
     }
 
     PassengerFlow::POINT3 foot_position_in_world;
     bool position_valid;
     person->get_foot_position(&foot_position_in_world, &position_valid);
-    if(position_valid) {
+    if (position_valid) {
         PassengerFlow::fVECTOR_3 foot_position_vec{foot_position_in_world.x, foot_position_in_world.y,
-                                                    foot_position_in_world.z};
+                                                   foot_position_in_world.z};
         auto foot_position_uv = cam->project_points(foot_position_vec);
         int u = foot_position_uv[0], v = foot_position_uv[1];
         cv::Point2i foot_position_in_img{u, v};
         // cv::putText(img, person_id, foot_position_in_img, cv::FONT_HERSHEY_SIMPLEX, 1, c, 1);
         cv::circle(img, foot_position_in_img, 2, c, 4);
     }
-
 }
 
-void draw_region_points(cv::Mat& img, const cv::Scalar& region_color, const std::string &region_name,
-                    const std::vector<PassengerFlow::POINT> &region_points,
-                        const PassengerFlow::GroundPtr &ground, const PassengerFlow::CameraModelPtr &camera) {
+void draw_region_points(cv::Mat &img, const cv::Scalar &region_color, const std::string &region_name,
+                        const std::vector<PassengerFlow::POINT> &region_points,
+                        const PassengerFlow::GroundPtr &ground, const PassengerFlow::CameraModelPtr &camera)
+{
     std::vector<cv::Point2i> region_points_on_img;
-    int center_u=0, center_v=0;
-    for(auto& point : region_points){
+    int center_u = 0, center_v = 0;
+    for (auto &point : region_points) {
         auto point_in_world = ground->ground_to_world(point);
         PassengerFlow::fVECTOR_3 point_in_world_vec(point_in_world.x, point_in_world.y, point_in_world.z);
         auto point_on_img = camera->project_points(point_in_world_vec);
@@ -67,28 +68,29 @@ void draw_region_points(cv::Mat& img, const cv::Scalar& region_color, const std:
 
     center_u /= region_points_on_img.size();
     center_v /= region_points_on_img.size();
-    PassengerFlow::POINT pre_point=region_points_on_img[0], next_point;
-    for(int i = 1; i<region_points_on_img.size();++i){
+    PassengerFlow::POINT pre_point = region_points_on_img[0], next_point;
+    for (int i = 1; i < region_points_on_img.size(); ++i) {
         next_point = region_points_on_img[i];
         cv::line(img, pre_point, next_point, region_color);
         pre_point = next_point;
     }
     next_point = region_points_on_img[0];
     cv::line(img, pre_point, next_point, region_color);
-    cv::putText(img, region_name, cv::Point2i(center_u, center_v), cv::FONT_HERSHEY_SIMPLEX, 1, region_color,2);
+    cv::putText(img, region_name, cv::Point2i(center_u, center_v), cv::FONT_HERSHEY_SIMPLEX, 1, region_color, 2);
 }
 
-void draw_event_zone(cv::Mat& img, const std::map<std::string, PassengerFlow::EventZonePtr> &event_zones,
-                const PassengerFlow::GroundPtr &ground, const PassengerFlow::CameraModelPtr &camera){
+void draw_event_zone(cv::Mat &img, const std::map<std::string, PassengerFlow::EventZonePtr> &event_zones,
+                     const PassengerFlow::GroundPtr &ground, const PassengerFlow::CameraModelPtr &camera)
+{
     int rand_seed = 0;
-    for(auto& iter:event_zones){
+    for (auto &iter : event_zones) {
         srand(rand_seed);
-        rand_seed +=10;
+        rand_seed += 10;
         int r = rand() % 255;
         int b = rand() % 255;
         cv::Scalar event_zone_color(b, 0, r);
         auto event_regions = iter.second->get_region_points();
-        for(auto&region:event_regions){
+        for (auto &region : event_regions) {
             draw_region_points(img, event_zone_color, region.first, region.second, ground, camera);
         }
     }
@@ -110,7 +112,7 @@ PSGCount::PSGCount()
 }
 
 int PSGCount::init(const std::shared_ptr<InitConfig> &config,
-                    const std::shared_ptr<RuntimeConfig> &runtime_config)
+                   const std::shared_ptr<RuntimeConfig> &runtime_config)
 {
     ROS_ASSERT(m_status_code == NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::STOPPED,
                "init FAILED! status code is not BEFORE_INIT or STOPPED");
@@ -133,7 +135,7 @@ int PSGCount::init(const std::shared_ptr<InitConfig> &config,
     m_impl->spatial_analyzer->set_scene(m_impl->scene);
     m_impl->spatial_analyzer->set_ground(m_impl->ground);
 
-    for (auto &iter: m_impl->event_zones) {
+    for (auto &iter : m_impl->event_zones) {
         m_impl->trajectory_analyzer->set_event_zone(iter.first, iter.second);
     }
 
@@ -307,11 +309,11 @@ void PSGCount::_add_document_to_buffer(const MSG_PsgDocument &document, Map_Docu
 
 void PSGCount::_remove_document_from_buffer(int frame_number, Map_Documents *document_buffer_ptr)
 {
-    RCLCPP_INFO(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d", frame_number);
+    RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d", frame_number);
     // if frame_number is not in buffer, do nothing
     if (document_buffer_ptr->find(frame_number) != document_buffer_ptr->end()) {
         document_buffer_ptr->erase(frame_number);
-        RCLCPP_INFO(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d SUCCESS", frame_number);
+        RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d SUCCESS", frame_number);
     }
 }
 
@@ -380,8 +382,8 @@ void PSGCount::_send_document_to_downstreams()
         auto task_response = handle.get();
         RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): frame async_send_goal: %ld SUCCESS", task->document.frame.frame_num);
         if (task_response != nullptr) {
-            RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): async_send_goal: %ld task_response is %d",
-                        task->document.frame.frame_num, task_response->get_status());
+            RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): async_send_goal: %ld task_response is %d",
+                         task->document.frame.frame_num, task_response->get_status());
             // accepted or executing
             if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
                 task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
@@ -392,14 +394,14 @@ void PSGCount::_send_document_to_downstreams()
                     (**lock_ptr_psg_document_task_doing)[task->goal_handle] = task;
                 }
                 tasks_to_remove.push_back(it.first);
-                RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): STATUS_ACCEPTED tasks_to_remove push_back framenumber %ld", task->document.frame.frame_num);
+                RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_ACCEPTED tasks_to_remove push_back framenumber %ld", task->document.frame.frame_num);
             }
 
             // succeed
             else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
                 m_psgdoc_task_done.push_back(task);
                 tasks_to_remove.push_back(it.first);
-                RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %ld", task->document.frame.frame_num);
+                RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %ld", task->document.frame.frame_num);
             }
         }
 
@@ -411,7 +413,7 @@ void PSGCount::_send_document_to_downstreams()
     {
         auto lock_ptr_psg_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
         for (auto &it : tasks_to_remove) {
-            RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): tasks_to_remove framenumber %d", std::get<1>(it));
+            RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): tasks_to_remove framenumber %d", std::get<1>(it));
             (*lock_ptr_psg_document_task_waiting)->erase(it);
         }
     }
@@ -427,7 +429,7 @@ void PSGCount::_send_document_to_downstreams()
                     if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
                         m_psgdoc_task_done.push_back(it.second);
                         tasks_to_remove.push_back(it.first);
-                        RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %ld", it.second->document.frame.frame_num);
+                        RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %ld", it.second->document.frame.frame_num);
                     }
                 }
             }
@@ -463,7 +465,7 @@ void PSGCount::_process_step()
             if (frame_num == m_waiting_frame_number || frame_num == INT_MAX) {
                 m_waiting_frame_number++;
                 documents_.push_back(it);
-                RCLCPP_INFO(m_impl->logger, "_process_step(): framenum %d document push_back to documents_", it.first);
+                RCLCPP_DEBUG(m_impl->logger, "_process_step(): framenum %d document push_back to documents_", it.first);
             } else {
                 std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
                 break;
@@ -482,18 +484,18 @@ void PSGCount::_process_step()
         // spatial analysis
         std::vector<PassengerFlow::PersonTrajectory> v_trajs;
         convert_msg_to_trajs(trajectories, v_trajs);
-        RCLCPP_INFO(m_impl->logger, "_process_step(): frame_num: %d, v_trajs size: %d", frame_num, v_trajs.size());
-        for (auto &traj: v_trajs) {
-            for (auto &person: traj.m_person_list) {
+        RCLCPP_DEBUG(m_impl->logger, "_process_step(): frame_num: %d, v_trajs size: %d", frame_num, v_trajs.size());
+        for (auto &traj : v_trajs) {
+            for (auto &person : traj.m_person_list) {
                 person->set_ground(m_impl->ground);
                 person->set_camera(m_impl->camera);
                 if (person->head()) {
-                    dynamic_cast<PassengerFlow::Detection*>(person->head().get())->set_camera(m_impl->camera);
+                    dynamic_cast<PassengerFlow::Detection *>(person->head().get())->set_camera(m_impl->camera);
                 }
             }
         }
         m_impl->spatial_analyzer->process_inplace(v_trajs);
-        RCLCPP_INFO(m_impl->logger, "_process_step(): spatial analysis success!");
+        RCLCPP_DEBUG(m_impl->logger, "_process_step(): spatial analysis success!");
 
         cv::Mat draw_img;
         if (frame.signal_code == SignalCode::RUN) {
@@ -501,13 +503,14 @@ void PSGCount::_process_step()
             auto tensor = get_tensor_by_v6d_id(frame.cache.id_int, m_impl->v6d_client);
             auto img = from_v6d_tensor_to_cvmat(tensor);
             draw_img = img.clone();
-        }
-        else {
+        } else {
             // black image
             draw_img = cv::Mat::zeros(1080, 1920, CV_8UC3);
         }
+
         // draw event zones
-        draw_event_zone(draw_img, m_impl->event_zones, m_impl->ground, m_impl->camera);
+        if (m_impl->visualize_flag)
+            draw_event_zone(draw_img, m_impl->event_zones, m_impl->ground, m_impl->camera);
 
         // trajectory analysis
         std::vector<PassengerFlow::TrajectoryEvent> v_traj_event;
@@ -515,28 +518,30 @@ void PSGCount::_process_step()
 
         bool has_traj = false;
 
-        for (auto &traj: v_trajs) {
+        for (auto &traj : v_trajs) {
             auto events = m_impl->trajectory_analyzer->process(traj);
 
             // test log
-            for (auto &person: traj.m_person_list) {
+            for (auto &person : traj.m_person_list) {
                 if (person->body()) {
                     PassengerFlow::POINT3 foot_position;
                     bool position_valid;
                     person->get_foot_position(&foot_position, &position_valid);
-                    RCLCPP_INFO(m_impl->logger, "_process_step(): person id: %d, person height: %lf, foot position: (%lf, %lf, %lf)",
-                                person->get_person_id(), person->get_body_height().m_body_height, foot_position.x, foot_position.y, foot_position.z);
+                    RCLCPP_DEBUG(m_impl->logger, "_process_step(): person id: %d, person height: %lf, foot position: (%lf, %lf, %lf)",
+                                 person->get_person_id(), person->get_body_height().m_body_height, foot_position.x, foot_position.y, foot_position.z);
                 }
 
                 // draw person test
-                draw_person(m_impl->camera, m_impl->ground, draw_img, person);
+                if (m_impl->visualize_flag)
+                    draw_person(m_impl->camera, m_impl->ground, draw_img, person);
                 has_traj = true;
             }
 
-            for (auto &iter: events) {
-                for (auto &event: iter.second) {
-                    RCLCPP_INFO(m_impl->logger, "_process_step(): event id: %d, id: %d, event type: %d, start time: %f, end time: %f, \
-                                event info: %s, speed_x: %f, speed_y: %f", event.m_person_id, event.m_person_id, event.m_event_type, event.m_start_time,
+            for (auto &iter : events) {
+                for (auto &event : iter.second) {
+                    RCLCPP_DEBUG(m_impl->logger, "_process_step(): event id: %d, id: %d, event type: %d, start time: %f, end time: %f, \
+                                event info: %s, speed_x: %f, speed_y: %f",
+                                 event.m_person_id, event.m_person_id, event.m_event_type, event.m_start_time,
                                  event.m_end_time, event.m_matched_trajectory.c_str(), event.m_speed.x, event.m_speed.y);
                     v_traj_event.push_back(event);
                 }
@@ -545,7 +550,8 @@ void PSGCount::_process_step()
 
         // test visualization output
         if (has_traj) {
-            cv::imwrite("/mnt/chengxiao/traj_framenum_" + std::to_string(frame.frame_num) + "_out.jpg", draw_img);
+            if (m_impl->visualize_flag)
+                cv::imwrite("/mnt/chengxiao/traj_framenum_" + std::to_string(frame.frame_num) + "_out.jpg", draw_img);
         }
 
         convert_events_to_msg(v_traj_event, msg_traj_events);

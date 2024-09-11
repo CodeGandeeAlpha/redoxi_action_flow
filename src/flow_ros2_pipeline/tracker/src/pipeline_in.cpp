@@ -192,7 +192,7 @@ void TrackerIn::_process_document_create_tasks(const MSG_PsgDocument &document, 
 
 void TrackerIn::_process_detections_create_tasks(const MSG_Detections &detections, Map_Detections_Waiting *detections_waiting_map_ptr)
 {
-    RCLCPP_INFO(m_impl->logger, "create frame %ld detections tasks for downstreams", detections.frame.frame_num);
+    RCLCPP_DEBUG(m_impl->logger, "create frame %ld detections tasks for downstreams", detections.frame.frame_num);
 
     // create tasks of this frame for all downstreams
     for (auto &x : m_model_downstreams) {
@@ -298,8 +298,8 @@ void TrackerIn::_send_detections_to_downstreams()
         auto task_response = handle.get();
         RCLCPP_INFO(m_impl->logger, "_send_detections_to_downstreams(): frame async_send_goal: %ld SUCCESS", task->detections.frame.frame_num);
         if (task_response != nullptr) {
-            RCLCPP_INFO(m_impl->logger, "_send_detections_to_downstreams(): async_send_goal: %ld task_response is %d",
-                        task->detections.frame.frame_num, task_response->get_status());
+            RCLCPP_DEBUG(m_impl->logger, "_send_detections_to_downstreams(): async_send_goal: %ld task_response is %d",
+                         task->detections.frame.frame_num, task_response->get_status());
             // accepted or executing
             if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
                 task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
@@ -310,14 +310,14 @@ void TrackerIn::_send_detections_to_downstreams()
                     (**lock_ptr_detections_task_doing)[task->goal_handle] = task;
                 }
                 tasks_to_remove.push_back(it.first);
-                RCLCPP_INFO(m_impl->logger, "_send_detections_to_downstreams(): STATUS_ACCEPTED tasks_to_remove push_back framenumber %ld", task->detections.frame.frame_num);
+                RCLCPP_DEBUG(m_impl->logger, "_send_detections_to_downstreams(): STATUS_ACCEPTED tasks_to_remove push_back framenumber %ld", task->detections.frame.frame_num);
             }
 
             // succeed
             else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
                 m_detections_task_done.push_back(task);
                 tasks_to_remove.push_back(it.first);
-                RCLCPP_INFO(m_impl->logger, "_send_detections_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %ld", task->detections.frame.frame_num);
+                RCLCPP_DEBUG(m_impl->logger, "_send_detections_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %ld", task->detections.frame.frame_num);
             }
         }
 
@@ -329,7 +329,7 @@ void TrackerIn::_send_detections_to_downstreams()
     {
         auto lock_ptr_detections_task_waiting = m_impl->sync_detections_waiting_map.synchronize();
         for (auto &it : tasks_to_remove) {
-            RCLCPP_INFO(m_impl->logger, "_send_detections_to_downstreams(): tasks_to_remove framenumber %d", std::get<1>(it));
+            RCLCPP_DEBUG(m_impl->logger, "_send_detections_to_downstreams(): tasks_to_remove framenumber %d", std::get<1>(it));
             (*lock_ptr_detections_task_waiting)->erase(it);
         }
     }
@@ -345,7 +345,7 @@ void TrackerIn::_send_detections_to_downstreams()
                     if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
                         m_detections_task_done.push_back(it.second);
                         tasks_to_remove.push_back(it.first);
-                        RCLCPP_INFO(m_impl->logger, "_send_detections_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %ld", it.second->detections.frame.frame_num);
+                        RCLCPP_DEBUG(m_impl->logger, "_send_detections_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %ld", it.second->detections.frame.frame_num);
                     }
                 }
             }

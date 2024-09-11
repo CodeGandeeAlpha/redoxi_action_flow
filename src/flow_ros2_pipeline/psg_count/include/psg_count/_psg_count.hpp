@@ -1,12 +1,12 @@
 #pragma once
 
+#include <PassengerFlow/PassengerFlow.h>
 #include <boost/thread/synchronized_value.hpp>
+#include <fstream>
 #include <memory>
+#include <psg_count/psg_count.hpp>
 #include <rcpputils/asserts.hpp>
 #include <thread>
-#include <fstream>
-#include <psg_count/psg_count.hpp>
-#include <PassengerFlow/PassengerFlow.h>
 #include <vineyard/client/client.h>
 #include <vineyard/client/ds/object_meta.h>
 
@@ -152,8 +152,8 @@ class PSGCountImpl
     }
 
     void set_scene(const SceneParameter &scene_parameter, PassengerFlow::ScenePtr &out_scene,
-                PassengerFlow::CameraModelPtr &out_camera, PassengerFlow::GroundPtr &out_ground,
-                std::map<std::string, PassengerFlow::EventZonePtr> &out_event_zones)
+                   PassengerFlow::CameraModelPtr &out_camera, PassengerFlow::GroundPtr &out_ground,
+                   std::map<std::string, PassengerFlow::EventZonePtr> &out_event_zones)
     {
         set_camera_model(scene_parameter, out_camera);
         set_ground(scene_parameter, out_ground);
@@ -186,7 +186,8 @@ class PSGCountImpl
 
     PassengerFlow::POINT get_point_on_ground_from_project_point(const PassengerFlow::CameraModelPtr &cam,
                                                                 const PassengerFlow::GroundPtr &ground,
-                                                                const PassengerFlow::POINT &point) {
+                                                                const PassengerFlow::POINT &point)
+    {
         PassengerFlow::fVECTOR_3 point_ray, point_ray_p0;
         PassengerFlow::fVECTOR_2 point_uv_vector(point.x, point.y);
         cam->ray_from_projected_points(point_uv_vector, &point_ray_p0, &point_ray);
@@ -203,7 +204,7 @@ class PSGCountImpl
     }
 
     PassengerFlow::EventZonePtr gen_event_zone(const RegionInfoPtr &region_info, const PassengerFlow::CameraModelPtr &cam,
-                                            const PassengerFlow::GroundPtr &ground)
+                                               const PassengerFlow::GroundPtr &ground)
     {
         if (region_info->m_region_type == PassengerFlow::RegionTypes::DoorInOut) {
             auto door_in_region_info = RedoxiTrack::dyncast_with_check<DoorInOutRegionInfo>(region_info.get());
@@ -224,10 +225,10 @@ class PSGCountImpl
     }
 
     PassengerFlow::EventZonePtr gen_door_in_out_zone(const DoorInOutRegionInfo *region_info, const PassengerFlow::CameraModelPtr &cam,
-                                                    const PassengerFlow::GroundPtr &ground)
+                                                     const PassengerFlow::GroundPtr &ground)
     {
         auto door_in_out_region = gen_door_in_out_region(region_info->m_door_line_pixel_points, region_info->m_door_in_pixel_point,
-                                                        region_info->m_likely_region_size, region_info->m_certain_region_size, cam, ground);
+                                                         region_info->m_likely_region_size, region_info->m_certain_region_size, cam, ground);
         auto door_in_out_region_name = region_info->m_name + " : door in out region";
         door_in_out_region->set_name(door_in_out_region_name);
 
@@ -250,12 +251,12 @@ class PSGCountImpl
         auto door_in_point_on_ground = get_point_on_ground_from_project_point(cam, ground, door_in_pixel_point);
         std::vector<PassengerFlow::POINT> door_points_on_ground{door_point1_on_ground, door_point2_on_ground};
         auto region = std::make_shared<PassengerFlow::DoorInOutRegion>(ground, door_points_on_ground,
-                                                                    door_in_point_on_ground, buffer_area_length, certainly_area_length);
+                                                                       door_in_point_on_ground, buffer_area_length, certainly_area_length);
         return region;
     }
 
     PassengerFlow::EventZonePtr gen_disappear_zone(const DisappearRegionInfo *region_info, const PassengerFlow::CameraModelPtr &cam,
-                                                const PassengerFlow::GroundPtr &ground)
+                                                   const PassengerFlow::GroundPtr &ground)
     {
         auto door_point1_uv = region_info->m_door_line_pixel_points[0];
         auto door_point2_uv = region_info->m_door_line_pixel_points[1];
@@ -276,7 +277,7 @@ class PSGCountImpl
     }
 
     PassengerFlow::EventZonePtr gen_passing_zone(const PassingRegionInfo *region_info, const PassengerFlow::CameraModelPtr &cam,
-                                                const PassengerFlow::GroundPtr &ground)
+                                                 const PassengerFlow::GroundPtr &ground)
     {
 
         std::vector<PassengerFlow::POINT> region_points_on_ground;
@@ -309,5 +310,7 @@ class PSGCountImpl
     std::shared_ptr<std::thread> step_thread;
     std::shared_ptr<std::thread> process_thread;
     bool step_running = false; // for stopping the step thread
+
+    bool visualize_flag = false;
 };
 } // namespace FlowRos2Pipeline

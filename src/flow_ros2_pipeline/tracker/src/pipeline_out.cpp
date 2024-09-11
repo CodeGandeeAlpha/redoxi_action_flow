@@ -267,7 +267,7 @@ void TrackerOut::_accept_track_targets_accepted_callback(
     RCLCPP_INFO(m_impl->logger, "_accept_track_targets_accepted_callback(): Accepted frame %ld with %ld track_targets", frame.frame_num, track_targets.size());
     for (const auto &track_target : track_targets) {
         RCLCPP_DEBUG(m_impl->logger, "_accept_track_targets_accepted_callback(): Accepted track_target %s",
-                    track_target_msg_to_string(track_target).c_str());
+                     track_target_msg_to_string(track_target).c_str());
     }
 
     // add to buffer
@@ -288,7 +288,7 @@ void TrackerOut::_accept_track_targets_accepted_callback(
 void TrackerOut::_process_document_create_tasks(MSG_PsgDocument &document,
                                                 TrackerOut::Map_Document_Waiting *document_waiting_map_ptr)
 {
-    RCLCPP_INFO(m_impl->logger, "_process_document_create_tasks(): create tasks for document %ld", document.frame.frame_num);
+    RCLCPP_DEBUG(m_impl->logger, "_process_document_create_tasks(): create tasks for document %ld", document.frame.frame_num);
     // create tasks of this frame for all downstreams
     for (auto &x : m_downstreams) {
         auto task = std::make_shared<DSTask_PsgDocument>();
@@ -457,31 +457,31 @@ void TrackerOut::_add_person_to_buffer(const MSG_Person &person, std::map<Tracke
 
 void TrackerOut::_remove_document_from_buffer(int frame_number, std::map<int, TrackerOut::MSG_PsgDocument> *document_buffer_ptr)
 {
-    RCLCPP_INFO(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d", frame_number);
+    RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d", frame_number);
     // if frame_number is not in buffer, do nothing
     if (document_buffer_ptr->find(frame_number) != document_buffer_ptr->end()) {
         document_buffer_ptr->erase(frame_number);
-        RCLCPP_INFO(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d SUCCESS", frame_number);
+        RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d SUCCESS", frame_number);
     }
 }
 
 void TrackerOut::_remove_track_targets_from_buffer(int frame_number, std::map<int, TrackerOut::MSG_TrackTargets> *track_targets_buffer_ptr)
 {
-    RCLCPP_INFO(m_impl->logger, "_remove_track_targets_from_buffer(): remove track_targets with frame_num %d", frame_number);
+    RCLCPP_DEBUG(m_impl->logger, "_remove_track_targets_from_buffer(): remove track_targets with frame_num %d", frame_number);
     // if frame_number is not in buffer, do nothing
     if (track_targets_buffer_ptr->find(frame_number) != track_targets_buffer_ptr->end()) {
         track_targets_buffer_ptr->erase(frame_number);
-        RCLCPP_INFO(m_impl->logger, "_remove_track_targets_from_buffer(): remove track_targets with frame_num %d SUCCESS", frame_number);
+        RCLCPP_DEBUG(m_impl->logger, "_remove_track_targets_from_buffer(): remove track_targets with frame_num %d SUCCESS", frame_number);
     }
 }
 
 void TrackerOut::_remove_person_from_buffer(const UUID &uuid, std::map<UUID, MSG_Person> *person_buffer_ptr)
 {
-    RCLCPP_INFO(m_impl->logger, "_remove_person_from_buffer(): remove person with uuid %s", uuid_to_string(uuid).c_str());
+    RCLCPP_DEBUG(m_impl->logger, "_remove_person_from_buffer(): remove person with uuid %s", uuid_to_string(uuid).c_str());
     // if uuid is not in buffer, do nothing
     if (person_buffer_ptr->find(uuid) != person_buffer_ptr->end()) {
         person_buffer_ptr->erase(uuid);
-        RCLCPP_INFO(m_impl->logger, "_remove_person_from_buffer(): remove person with uuid %s SUCCESS", uuid_to_string(uuid).c_str());
+        RCLCPP_DEBUG(m_impl->logger, "_remove_person_from_buffer(): remove person with uuid %s SUCCESS", uuid_to_string(uuid).c_str());
     }
 }
 
@@ -507,7 +507,7 @@ void TrackerOut::_get_closed_trajectory()
 
         for (auto &track_target : track_targets) {
             // // test log
-            // RCLCPP_INFO(m_impl->logger, "_get_closed_trajectory(): track_target %s", track_target_msg_to_string(track_target).c_str());
+            // RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): track_target %s", track_target_msg_to_string(track_target).c_str());
 
             // copy track_target info to person
             {

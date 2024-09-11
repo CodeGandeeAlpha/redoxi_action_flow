@@ -26,7 +26,7 @@ class TrackEventHandler : public RedoxiTrack::TrackingEventHandler
     int evt_target_association_after(RedoxiTrack::TrackerBase *sender,
                                      const RedoxiTrack::TrackingEvent::TargetAssociation &evt_data) override
     {
-        RCLCPP_INFO(rclcpp::get_logger("tracker_node"), "evt_target_association_after()");
+        RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "evt_target_association_after()");
 
         auto &detection = evt_data.m_detection;
         auto &track_target = evt_data.m_target;
@@ -38,14 +38,14 @@ class TrackEventHandler : public RedoxiTrack::TrackingEventHandler
         // str += "bbox: Rect2f: {x: " + std::to_string(detection->get_bbox().x) + ", y: " + std::to_string(detection->get_bbox().y) + ", w: " + std::to_string(detection->get_bbox().width) + ", h: " + std::to_string(detection->get_bbox().height) + "}\n";
         // str += "confidence: " + std::to_string(detection->get_confidence()) + "\n";
         // str += "}";
-        // RCLCPP_INFO(rclcpp::get_logger("tracker_node"), "evt_target_association_after(): %s", str.c_str());
+        // RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "evt_target_association_after(): %s", str.c_str());
 
         std::string str2 = "TrackTarget: {\n";
         str2 += "track_id: " + std::to_string(track_target->get_path_id()) + "\n";
         str2 += "track_status: " + std::to_string(track_target->get_path_state()) + "\n";
         str2 += "track_bbox: Rect2f: {x: " + std::to_string(track_target->get_bbox().x) + ", y: " + std::to_string(track_target->get_bbox().y) + ", w: " + std::to_string(track_target->get_bbox().width) + ", h: " + std::to_string(track_target->get_bbox().height) + "}\n";
         str2 += "}";
-        RCLCPP_INFO(rclcpp::get_logger("tracker_node"), "evt_target_association_after(): %s", str2.c_str());
+        RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "evt_target_association_after(): %s", str2.c_str());
 
         m_det2target_associate[evt_data.m_detection] = evt_data.m_target;
         return 0;
@@ -65,7 +65,7 @@ class TrackEventHandler : public RedoxiTrack::TrackingEventHandler
     int evt_target_created_after(RedoxiTrack::TrackerBase *sender,
                                  const RedoxiTrack::TrackingEvent::TargetAssociation &evt_data) override
     {
-        RCLCPP_INFO(rclcpp::get_logger("tracker_node"), "evt_target_created_after()");
+        RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "evt_target_created_after()");
 
         auto &detection = evt_data.m_detection;
         auto &track_target = evt_data.m_target;
@@ -77,17 +77,17 @@ class TrackEventHandler : public RedoxiTrack::TrackingEventHandler
         // str += "bbox: Rect2f: {x: " + std::to_string(detection->get_bbox().x) + ", y: " + std::to_string(detection->get_bbox().y) + ", w: " + std::to_string(detection->get_bbox().width) + ", h: " + std::to_string(detection->get_bbox().height) + "}\n";
         // str += "confidence: " + std::to_string(detection->get_confidence()) + "\n";
         // str += "}";
-        // RCLCPP_INFO(rclcpp::get_logger("tracker_node"), "evt_target_created_after(): %s", str.c_str());
+        // RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "evt_target_created_after(): %s", str.c_str());
 
         std::string str2 = "TrackTarget: {\n";
         str2 += "track_id: " + std::to_string(track_target->get_path_id()) + "\n";
         str2 += "track_status: " + std::to_string(track_target->get_path_state()) + "\n";
         str2 += "track_bbox: Rect2f: {x: " + std::to_string(track_target->get_bbox().x) + ", y: " + std::to_string(track_target->get_bbox().y) + ", w: " + std::to_string(track_target->get_bbox().width) + ", h: " + std::to_string(track_target->get_bbox().height) + "}\n";
         str2 += "}";
-        RCLCPP_INFO(rclcpp::get_logger("tracker_node"), "evt_target_created_after(): %s", str2.c_str());
+        RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "evt_target_created_after(): %s", str2.c_str());
 
         m_det2target_create[evt_data.m_detection] = evt_data.m_target;
-        RCLCPP_INFO(rclcpp::get_logger("tracker_node"), "evt_target_created_after(): m_det2target_create.size() = %ld", m_det2target_create.size());
+        RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "evt_target_created_after(): m_det2target_create.size() = %ld", m_det2target_create.size());
         return 0;
     }
 
@@ -351,5 +351,7 @@ class TrackerImpl
     std::shared_ptr<std::thread> step_thread;
     std::shared_ptr<std::thread> process_thread;
     bool step_running = false; // for stopping the step thread
+
+    bool visualize_flag = false;
 };
 } // namespace FlowRos2Pipeline
