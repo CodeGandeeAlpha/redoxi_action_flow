@@ -9,8 +9,8 @@ void PSGCountInitConfig::from_parameters(PSGCount *node)
     passengerflow_config_path = node->get_parameter("passengerflow_config_path").as_string();
 
     const auto &logger = node->get_logger();
-    RCLCPP_INFO(logger, "process_document_action: %s", this->process_document_action.c_str());
-    RCLCPP_INFO(logger, "passengerflow_config_path: %s", this->passengerflow_config_path.c_str());
+    // RCLCPP_INFO(logger, "process_document_action: %s", this->process_document_action.c_str());
+    // RCLCPP_INFO(logger, "passengerflow_config_path: %s", this->passengerflow_config_path.c_str());
 }
 
 void PSGCountRuntimeConfig::from_parameters(PSGCount *node)
@@ -19,7 +19,7 @@ void PSGCountRuntimeConfig::from_parameters(PSGCount *node)
     timeout_ms_send_to_downstream = node->get_parameter("timeout_ms_send_to_downstream").as_double();
 
     const auto &logger = node->get_logger();
-    RCLCPP_INFO(logger, "step_interval_ms: %lf", this->step_interval_ms);
-    RCLCPP_INFO(logger, "timeout_ms_send_to_downstream: %lf", this->timeout_ms_send_to_downstream);
+    // RCLCPP_INFO(logger, "step_interval_ms: %lf", this->step_interval_ms);
+    // RCLCPP_INFO(logger, "timeout_ms_send_to_downstream: %lf", this->timeout_ms_send_to_downstream);
 }
 } // namespace FlowRos2Pipeline

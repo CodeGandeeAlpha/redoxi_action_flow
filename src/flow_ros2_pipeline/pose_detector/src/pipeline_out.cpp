@@ -26,7 +26,7 @@ PoseDetectorOut::PoseDetectorOut()
     m_impl->sync_bodyposes_buffer = &m_bodyposes_buffer;
 
 
-    RCLCPP_INFO(m_impl->logger, "constraction success!");
+    // RCLCPP_INFO(m_impl->logger, "constraction success!");
 }
 
 int PoseDetectorOut::init(const std::shared_ptr<InitConfig> &config,
@@ -62,9 +62,7 @@ int PoseDetectorOut::init(const std::shared_ptr<InitConfig> &config,
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::INITIALIZED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -97,9 +95,7 @@ int PoseDetectorOut::start()
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::STARTED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
 
     m_impl->step_running = true;
     m_impl->step_thread = std::make_shared<std::thread>(
@@ -128,9 +124,7 @@ int PoseDetectorOut::stop()
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::STOPPED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -145,7 +139,7 @@ rclcpp_action::GoalResponse PoseDetectorOut::_accept_document_goal_callback(
     const rclcpp_action::GoalUUID &uuid,
     std::shared_ptr<const ACT_AcceptDocument::Goal> goal)
 {
-    RCLCPP_INFO(m_impl->logger, "Received goal request with psg document %ld", goal->document.frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "Received goal request with psg document %ld", goal->document.frame.frame_num);
     (void)uuid; // not used
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
@@ -153,7 +147,7 @@ rclcpp_action::GoalResponse PoseDetectorOut::_accept_document_goal_callback(
 rclcpp_action::CancelResponse PoseDetectorOut::_accept_document_cancel_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle)
 {
-    RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
+    // RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
     (void)goal_handle; // not used
     return rclcpp_action::CancelResponse::REJECT;
 }
@@ -172,8 +166,8 @@ void PoseDetectorOut::_accept_document_accepted_callback(
         auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
         _add_document_to_buffer(document, *lock_ptr_document_buffer);
 
-        RCLCPP_INFO(m_impl->logger, "Accepted document %ld with UUID %s and add it to buffer",
-                    document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
+        // RCLCPP_INFO(m_impl->logger, "Accepted document %ld with UUID %s and add it to buffer",
+        // document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
     }
 
     auto result = std::make_shared<ACT_AcceptDocument::Result>();
@@ -186,7 +180,7 @@ rclcpp_action::GoalResponse PoseDetectorOut::_accept_bodyposes_goal_callback(
     const rclcpp_action::GoalUUID &uuid,
     std::shared_ptr<const ACT_AcceptBodyposes::Goal> goal)
 {
-    RCLCPP_INFO(m_impl->logger, "Received goal request with bodyposes with frame_num %ld", goal->frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "Received goal request with bodyposes with frame_num %ld", goal->frame.frame_num);
     (void)uuid; // not used
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
@@ -194,7 +188,7 @@ rclcpp_action::GoalResponse PoseDetectorOut::_accept_bodyposes_goal_callback(
 rclcpp_action::CancelResponse PoseDetectorOut::_accept_bodyposes_cancel_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptBodyposes>> goal_handle)
 {
-    RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
+    // RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
     (void)goal_handle; // not used
     return rclcpp_action::CancelResponse::REJECT;
 }
@@ -215,7 +209,7 @@ void PoseDetectorOut::_accept_bodyposes_accepted_callback(
         _add_bodyposes_to_buffer(body_poses, frame.frame_num, *lock_ptr_bodyposes_buffer);
     }
 
-    RCLCPP_INFO(m_impl->logger, "_accept_bodyposes_accepted_callback(): Accepted frame_number %ld and add it to buffer", frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "_accept_bodyposes_accepted_callback(): Accepted frame_number %ld and add it to buffer", frame.frame_num);
 
     auto result = std::make_shared<ACT_AcceptBodyposes::Result>();
     result->return_msg = "Bodyposes accepted";
@@ -227,7 +221,7 @@ void PoseDetectorOut::_accept_bodyposes_accepted_callback(
 void PoseDetectorOut::_process_document_create_tasks(const MSG_PsgDocument &document,
                                                      PoseDetectorOut::Map_Document_Waiting *document_waiting_map_ptr)
 {
-    RCLCPP_INFO(m_impl->logger, "_process_document_create_tasks(): create tasks for document %ld", document.frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "_process_document_create_tasks(): create tasks for document %ld", document.frame.frame_num);
 
     // create tasks of this frame for all downstreams
     for (auto &x : m_downstreams) {
@@ -253,7 +247,7 @@ void PoseDetectorOut::_connect_to_downstreams()
 
     for (auto it : m_init_config->downstreams) {
         auto ds = std::make_shared<Downstream>();
-        RCLCPP_INFO(m_impl->logger, "connecting to pipeline downstream %s", it.first.c_str());
+        // RCLCPP_INFO(m_impl->logger, "connecting to pipeline downstream %s", it.first.c_str());
 
         // 创建downstream
         {
@@ -269,9 +263,9 @@ void PoseDetectorOut::_connect_to_downstreams()
             //         std::bind(&PoseDetectorOut::process_document_result_callback, this, std::placeholders::_1);
 
             // wait until the action server is ready
-            RCLCPP_INFO(m_impl->logger, "waiting for pipeline action server %s", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "waiting for pipeline action server %s", name.c_str());
             client->wait_for_action_server();
-            RCLCPP_INFO(m_impl->logger, "pipeline action server %s is ready", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "pipeline action server %s is ready", name.c_str());
         }
 
         m_downstreams[it.first] = ds;
@@ -294,6 +288,10 @@ void PoseDetectorOut::_send_document_to_downstreams()
         auto &task = it.second;
         ACT_AcceptDocument::Goal goal;
         goal.document = task->document;
+
+        // time log
+        RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal.document.frame.frame_num, "pose_detector", "OUT", this->now().nanoseconds());
+
         auto ds = task->downstream;
         auto handle = task->downstream->accept_document->async_send_goal(goal, ds->accept_document_options);
 
@@ -392,21 +390,21 @@ void PoseDetectorOut::_add_bodyposes_to_buffer(const MSG_Bodyposes &bodyposes, c
 
 void PoseDetectorOut::_remove_document_from_buffer(int frame_number, std::map<int, PoseDetectorOut::MSG_PsgDocument> *document_buffer_ptr)
 {
-    RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d", frame_number);
+    // RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d", frame_number);
     // if frame_number is not in buffer, do nothing
     if (document_buffer_ptr->find(frame_number) != document_buffer_ptr->end()) {
         document_buffer_ptr->erase(frame_number);
-        RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d SUCCESS", frame_number);
+        // RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d SUCCESS", frame_number);
     }
 }
 
 void PoseDetectorOut::_remove_bodyposes_from_buffer(int frame_number, std::map<int, PoseDetectorOut::MSG_Bodyposes> *bodyposes_buffer_ptr)
 {
-    RCLCPP_DEBUG(m_impl->logger, "_remove_bodyposes_from_buffer(): remove bodyposes with frame_num %d", frame_number);
+    // RCLCPP_DEBUG(m_impl->logger, "_remove_bodyposes_from_buffer(): remove bodyposes with frame_num %d", frame_number);
     // if frame_number is not in buffer, do nothing
     if (bodyposes_buffer_ptr->find(frame_number) != bodyposes_buffer_ptr->end()) {
         bodyposes_buffer_ptr->erase(frame_number);
-        RCLCPP_DEBUG(m_impl->logger, "_remove_bodyposes_from_buffer(): remove bodyposes with frame_num %d SUCCESS", frame_number);
+        // RCLCPP_DEBUG(m_impl->logger, "_remove_bodyposes_from_buffer(): remove bodyposes with frame_num %d SUCCESS", frame_number);
     }
 }
 
@@ -431,7 +429,7 @@ void PoseDetectorOut::_merge_bodyposes_and_documents()
             auto lock_ptr_bodyposes_buffer = m_impl->sync_bodyposes_buffer.synchronize();
             // // test
             // for (auto const &it : (**lock_ptr_bodyposes_buffer)) {
-            //     RCLCPP_INFO(m_impl->logger, "_merge_bodyposes_and_documents(): bodyposes_buffer frame_num %d", it.first);
+            //     //RCLCPP_INFO(m_impl->logger, "_merge_bodyposes_and_documents(): bodyposes_buffer frame_num %d", it.first);
             // }
 
             if ((*lock_ptr_bodyposes_buffer)->find(frame_num) != (*lock_ptr_bodyposes_buffer)->end()) {
@@ -444,8 +442,8 @@ void PoseDetectorOut::_merge_bodyposes_and_documents()
             continue;
         }
 
-        RCLCPP_DEBUG(m_impl->logger, "_merge_bodyposes_and_documents(): for frame %d", frame_num);
-        RCLCPP_DEBUG(m_impl->logger, "_merge_bodyposes_and_documents(): _merge framenum %ld document and bodyposes", document.frame.frame_num);
+        // RCLCPP_DEBUG(m_impl->logger, "_merge_bodyposes_and_documents(): for frame %d", frame_num);
+        // RCLCPP_DEBUG(m_impl->logger, "_merge_bodyposes_and_documents(): _merge framenum %ld document and bodyposes", document.frame.frame_num);
 
         // after bodypose in buffer, if signal code is FLUSH OR TERMINATE
         if (document.signal_code == SignalCode::FLUSH || document.signal_code == SignalCode::TERMINATE) {
@@ -471,7 +469,7 @@ void PoseDetectorOut::_merge_bodyposes_and_documents()
 
 
         // merge bodyposes and document's persons
-        bool is_merged = false;
+        // bool is_merged = false;
         for (auto &bodypose : bodyposes) {
             // find the corresponding persons
             auto &persons = document.persons;
@@ -479,14 +477,15 @@ void PoseDetectorOut::_merge_bodyposes_and_documents()
                 if (bodypose.uuid == person.uuid) {
                     // merge bodypose and person
                     person.pose = bodypose;
-                    is_merged = true;
-                    // RCLCPP_INFO(m_impl->logger, "_merge_bodyposes_and_documents(): merged bodypose and person with uuid %s", uuid_to_string(person.uuid.uuid).c_str());
+                    // is_merged = true;
+                    // //RCLCPP_INFO(m_impl->logger, "_merge_bodyposes_and_documents(): merged bodypose and person with uuid %s", uuid_to_string(person.uuid.uuid).c_str());
                     break;
                 }
             }
         }
 
-        if (is_merged) {
+        // if (is_merged)
+        {
             // create task for document
             {
                 auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();

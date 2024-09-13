@@ -108,7 +108,7 @@ PSGCount::PSGCount()
     m_impl->sync_document_doing_map = &m_psgdoc_task_doing;
     m_impl->sync_documents_map = &m_documents_buffer;
 
-    RCLCPP_INFO(m_impl->logger, "constraction success!");
+    // RCLCPP_INFO(m_impl->logger, "constraction success!");
 }
 
 int PSGCount::init(const std::shared_ptr<InitConfig> &config,
@@ -151,9 +151,7 @@ int PSGCount::init(const std::shared_ptr<InitConfig> &config,
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::INITIALIZED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -186,9 +184,7 @@ int PSGCount::start()
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::STARTED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
 
     m_impl->step_running = true;
     m_impl->step_thread = std::make_shared<std::thread>(
@@ -202,7 +198,10 @@ int PSGCount::start()
     m_impl->process_thread = std::make_shared<std::thread>(
         [this]() {
             while (rclcpp::ok() && m_impl->step_running) {
-                _process_step();
+                auto process_doc_size = _process_step();
+                if (process_doc_size == 0) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+                }
             }
         });
 
@@ -234,9 +233,7 @@ int PSGCount::stop()
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::STOPPED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -251,7 +248,7 @@ rclcpp_action::GoalResponse PSGCount::_accept_document_goal_callback(
     const rclcpp_action::GoalUUID &uuid,
     std::shared_ptr<const ACT_AcceptDocument::Goal> goal)
 {
-    RCLCPP_INFO(m_impl->logger, "Received goal request with psg document %ld", goal->document.frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "Received goal request with psg document %ld", goal->document.frame.frame_num);
     (void)uuid; // not used
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
@@ -259,7 +256,7 @@ rclcpp_action::GoalResponse PSGCount::_accept_document_goal_callback(
 rclcpp_action::CancelResponse PSGCount::_accept_document_cancel_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle)
 {
-    RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
+    // RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
     (void)goal_handle; // not used
     return rclcpp_action::CancelResponse::REJECT;
 }
@@ -270,6 +267,9 @@ void PSGCount::_accept_document_accepted_callback(
 
     const auto &goal = goal_handle->get_goal();
 
+    // time log
+    RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal->document.frame.frame_num, "psg_count", "IN", this->now().nanoseconds());
+
     // cache the document, copy it for modify it
     auto document = goal->document;
 
@@ -279,14 +279,14 @@ void PSGCount::_accept_document_accepted_callback(
         _add_document_to_buffer(document, *lock_ptr_documents_map);
     }
 
-    RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): Accepted frame_number %ld and add it to buffer", document.frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): Accepted frame_number %ld and add it to buffer", document.frame.frame_num);
 
     auto result = std::make_shared<ACT_AcceptDocument::Result>();
     result->return_msg = "Document accepted";
     result->return_code = ReturnCode::SUCCESS;
     goal_handle->succeed(result);
 
-    RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): return client success in frame_number %ld", document.frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): return client success in frame_number %ld", document.frame.frame_num);
 }
 
 
@@ -309,11 +309,11 @@ void PSGCount::_add_document_to_buffer(const MSG_PsgDocument &document, Map_Docu
 
 void PSGCount::_remove_document_from_buffer(int frame_number, Map_Documents *document_buffer_ptr)
 {
-    RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d", frame_number);
+    // RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d", frame_number);
     // if frame_number is not in buffer, do nothing
     if (document_buffer_ptr->find(frame_number) != document_buffer_ptr->end()) {
         document_buffer_ptr->erase(frame_number);
-        RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d SUCCESS", frame_number);
+        // RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d SUCCESS", frame_number);
     }
 }
 
@@ -330,7 +330,7 @@ void PSGCount::_connect_to_downstreams()
 
     for (auto it : m_init_config->pipeline_downstreams) {
         auto ds = std::make_shared<DownstreamPipeline>();
-        RCLCPP_INFO(m_impl->logger, "connecting to pipeline downstream %s", it.first.c_str());
+        // RCLCPP_INFO(m_impl->logger, "connecting to pipeline downstream %s", it.first.c_str());
 
         // create pipeline downstream
         {
@@ -346,9 +346,9 @@ void PSGCount::_connect_to_downstreams()
             //         std::bind(&PSGCount::process_document_result_callback, this, std::placeholders::_1);
 
             // wait until the action server is ready
-            RCLCPP_INFO(m_impl->logger, "waiting for pipeline action server %s", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "waiting for pipeline action server %s", name.c_str());
             client->wait_for_action_server();
-            RCLCPP_INFO(m_impl->logger, "pipeline action server %s is ready", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "pipeline action server %s is ready", name.c_str());
         }
 
         m_pipeline_downstreams[it.first] = ds;
@@ -373,17 +373,20 @@ void PSGCount::_send_document_to_downstreams()
         ACT_AcceptDocument::Goal goal;
         goal.document = task->document;
 
+        // time log
+        RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal.document.frame.frame_num, "psg_count", "OUT", this->now().nanoseconds());
+
         auto ds = task->downstream;
         auto handle = task->downstream->accept_document->async_send_goal(goal, ds->accept_document_options);
 
-        RCLCPP_INFO(m_impl->logger, "[Request Send]framenum: %ld document", goal.document.frame.frame_num);
+        // RCLCPP_INFO(m_impl->logger, "[Request Send]framenum: %ld document", goal.document.frame.frame_num);
 
         // FIXME: add timeout condition
         auto task_response = handle.get();
-        RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): frame async_send_goal: %ld SUCCESS", task->document.frame.frame_num);
+        // RCLCPP_INFO(m_impl->logger, "_send_document_to_downstreams(): frame async_send_goal: %ld SUCCESS", task->document.frame.frame_num);
         if (task_response != nullptr) {
-            RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): async_send_goal: %ld task_response is %d",
-                         task->document.frame.frame_num, task_response->get_status());
+            // RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): async_send_goal: %ld task_response is %d",
+            //              task->document.frame.frame_num, task_response->get_status());
             // accepted or executing
             if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
                 task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
@@ -394,14 +397,14 @@ void PSGCount::_send_document_to_downstreams()
                     (**lock_ptr_psg_document_task_doing)[task->goal_handle] = task;
                 }
                 tasks_to_remove.push_back(it.first);
-                RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_ACCEPTED tasks_to_remove push_back framenumber %ld", task->document.frame.frame_num);
+                // RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_ACCEPTED tasks_to_remove push_back framenumber %ld", task->document.frame.frame_num);
             }
 
             // succeed
             else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
                 m_psgdoc_task_done.push_back(task);
                 tasks_to_remove.push_back(it.first);
-                RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %ld", task->document.frame.frame_num);
+                // RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %ld", task->document.frame.frame_num);
             }
         }
 
@@ -413,7 +416,7 @@ void PSGCount::_send_document_to_downstreams()
     {
         auto lock_ptr_psg_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
         for (auto &it : tasks_to_remove) {
-            RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): tasks_to_remove framenumber %d", std::get<1>(it));
+            // RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): tasks_to_remove framenumber %d", std::get<1>(it));
             (*lock_ptr_psg_document_task_waiting)->erase(it);
         }
     }
@@ -429,7 +432,7 @@ void PSGCount::_send_document_to_downstreams()
                     if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
                         m_psgdoc_task_done.push_back(it.second);
                         tasks_to_remove.push_back(it.first);
-                        RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %ld", it.second->document.frame.frame_num);
+                        // RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %ld", it.second->document.frame.frame_num);
                     }
                 }
             }
@@ -454,7 +457,7 @@ void PSGCount::_declare_all_parameters()
 }
 
 
-void PSGCount::_process_step()
+size_t PSGCount::_process_step()
 {
     std::vector<std::pair<int, MSG_PsgDocument>> documents_;
     {
@@ -465,9 +468,9 @@ void PSGCount::_process_step()
             if (frame_num == m_waiting_frame_number || frame_num == INT_MAX) {
                 m_waiting_frame_number++;
                 documents_.push_back(it);
-                RCLCPP_DEBUG(m_impl->logger, "_process_step(): framenum %d document push_back to documents_", it.first);
+                // RCLCPP_DEBUG(m_impl->logger, "_process_step(): framenum %d document push_back to documents_", it.first);
             } else {
-                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+                // std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
                 break;
             }
         }
@@ -484,7 +487,7 @@ void PSGCount::_process_step()
         // spatial analysis
         std::vector<PassengerFlow::PersonTrajectory> v_trajs;
         convert_msg_to_trajs(trajectories, v_trajs);
-        RCLCPP_DEBUG(m_impl->logger, "_process_step(): frame_num: %d, v_trajs size: %d", frame_num, v_trajs.size());
+        // RCLCPP_DEBUG(m_impl->logger, "_process_step(): frame_num: %d, v_trajs size: %d", frame_num, v_trajs.size());
         for (auto &traj : v_trajs) {
             for (auto &person : traj.m_person_list) {
                 person->set_ground(m_impl->ground);
@@ -495,7 +498,7 @@ void PSGCount::_process_step()
             }
         }
         m_impl->spatial_analyzer->process_inplace(v_trajs);
-        RCLCPP_DEBUG(m_impl->logger, "_process_step(): spatial analysis success!");
+        // RCLCPP_DEBUG(m_impl->logger, "_process_step(): spatial analysis success!");
 
         cv::Mat draw_img;
         if (frame.signal_code == SignalCode::RUN) {
@@ -527,8 +530,8 @@ void PSGCount::_process_step()
                     PassengerFlow::POINT3 foot_position;
                     bool position_valid;
                     person->get_foot_position(&foot_position, &position_valid);
-                    RCLCPP_DEBUG(m_impl->logger, "_process_step(): person id: %d, person height: %lf, foot position: (%lf, %lf, %lf)",
-                                 person->get_person_id(), person->get_body_height().m_body_height, foot_position.x, foot_position.y, foot_position.z);
+                    // RCLCPP_DEBUG(m_impl->logger, "_process_step(): person id: %d, person height: %lf, foot position: (%lf, %lf, %lf)",
+                    //              person->get_person_id(), person->get_body_height().m_body_height, foot_position.x, foot_position.y, foot_position.z);
                 }
 
                 // draw person test
@@ -539,10 +542,10 @@ void PSGCount::_process_step()
 
             for (auto &iter : events) {
                 for (auto &event : iter.second) {
-                    RCLCPP_DEBUG(m_impl->logger, "_process_step(): event id: %d, id: %d, event type: %d, start time: %f, end time: %f, \
-                                event info: %s, speed_x: %f, speed_y: %f",
-                                 event.m_person_id, event.m_person_id, event.m_event_type, event.m_start_time,
-                                 event.m_end_time, event.m_matched_trajectory.c_str(), event.m_speed.x, event.m_speed.y);
+                    // RCLCPP_DEBUG(m_impl->logger, "_process_step(): event id: %d, id: %d, event type: %d, start time: %f, end time: %f, \
+                    //             event info: %s, speed_x: %f, speed_y: %f",
+                    //              event.m_person_id, event.m_person_id, event.m_event_type, event.m_start_time,
+                    //              event.m_end_time, event.m_matched_trajectory.c_str(), event.m_speed.x, event.m_speed.y);
                     v_traj_event.push_back(event);
                 }
             }
@@ -568,5 +571,7 @@ void PSGCount::_process_step()
             _remove_document_from_buffer(frame_num, *lock_ptr_documents_map);
         }
     }
+
+    return documents_.size();
 }
 } // namespace FlowRos2Pipeline

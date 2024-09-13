@@ -9,8 +9,8 @@ void PoseDetectorOutInitConfig::from_parameters(PoseDetectorOut *node)
     process_bodyposes_action = node->get_parameter("process_bodyposes_action").as_string();
 
     const auto &logger = node->get_logger();
-    RCLCPP_INFO(logger, "process_document_action: %s", this->process_document_action.c_str());
-    RCLCPP_INFO(logger, "process_bodyposes_action: %s", this->process_bodyposes_action.c_str());
+    // RCLCPP_INFO(logger, "process_document_action: %s", this->process_document_action.c_str());
+    // RCLCPP_INFO(logger, "process_bodyposes_action: %s", this->process_bodyposes_action.c_str());
 }
 
 void PoseDetectorOutRuntimeConfig::from_parameters(PoseDetectorOut *node)
@@ -19,7 +19,7 @@ void PoseDetectorOutRuntimeConfig::from_parameters(PoseDetectorOut *node)
     timeout_ms_send_to_downstream = node->get_parameter("timeout_ms_send_to_downstream").as_double();
 
     const auto &logger = node->get_logger();
-    RCLCPP_INFO(logger, "step_interval_ms: %lf", this->step_interval_ms);
-    RCLCPP_INFO(logger, "timeout_ms_send_to_downstream: %lf", this->timeout_ms_send_to_downstream);
+    // RCLCPP_INFO(logger, "step_interval_ms: %lf", this->step_interval_ms);
+    // RCLCPP_INFO(logger, "timeout_ms_send_to_downstream: %lf", this->timeout_ms_send_to_downstream);
 }
 } // namespace FlowRos2Pipeline

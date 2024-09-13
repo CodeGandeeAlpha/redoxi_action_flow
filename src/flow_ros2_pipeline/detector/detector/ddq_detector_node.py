@@ -19,7 +19,7 @@ from psg_actions.action import ProcessDetections, ProcessFrame
 from psg_public_msgs.msg import Frame
 from psg_public_msgs.msg import Detections, Detection
 from psg_common.interfaces import IOpenCloseProtocol
-from psg_common.constants import NodeStatusCode, ReturnCode, SignalCode
+from psg_common.constants import NodeStatusCode, ReturnCode, SignalCode, DefaultWaitForGoalDoneIntervalMs
 from psg_common.utilities import create_v6d_client, get_img_by_v6d_id
 
 from detector.ddq_detector import DdqDetrDetector
@@ -104,8 +104,8 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self._log = self.get_logger().info
 
         # test only
-        self._visialize_flag = False
-        if self._visialize_flag:
+        self._visualize_flag = True
+        if self._visualize_flag:
             self._out_video = cv2.VideoWriter('/mnt/chengxiao/detector_test_out.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30, (1920, 1080))
         self._start_time = None
         self._end_time = None
@@ -259,7 +259,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
         assert self.m_status_code == NodeStatusCode.OPENED or self.m_status_code == NodeStatusCode.STOPPED, \
             "cannot close because status code is not OPENED or STOPPED"
 
-        if self._visialize_flag:
+        if self._visualize_flag:
             self._out_video.release()
             self.m_logger.debug(f"close(): test out video released")
 
@@ -380,7 +380,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         frame = goal_handle.request.frame
         uuid = goal_handle.request.detections_uuid
-        self.m_logger.info(f'_accept_frame_accepted_callback(): frame_num: {frame.frame_num}, detections_uuid: {pyuuid.UUID(bytes=bytes(uuid.uuid))}')
+        # self.m_logger.info(f'_accept_frame_accepted_callback(): frame_num: {frame.frame_num}, detections_uuid: {pyuuid.UUID(bytes=bytes(uuid.uuid))}')
 
         # # add to frame buffer
         # self._add_frame_to_buffer(frame, uuid)
@@ -414,7 +414,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
             self.m_logger.debug('_send_goal(): waiting for response...')
             while not self._send_goal_future.done():
                 self.m_logger.debug('_send_goal(): waiting...')
-                time.sleep(0.1)
+                time.sleep(DefaultWaitForGoalDoneIntervalMs / 1000)
 
             goal_handle = self._send_goal_future.result()
             if not goal_handle.accepted:
@@ -427,25 +427,24 @@ class DetectorNode(Node, IOpenCloseProtocol):
             self.m_logger.debug('_send_goal(): Result: {0}'.format(result.return_msg))
 
 
-    def _visialize(self, goal: ProcessDetections.Goal):
+    def _visualize(self, goal: ProcessDetections.Goal):
         detections = goal.detections
         frame = detections.frame
         img = self._get_frame_from_v6d(frame)
-        if self._visialize_flag:
-            img = np.copy(img)  # make a copy to avoid modifying the original image
-            self.m_logger.debug(f"_visialize(): frame {frame.frame_num} img shape {img.shape}")
-            for det in detections.detections:
-                x, y, w, h = int(det.bbox.x), int(det.bbox.y), int(det.bbox.width), int(det.bbox.height)
-                if det.category == 0:
-                    cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                if det.category == 1:
-                    cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
-            self._out_video.write(img)
+        img = np.copy(img)  # make a copy to avoid modifying the original image
+        self.m_logger.debug(f"_visualize(): frame {frame.frame_num} img shape {img.shape}")
+        for det in detections.detections:
+            x, y, w, h = int(det.bbox.x), int(det.bbox.y), int(det.bbox.width), int(det.bbox.height)
+            if det.category == 0:
+                cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+            if det.category == 1:
+                cv2.rectangle(img, (x, y), (x+w, y+h), (0, 0, 255), 2)
+        self._out_video.write(img)
 
-            # for test only
-            if frame.frame_num == 172:
-                self._out_video.release()
-                self.m_logger.debug(f"_visialize(): test out video released")
+            # # for test only
+            # if frame.frame_num == 200:
+            #     self._out_video.release()
+            #     self.m_logger.debug(f"_visualize(): test out video released")
 
 
     def _merge_detections(self):
@@ -510,8 +509,11 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 self._send_goal(goal_msg)
                 self.m_logger.debug(f"_step(): sent to downstream {pyuuid.UUID(bytes=bytes(det.uuid.uuid))}")
 
-                if det.frame.signal_code == SignalCode.RUN:
-                    self._visialize(goal_msg)  # test only
+                if self._visualize_flag:
+                    if det.frame.signal_code == SignalCode.RUN:
+                        self._visualize(goal_msg)  # test only
+                    else:
+                        self._out_video.release()
 
                 # # remove the frame from buffer
                 # self._remove_frame_from_buffer(det.frame.frame_num)
@@ -553,17 +555,12 @@ class DetectorNode(Node, IOpenCloseProtocol):
             img = self._get_frame_from_v6d(frame_msg)
             self.m_logger.debug(f"_model_step(): framenum {frame_msg.frame_num} img shape {img.shape}")
 
-            # process the image
+            # test only
             # img = torch.from_numpy(img).float().to(self.m_model_groups_data[model_group_name].group_models[model_idx].model.device).mean(dim=(0, 1))
+            # result = []
+            # process the image
             result = self.m_model_groups_data[model_group_name].group_models[model_idx].model.infer(img, pred_threshold=self.m_runtime_config.pred_score_thr)
             # time.sleep(0.001)
-
-            # for time test
-            if self._time_test:
-                torch.cuda.synchronize(model_idx)
-                self._end_time = time.time()
-                self.m_logger.info(f"Total inference time for the video: {self._end_time - self._start_time} seconds")
-                self.m_logger.info(f"Average inference time per frame: {(self._end_time - self._start_time) / (frame_msg.frame_num + 1)} seconds")
 
             # convert the result to Detections msg
             detections = self._to_detections_msg(result)

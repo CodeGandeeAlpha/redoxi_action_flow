@@ -35,7 +35,7 @@ MasterNode::MasterNode()
 
     m_memory_registry = std::make_shared<MemoryRegistry>(this);
 
-    RCLCPP_INFO(m_impl->logger, "[MasterNode] constraction success!");
+    // RCLCPP_INFO(m_impl->logger, "[MasterNode] constraction success!");
 }
 
 void MasterNode::_declare_all_parameters()
@@ -55,7 +55,7 @@ void MasterNode::_connect_to_downstreams()
     m_downstreams.clear();
     for (auto it : m_init_config->downstreams) {
         auto ds = std::make_shared<Downstream>();
-        RCLCPP_INFO(m_impl->logger, "[MasterNode] connecting to downstream %s", it.first.c_str());
+        // RCLCPP_INFO(m_impl->logger, "[MasterNode] connecting to downstream %s", it.first.c_str());
 
         // 创建accept_frame_client
         {
@@ -71,9 +71,9 @@ void MasterNode::_connect_to_downstreams()
                 std::bind(&MasterNode::_process_document_result_callback, this, std::placeholders::_1);
 
             // wait until the action server is ready
-            RCLCPP_INFO(m_impl->logger, "[MasterNode] waiting for action server %s", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "[MasterNode] waiting for action server %s", name.c_str());
             client->wait_for_action_server();
-            RCLCPP_INFO(m_impl->logger, "[MasterNode] action server %s is ready", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "[MasterNode] action server %s is ready", name.c_str());
         }
 
         m_downstreams[it.first] = ds;
@@ -105,11 +105,9 @@ int MasterNode::init(const std::shared_ptr<InitConfig> &config,
         std::bind(&MasterNode::_accept_frame_cancel_callback, this, std::placeholders::_1),
         std::bind(&MasterNode::_accept_frame_accepted_callback, this, std::placeholders::_1));
 
-
-    RCLCPP_INFO(m_impl->logger,
-                "[MasterNode] m_status_code from %d to %d!",
-                m_status_code, NodeStatusCode::INITIALIZED);
+    auto status_before = m_status_code;
     m_status_code = NodeStatusCode::INITIALIZED;
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -144,7 +142,7 @@ void MasterNode::_process_document_goal_response_callback(
     if (goal_handle->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
         // TODO: here
     } else {
-        RCLCPP_INFO(m_impl->logger, "[MasterNode] Frame rejected");
+        // RCLCPP_INFO(m_impl->logger, "[MasterNode] Frame rejected");
     }
 }
 
@@ -165,16 +163,16 @@ void MasterNode::_status_query_callback(const std::shared_ptr<SRV_StatusQuery::R
                                         std::shared_ptr<SRV_StatusQuery::Response> response)
 {
     (void)request; // not used
-    RCLCPP_DEBUG(m_impl->logger, "Received status query request");
+    // RCLCPP_DEBUG(m_impl->logger, "Received status query request");
     response->status = ReturnCode::SUCCESS;
-    RCLCPP_DEBUG(m_impl->logger, "Response status query request");
+    // RCLCPP_DEBUG(m_impl->logger, "Response status query request");
 }
 
 rclcpp_action::GoalResponse MasterNode::_accept_frame_goal_callback(
     const rclcpp_action::GoalUUID &uuid,
     std::shared_ptr<const ACT_AcceptFrame::Goal> goal)
 {
-    RCLCPP_INFO(m_impl->logger, "Received goal request with frame %ld", goal->frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "Received goal request with frame %ld", goal->frame.frame_num);
     (void)uuid; // not used
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
@@ -182,7 +180,7 @@ rclcpp_action::GoalResponse MasterNode::_accept_frame_goal_callback(
 rclcpp_action::CancelResponse MasterNode::_accept_frame_cancel_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptFrame>> goal_handle)
 {
-    RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
+    // RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
     (void)goal_handle; // not used
     return rclcpp_action::CancelResponse::REJECT;
 }
@@ -193,6 +191,9 @@ void MasterNode::_accept_frame_accepted_callback(
 
     const auto &goal = goal_handle->get_goal();
 
+    // time log
+    RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal->frame.frame_num, "master_node", "IN", this->now().nanoseconds());
+
     // cache the frame
     const auto &frame = goal->frame;
 
@@ -202,7 +203,7 @@ void MasterNode::_accept_frame_accepted_callback(
         _add_frame_to_buffer(frame, *lock_ptr_frame_buffer);
     }
 
-    RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and add it to buffer", frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and add it to buffer", frame.frame_num);
 
     // create tasks for all downstreams
     {
@@ -214,7 +215,7 @@ void MasterNode::_accept_frame_accepted_callback(
     result->return_msg = "Frame accepted";
     result->return_code = ReturnCode::SUCCESS;
     goal_handle->succeed(result);
-    RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and succeed", frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and succeed", frame.frame_num);
 }
 
 void MasterNode::_add_frame_to_buffer(const MSG_Frame &frame, std::map<int, MasterNode::MSG_Frame> *frame_buffer_ptr)
@@ -249,7 +250,7 @@ void MasterNode::_process_document_create_tasks(const MSG_Frame &frame, Map_Docu
         task->frame = frame;
         (*document_waiting_map_ptr)[std::make_tuple(task->downstream.get(), frame.frame_num)] = task;
     }
-    RCLCPP_DEBUG(m_impl->logger, "_process_document_create_tasks: %ld, end", frame.frame_num);
+    // RCLCPP_DEBUG(m_impl->logger, "_process_document_create_tasks: %ld, end", frame.frame_num);
 }
 
 int MasterNode::start()
@@ -260,9 +261,7 @@ int MasterNode::start()
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::STARTED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
 
     m_impl->step_running = true;
     m_impl->step_thread = std::make_shared<std::thread>(
@@ -291,9 +290,7 @@ int MasterNode::stop()
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::STOPPED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -314,7 +311,11 @@ void MasterNode::_step()
         ACT_AcceptDocument::Goal goal;
         goal.document.frame = task->frame;
         goal.document.signal_code = task->frame.signal_code;
-        goal.document.header.stamp = this->now();
+        auto now = this->now();
+        goal.document.header.stamp = now;
+        // time log
+        RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal.document.frame.frame_num, "master_node", "OUT", now.nanoseconds());
+
         auto ds = task->downstream;
         auto handle = task->downstream->handler->async_send_goal(goal, ds->options);
 

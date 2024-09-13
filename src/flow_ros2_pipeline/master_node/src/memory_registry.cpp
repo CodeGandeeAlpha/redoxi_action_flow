@@ -50,7 +50,7 @@ int MemoryRegistry::connect_to_v6d(const std::string &v6d_endpoint)
         RCLCPP_ERROR(m_impl->logger, "[MemoryRegistry] Failed to connect to IPCServer: %s", v6d_endpoint.c_str());
         return ReturnCode::ERROR;
     }
-    RCLCPP_INFO(m_impl->logger, "[MemoryRegistry] v6d Connected to IPCServer: %s", v6d_endpoint.c_str());
+    // RCLCPP_INFO(m_impl->logger, "[MemoryRegistry] v6d Connected to IPCServer: %s", v6d_endpoint.c_str());
     return ReturnCode::SUCCESS;
 }
 

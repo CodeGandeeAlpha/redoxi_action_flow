@@ -109,7 +109,7 @@ class PSGCount : public rclcpp::Node, public IStartStopProtocol
 
   protected:
     virtual void _step();
-    virtual void _process_step();
+    virtual size_t _process_step();
 
     // find and connect to downstreams
     virtual void _connect_to_downstreams();

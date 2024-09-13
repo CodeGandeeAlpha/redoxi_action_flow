@@ -94,7 +94,7 @@ cv::Scalar _get_color(const int id)
 
 void draw_track_targets_msg_on_img(cv::Mat &img, const Tracker::MSG_TrackTargets &targets)
 {
-    RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "draw_track_targets_msg_on_img()");
+    // RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "draw_track_targets_msg_on_img()");
     for (const auto &target : targets) {
         cv::Rect2i bbox(int(target.track_bbox.x), int(target.track_bbox.y),
                         int(target.track_bbox.width), int(target.track_bbox.height));
@@ -126,7 +126,7 @@ Tracker::Tracker()
                                       30,
                                       cv::Size(1920, 1080));
 
-    RCLCPP_INFO(m_impl->logger, "constraction success!");
+    // RCLCPP_INFO(m_impl->logger, "constraction success!");
 }
 
 int Tracker::init(const std::shared_ptr<InitConfig> &config,
@@ -157,9 +157,7 @@ int Tracker::init(const std::shared_ptr<InitConfig> &config,
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::INITIALIZED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -218,9 +216,7 @@ int Tracker::open()
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::OPENED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
 
     return ReturnCode::SUCCESS;
 }
@@ -234,9 +230,7 @@ int Tracker::start()
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::STARTED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
 
     m_impl->step_running = true;
     m_impl->step_thread = std::make_shared<std::thread>(
@@ -250,7 +244,10 @@ int Tracker::start()
     m_impl->process_thread = std::make_shared<std::thread>(
         [this]() {
             while (rclcpp::ok() && m_impl->step_running) {
-                _process_step();
+                auto process_doc_size = _process_step();
+                if (process_doc_size == 0) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+                }
             }
         });
 
@@ -278,9 +275,7 @@ int Tracker::stop()
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::STOPPED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -300,9 +295,7 @@ int Tracker::close()
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::CLOSED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
 
     return ReturnCode::SUCCESS;
 }
@@ -318,7 +311,7 @@ rclcpp_action::GoalResponse Tracker::_accept_detections_goal_callback(
     const rclcpp_action::GoalUUID &uuid,
     std::shared_ptr<const ACT_AcceptDetections::Goal> goal)
 {
-    RCLCPP_INFO(m_impl->logger, "Received goal request with detections with frame_num %ld", goal->detections.frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "Received goal request with detections with frame_num %ld", goal->detections.frame.frame_num);
     (void)uuid; // not used
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
@@ -326,7 +319,7 @@ rclcpp_action::GoalResponse Tracker::_accept_detections_goal_callback(
 rclcpp_action::CancelResponse Tracker::_accept_detections_cancel_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDetections>> goal_handle)
 {
-    RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
+    // RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
     (void)goal_handle; // not used
     return rclcpp_action::CancelResponse::REJECT;
 }
@@ -346,21 +339,21 @@ void Tracker::_accept_detections_accepted_callback(
         _add_detections_to_buffer(detections, *lock_ptr_detections_map);
     }
 
-    RCLCPP_INFO(m_impl->logger, "_accept_detections_accepted_callback(): Accepted frame_number %ld and add it to buffer", detections.frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "_accept_detections_accepted_callback(): Accepted frame_number %ld and add it to buffer", detections.frame.frame_num);
 
     auto result = std::make_shared<ACT_AcceptDetections::Result>();
     result->return_msg = "Detections accepted";
     result->return_code = ReturnCode::SUCCESS;
     goal_handle->succeed(result);
 
-    RCLCPP_INFO(m_impl->logger, "_accept_detections_accepted_callback(): return client success in frame_number %ld", detections.frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "_accept_detections_accepted_callback(): return client success in frame_number %ld", detections.frame.frame_num);
 }
 
 
 void Tracker::_process_track_targets_create_tasks(const MSG_TrackTargets &track_targets, const MSG_Frame &frame,
                                                   Map_TrackTargets_Waiting *track_targets_waiting_map_ptr)
 {
-    RCLCPP_DEBUG(m_impl->logger, "_process_track_targets_create_tasks(): create tasks for track targets %ld", frame.frame_num);
+    // RCLCPP_DEBUG(m_impl->logger, "_process_track_targets_create_tasks(): create tasks for track targets %ld", frame.frame_num);
 
     // // test log
     // for (const auto &track_target : track_targets) {
@@ -403,7 +396,7 @@ void Tracker::_step()
     _send_track_targets_to_downstreams();
 }
 
-void Tracker::_process_step()
+size_t Tracker::_process_step()
 {
     std::vector<std::pair<int, MSG_Detections>> detections_;
     {
@@ -415,7 +408,7 @@ void Tracker::_process_step()
             if (frame_num == m_waiting_frame_number || frame_num == INT_MAX) {
                 m_waiting_frame_number++;
                 detections_.push_back(it);
-                RCLCPP_DEBUG(m_impl->logger, "_process_step(): framenum %d detections push_back to detections_", it.first);
+                // RCLCPP_DEBUG(m_impl->logger, "_process_step(): framenum %d detections push_back to detections_", it.first);
                 // // test log
                 // for (const auto &detection : detections.detections) {
                 //     RCLCPP_DEBUG(m_impl->logger, "_process_step(): detection %s",
@@ -435,9 +428,16 @@ void Tracker::_process_step()
 
         auto &frame = detections.frame;
 
-        RCLCPP_DEBUG(m_impl->logger, "_process_step(): framenum %d", frame_num);
+        // RCLCPP_DEBUG(m_impl->logger, "_process_step(): framenum %d", frame_num);
 
         MSG_TrackTargets cur_track_targets;
+        // no process test only
+        // {
+        //     auto lock_ptr_track_targets_map = m_impl->sync_track_targets_map.synchronize();
+        //     _add_track_targets_to_buffer(cur_track_targets, frame, *lock_ptr_track_targets_map);
+        // }
+
+
         if (frame.signal_code == SignalCode::FLUSH || frame.signal_code == SignalCode::TERMINATE) { // last frame
             m_impl->ros_track_event_handler->clear();
             m_impl->tracker->finish_track();
@@ -460,7 +460,9 @@ void Tracker::_process_step()
                 _add_track_targets_to_buffer(cur_track_targets, frame, *lock_ptr_track_targets_map);
             }
 
-            // m_impl->out_video_writer.release();
+            if (m_impl->visualize_flag) {
+                m_impl->out_video_writer.release();
+            }
         }
 
         else {
@@ -540,18 +542,14 @@ void Tracker::_process_step()
             }
         }
 
-        if (m_impl->visualize_flag) {
-            if (frame_num == 172) {
-                m_impl->out_video_writer.release();
-            }
-        }
-
         // remove it from buffer
         {
             auto lock_ptr_detections_map = m_impl->sync_detections_map.synchronize();
             _remove_detections_from_buffer(frame_num, *lock_ptr_detections_map);
         }
     }
+
+    return detections_.size();
 }
 
 void Tracker::_connect_to_downstreams()
@@ -562,7 +560,7 @@ void Tracker::_connect_to_downstreams()
 
     for (auto it : m_init_config->pipeline_downstreams) {
         auto ds = std::make_shared<Downstream>();
-        RCLCPP_INFO(m_impl->logger, "connecting to pipeline downstream %s", it.first.c_str());
+        // RCLCPP_INFO(m_impl->logger, "connecting to pipeline downstream %s", it.first.c_str());
 
         // 创建downstream
         {
@@ -578,9 +576,9 @@ void Tracker::_connect_to_downstreams()
             //         std::bind(&Tracker::process_document_result_callback, this, std::placeholders::_1);
 
             // wait until the action server is ready
-            RCLCPP_INFO(m_impl->logger, "waiting for pipeline action server %s", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "waiting for pipeline action server %s", name.c_str());
             client->wait_for_action_server();
-            RCLCPP_INFO(m_impl->logger, "pipeline action server %s is ready", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "pipeline action server %s is ready", name.c_str());
         }
 
         m_downstreams[it.first] = ds;
@@ -714,21 +712,21 @@ void Tracker::_add_track_targets_to_buffer(const MSG_TrackTargets &track_targets
 
 void Tracker::_remove_detections_from_buffer(int frame_number, Map_Detections *detections_map_ptr)
 {
-    RCLCPP_DEBUG(m_impl->logger, "_remove_detections_from_buffer(): remove detections with frame_num %d", frame_number);
+    // RCLCPP_DEBUG(m_impl->logger, "_remove_detections_from_buffer(): remove detections with frame_num %d", frame_number);
     // if frame_number is not in buffer, do nothing
     if (detections_map_ptr->find(frame_number) != detections_map_ptr->end()) {
         detections_map_ptr->erase(frame_number);
-        RCLCPP_DEBUG(m_impl->logger, "_remove_detections_from_buffer(): remove detections with frame_num %d SUCCESS", frame_number);
+        // RCLCPP_DEBUG(m_impl->logger, "_remove_detections_from_buffer(): remove detections with frame_num %d SUCCESS", frame_number);
     }
 }
 
 void Tracker::_remove_track_targets_from_buffer(int frame_number, Map_TrackTargets *track_targets_map_ptr)
 {
-    RCLCPP_DEBUG(m_impl->logger, "_remove_track_targets_from_buffer(): remove track_targets with frame_num %d", frame_number);
+    // RCLCPP_DEBUG(m_impl->logger, "_remove_track_targets_from_buffer(): remove track_targets with frame_num %d", frame_number);
     // if frame_number is not in buffer, do nothing
     if (track_targets_map_ptr->find(frame_number) != track_targets_map_ptr->end()) {
         track_targets_map_ptr->erase(frame_number);
-        RCLCPP_DEBUG(m_impl->logger, "_remove_track_targets_from_buffer(): remove track_targets with frame_num %d SUCCESS", frame_number);
+        // RCLCPP_DEBUG(m_impl->logger, "_remove_track_targets_from_buffer(): remove track_targets with frame_num %d SUCCESS", frame_number);
     }
 }
 
@@ -740,11 +738,11 @@ void ROSTracker::init(const RedoxiTrack::TrackerBasePtr tracker_ptr, const Track
 
 void ROSTracker::begin_track(const cv::Mat &img, const Tracker::MSG_Detections &detections, int frame_number)
 {
-    RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "ROSTracker::begin_track()");
+    // RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "ROSTracker::begin_track()");
     std::vector<RedoxiTrack::DetectionPtr> det_bodies;
     std::map<RedoxiTrack::DetectionPtr, std::pair<int, Tracker::MSG_Detection>> det_bodies2msg_detections;
     _msg_dets_to_body_dets(detections, det_bodies, det_bodies2msg_detections);
-    RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "ROSTracker::begin_track() after _msg_dets_to_body_dets()");
+    // RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "ROSTracker::begin_track() after _msg_dets_to_body_dets()");
 
     // // test log
     // for (auto &det_body : det_bodies) {
@@ -753,9 +751,9 @@ void ROSTracker::begin_track(const cv::Mat &img, const Tracker::MSG_Detections &
     // }
 
     m_track_event_handler->clear();
-    RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "ROSTracker::begin_track() before m_tracker->begin_track()");
+    // RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "ROSTracker::begin_track() before m_tracker->begin_track()");
     m_tracker->begin_track(img, det_bodies, frame_number);
-    RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "ROSTracker::begin_track() after m_tracker->begin_track()");
+    // RCLCPP_DEBUG(rclcpp::get_logger("tracker_node"), "ROSTracker::begin_track() after m_tracker->begin_track()");
     for (auto &iter : m_track_event_handler->m_det2target_create) {
         auto track_det = iter.first;
         auto track_target = iter.second;

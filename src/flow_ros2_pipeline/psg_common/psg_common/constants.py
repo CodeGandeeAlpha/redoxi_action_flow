@@ -24,3 +24,4 @@ class SignalCode:
 
 DefaultTimeoutMs = 10000
 DefaultNodeStepIntervalMs = 10
+DefaultWaitForGoalDoneIntervalMs = 5

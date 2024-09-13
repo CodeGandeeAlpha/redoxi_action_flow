@@ -5,8 +5,6 @@ from rtmlib.tools.pose_estimation.post_processings import get_simcc_maximum
 import numpy as np
 from typing import List, Tuple
 
-import rclpy.logging
-
 class RTMPoseDetector(BasePoseDetector, BaseTool):
     def __init__(self):
         self.model = None

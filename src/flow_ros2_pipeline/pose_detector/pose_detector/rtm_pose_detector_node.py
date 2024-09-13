@@ -17,11 +17,12 @@ from geometry_msgs.msg import Point
 from psg_actions.action import ProcessDetections, ProcessBodyPoses
 from psg_public_msgs.msg import BodyPose, Detections
 from psg_common.interfaces import IOpenCloseProtocol
-from psg_common.constants import NodeStatusCode, ReturnCode, SignalCode
+from psg_common.constants import NodeStatusCode, ReturnCode, SignalCode, DefaultWaitForGoalDoneIntervalMs
 from psg_common.utilities import create_v6d_client, get_img_by_v6d_id
 
 from pose_detector.rtm_pose_detector import RTMPoseDetector
-from pose_detector.base_pose_detector import BasePoseDetector
+from pose_detector.base_pose_detector import BasePoseDetector, PoseDetectionResult
+import torch
 
 class PoseDetectorNode(Node, IOpenCloseProtocol):
     @define(kw_only=True)
@@ -97,12 +98,9 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         self.m_step_thread : threading.Thread = None
 
         # test only
-        self._visialize_flag = False
-        if self._visialize_flag:
+        self._visualize_flag = True
+        if self._visualize_flag:
             self._out_video = cv2.VideoWriter('/mnt/chengxiao/pose_detector_test_out.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30, (1920, 1080))
-        self._start_time = None
-        self._end_time = None
-        self._time_test = False
 
     def _func_step(self):
         while rclpy.ok() and self.m_step_running:
@@ -252,7 +250,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         assert self.m_status_code == NodeStatusCode.OPENED or self.m_status_code == NodeStatusCode.STOPPED, \
             "cannot close because status code is not OPENED or STOPPED"
 
-        if self._visialize_flag:
+        if self._visualize_flag:
             self._out_video.release()
             self.m_logger.debug(f"close(): test out video released")
 
@@ -335,11 +333,11 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
                 bodypose_msg.keypoints_2.append(kpt)
                 bodypose_msg.confidence.append(scores[i][j])
                 bodypose_msg.semantic_type.append(j)
-                bodypose_msg.uuid = uuids[i]
-                bodypose_msg.bbox.x = bboxes[i][0]
-                bodypose_msg.bbox.y = bboxes[i][1]
-                bodypose_msg.bbox.width = bboxes[i][2] - bboxes[i][0]
-                bodypose_msg.bbox.height = bboxes[i][3] - bboxes[i][1]
+            bodypose_msg.uuid = uuids[i]
+            bodypose_msg.bbox.x = bboxes[i][0]
+            bodypose_msg.bbox.y = bboxes[i][1]
+            bodypose_msg.bbox.width = bboxes[i][2] - bboxes[i][0]
+            bodypose_msg.bbox.height = bboxes[i][3] - bboxes[i][1]
             bodypose_msg.frame = frame_msg
 
             bodyposes.append(bodypose_msg)
@@ -351,7 +349,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         # just accept the frame and add it to buffer, no processing
 
         detections = goal_handle.request.detections
-        self.m_logger.info(f'_accept_detections_accepted_callback(): frame_num: {detections.frame.frame_num}')
+        # self.m_logger.info(f'_accept_detections_accepted_callback(): frame_num: {detections.frame.frame_num}')
 
         # add it to every model task queue
         self._process_detections_create_model_tasks(detections)
@@ -382,7 +380,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
             self.m_logger.debug('_send_goal(): waiting for response...')
             while not self._send_goal_future.done():
                 self.m_logger.debug('_send_goal(): waiting...')
-                time.sleep(0.01)
+                time.sleep(DefaultWaitForGoalDoneIntervalMs / 1000)
 
             goal_handle = self._send_goal_future.result()
             if not goal_handle.accepted:
@@ -395,35 +393,35 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
             self.m_logger.debug('_send_goal(): Result: {0}'.format(result.return_msg))
 
 
-    def _visialize(self, goal: ProcessBodyPoses.Goal):
+    def _visualize(self, goal: ProcessBodyPoses.Goal):
         body_poses = goal.body_poses
         frame = body_poses[0].frame
         img = self._get_frame_from_v6d(frame)
-        if self._visialize_flag:
-            img = np.copy(img)  # make a copy to avoid modifying the original image
-            # self.m_logger.info(f"_visialize(): frame {frame.frame_num} img shape {img.shape}")
-            for body_pose in body_poses:
-                bbox = body_pose.bbox
-                x, y, w, h = int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height)
-                # self.m_logger.info(f"_visialize(): frame {frame.frame_num} bbox {x} {y} {w} {h}")
-                cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
-                keypoints = body_pose.keypoints_2
-                scores = body_pose.confidence
-                for kpt in keypoints:
-                    cv2.circle(img, (int(kpt.x), int(kpt.y)), 4, (0, 255, 255), -1)
-                # # to numpy array
-                # keypoints = np.array([[kp.x, kp.y] for kp in keypoints])
-                # scores = np.array(scores)
-                # draw_skeleton(img, keypoints, scores)
+        img = np.copy(img)  # make a copy to avoid modifying the original image
+        # self.m_logger.info(f"_visualize(): frame {frame.frame_num} img shape {img.shape}")
+        for body_pose in body_poses:
+            bbox = body_pose.bbox
+            x, y, w, h = int(bbox.x), int(bbox.y), int(bbox.width), int(bbox.height)
+            # self.m_logger.info(f"_visualize(): frame {frame.frame_num} bbox {x} {y} {w} {h}")
+            cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
-            self._out_video.write(img)
-            # self.m_logger.info(f"_visialize(): frame {frame.frame_num} visualized")
+            keypoints = body_pose.keypoints_2
+            scores = body_pose.confidence
+            for kpt in keypoints:
+                cv2.circle(img, (int(kpt.x), int(kpt.y)), 4, (0, 255, 255), -1)
+            # # to numpy array
+            # keypoints = np.array([[kp.x, kp.y] for kp in keypoints])
+            # scores = np.array(scores)
+            # draw_skeleton(img, keypoints, scores)
 
-            # for test only
-            if frame.frame_num >= 172:
-                self._out_video.release()
-                self.m_logger.debug(f"_visialize(): test out video released")
+        self._out_video.write(img)
+        # self.m_logger.info(f"_visualize(): frame {frame.frame_num} visualized")
+
+            # # for test only
+            # if frame.frame_num >= 200:
+            #     self._out_video.release()
+            #     self.m_logger.debug(f"_visualize(): test out video released")
 
 
     def _merge_bodyposes(self):
@@ -486,10 +484,13 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
                 if len(bodyposes) > 0:
                     goal_msg.frame = bodyposes[0].frame
                 self._send_goal(goal_msg)
-                self.m_logger.info(f"_step(): sent to downstream {bodyposes[0].frame.frame_num}")
+                # self.m_logger.info(f"_step(): sent to downstream {bodyposes[0].frame.frame_num}")
+                if self._visualize_flag:
+                    if goal_msg.frame.signal_code == SignalCode.RUN:
+                        self._visualize(goal_msg)  # test only
 
-                if goal_msg.frame.signal_code == SignalCode.RUN:
-                    self._visialize(goal_msg)  # test only
+                    else:
+                        self._out_video.release()
 
                 # # remove the frame from buffer
                 # self._remove_frame_from_buffer(det.frame.frame_num)
@@ -510,12 +511,6 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
 
             frame_msg = detections_msg.frame
 
-            # for time test
-            if self._time_test:
-                if self._start_time is None:
-                    # cp.cuda.Device().synchronize()
-                    self._start_time = time.time()
-
             # if frame is FLUSH OR TERMINATE, send it to downstreams
             if frame_msg.signal_code == SignalCode.FLUSH or frame_msg.signal_code == SignalCode.TERMINATE:
                 bodyposes = []
@@ -531,21 +526,22 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
             img = self._get_frame_from_v6d(frame_msg)
             self.m_logger.debug(f"_model_step(): framenum {frame_msg.frame_num} img shape {img.shape}")
 
-            # process the image
-            # img = torch.from_numpy(img).float().to(self.m_model_groups_data[model_group_name].group_models[model_idx].model.device).mean(dim=(0, 1))
             bboxes, uuids = self._get_bboxes_and_uuids_from_detections(detections_msg)
+            # process the image
             result = self.m_model_groups_data[model_group_name].group_models[model_idx].model.infer(img, bboxes)
-            # time.sleep(0.001)
 
-            # for time test
-            if self._time_test:
-                # cp.cuda.Device().synchronize()
-                self._end_time = time.time()
-                self.m_logger.info(f"_model_step(): Total inference time for the video: {self._end_time - self._start_time} seconds")
-                self.m_logger.info(f"_model_step(): Average inference time per frame: {(self._end_time - self._start_time) / (frame_msg.frame_num + 1)} seconds")
+            # no process test only
+            # img = torch.from_numpy(img).float().to(self.m_model_groups_data[model_group_name].group_models[model_idx].model.device).mean(dim=(0, 1))
+
+            # time.sleep(0.001)
 
             # convert the result to BodyPose msgs list
             bodypose_msg_list = self._to_bodyposes_msg(result, frame_msg, uuids, bboxes)
+
+            # no process test only
+            # bodypose_msg = BodyPose()
+            # bodypose_msg.frame = frame_msg
+            # bodypose_msg_list = [bodypose_msg]
 
             # self.m_logger.info(f"_model_step(): framenum {frame_msg.frame_num} detections {detections}")
 

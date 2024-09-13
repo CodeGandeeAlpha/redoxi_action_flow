@@ -25,7 +25,7 @@ DetectorIn::DetectorIn()
     m_impl->sync_frame_waiting_map = &m_frame_task_waiting;
     m_impl->sync_frame_doing_map = &m_frame_task_doing;
 
-    RCLCPP_INFO(m_impl->logger, "constraction success!");
+    // RCLCPP_INFO(m_impl->logger, "constraction success!");
 }
 
 int DetectorIn::init(const std::shared_ptr<InitConfig> &config,
@@ -49,9 +49,7 @@ int DetectorIn::init(const std::shared_ptr<InitConfig> &config,
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::INITIALIZED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -84,9 +82,7 @@ int DetectorIn::start()
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::STARTED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
 
     m_impl->step_running = true;
     m_impl->step_thread = std::make_shared<std::thread>(
@@ -115,9 +111,7 @@ int DetectorIn::stop()
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::STOPPED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -132,7 +126,7 @@ rclcpp_action::GoalResponse DetectorIn::_accept_document_goal_callback(
     const rclcpp_action::GoalUUID &uuid,
     std::shared_ptr<const ACT_AcceptDocument::Goal> goal)
 {
-    RCLCPP_INFO(m_impl->logger, "Received goal request with psg document %ld", goal->document.frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "Received goal request with psg document %ld", goal->document.frame.frame_num);
     (void)uuid; // not used
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
@@ -140,7 +134,7 @@ rclcpp_action::GoalResponse DetectorIn::_accept_document_goal_callback(
 rclcpp_action::CancelResponse DetectorIn::_accept_document_cancel_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle)
 {
-    RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
+    // RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
     (void)goal_handle; // not used
     return rclcpp_action::CancelResponse::REJECT;
 }
@@ -150,6 +144,9 @@ void DetectorIn::_accept_document_accepted_callback(
 {
 
     const auto &goal = goal_handle->get_goal();
+
+    // time log
+    RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal->document.frame.frame_num, "detector", "IN", this->now().nanoseconds());
 
     // cache the document, copy it for modify it
     auto document = goal->document;
@@ -190,8 +187,8 @@ void DetectorIn::_process_document_create_tasks(const MSG_PsgDocument &document,
 
 void DetectorIn::_process_frame_create_tasks(const MSG_Frame &frame, const MSG_UUID &detections_uuid, Map_Frame_Waiting *frame_waiting_map_ptr)
 {
-    RCLCPP_DEBUG(m_impl->logger, "create frame %ld detections uuid %s tasks for downstreams", frame.frame_num,
-                 uuid_to_string(detections_uuid.uuid).c_str());
+    // RCLCPP_DEBUG(m_impl->logger, "create frame %ld detections uuid %s tasks for downstreams", frame.frame_num,
+    //              uuid_to_string(detections_uuid.uuid).c_str());
 
     // create tasks of this frame for all downstreams
     for (auto &x : m_model_downstreams) {
@@ -220,7 +217,7 @@ void DetectorIn::_connect_to_downstreams()
 
     for (auto it : m_init_config->pipeline_downstreams) {
         auto ds = std::make_shared<DownstreamPipeline>();
-        RCLCPP_INFO(m_impl->logger, "connecting to pipeline downstream %s", it.first.c_str());
+        // RCLCPP_INFO(m_impl->logger, "connecting to pipeline downstream %s", it.first.c_str());
 
         // 创建pipeline downstream
         {
@@ -236,9 +233,9 @@ void DetectorIn::_connect_to_downstreams()
             //         std::bind(&DetectorIn::process_document_result_callback, this, std::placeholders::_1);
 
             // wait until the action server is ready
-            RCLCPP_INFO(m_impl->logger, "waiting for pipeline action server %s", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "waiting for pipeline action server %s", name.c_str());
             client->wait_for_action_server();
-            RCLCPP_INFO(m_impl->logger, "pipeline action server %s is ready", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "pipeline action server %s is ready", name.c_str());
         }
 
         m_pipeline_downstreams[it.first] = ds;
@@ -246,7 +243,7 @@ void DetectorIn::_connect_to_downstreams()
 
     for (auto it : m_init_config->model_downstreams) {
         auto ds = std::make_shared<DownstreamModel>();
-        RCLCPP_INFO(m_impl->logger, "connecting to pipeline downstream %s", it.first.c_str());
+        // RCLCPP_INFO(m_impl->logger, "connecting to pipeline downstream %s", it.first.c_str());
 
         // 创建pipeline downstream
         {
@@ -262,9 +259,9 @@ void DetectorIn::_connect_to_downstreams()
             //         std::bind(&DetectorIn::process_document_result_callback, this, std::placeholders::_1);
 
             // wait until the action server is ready
-            RCLCPP_INFO(m_impl->logger, "waiting for model action server %s", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "waiting for model action server %s", name.c_str());
             client->wait_for_action_server();
-            RCLCPP_INFO(m_impl->logger, "model action server %s is ready", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "model action server %s is ready", name.c_str());
         }
 
         m_model_downstreams[it.first] = ds;
@@ -294,12 +291,12 @@ void DetectorIn::_send_frame_to_downstreams()
         auto ds = task->downstream;
         auto handle = task->downstream->accept_frame->async_send_goal(goal, ds->accept_frame_options);
 
-        RCLCPP_INFO(m_impl->logger, "[Request Send]framenum: %ld, detections_uuid: %s", goal.frame.frame_num,
-                    uuid_to_string(goal.detections_uuid.uuid).c_str());
+        // RCLCPP_INFO(m_impl->logger, "[Request Send]framenum: %ld, detections_uuid: %s", goal.frame.frame_num,
+        // uuid_to_string(goal.detections_uuid.uuid).c_str());
 
         // FIXME: add timeout condition
         auto task_response = handle.get();
-        RCLCPP_INFO(m_impl->logger, "_step frame async_send_goal: %ld SUCCESS", task->frame.frame_num);
+        // RCLCPP_INFO(m_impl->logger, "_step frame async_send_goal: %ld SUCCESS", task->frame.frame_num);
         if (task_response != nullptr) {
             // accepted
             if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
@@ -377,11 +374,11 @@ void DetectorIn::_send_document_to_downstreams()
         goal.document = task->document;
         auto ds = task->downstream;
         auto handle = task->downstream->accept_document->async_send_goal(goal, ds->accept_document_options);
-        RCLCPP_INFO(m_impl->logger, "_step document async_send_goal: %ld", task->document.frame.frame_num);
+        // RCLCPP_INFO(m_impl->logger, "_step document async_send_goal: %ld", task->document.frame.frame_num);
 
         // FIXME: add timeout condition
         auto task_response = handle.get();
-        RCLCPP_INFO(m_impl->logger, "_step document async_send_goal: %ld SUCCESS", task->document.frame.frame_num);
+        // RCLCPP_INFO(m_impl->logger, "_step document async_send_goal: %ld SUCCESS", task->document.frame.frame_num);
         if (task_response != nullptr) {
             // accepted
             if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||

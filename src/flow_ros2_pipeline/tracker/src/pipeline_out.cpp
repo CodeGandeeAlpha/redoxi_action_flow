@@ -66,7 +66,7 @@ TrackerOut::TrackerOut()
     m_impl->sync_track_targets_buffer = &m_track_targets_buffer;
     m_impl->sync_person_buffer = &m_person_buffer;
 
-    RCLCPP_INFO(m_impl->logger, "constraction success!");
+    // RCLCPP_INFO(m_impl->logger, "constraction success!");
 }
 
 int TrackerOut::init(const std::shared_ptr<InitConfig> &config,
@@ -102,9 +102,7 @@ int TrackerOut::init(const std::shared_ptr<InitConfig> &config,
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::INITIALIZED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -137,9 +135,7 @@ int TrackerOut::start()
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::STARTED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
 
     m_impl->step_running = true;
     m_impl->step_thread = std::make_shared<std::thread>(
@@ -168,9 +164,7 @@ int TrackerOut::stop()
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::STOPPED;
-    RCLCPP_INFO(m_impl->logger,
-                "m_status_code from %d to %d!",
-                status_before, m_status_code);
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
 
     m_status_code = NodeStatusCode::STOPPED;
     return ReturnCode::SUCCESS;
@@ -187,7 +181,7 @@ rclcpp_action::GoalResponse TrackerOut::_accept_document_goal_callback(
     const rclcpp_action::GoalUUID &uuid,
     std::shared_ptr<const ACT_AcceptDocument::Goal> goal)
 {
-    RCLCPP_INFO(m_impl->logger, "Received goal request with psg document %ld", goal->document.frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "Received goal request with psg document %ld", goal->document.frame.frame_num);
     (void)uuid; // not used
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
@@ -195,7 +189,7 @@ rclcpp_action::GoalResponse TrackerOut::_accept_document_goal_callback(
 rclcpp_action::CancelResponse TrackerOut::_accept_document_cancel_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle)
 {
-    RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
+    // RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
     (void)goal_handle; // not used
     return rclcpp_action::CancelResponse::REJECT;
 }
@@ -220,15 +214,15 @@ void TrackerOut::_accept_document_accepted_callback(
         auto lock_ptr_person_buffer = m_impl->sync_person_buffer.synchronize();
         for (const auto &person : document.persons.persons) {
             // // test log
-            // RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): Accepted person %s",
+            // //RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): Accepted person %s",
             //             person_msg_to_string(person).c_str());
             // add to buffer
             _add_person_to_buffer(person, *lock_ptr_person_buffer);
         }
     }
 
-    RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): Accepted document %ld with UUID %s and add it to buffer",
-                document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
+    // RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): Accepted document %ld with UUID %s and add it to buffer",
+    // document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
 
     auto result = std::make_shared<ACT_AcceptDocument::Result>();
     result->return_msg = "Document accepted";
@@ -240,7 +234,7 @@ rclcpp_action::GoalResponse TrackerOut::_accept_track_targets_goal_callback(
     const rclcpp_action::GoalUUID &uuid,
     std::shared_ptr<const ACT_AcceptTrackTargets::Goal> goal)
 {
-    RCLCPP_INFO(m_impl->logger, "_accept_track_targets_goal_callback(): Received goal request with frame_num %ld", goal->frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "_accept_track_targets_goal_callback(): Received goal request with frame_num %ld", goal->frame.frame_num);
     (void)uuid; // not used
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
@@ -248,7 +242,7 @@ rclcpp_action::GoalResponse TrackerOut::_accept_track_targets_goal_callback(
 rclcpp_action::CancelResponse TrackerOut::_accept_track_targets_cancel_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptTrackTargets>> goal_handle)
 {
-    RCLCPP_INFO(m_impl->logger, "_accept_track_targets_cancel_callback(): Received request to cancel goal");
+    // RCLCPP_INFO(m_impl->logger, "_accept_track_targets_cancel_callback(): Received request to cancel goal");
     (void)goal_handle; // not used
     return rclcpp_action::CancelResponse::REJECT;
 }
@@ -264,10 +258,10 @@ void TrackerOut::_accept_track_targets_accepted_callback(
     auto frame = goal->frame;
 
     // test log
-    RCLCPP_INFO(m_impl->logger, "_accept_track_targets_accepted_callback(): Accepted frame %ld with %ld track_targets", frame.frame_num, track_targets.size());
+    // RCLCPP_INFO(m_impl->logger, "_accept_track_targets_accepted_callback(): Accepted frame %ld with %ld track_targets", frame.frame_num, track_targets.size());
     for (const auto &track_target : track_targets) {
-        RCLCPP_DEBUG(m_impl->logger, "_accept_track_targets_accepted_callback(): Accepted track_target %s",
-                     track_target_msg_to_string(track_target).c_str());
+        // RCLCPP_DEBUG(m_impl->logger, "_accept_track_targets_accepted_callback(): Accepted track_target %s",
+        //              track_target_msg_to_string(track_target).c_str());
     }
 
     // add to buffer
@@ -276,7 +270,7 @@ void TrackerOut::_accept_track_targets_accepted_callback(
         _add_track_targets_to_buffer(track_targets, frame.frame_num, *lock_ptr_track_targets_buffer);
     }
 
-    RCLCPP_INFO(m_impl->logger, "_accept_track_targets_accepted_callback(): Accepted frame_number %ld and add it to buffer", frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "_accept_track_targets_accepted_callback(): Accepted frame_number %ld and add it to buffer", frame.frame_num);
 
     auto result = std::make_shared<ACT_AcceptTrackTargets::Result>();
     result->return_msg = "TrackTargets accepted";
@@ -288,7 +282,7 @@ void TrackerOut::_accept_track_targets_accepted_callback(
 void TrackerOut::_process_document_create_tasks(MSG_PsgDocument &document,
                                                 TrackerOut::Map_Document_Waiting *document_waiting_map_ptr)
 {
-    RCLCPP_DEBUG(m_impl->logger, "_process_document_create_tasks(): create tasks for document %ld", document.frame.frame_num);
+    // RCLCPP_DEBUG(m_impl->logger, "_process_document_create_tasks(): create tasks for document %ld", document.frame.frame_num);
     // create tasks of this frame for all downstreams
     for (auto &x : m_downstreams) {
         auto task = std::make_shared<DSTask_PsgDocument>();
@@ -313,7 +307,7 @@ void TrackerOut::_connect_to_downstreams()
 
     for (auto it : m_init_config->downstreams) {
         auto ds = std::make_shared<Downstream>();
-        RCLCPP_INFO(m_impl->logger, "connecting to pipeline downstream %s", it.first.c_str());
+        // RCLCPP_INFO(m_impl->logger, "connecting to pipeline downstream %s", it.first.c_str());
 
         // 创建downstream
         {
@@ -329,9 +323,9 @@ void TrackerOut::_connect_to_downstreams()
             //         std::bind(&TrackerOut::process_document_result_callback, this, std::placeholders::_1);
 
             // wait until the action server is ready
-            RCLCPP_INFO(m_impl->logger, "waiting for pipeline action server %s", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "waiting for pipeline action server %s", name.c_str());
             client->wait_for_action_server();
-            RCLCPP_INFO(m_impl->logger, "pipeline action server %s is ready", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "pipeline action server %s is ready", name.c_str());
         }
 
         m_downstreams[it.first] = ds;
@@ -354,6 +348,10 @@ void TrackerOut::_send_document_to_downstreams()
         auto &task = it.second;
         ACT_AcceptDocument::Goal goal;
         goal.document = task->document;
+
+        // time log
+        RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal.document.frame.frame_num, "tracker", "OUT", this->now().nanoseconds());
+
         auto ds = task->downstream;
         auto handle = task->downstream->accept_document->async_send_goal(goal, ds->accept_document_options);
 
@@ -457,31 +455,31 @@ void TrackerOut::_add_person_to_buffer(const MSG_Person &person, std::map<Tracke
 
 void TrackerOut::_remove_document_from_buffer(int frame_number, std::map<int, TrackerOut::MSG_PsgDocument> *document_buffer_ptr)
 {
-    RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d", frame_number);
+    // RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d", frame_number);
     // if frame_number is not in buffer, do nothing
     if (document_buffer_ptr->find(frame_number) != document_buffer_ptr->end()) {
         document_buffer_ptr->erase(frame_number);
-        RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d SUCCESS", frame_number);
+        // RCLCPP_DEBUG(m_impl->logger, "_remove_document_from_buffer(): remove document with frame_num %d SUCCESS", frame_number);
     }
 }
 
 void TrackerOut::_remove_track_targets_from_buffer(int frame_number, std::map<int, TrackerOut::MSG_TrackTargets> *track_targets_buffer_ptr)
 {
-    RCLCPP_DEBUG(m_impl->logger, "_remove_track_targets_from_buffer(): remove track_targets with frame_num %d", frame_number);
+    // RCLCPP_DEBUG(m_impl->logger, "_remove_track_targets_from_buffer(): remove track_targets with frame_num %d", frame_number);
     // if frame_number is not in buffer, do nothing
     if (track_targets_buffer_ptr->find(frame_number) != track_targets_buffer_ptr->end()) {
         track_targets_buffer_ptr->erase(frame_number);
-        RCLCPP_DEBUG(m_impl->logger, "_remove_track_targets_from_buffer(): remove track_targets with frame_num %d SUCCESS", frame_number);
+        // RCLCPP_DEBUG(m_impl->logger, "_remove_track_targets_from_buffer(): remove track_targets with frame_num %d SUCCESS", frame_number);
     }
 }
 
 void TrackerOut::_remove_person_from_buffer(const UUID &uuid, std::map<UUID, MSG_Person> *person_buffer_ptr)
 {
-    RCLCPP_DEBUG(m_impl->logger, "_remove_person_from_buffer(): remove person with uuid %s", uuid_to_string(uuid).c_str());
+    // RCLCPP_DEBUG(m_impl->logger, "_remove_person_from_buffer(): remove person with uuid %s", uuid_to_string(uuid).c_str());
     // if uuid is not in buffer, do nothing
     if (person_buffer_ptr->find(uuid) != person_buffer_ptr->end()) {
         person_buffer_ptr->erase(uuid);
-        RCLCPP_DEBUG(m_impl->logger, "_remove_person_from_buffer(): remove person with uuid %s SUCCESS", uuid_to_string(uuid).c_str());
+        // RCLCPP_DEBUG(m_impl->logger, "_remove_person_from_buffer(): remove person with uuid %s SUCCESS", uuid_to_string(uuid).c_str());
     }
 }
 
@@ -522,12 +520,12 @@ void TrackerOut::_get_closed_trajectory()
             if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::New) {
                 m_closed_trajectory_buffer[track_target.track_id] = std::vector<UUID>();
                 m_closed_trajectory_buffer[track_target.track_id].push_back(track_target.uuid.uuid);
-                RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): create new trajectory with track_id %ld", track_target.track_id);
+                // RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): create new trajectory with track_id %ld", track_target.track_id);
             }
             // if track_target is open, add it to trajectory
             else if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::Open) {
                 m_closed_trajectory_buffer[track_target.track_id].push_back(track_target.uuid.uuid);
-                RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): add track_target to trajectory with track_id %d and frame number %ld", track_target.track_id, frame_num);
+                // RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): add track_target to trajectory with track_id %d and frame number %ld", track_target.track_id, frame_num);
             }
             // if track_target is close, get trajectory and remove it from buffer
             else if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::Close) {
@@ -549,14 +547,14 @@ void TrackerOut::_get_closed_trajectory()
                 document.trajectories.person_trajectories.push_back(closed_trajectory);
 
                 // test log
-                RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): get closed trajectory with track_id %ld in frame_number %ld", track_target.track_id, frame_num);
-                RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): total closed trajectory %ld", document.trajectories.person_trajectories.size());
-                for (auto &traj : document.trajectories.person_trajectories) {
-                    RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): closed trajectory %ld", traj.track_id);
-                    for (auto &person : traj.persons) {
-                        RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): person %s", person_msg_to_string(person).c_str());
-                    }
-                }
+                // RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): get closed trajectory with track_id %ld in frame_number %ld", track_target.track_id, frame_num);
+                // RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): total closed trajectory %ld", document.trajectories.person_trajectories.size());
+                // for (auto &traj : document.trajectories.person_trajectories) {
+                //     RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): closed trajectory %ld", traj.track_id);
+                //     for (auto &person : traj.persons) {
+                //         RCLCPP_DEBUG(m_impl->logger, "_get_closed_trajectory(): person %s", person_msg_to_string(person).c_str());
+                //     }
+                // }
             } else
                 continue;
         }

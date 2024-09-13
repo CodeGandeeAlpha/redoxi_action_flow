@@ -311,6 +311,6 @@ class PSGCountImpl
     std::shared_ptr<std::thread> process_thread;
     bool step_running = false; // for stopping the step thread
 
-    bool visualize_flag = false;
+    bool visualize_flag = true;
 };
 } // namespace FlowRos2Pipeline

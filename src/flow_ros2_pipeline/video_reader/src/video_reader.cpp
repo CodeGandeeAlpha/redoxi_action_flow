@@ -118,11 +118,11 @@ uint64_t OpencvVideoReader::_add_frame_to_shared_memory(const cv::Mat &frame)
     VINEYARD_CHECK_OK(m_impl->v6d_client->Persist(sealed->id()));
 
     auto id = sealed->id();
-    RCLCPP_DEBUG(m_impl->logger, "[OpencvVideoReader] Successfully sealed, ObjectID_int: %ld", id);
-    RCLCPP_DEBUG(m_impl->logger, "[OpencvVideoReader] Successfully sealed, ObjectID: %s", ObjectIDToString(id).c_str());
+    // RCLCPP_DEBUG(m_impl->logger, "[OpencvVideoReader] Successfully sealed, ObjectID_int: %ld", id);
+    // RCLCPP_DEBUG(m_impl->logger, "[OpencvVideoReader] Successfully sealed, ObjectID: %s", ObjectIDToString(id).c_str());
 
     // auto test = m_impl->v6d_client->GetObject(id);
-    // RCLCPP_INFO(m_impl->logger, "read v6d id : %ld", test->id());
+    // //RCLCPP_INFO(m_impl->logger, "read v6d id : %ld", test->id());
 
     return id;
 }
@@ -147,7 +147,7 @@ bool OpencvVideoReader::_read_frame(cv::Mat &frame)
         frame_number += m_init_config->start_frame_number;
 
     if (m_init_config->end_frame_number != -1 && frame_number + 1 >= m_init_config->end_frame_number) {
-        RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] reached end of frame %d", m_init_config->end_frame_number);
+        // RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] reached end of frame %d", m_init_config->end_frame_number);
         return false;
     }
 
@@ -176,16 +176,16 @@ bool OpencvVideoReader::_check_downstreams_ready()
         auto wait_status =
             result.wait_for(std::chrono::milliseconds((long)timeout_ms));
         if (wait_status == std::future_status::timeout) {
-            RCLCPP_DEBUG(m_impl->logger, "[OpencvVideoReader] _check_downstreams_ready TIMEOUT");
+            // RCLCPP_DEBUG(m_impl->logger, "[OpencvVideoReader] _check_downstreams_ready TIMEOUT");
             return false;
         } else if (wait_status == std::future_status::ready) {
-            RCLCPP_DEBUG(m_impl->logger, "[OpencvVideoReader] _check_downstreams_ready READY");
+            // RCLCPP_DEBUG(m_impl->logger, "[OpencvVideoReader] _check_downstreams_ready READY");
             auto response = result.get();
             bool ok = response->status == ReturnCode::SUCCESS;
             if (!ok)
                 return false;
         } else {
-            RCLCPP_DEBUG(m_impl->logger, "[OpencvVideoReader] _check_downstreams_ready DEFERRED");
+            // RCLCPP_DEBUG(m_impl->logger, "[OpencvVideoReader] _check_downstreams_ready DEFERRED");
             return false;
         }
     }
@@ -220,7 +220,7 @@ void OpencvVideoReader::_step()
 
         if (!success || frame.empty()) {
             // end of video sequence
-            RCLCPP_INFO(logger, "[OpencvVideoReader] end of video reached");
+            // RCLCPP_INFO(logger, "[OpencvVideoReader] end of video reached");
             m_impl->is_video_end = true;
             stop();
             return false;
@@ -238,12 +238,12 @@ void OpencvVideoReader::_step()
             // }
 
             downstream_ready = _check_downstreams_ready();
-            RCLCPP_INFO(logger, "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
+            // RCLCPP_INFO(logger, "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
 
         } else if (m_runtime_config->read_frame_mode == RuntimeConfig::RFM_READ_IF_READY) {
             // query first, read frame only if all downstreams can accept new frame
             downstream_ready = _check_downstreams_ready();
-            RCLCPP_INFO(logger, "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
+            // RCLCPP_INFO(logger, "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
 
             // some downstream can accept this frame, read it write it to v6d and send to all downstreams
             if (downstream_ready) {
@@ -285,7 +285,7 @@ void OpencvVideoReader::_step()
         }
 
         // send frame to downstreams
-        RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] before send, ObjectID: %ld", frame_msg.cache.id_int);
+        // RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] before send, ObjectID: %ld", frame_msg.cache.id_int);
 
         // downstream actions are alreayd checked, no need to do it again
         auto frame_sent_ok = _send_frame_to_downstreams(frame_msg, false);
@@ -360,12 +360,11 @@ int OpencvVideoReader::open()
         return ReturnCode::ERROR;
     }
 
-    RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] open SUCCESS!");
+    // RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] open SUCCESS!");
 
-    RCLCPP_INFO(m_impl->logger,
-                "[OpencvVideoReader] m_status_code from %d to %d!",
-                m_status_code, NodeStatusCode::OPENED);
+    auto status_before = m_status_code;
     m_status_code = NodeStatusCode::OPENED;
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
 
     // create step thread
     m_impl->step_running = true;
@@ -400,11 +399,9 @@ int OpencvVideoReader::start()
         m_impl->frame_timer = nullptr;
     }
 
-    RCLCPP_INFO(m_impl->logger,
-                "[OpencvVideoReader] m_status_code from %d to %d!",
-                m_status_code, NodeStatusCode::STARTED);
-
+    auto status_before = m_status_code;
     m_status_code = NodeStatusCode::STARTED;
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -420,11 +417,9 @@ int OpencvVideoReader::stop()
         m_impl->frame_timer = nullptr;
     }
 
-    RCLCPP_INFO(m_impl->logger,
-                "[OpencvVideoReader] m_status_code from %d to %d!",
-                m_status_code, NodeStatusCode::STOPPED);
-
+    auto status_before = m_status_code;
     m_status_code = NodeStatusCode::STOPPED;
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
     return ReturnCode::SUCCESS;
 }
 
@@ -448,11 +443,9 @@ int OpencvVideoReader::close()
     // reset frame number
     m_frame_number = -1;
 
-    RCLCPP_INFO(m_impl->logger,
-                "[OpencvVideoReader] m_status_code from %d to %d!",
-                m_status_code, NodeStatusCode::CLOSED);
-
+    auto status_before = m_status_code;
     m_status_code = NodeStatusCode::CLOSED;
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
 
     // terminate step thread
     m_impl->step_running = false;
@@ -495,11 +488,9 @@ int OpencvVideoReader::init(const std::shared_ptr<InitConfig> &config, const std
     // setup downstreams
     _connect_to_downstreams();
 
-    RCLCPP_INFO(m_impl->logger,
-                "[OpencvVideoReader] m_status_code from %d to %d!",
-                m_status_code, NodeStatusCode::INITIALIZED);
-
+    auto status_before = m_status_code;
     m_status_code = NodeStatusCode::INITIALIZED;
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
 
     // start step timer
     // auto step_timer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(runtime_config->step_interval_ms)),
@@ -516,16 +507,16 @@ void OpencvVideoReader::_connect_to_downstreams()
     m_downstreams.clear();
     for (auto it : m_init_config->downstreams) {
         auto ds = std::make_shared<Downstream>();
-        RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] connecting to downstream %s", it.first.c_str());
-        // 创建status_query_client
+        // RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] connecting to downstream %s", it.first.c_str());
+        //  创建status_query_client
         {
             std::string name = it.second.status_query_service;
             auto client = this->create_client<DownstreamReadyQueryService>(name);
             ds->get_status = client;
             // wait until the service server is ready
-            RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] waiting for service server %s", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] waiting for service server %s", name.c_str());
             client->wait_for_service();
-            RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] service server %s is ready", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] service server %s is ready", name.c_str());
         }
 
         // 创建accept_frame_client
@@ -540,9 +531,9 @@ void OpencvVideoReader::_connect_to_downstreams()
             // ds->accept_frame_options = opt;
 
             // wait until the action server is ready
-            RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] waiting for action server %s", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] waiting for action server %s", name.c_str());
             client->wait_for_action_server();
-            RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] action server %s is ready", name.c_str());
+            // RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] action server %s is ready", name.c_str());
         }
 
         m_downstreams[it.first] = ds;
