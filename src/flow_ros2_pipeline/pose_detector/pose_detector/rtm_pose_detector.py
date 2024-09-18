@@ -86,8 +86,8 @@ class RTMPoseDetector(BasePoseDetector, BaseTool):
 
 
     def infer(self, image: np.ndarray, bboxes: list = []):
-        if len(bboxes) == 0:
-            bboxes = [[0, 0, image.shape[1], image.shape[0]]]
+        # if len(bboxes) == 0:
+        #     bboxes = [[0, 0, image.shape[1], image.shape[0]]]
 
         keypoints, scores = [], []
         for bbox in bboxes:
@@ -98,7 +98,8 @@ class RTMPoseDetector(BasePoseDetector, BaseTool):
             keypoints.append(kpts)
             scores.append(score)
 
-
+        if len(keypoints) == 0:
+            return PoseDetectionResult(keypoints=np.array([]), scores=np.array([]))
         keypoints = np.concatenate(keypoints, axis=0)
         scores = np.concatenate(scores, axis=0)
 

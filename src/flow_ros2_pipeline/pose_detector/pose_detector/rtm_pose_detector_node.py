@@ -322,6 +322,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
 
         keypoints, scores = result.keypoints, result.scores
         # self.m_logger.info(f"_to_bodyposes_msg(): frame {frame_msg.frame_num} keypoints {keypoints} scores {scores}")
+        # self.m_logger.info(f"_to_bodyposes_msg(): frame {frame_msg.frame_num} uuids {uuids} bboxes {bboxes}")
 
         for i in range(len(keypoints)):
             bodypose_msg = BodyPose()
@@ -527,6 +528,14 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
             self.m_logger.debug(f"_model_step(): framenum {frame_msg.frame_num} img shape {img.shape}")
 
             bboxes, uuids = self._get_bboxes_and_uuids_from_detections(detections_msg)
+            if len(bboxes) == 0:
+                self.m_logger.info(f"_model_step(): framenum {frame_msg.frame_num} have no bboxes")
+                bodyposes = []
+                bodypose_msg = BodyPose()
+                bodypose_msg.frame = frame_msg
+                bodyposes.append(bodypose_msg)
+                self.m_model_groups_data[model_group_name].out_queue.put(bodyposes)
+                return
             # process the image
             result = self.m_model_groups_data[model_group_name].group_models[model_idx].model.infer(img, bboxes)
 
