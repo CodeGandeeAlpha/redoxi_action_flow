@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
     auto init_config = std::make_shared<FlowRos2Pipeline::Tracker::InitConfig>();
     auto runtime_config = std::make_shared<FlowRos2Pipeline::Tracker::RuntimeConfig>();
     init_config->from_parameters(node.get());
-    init_config->tracker_type = 1;
+    init_config->tracker_type = FlowRos2Pipeline::TrackerTypes::BOTSORT;
 
     // init_config->process_document_action = "detector_in_process_document_action";
     FlowRos2Pipeline::TrackerInitConfig::DownstreamPipelineNode tracker_out_pipeline_node;
