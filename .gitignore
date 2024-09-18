@@ -3,6 +3,7 @@ default.etcd/
 install/
 libs/
 log/
+Log/
 design.md
 
 # Prerequisites
