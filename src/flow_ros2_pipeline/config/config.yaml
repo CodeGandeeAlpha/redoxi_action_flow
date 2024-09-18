@@ -12,12 +12,15 @@
     # source_file: "/media/ramdisk/20.22.6.30-2023-06-18-15-00-02_27908_28658-00.00.00.000-00.00.06.926.mp4"
     source_file: "/3d/chengxiao/data/passengerflow/0912_badcase_test/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
     # source_file: "/mnt/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.7.164-2023-06-18-17-00-00.mp4"
+    # orbbec_net_device_ip: 192.168.32.141
+    # orbbec_net_device_ip: 192.168.32.139
+    orbbec_net_device_ip: 192.168.32.135
     source_camera_index: -1
     start_frame_number: -1
     end_frame_number: -1
     image_width: 1920
     image_height: 1080
-    frame_interval_ms: 1.0
+    frame_interval_ms: 40.0
 
 /master_node:
   ros__parameters:

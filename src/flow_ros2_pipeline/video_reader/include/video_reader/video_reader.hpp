@@ -119,7 +119,10 @@ class OpencvVideoReader : public rclcpp::Node, public IOpenCloseProtocol
     virtual void _declare_all_parameters();
 
     // read next frame and return true if success
-    virtual bool _read_frame(cv::Mat &frame);
+    virtual bool _read_frame_local(cv::Mat &frame);
+
+    // read next frame from orbbec net device and return true if success
+    virtual bool _read_frame_orbbec(cv::Mat &frame);
 
     // publish frame msg for visualization
     virtual void _publish_frame(const cv::Mat &frame);

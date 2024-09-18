@@ -14,6 +14,7 @@ int main(int argc, char *argv[])
     auto init_config = std::make_shared<FlowRos2Pipeline::OpencvVideoReader::InitConfig>();
     auto runtime_config = std::make_shared<FlowRos2Pipeline::OpencvVideoReader::RuntimeConfig>();
     init_config->from_parameters(node.get());
+    init_config->video_type = FlowRos2Pipeline::VideoTypes::OrbbecNetDevice;
 
     FlowRos2Pipeline::OpencvVideoReader::InitConfig::DownstreamNode downstream_node;
     downstream_node.accept_frame_action = "master_node_process_frame";

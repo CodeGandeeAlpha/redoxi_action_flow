@@ -23,6 +23,7 @@ find_package(vineyard REQUIRED)
 find_package(Boost REQUIRED)
 
 include_directories(include ${OpenCV_INCLUDE_DIRS} ${VINEYARD_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
+include_directories(/usr/local/include)
 
 install(DIRECTORY include/
   DESTINATION include)
@@ -45,7 +46,7 @@ ament_target_dependencies(${PROJECT_NAME}_node
 )
 
 
-target_link_libraries(${PROJECT_NAME}_node ${OpenCV_LIBS} ${VINEYARD_LIBRARIES} ${Boost_LIBRARIES})
+target_link_libraries(${PROJECT_NAME}_node ${OpenCV_LIBS} ${VINEYARD_LIBRARIES} ${Boost_LIBRARIES} OrbbecSDK)
 
 install(TARGETS ${PROJECT_NAME}_node
   DESTINATION lib/${PROJECT_NAME})

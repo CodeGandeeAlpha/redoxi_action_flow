@@ -7,6 +7,12 @@ namespace FlowRos2Pipeline
 {
 class OpencvVideoReader;
 
+namespace VideoTypes // FIXME: remove this namespace
+{
+const int Local = 0;
+const int OrbbecNetDevice = 1;
+}; // namespace VideoTypes
+
 class OpencvVideoReaderDownstreamNode
 {
   public:
@@ -23,6 +29,8 @@ class OpencvVideoReaderInitConfig
     virtual ~OpencvVideoReaderInitConfig()
     {
     }
+    int video_type = VideoTypes::Local;
+
     // can be a file path or a camera index
     // only one source can be specified
     std::string source_file;
@@ -31,6 +39,9 @@ class OpencvVideoReaderInitConfig
     // read frames as frames[start_frame_number:end_frame_number], like python
     int start_frame_number = 0; // 0 means start from the beginning
     int end_frame_number = -1;  // -1 means read all frames
+
+    // orbbec net device
+    std::string orbbec_net_device_ip;
 
     // downstream nodes, mapping node name to node configurations
     using DownstreamNode = OpencvVideoReaderDownstreamNode;

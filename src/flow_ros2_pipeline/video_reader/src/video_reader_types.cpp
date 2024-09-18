@@ -11,6 +11,7 @@ void OpencvVideoReaderInitConfig::from_parameters(OpencvVideoReader *node)
     this->source_camera_index = node->get_parameter("source_camera_index").as_int();
     this->start_frame_number = node->get_parameter("start_frame_number").as_int();
     this->end_frame_number = node->get_parameter("end_frame_number").as_int();
+    this->orbbec_net_device_ip = node->get_parameter("orbbec_net_device_ip").as_string();
 
     // RCLCPP_INFO(logger_, "source_file: %s", this->source_file.c_str());
     // RCLCPP_INFO(logger_, "source_camera_index: %d", this->source_camera_index);

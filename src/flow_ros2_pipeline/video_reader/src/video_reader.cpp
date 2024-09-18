@@ -137,7 +137,7 @@ OpencvVideoReader::OpencvVideoReader()
     auto logger_ = m_impl->logger;
 }
 
-bool OpencvVideoReader::_read_frame(cv::Mat &frame)
+bool OpencvVideoReader::_read_frame_local(cv::Mat &frame)
 {
     ROS_ASSERT(m_impl->video_capture->isOpened(), "[OpencvVideoReader] video capture is not opened but tried to read");
 
@@ -157,6 +157,48 @@ bool OpencvVideoReader::_read_frame(cv::Mat &frame)
         // end of video sequence
         return false;
     }
+    this->m_frame_number += 1;
+    return true;
+}
+
+bool OpencvVideoReader::_read_frame_orbbec(cv::Mat &frame)
+{
+    std::shared_ptr<ob::FrameSet> frameset;
+    {
+        std::lock_guard<std::mutex> lock(m_impl->frameset_mutex);
+        frameset = m_impl->current_frameset;
+    }
+
+    if (frameset == nullptr) {
+        RCLCPP_WARN(m_impl->logger, "_read_frame_orbbec(): frameset is nullptr");
+        return false;
+    }
+
+    // get color frame frameset->colorFrame()
+    auto color_frame = frameset->getFrame(OB_FRAME_COLOR);
+    if (color_frame == nullptr) {
+        RCLCPP_ERROR(m_impl->logger, "_read_frame_orbbec(): color_frame is nullptr");
+        return false;
+    }
+
+    // get color frame data
+    if (color_frame->format() != OB_FORMAT_RGB) {
+        if (color_frame->format() == OB_FORMAT_MJPG) {
+            m_impl->format_convert_filter->setFormatConvertType(FORMAT_MJPG_TO_RGB888);
+        } else if (color_frame->format() == OB_FORMAT_UYVY) {
+            m_impl->format_convert_filter->setFormatConvertType(FORMAT_UYVY_TO_RGB888);
+        } else if (color_frame->format() == OB_FORMAT_YUYV) {
+            m_impl->format_convert_filter->setFormatConvertType(FORMAT_YUYV_TO_RGB888);
+        } else {
+            RCLCPP_WARN(m_impl->logger, "[OpencvVideoReader] unsupported color frame format %d", color_frame->format());
+            return false;
+        }
+        color_frame = m_impl->format_convert_filter->process(color_frame)->as<ob::ColorFrame>();
+    }
+    m_impl->format_convert_filter->setFormatConvertType(FORMAT_RGB888_TO_BGR);
+
+    auto _color_frame = m_impl->format_convert_filter->process(color_frame)->as<ob::ColorFrame>();
+    frame = m_impl->orbbec_color_to_cvmat(_color_frame);
     this->m_frame_number += 1;
     return true;
 }
@@ -212,7 +254,11 @@ void OpencvVideoReader::_step()
     auto &frame = m_impl->src_frame;
 
     auto read_next_frame = [&]() {
-        auto success = _read_frame(frame);
+        bool success = false;
+        if (m_init_config->video_type == VideoTypes::OrbbecNetDevice)
+            success = _read_frame_orbbec(frame);
+        else
+            success = _read_frame_local(frame);
 
         // do we have limited reading frame rate?
         if (m_runtime_config->frame_interval_ms > 0)
@@ -221,10 +267,20 @@ void OpencvVideoReader::_step()
         if (!success || frame.empty()) {
             // end of video sequence
             // RCLCPP_INFO(logger, "[OpencvVideoReader] end of video reached");
+            if (m_init_config->video_type == VideoTypes::Local) {
+                m_impl->is_video_end = true;
+                stop();
+            }
+            return false;
+        }
+
+        // test
+        if (this->m_frame_number == 200) {
             m_impl->is_video_end = true;
             stop();
             return false;
         }
+
         return success;
     };
 
@@ -232,7 +288,7 @@ void OpencvVideoReader::_step()
     bool downstream_ready = false;
     if (!(m_impl->is_video_end)) {
         if (m_runtime_config->read_frame_mode == RuntimeConfig::RFM_READ_ALL) {
-            auto ok = read_next_frame();
+            m_impl->read_frame_ok = read_next_frame();
             // if (!ok) {// read failed, but not end of video
             //     return;
             // }
@@ -247,7 +303,7 @@ void OpencvVideoReader::_step()
 
             // some downstream can accept this frame, read it write it to v6d and send to all downstreams
             if (downstream_ready) {
-                auto ok = read_next_frame();
+                m_impl->read_frame_ok = read_next_frame();
                 // if (!ok)
                 //     return;
             }
@@ -258,27 +314,32 @@ void OpencvVideoReader::_step()
     if (downstream_ready) {
         MSG_Frame frame_msg;
         if (!(m_impl->is_video_end)) {
-            auto h = m_runtime_config->image_height;
-            auto w = m_runtime_config->image_width;
-            cv::Mat resized_frame;
+            if (m_impl->read_frame_ok) {
+                auto h = m_runtime_config->image_height;
+                auto w = m_runtime_config->image_width;
+                cv::Mat resized_frame;
 
-            if (h > 0 && w > 0) {
-                // FIXME: if h<0 or w<0, resize by preserving aspect ratio
-                cv::resize(frame, m_impl->resized_frame, cv::Size(w, h));
-                resized_frame = m_impl->resized_frame;
+                if (h > 0 && w > 0) {
+                    // FIXME: if h<0 or w<0, resize by preserving aspect ratio
+                    cv::resize(frame, m_impl->resized_frame, cv::Size(w, h));
+                    resized_frame = m_impl->resized_frame;
+                } else
+                    resized_frame = frame;
+
+                if (m_publish_image)
+                    _publish_frame(resized_frame);
+
+                // cv::imshow("frame", resized_frame);
+
+                // add frame to v6d
+                auto v6d_id = _add_frame_to_shared_memory(resized_frame);
+                frame_msg.cache.id_int = v6d_id;
+                frame_msg.cache.has_int_id = true;
+                frame_msg.cache.id_string = ObjectIDToString(v6d_id);
+                frame_msg.frame_num = m_frame_number;
+                frame_msg.signal_code = SignalCode::RUN;
             } else
-                resized_frame = frame;
-
-            if (m_publish_image)
-                _publish_frame(resized_frame);
-
-            // add frame to v6d
-            auto v6d_id = _add_frame_to_shared_memory(resized_frame);
-            frame_msg.cache.id_int = v6d_id;
-            frame_msg.cache.has_int_id = true;
-            frame_msg.cache.id_string = ObjectIDToString(v6d_id);
-            frame_msg.frame_num = m_frame_number;
-            frame_msg.signal_code = SignalCode::RUN;
+                return;
         } else {
             frame_msg.frame_num = INT_MAX;
             frame_msg.signal_code = SignalCode::FLUSH;
@@ -343,21 +404,77 @@ int OpencvVideoReader::open()
     ROS_ASSERT(m_status_code == NodeStatusCode::INITIALIZED || m_status_code == NodeStatusCode::CLOSED,
                "[OpencvVideoReader] cannot open because status code is not INITIALIZED or CLOSED");
     ROS_ASSERT(m_impl->v6d_client != nullptr, "[OpencvVideoReader] v6d_client is nullptr");
+    ROS_ASSERT(m_init_config != nullptr, "[OpencvVideoReader] m_init_config is nullptr");
+    ROS_ASSERT(m_init_config->video_type == VideoTypes::Local || m_init_config->video_type == VideoTypes::OrbbecNetDevice,
+               "[OpencvVideoReader] video_type is not Local or OrbbecNetDevice");
 
-    m_impl->video_capture = std::make_shared<cv::VideoCapture>();
-    if (m_init_config->source_camera_index != -1)
-        m_impl->video_capture->open(m_init_config->source_camera_index);
-    else {
-        m_impl->video_capture->open(m_init_config->source_file);
-        if (m_impl->video_capture->isOpened() && m_init_config->start_frame_number >= 0)
-            m_impl->video_capture->set(cv::CAP_PROP_POS_FRAMES, m_init_config->start_frame_number);
-    }
+    if (m_init_config->video_type == VideoTypes::Local) {
+        m_impl->video_capture = std::make_shared<cv::VideoCapture>();
+        if (m_init_config->source_camera_index != -1)
+            m_impl->video_capture->open(m_init_config->source_camera_index);
+        else {
+            m_impl->video_capture->open(m_init_config->source_file);
+            if (m_impl->video_capture->isOpened() && m_init_config->start_frame_number >= 0)
+                m_impl->video_capture->set(cv::CAP_PROP_POS_FRAMES, m_init_config->start_frame_number);
+        }
 
 
-    if (!m_impl->video_capture->isOpened()) {
-        RCLCPP_ERROR(m_impl->logger, "[OpencvVideoReader] open FAILED! video capture is not opened");
-        m_impl->video_capture = nullptr;
-        return ReturnCode::ERROR;
+        if (!m_impl->video_capture->isOpened()) {
+            RCLCPP_ERROR(m_impl->logger, "[OpencvVideoReader] open FAILED! video capture is not opened");
+            m_impl->video_capture = nullptr;
+            return ReturnCode::ERROR;
+        }
+    } else if (m_init_config->video_type == VideoTypes::OrbbecNetDevice) {
+        ROS_ASSERT(m_init_config->orbbec_net_device_ip != "",
+                   "[OpencvVideoReader] orbbec_net_device_ip is empty");
+        // connect to orbbec net device
+        m_impl->ob_ctx = std::make_shared<ob::Context>();
+        m_impl->net_device = m_impl->ob_ctx->createNetDevice(m_init_config->orbbec_net_device_ip.c_str(), 8090);
+        ROS_ASSERT(m_impl->net_device != nullptr, "[OpencvVideoReader] net_device open failed");
+
+        RCLCPP_WARN(m_impl->logger, "net_device name: %s", m_impl->net_device->getDeviceInfo()->name());
+        RCLCPP_WARN(m_impl->logger, "net_device serial number: %s", m_impl->net_device->getDeviceInfo()->serialNumber());
+        RCLCPP_WARN(m_impl->logger, "net_device ipAddress: %s", m_impl->net_device->getDeviceInfo()->ipAddress());
+
+        m_impl->ob_pipeline = std::make_shared<ob::Pipeline>(m_impl->net_device);
+        // Create Config for configuring Pipeline work
+        std::shared_ptr<ob::Config> config = std::make_shared<ob::Config>();
+
+        // // Get the depth camera configuration list
+        // auto depthProfileList = m_impl->ob_pipeline->getStreamProfileList(OB_SENSOR_DEPTH);
+        // auto depthProfile = depthProfileList->getVideoStreamProfile(1280, OB_HEIGHT_ANY, OB_FORMAT_Y16, 20);
+
+
+        // if (!depthProfile) {
+        //     // use default configuration
+        //     depthProfile = depthProfileList->getProfile(OB_PROFILE_DEFAULT)->as<ob::VideoStreamProfile>();
+        // }
+        // // enable depth stream
+        // config->enableStream(depthProfile);
+
+        // RCLCPP_WARN(m_impl->logger, "enable stream depthProfile");
+
+        // Get the color camera configuration list
+        auto colorProfileList = m_impl->ob_pipeline->getStreamProfileList(OB_SENSOR_COLOR);
+        auto colorProfile = colorProfileList->getVideoStreamProfile(1280, OB_HEIGHT_ANY, OB_FORMAT_RGB, OB_FPS_ANY);
+        RCLCPP_WARN(m_impl->logger, "colorProfile getVideoStreamProfile");
+        if (!colorProfile) {
+            // use default configuration
+            colorProfile = colorProfileList->getProfile(OB_PROFILE_DEFAULT)->as<ob::VideoStreamProfile>();
+        }
+        // enable color stream
+        config->enableStream(colorProfile);
+
+        RCLCPP_WARN(m_impl->logger, "enable stream colorProfile");
+
+        // Pass in the configuration and start the pipeline
+        m_impl->ob_pipeline->start(config, [&](std::shared_ptr<ob::FrameSet> frameSet) {
+            std::lock_guard<std::mutex> lock(m_impl->frameset_mutex);
+            m_impl->current_frameset = frameSet;
+        });
+
+        // create format convert filter
+        m_impl->format_convert_filter = std::make_shared<ob::FormatConvertFilter>();
     }
 
     // RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] open SUCCESS!");
@@ -433,8 +550,16 @@ int OpencvVideoReader::close()
     ROS_ASSERT(m_status_code == NodeStatusCode::OPENED || m_status_code == NodeStatusCode::STOPPED,
                "[OpencvVideoReader] cannot close because status code is not OPENED or STOPPED");
 
-    // closing, release video capture
-    m_impl->video_capture = nullptr;
+    if (m_init_config->video_type == VideoTypes::Local) {
+        // closing, release video capture
+        m_impl->video_capture = nullptr;
+    } else if (m_init_config->video_type == VideoTypes::OrbbecNetDevice) {
+        // closing, release orbbec pipeline
+        m_impl->ob_pipeline->stop();
+        m_impl->ob_pipeline = nullptr;
+        m_impl->net_device = nullptr;
+        m_impl->ob_ctx = nullptr;
+    }
 
     // closing, release v6d client
     m_impl->v6d_client->Disconnect();
@@ -554,6 +679,7 @@ void OpencvVideoReader::_declare_all_parameters()
     this->declare_parameter<int>("end_frame_number", -1);
     this->declare_parameter<int>("image_width", -1);
     this->declare_parameter<int>("image_height", -1);
+    this->declare_parameter<std::string>("orbbec_net_device_ip", "");
 
     this->declare_parameter<double>("frame_interval_ms", -1.0);
 }
