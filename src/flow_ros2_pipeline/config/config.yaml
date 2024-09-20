@@ -21,6 +21,7 @@
     image_width: 1920
     image_height: 1080
     frame_interval_ms: 40.0
+    send_goal_retry_times: 5
 
 /master_node:
   ros__parameters:
@@ -28,19 +29,24 @@
     process_frame_action: "master_node_process_frame"
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 1000.0
-
+    buffer_size: 5
+    send_goal_retry_times: 5
 
 /detector_in_node:
   ros__parameters:
     process_document_action: "detector_in_process_document_action"
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 1000.0
+    buffer_size: 5
+    send_goal_retry_times: 5
 
 /detector_node:
   ros__parameters:
     process_frame_action: "model_process_frame_action"
     step_interval_ms: 1.0
     pred_score_thr: 0.3
+    buffer_size: 5
+    send_goal_retry_times: 5
 
 
 /detector_out_node:
@@ -49,12 +55,16 @@
     process_detections_action: "detector_out_process_detections_action"
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 1000.0
+    buffer_size: 5
+    send_goal_retry_times: 5
 
 /person_generator_node:
   ros__parameters:
     process_document_action: "person_generator_process_document_action"
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 1000.0
+    buffer_size: 5
+    send_goal_retry_times: 5
 
 
 /pose_detector_in_node:
@@ -62,12 +72,16 @@
     process_document_action: "pose_detector_in_process_document_action"
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 1000.0
+    buffer_size: 5
+    send_goal_retry_times: 5
 
 /pose_detector_node:
   ros__parameters:
     process_detections_action: "model_process_detections_action"
     step_interval_ms: 1.0
     pred_score_thr: 0.3
+    buffer_size: 5
+    send_goal_retry_times: 5
 
 /pose_detector_out_node:
   ros__parameters:
@@ -75,6 +89,8 @@
     process_bodyposes_action: "pose_detector_out_process_bodyposes_action"
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 1000.0
+    buffer_size: 5
+    send_goal_retry_times: 5
 
 
 /tracker_in_node:
@@ -82,11 +98,15 @@
     process_document_action: "tracker_in_process_document_action"
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 1000.0
+    buffer_size: 5
+    send_goal_retry_times: 5
 
 /tracker_node:
   ros__parameters:
     process_detections_action: "tracker_process_detections_action"
     step_interval_ms: 1.0
+    buffer_size: 5
+    send_goal_retry_times: 5
 
 /tracker_out_node:
   ros__parameters:
@@ -94,6 +114,8 @@
     process_track_targets_action: "tracker_out_process_track_targets_action"
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 1000.0
+    buffer_size: 5
+    send_goal_retry_times: 5
 
 /psg_count_node:
   ros__parameters:
@@ -103,3 +125,5 @@
     # passengerflow_config_path: "/media/ramdisk/20.22.6.30.json"
     passengerflow_config_path: "/3d/chengxiao/data/passengerflow/0912_badcase_test/psg_configs/20.22.6.214.json"
     # passengerflow_config_path: "/mnt/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.7.164.json"
+    buffer_size: 5
+    send_goal_retry_times: 5

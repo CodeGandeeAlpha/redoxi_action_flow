@@ -1,5 +1,6 @@
 psg_public_msgs/TrackTarget[] track_targets
 psg_public_msgs/Frame frame
+psg_public_msgs/Control control_msg
 ---
 string return_msg
 int64 return_code

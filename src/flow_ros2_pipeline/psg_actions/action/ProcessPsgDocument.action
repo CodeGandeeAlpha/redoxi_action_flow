@@ -1,4 +1,5 @@
 psg_private_msgs/PsgDocument document
+psg_public_msgs/Control control_msg
 ---
 string return_msg
 int64 return_code

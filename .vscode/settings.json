@@ -37,5 +37,6 @@
         "/3d/chengxiao/code/psf_ros2_ws/install/psg_common/lib/python3.10/site-packages",
         "/opt/ros/iron/lib/python3.10/site-packages"
     ],
-    "ros.distro": "iron"
+    "ros.distro": "iron",
+    "cmake.sourceDirectory": "/3d/chengxiao/code/psf_ros2_ws/src/flow_ros2_pipeline/person_generator"
 }
