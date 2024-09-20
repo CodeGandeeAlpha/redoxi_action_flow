@@ -21,5 +21,8 @@ void MasterNodeRuntimeConfig::from_parameters(MasterNode *node)
     const auto &logger = node->get_logger();
     // RCLCPP_INFO(logger, "step_interval_ms: %lf", this->step_interval_ms);
     // RCLCPP_INFO(logger, "timeout_ms_send_frame_to_downstream: %lf", this->timeout_ms_send_frame_to_downstream);
+
+    buffer_size = node->get_parameter("buffer_size").as_int();
+    send_goal_retry_times = node->get_parameter("send_goal_retry_times").as_int();
 }
 } // namespace FlowRos2Pipeline

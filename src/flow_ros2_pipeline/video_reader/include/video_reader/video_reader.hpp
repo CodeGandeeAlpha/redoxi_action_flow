@@ -107,8 +107,14 @@ class OpencvVideoReader : public rclcpp::Node, public IOpenCloseProtocol
     // check if all downstreams are ready to accept new frame
     virtual bool _check_downstreams_ready();
 
+    // ping all downstreams to check if they are ready to accept new frame
+    virtual bool _ping_downstreams();
+
     // add a frame to shared memory, return object id
     virtual uint64_t _add_frame_to_shared_memory(const cv::Mat &frame);
+
+    // check if need to send frame to downstreams
+    virtual bool _need_to_send_frame_to_downstreams(bool all_downstream_accepted_frame, int failed_count);
 
     // send frame in shared memory to all downstreams
     // return whether the frame is actually sent

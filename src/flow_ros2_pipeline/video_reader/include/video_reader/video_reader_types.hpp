@@ -67,7 +67,7 @@ class OpencvVideoReaderRuntimeConfig
     int image_width = -1;
     int image_height = -1;
 
-    double timeout_ms_send_frame_to_downstream = 10000;
+    double timeout_ms_send_frame_to_downstream = DefaultTimeoutMs;
 
     // frame reading mode
     enum ReadFrameMode {
@@ -75,6 +75,9 @@ class OpencvVideoReaderRuntimeConfig
         RFM_READ_IF_READY = 1, // read frame if downstream is ready
     };
     ReadFrameMode read_frame_mode = RFM_READ_ALL;
+
+    int send_goal_retry_times = 0; // retry times when send goal failed
+
 
     void from_parameters(OpencvVideoReader *node);
 };

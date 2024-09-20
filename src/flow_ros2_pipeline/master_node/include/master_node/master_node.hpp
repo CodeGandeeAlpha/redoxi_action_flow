@@ -60,6 +60,7 @@ class MasterNode : public rclcpp::Node, public IStartStopProtocol
         MSG_Frame frame; // frame associated with this task
         std::shared_ptr<Downstream> downstream;
         GoalHandle goal_handle; // downstream goal handle
+        int retry_times = 0;    // retry times already
     };
 
   public:

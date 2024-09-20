@@ -45,6 +45,9 @@ class MasterNodeRuntimeConfig
 
     double timeout_ms_send_frame_to_downstream = DefaultTimeoutMs;
 
+    int send_goal_retry_times = 0; // retry times when send goal failed
+    int buffer_size = 1;           // buffer size for sending task to downstream
+
     void from_parameters(MasterNode *node);
 };
 } // namespace FlowRos2Pipeline

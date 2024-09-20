@@ -32,6 +32,15 @@ using namespace vineyard;
 #ifdef COMPILE_THIS
 namespace FlowRos2Pipeline
 {
+bool OpencvVideoReader::_need_to_send_frame_to_downstreams(bool all_downstream_accepted_frame, int failed_count)
+{
+    if (m_init_config->video_type == VideoTypes::Local) {
+        return !all_downstream_accepted_frame;
+    } else {
+        return !all_downstream_accepted_frame && failed_count < m_runtime_config->send_goal_retry_times;
+    }
+}
+
 bool OpencvVideoReader::_send_frame_to_downstreams(
     const MSG_Frame &frame_msg,
     bool check_downstream_ready_before_send)
@@ -45,49 +54,56 @@ bool OpencvVideoReader::_send_frame_to_downstreams(
     // TODO: record this into protocol
     // If v6d id is sent to downstream, and timeout, the system is in inconsistent state,
     // should be terminated, because we do not know when to delete v6d data.
-    bool any_downstream_accepted_frame = false;
-    m_impl->frame_sent_flags.clear();
-    for (auto &it : m_downstreams) {
-        auto goal_msg = DownstreamAcceptFrameAction::Goal();
-        goal_msg.frame = frame_msg;
-        auto &ds = it.second;
+    bool all_downstream_accepted_frame = false;
+    std::map<std::string, bool> downstream_accepted_frames;
 
-        // m_impl->frame_sent_flags.push_back(false);
-        // int flag_index = m_impl->frame_sent_flags.size() - 1;
 
-        // using DownStreamGoalHandle = rclcpp_action::ClientGoalHandle<DownstreamAcceptFrameAction>::SharedPtr;
-        // decltype(ds->accept_frame_options) opt;
-        // auto callback = [this, flag_index](DownStreamGoalHandle handle) {
-        //     auto s = handle->get_status();
-        //     bool ok = false;
+    // local video need to wait for all downstreams to accept the frame
+    int failed_count = 0;
+    while (_need_to_send_frame_to_downstreams(all_downstream_accepted_frame, failed_count)) {
+        for (auto &it : m_downstreams) {
+            // if downstream did not accept the frame or never sent to downstream, send it
+            if (downstream_accepted_frames.find(it.first) == downstream_accepted_frames.end() || downstream_accepted_frames.at(it.first) == false) {
+                auto goal_msg = DownstreamAcceptFrameAction::Goal();
+                goal_msg.frame = frame_msg;
+                auto &ds = it.second;
 
-        //     // downstream accepted?
-        //     ok |= s == rclcpp_action::GoalStatus::STATUS_ACCEPTED;
-        //     ok |= s == rclcpp_action::GoalStatus::STATUS_SUCCEEDED;
-        //     ok |= s == rclcpp_action::GoalStatus::STATUS_EXECUTING;
+                // opt.goal_response_callback = callback;
+                auto res = ds->accept_frame->async_send_goal(goal_msg, ds->accept_frame_options);
 
-        //     m_impl->frame_sent_flags[flag_index] = ok;
-        // };
+                auto t = (long)m_runtime_config->timeout_ms_send_frame_to_downstream;
+                auto wait_result = res.wait_for(std::chrono::milliseconds(t));
+                if (wait_result == std::future_status::ready) {
+                    auto s = res.get()->get_status();
+                    bool ok = false;
 
-        // opt.goal_response_callback = callback;
-        auto res = ds->accept_frame->async_send_goal(goal_msg, ds->accept_frame_options);
+                    // downstream accepted?
+                    ok |= s == rclcpp_action::GoalStatus::STATUS_ACCEPTED;
+                    ok |= s == rclcpp_action::GoalStatus::STATUS_SUCCEEDED;
+                    ok |= s == rclcpp_action::GoalStatus::STATUS_EXECUTING;
 
-        auto t = (long)m_runtime_config->timeout_ms_send_frame_to_downstream;
-        auto wait_result = res.wait_for(std::chrono::milliseconds(t));
-        if (wait_result == std::future_status::ready) {
-            auto s = res.get()->get_status();
-            bool ok = false;
-
-            // downstream accepted?
-            ok |= s == rclcpp_action::GoalStatus::STATUS_ACCEPTED;
-            ok |= s == rclcpp_action::GoalStatus::STATUS_SUCCEEDED;
-            ok |= s == rclcpp_action::GoalStatus::STATUS_EXECUTING;
-
-            any_downstream_accepted_frame = ok;
+                    if (!ok) {
+                        // downstream did not accept the frame, try again
+                        failed_count++;
+                        downstream_accepted_frames[it.first] = false;
+                        break;
+                    } else {
+                        downstream_accepted_frames[it.first] = true;
+                    }
+                } else {
+                    // timeout, try again
+                    failed_count++;
+                    downstream_accepted_frames[it.first] = false;
+                    break;
+                }
+            }
+        }
+        all_downstream_accepted_frame = true;
+        for (auto &it : downstream_accepted_frames) {
+            all_downstream_accepted_frame &= it.second;
         }
     }
-
-    return any_downstream_accepted_frame;
+    return all_downstream_accepted_frame;
 }
 
 uint64_t OpencvVideoReader::_add_frame_to_shared_memory(const cv::Mat &frame)
@@ -234,6 +250,41 @@ bool OpencvVideoReader::_check_downstreams_ready()
     return true;
 }
 
+bool OpencvVideoReader::_ping_downstreams()
+{
+    // check m_downstreams size first
+    if (m_downstreams.empty())
+        return false;
+
+    // check if all downstreams can accept new frame
+    for (auto it : m_downstreams) {
+        auto goal_msg = DownstreamAcceptFrameAction::Goal();
+        goal_msg.control_msg.control_signal = 1; // ping
+        goal_msg.control_msg.control_msg = "ping";
+        auto &ds = it.second;
+
+        // opt.goal_response_callback = callback;
+        auto res = ds->accept_frame->async_send_goal(goal_msg, ds->accept_frame_options);
+
+        auto t = (long)m_runtime_config->timeout_ms_send_frame_to_downstream;
+        auto wait_result = res.wait_for(std::chrono::milliseconds(t));
+        if (wait_result == std::future_status::ready) {
+            auto s = res.get()->get_status();
+            bool ok = false;
+
+            // downstream accepted?
+            ok |= s == rclcpp_action::GoalStatus::STATUS_ACCEPTED;
+            ok |= s == rclcpp_action::GoalStatus::STATUS_SUCCEEDED;
+            ok |= s == rclcpp_action::GoalStatus::STATUS_EXECUTING;
+
+            if (!ok)
+                return false;
+        } else
+            return false;
+    }
+    return true;
+}
+
 
 void OpencvVideoReader::_step()
 {
@@ -293,13 +344,17 @@ void OpencvVideoReader::_step()
             //     return;
             // }
 
-            downstream_ready = _check_downstreams_ready();
+            // downstream_ready = _check_downstreams_ready();
             // RCLCPP_INFO(logger, "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
+
+            downstream_ready = _ping_downstreams(); // all downstreams are pinged
 
         } else if (m_runtime_config->read_frame_mode == RuntimeConfig::RFM_READ_IF_READY) {
             // query first, read frame only if all downstreams can accept new frame
-            downstream_ready = _check_downstreams_ready();
+            // downstream_ready = _check_downstreams_ready();
             // RCLCPP_INFO(logger, "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
+
+            downstream_ready = _ping_downstreams();
 
             // some downstream can accept this frame, read it write it to v6d and send to all downstreams
             if (downstream_ready) {
@@ -682,6 +737,7 @@ void OpencvVideoReader::_declare_all_parameters()
     this->declare_parameter<std::string>("orbbec_net_device_ip", "");
 
     this->declare_parameter<double>("frame_interval_ms", -1.0);
+    this->declare_parameter<int>("send_goal_retry_times", 0);
 }
 
 void OpencvVideoReader::_create_image_topic()
