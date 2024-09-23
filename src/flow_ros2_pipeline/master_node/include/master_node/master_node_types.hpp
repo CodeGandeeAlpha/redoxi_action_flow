@@ -43,7 +43,7 @@ class MasterNodeRuntimeConfig
     }
     double step_interval_ms = DefaultNodeStepIntervalMs;
 
-    double timeout_ms_send_frame_to_downstream = DefaultTimeoutMs;
+    double timeout_ms_send_to_downstream = DefaultTimeoutMs;
 
     int send_goal_retry_times = 0; // retry times when send goal failed
     int buffer_size = 1;           // buffer size for sending task to downstream

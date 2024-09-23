@@ -45,7 +45,7 @@ void MasterNode::_declare_all_parameters()
     this->declare_parameter<std::string>("status_query_service", "");
     this->declare_parameter<std::string>("send_frame_action", "");
     this->declare_parameter<double>("step_interval_ms", -1);
-    this->declare_parameter<double>("timeout_ms_send_frame_to_downstream", -1);
+    this->declare_parameter<double>("timeout_ms_send_to_downstream", 10000);
     this->declare_parameter<int>("buffer_size", 1);
     this->declare_parameter<int>("send_goal_retry_times", 0);
 }
@@ -98,256 +98,276 @@ int MasterNode::init(const std::shared_ptr<InitConfig> &config,
         m_init_config->status_query_service, std::bind(&MasterNode::_status_query_callback, this, std::placeholders::_1, std::placeholders::_2));
 
     // setup downstreams
+    _connect_to_downstreams();
+    // create process_frame server
+    m_act_accept_frame = rclcpp_action::create_server<ACT_AcceptFrame>(
+        this, m_init_config->process_frame_action,
+        std::bind(&MasterNode::_accept_frame_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
+        std::bind(&MasterNode::_accept_frame_cancel_callback, this, std::placeholders::_1),
+        std::bind(&MasterNode::_accept_frame_accepted_callback, this, std::placeholders::_1));
+    auto status_before = m_status_code;
+    m_status_code = NodeStatusCode::INITIALIZED;
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
+    return ReturnCode::SUCCESS;
+}
+const std::shared_ptr<MasterNode::InitConfig> &MasterNode::get_init_config() const
+{
+    return m_init_config;
+}
+const std::shared_ptr<MasterNode::RuntimeConfig> &MasterNode::get_runtime_config() const
+{
+    return m_runtime_config;
+}
+int MasterNode::update_runtime_config(const std::shared_ptr<RuntimeConfig> &config)
+{
+    ROS_ASSERT(m_status_code != NodeStatusCode::STARTED &&
+                   m_status_code != NodeStatusCode::BEFORE_INIT,
+               "cannot update_runtime_config");
+    m_runtime_config = config;
+    return ReturnCode::SUCCESS;
+}
+int MasterNode::get_status_code() const
+{
+    return m_status_code;
+}
 
-    int MasterNode::update_runtime_config(const std::shared_ptr<RuntimeConfig> &config)
-    {
-        ROS_ASSERT(m_status_code != NodeStatusCode::STARTED &&
-                       m_status_code != NodeStatusCode::BEFORE_INIT,
-                   "cannot update_runtime_config");
-
-        m_runtime_config = config;
-        return ReturnCode::SUCCESS;
+void MasterNode::_process_document_goal_response_callback(
+    const rclcpp_action::ClientGoalHandle<MasterNode::ACT_AcceptDocument>::SharedPtr &goal_handle)
+{
+    if (goal_handle->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
+        // TODO: here
+    } else {
+        // RCLCPP_INFO(m_impl->logger, "[MasterNode] Frame rejected");
     }
+}
 
-    int MasterNode::get_status_code() const
-    {
-        return m_status_code;
-    }
+void MasterNode::_process_document_feedback_callback(rclcpp_action::ClientGoalHandle<MasterNode::ACT_AcceptDocument>::SharedPtr,
+                                                     const std::shared_ptr<const MasterNode::ACT_AcceptDocument::Feedback> feedback)
+{
+    (void)feedback;
+}
 
-    void MasterNode::_process_document_goal_response_callback(
-        const rclcpp_action::ClientGoalHandle<MasterNode::ACT_AcceptDocument>::SharedPtr &goal_handle)
-    {
-        if (goal_handle->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED) {
-            // TODO: here
-        } else {
-            // RCLCPP_INFO(m_impl->logger, "[MasterNode] Frame rejected");
-        }
-    }
-
-    void MasterNode::_process_document_feedback_callback(rclcpp_action::ClientGoalHandle<MasterNode::ACT_AcceptDocument>::SharedPtr,
-                                                         const std::shared_ptr<const MasterNode::ACT_AcceptDocument::Feedback> feedback)
-    {
-        (void)feedback;
-    }
-
-    void MasterNode::_process_document_result_callback(
-        const rclcpp_action::ClientGoalHandle<MasterNode::ACT_AcceptDocument>::WrappedResult &result)
-    {
-        (void)result;
-    }
+void MasterNode::_process_document_result_callback(
+    const rclcpp_action::ClientGoalHandle<MasterNode::ACT_AcceptDocument>::WrappedResult &result)
+{
+    (void)result;
+}
 
 
-    void MasterNode::_status_query_callback(const std::shared_ptr<SRV_StatusQuery::Request> request,
-                                            std::shared_ptr<SRV_StatusQuery::Response> response)
-    {
-        (void)request; // not used
-        // RCLCPP_DEBUG(m_impl->logger, "Received status query request");
-        response->status = ReturnCode::SUCCESS;
-        // RCLCPP_DEBUG(m_impl->logger, "Response status query request");
-    }
+void MasterNode::_status_query_callback(const std::shared_ptr<SRV_StatusQuery::Request> request,
+                                        std::shared_ptr<SRV_StatusQuery::Response> response)
+{
+    (void)request; // not used
+    // RCLCPP_DEBUG(m_impl->logger, "Received status query request");
+    response->status = ReturnCode::SUCCESS;
+    // RCLCPP_DEBUG(m_impl->logger, "Response status query request");
+}
 
-    rclcpp_action::GoalResponse MasterNode::_accept_frame_goal_callback(
-        const rclcpp_action::GoalUUID &uuid,
-        std::shared_ptr<const ACT_AcceptFrame::Goal> goal)
-    {
-        // RCLCPP_INFO(m_impl->logger, "Received goal request with frame %ld", goal->frame.frame_num);
-        (void)uuid; // not used
-        return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
-    }
+rclcpp_action::GoalResponse MasterNode::_accept_frame_goal_callback(
+    const rclcpp_action::GoalUUID &uuid,
+    std::shared_ptr<const ACT_AcceptFrame::Goal> goal)
+{
+    // RCLCPP_INFO(m_impl->logger, "Received goal request with frame %ld", goal->frame.frame_num);
+    (void)uuid; // not used
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+}
 
-    rclcpp_action::CancelResponse MasterNode::_accept_frame_cancel_callback(
-        const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptFrame>> goal_handle)
-    {
-        // RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
-        (void)goal_handle; // not used
-        return rclcpp_action::CancelResponse::REJECT;
-    }
+rclcpp_action::CancelResponse MasterNode::_accept_frame_cancel_callback(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptFrame>> goal_handle)
+{
+    // RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
+    (void)goal_handle; // not used
+    return rclcpp_action::CancelResponse::REJECT;
+}
 
-    void MasterNode::_accept_frame_accepted_callback(
-        const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptFrame>> goal_handle)
-    {
-        const auto &goal = goal_handle->get_goal();
-        const auto &control_msg = goal->control_msg;
+void MasterNode::_accept_frame_accepted_callback(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptFrame>> goal_handle)
+{
+    const auto &goal = goal_handle->get_goal();
+    const auto &control_msg = goal->control_msg;
 
-        // if buffer is full, reject the frame
-        if (m_frame_buffer.size() >= m_runtime_config->buffer_size) {
-            auto result = std::make_shared<ACT_AcceptFrame::Result>();
-            result->return_msg = "Buffer is full";
-            result->return_code = ReturnCode::REJECTED;
-            goal_handle->abort(result);
-            return;
-        }
-
-        // ping
-        if (control_msg.control_signal == 1) {
-            auto result = std::make_shared<ACT_AcceptFrame::Result>();
-            result->return_msg = "Ping accepted";
-            result->return_code = ReturnCode::SUCCESS;
-            goal_handle->succeed(result);
-            return;
-        }
-
-        // time log
-        RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal->frame.frame_num, "master_node", "IN", this->now().nanoseconds());
-
-        // cache the frame
-        const auto &frame = goal->frame;
-
-        // add to memory registry
-        if (frame.signal_code == SignalCode::RUN) {
-            auto lock_ptr_frame_buffer = m_impl->sync_frame_buffer.synchronize();
-            _add_frame_to_buffer(frame, *lock_ptr_frame_buffer);
-        }
-
-        // RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and add it to buffer", frame.frame_num);
-
-        // create tasks for all downstreams
-        {
-            auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
-            _process_document_create_tasks(frame, *lock_ptr_document_task_waiting);
-        }
-
+    // if buffer is full, reject the frame
+    if (m_frame_buffer.size() >= m_runtime_config->buffer_size) {
         auto result = std::make_shared<ACT_AcceptFrame::Result>();
-        result->return_msg = "Frame accepted";
+        result->return_msg = "Buffer is full";
+        result->return_code = ReturnCode::REJECTED;
+        goal_handle->abort(result);
+        return;
+    }
+
+    // ping
+    if (control_msg.control_signal == 1) {
+        auto result = std::make_shared<ACT_AcceptFrame::Result>();
+        result->return_msg = "Ping accepted";
         result->return_code = ReturnCode::SUCCESS;
         goal_handle->succeed(result);
-        // RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and succeed", frame.frame_num);
+        return;
     }
 
-    void MasterNode::_add_frame_to_buffer(const MSG_Frame &frame, std::map<int, MasterNode::MSG_Frame> *frame_buffer_ptr)
-    {
-        (*frame_buffer_ptr)[frame.frame_num] = frame;
+    // time log
+    RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal->frame.frame_num, "master_node", "IN", this->now().nanoseconds());
 
-        // add to memory registry
-        MemoryEntry e;
-        e.frame_number = frame.frame_num;
-        e.name = "frame";
+    // cache the frame
+    const auto &frame = goal->frame;
 
-        ROS_ASSERT(frame.cache.has_int_id, "frame.cache has no int_id");
-
-        e.v6d_object_id = frame.cache.id_int;
-        m_memory_registry->add_entry(e);
+    // add to memory registry
+    if (frame.signal_code == SignalCode::RUN) {
+        auto lock_ptr_frame_buffer = m_impl->sync_frame_buffer.synchronize();
+        _add_frame_to_buffer(frame, *lock_ptr_frame_buffer);
     }
 
-    void MasterNode::_remove_frame_from_buffer(int frame_number, std::map<int, MSG_Frame> *frame_buffer_ptr, bool remove_memory_entry)
+    // RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and add it to buffer", frame.frame_num);
+
+    // create tasks for all downstreams
     {
-        frame_buffer_ptr->erase(frame_number);
-        if (remove_memory_entry)
-            m_memory_registry->remove_entries_by_frame(frame_number);
+        auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+        _process_document_create_tasks(frame, *lock_ptr_document_task_waiting);
     }
 
-    void MasterNode::_process_document_create_tasks(const MSG_Frame &frame, Map_Document_Waiting *document_waiting_map_ptr)
-    {
-        // create tasks of this frame for all downstreams
-        for (auto &x : m_downstreams) {
-            auto task = std::make_shared<DSTask_PSGDocument>();
-            task->downstream = x.second;
-            task->frame = frame;
-            (*document_waiting_map_ptr)[std::make_tuple(task->downstream.get(), frame.frame_num)] = task;
-        }
-        // RCLCPP_DEBUG(m_impl->logger, "_process_document_create_tasks: %ld, end", frame.frame_num);
+    auto result = std::make_shared<ACT_AcceptFrame::Result>();
+    result->return_msg = "Frame accepted";
+    result->return_code = ReturnCode::SUCCESS;
+    goal_handle->succeed(result);
+    // RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and succeed", frame.frame_num);
+}
+
+void MasterNode::_add_frame_to_buffer(const MSG_Frame &frame, std::map<int, MasterNode::MSG_Frame> *frame_buffer_ptr)
+{
+    (*frame_buffer_ptr)[frame.frame_num] = frame;
+
+    // add to memory registry
+    MemoryEntry e;
+    e.frame_number = frame.frame_num;
+    e.name = "frame";
+
+    ROS_ASSERT(frame.cache.has_int_id, "frame.cache has no int_id");
+
+    e.v6d_object_id = frame.cache.id_int;
+    m_memory_registry->add_entry(e);
+}
+
+void MasterNode::_remove_frame_from_buffer(int frame_number, std::map<int, MSG_Frame> *frame_buffer_ptr, bool remove_memory_entry)
+{
+    frame_buffer_ptr->erase(frame_number);
+    if (remove_memory_entry)
+        m_memory_registry->remove_entries_by_frame(frame_number);
+}
+
+void MasterNode::_process_document_create_tasks(const MSG_Frame &frame, Map_Document_Waiting *document_waiting_map_ptr)
+{
+    // create tasks of this frame for all downstreams
+    for (auto &x : m_downstreams) {
+        auto task = std::make_shared<DSTask_PSGDocument>();
+        task->downstream = x.second;
+        task->frame = frame;
+        (*document_waiting_map_ptr)[std::make_tuple(task->downstream.get(), frame.frame_num)] = task;
     }
+    RCLCPP_DEBUG(m_impl->logger, "_process_document_create_tasks: %ld, end", frame.frame_num);
+}
 
-    int MasterNode::start()
-    {
-        // the node must be opened
-        ROS_ASSERT(m_status_code == NodeStatusCode::INITIALIZED,
-                   "cannot start because status code is not INITIALIZED");
+int MasterNode::start()
+{
+    // the node must be opened
+    ROS_ASSERT(m_status_code == NodeStatusCode::INITIALIZED,
+               "cannot start because status code is not INITIALIZED");
 
-        auto status_before = m_status_code;
-        m_status_code = NodeStatusCode::STARTED;
-        // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
+    auto status_before = m_status_code;
+    m_status_code = NodeStatusCode::STARTED;
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
 
-        m_impl->step_running = true;
-        m_impl->step_thread = std::make_shared<std::thread>(
-            [this]() {
-                while (rclcpp::ok() && m_impl->step_running) {
-                    _step();
-                    std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
-                }
-            });
-
-        return ReturnCode::SUCCESS;
-    }
-
-    int MasterNode::stop()
-    {
-        // only stoppable if the node is started
-        ROS_ASSERT(m_status_code == NodeStatusCode::STARTED,
-                   "cannot stop because status code is not STARTED");
-
-        // terminate step thread
-        m_impl->step_running = false;
-        if (m_impl->step_thread) {
-            m_impl->step_thread->join();
-            m_impl->step_thread = nullptr;
-        }
-
-        auto status_before = m_status_code;
-        m_status_code = NodeStatusCode::STOPPED;
-        // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
-        return ReturnCode::SUCCESS;
-    }
-
-    void MasterNode::_step()
-    {
-        std::vector<Map_Document_Waiting::key_type> tasks_to_remove;
-        std::vector<decltype(m_psgdoc_task_waiting)::value_type> psgdoc_task_waiting_;
-        {
-            auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
-
-            for (auto const &it : (**lock_ptr_document_task_waiting)) {
-                psgdoc_task_waiting_.push_back(it);
+    m_impl->step_running = true;
+    m_impl->step_thread = std::make_shared<std::thread>(
+        [this]() {
+            while (rclcpp::ok() && m_impl->step_running) {
+                _step();
+                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
             }
+        });
+
+
+    // auto step_timer = this->create_wall_timer(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)),
+    //                                           std::bind(&MasterNode::_step, this));
+    // m_impl->step_timer = step_timer;
+
+    return ReturnCode::SUCCESS;
+}
+
+int MasterNode::stop()
+{
+    // only stoppable if the node is started
+    ROS_ASSERT(m_status_code == NodeStatusCode::STARTED,
+               "cannot stop because status code is not STARTED");
+
+    // terminate step thread
+    m_impl->step_running = false;
+    if (m_impl->step_thread) {
+        m_impl->step_thread->join();
+        m_impl->step_thread = nullptr;
+    }
+    // if (m_impl->step_timer != nullptr) {
+    //     m_impl->step_timer->cancel();
+    //     m_impl->step_timer = nullptr;
+    // }
+
+    auto status_before = m_status_code;
+    m_status_code = NodeStatusCode::STOPPED;
+    // RCLCPP_INFO(m_impl->logger, "m_status_code from %d to %d!", status_before, m_status_code);
+    return ReturnCode::SUCCESS;
+}
+
+void MasterNode::_step()
+{
+    // RCLCPP_INFO(m_impl->logger, "MasterNode::_step");
+    std::vector<Map_Document_Waiting::key_type> tasks_to_remove;
+    std::vector<decltype(m_psgdoc_task_waiting)::value_type> psgdoc_task_waiting_;
+    {
+        auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+
+        for (auto const &it : (**lock_ptr_document_task_waiting)) {
+            psgdoc_task_waiting_.push_back(it);
         }
+    }
 
-        for (auto &it : psgdoc_task_waiting_) {
-            auto &task = it.second;
-            ACT_AcceptDocument::Goal goal;
-            goal.document.frame = task->frame;
-            goal.document.signal_code = task->frame.signal_code;
-            auto now = this->now();
-            goal.document.header.stamp = now;
-            // time log
-            RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal.document.frame.frame_num, "master_node", "OUT", now.nanoseconds());
+    for (auto &it : psgdoc_task_waiting_) {
+        auto &task = it.second;
+        ACT_AcceptDocument::Goal goal;
+        goal.document.frame = task->frame;
+        goal.document.signal_code = task->frame.signal_code;
+        auto now = this->now();
+        goal.document.header.stamp = now;
+        // time log
+        RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal.document.frame.frame_num, "master_node", "OUT", now.nanoseconds());
 
-            auto ds = task->downstream;
-            auto handle = task->downstream->handler->async_send_goal(goal, ds->options);
+        auto ds = task->downstream;
+        auto handle = task->downstream->handler->async_send_goal(goal, ds->options);
 
-            // FIXME: add timeout condition
-            auto t = (long)m_runtime_config->timeout_ms_send_frame_to_downstream;
-            auto wait_result = res.wait_for(std::chrono::milliseconds(t));
-            if (wait_result == std::future_status::ready) {
-                auto task_response = handle.get();
-                if (task_response != nullptr) {
-                    // accepted
-                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
-                        task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
-                        // successfully sent, record this
-                        task->goal_handle = task_response;
-                        {
-                            auto lock_ptr_document_task_doing = m_impl->sync_document_doing_map.synchronize();
-                            (**lock_ptr_document_task_doing)[task->goal_handle] = task;
-                        }
-                        tasks_to_remove.push_back(it.first);
+        // add timeout condition
+        auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
+        // RCLCPP_INFO(m_impl->logger, "send goal %ld", task->frame.frame_num);
+        auto wait_result = handle.wait_for(std::chrono::milliseconds(t));
+        // RCLCPP_INFO(m_impl->logger, "after wait send goal %ld, wait_result is %d", task->frame.frame_num, wait_result);
+        if (wait_result == std::future_status::ready) {
+            auto task_response = handle.get();
+            if (task_response != nullptr) {
+                // accepted or executing
+                if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
+                    task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
+                    // successfully sent, record this
+                    task->goal_handle = task_response;
+                    {
+                        auto lock_ptr_document_task_doing = m_impl->sync_document_doing_map.synchronize();
+                        (**lock_ptr_document_task_doing)[task->goal_handle] = task;
                     }
+                    tasks_to_remove.push_back(it.first);
+                }
 
-                    // succeed
-                    else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                        m_psgdoc_task_done.push_back(task);
-                        tasks_to_remove.push_back(it.first);
-                    }
-                    // rejected
-                    else {
-                        auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
-                        (**lock_ptr_document_task_waiting)[it.first]->retry_times++;
-                        if ((**lock_ptr_document_task_waiting)[it.first]->retry_times >= m_runtime_config->send_goal_retry_times) {
-                            m_psgdoc_task_done.push_back(task);
-                            tasks_to_remove.push_back(it.first);
-                        }
-                    }
-                } else {
-                    // rejected
+                // succeed
+                else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                    m_psgdoc_task_done.push_back(task);
+                    tasks_to_remove.push_back(it.first);
+                }
+                // rejected
+                else {
                     auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
                     (**lock_ptr_document_task_waiting)[it.first]->retry_times++;
                     if ((**lock_ptr_document_task_waiting)[it.first]->retry_times >= m_runtime_config->send_goal_retry_times) {
@@ -356,6 +376,7 @@ int MasterNode::init(const std::shared_ptr<InitConfig> &config,
                     }
                 }
             } else {
+                // rejected
                 auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
                 (**lock_ptr_document_task_waiting)[it.first]->retry_times++;
                 if ((**lock_ptr_document_task_waiting)[it.first]->retry_times >= m_runtime_config->send_goal_retry_times) {
@@ -363,48 +384,57 @@ int MasterNode::init(const std::shared_ptr<InitConfig> &config,
                     tasks_to_remove.push_back(it.first);
                 }
             }
-        }
-
-        // remove all sent tasks
-        {
+        } else {
             auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
-            for (auto &it : tasks_to_remove) {
-                (*lock_ptr_document_task_waiting)->erase(it);
+            (**lock_ptr_document_task_waiting)[it.first]->retry_times++;
+            if ((**lock_ptr_document_task_waiting)[it.first]->retry_times >= m_runtime_config->send_goal_retry_times) {
+                m_psgdoc_task_done.push_back(task);
+                tasks_to_remove.push_back(it.first);
             }
         }
+    }
 
-        {
-            auto lock_ptr_document_task_doing = m_impl->sync_document_doing_map.synchronize();
-            // for on-going tasks, if it is done, remove it
-            if (!(*lock_ptr_document_task_doing)->empty()) {
-                std::vector<GoalHandle> tasks_to_remove;
-                for (auto &it : (**lock_ptr_document_task_doing)) {
-                    auto &task_response = it.first;
-                    if (task_response) {
-                        if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                            m_psgdoc_task_done.push_back(it.second);
-                            tasks_to_remove.push_back(it.first);
-                        }
+    // remove all sent tasks from waiting list
+    {
+        auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+        for (auto &it : tasks_to_remove) {
+            (*lock_ptr_document_task_waiting)->erase(it);
+            // RCLCPP_INFO(m_impl->logger, "erase waiting task %ld", std::get<1>(it));
+        }
+    }
+
+    {
+        auto lock_ptr_document_task_doing = m_impl->sync_document_doing_map.synchronize();
+        // for on-going tasks, if it is done, remove it
+        if (!(*lock_ptr_document_task_doing)->empty()) {
+            std::vector<GoalHandle> tasks_to_remove;
+            for (auto &it : (**lock_ptr_document_task_doing)) {
+                auto &task_response = it.first;
+                if (task_response) {
+                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                        m_psgdoc_task_done.push_back(it.second);
+                        tasks_to_remove.push_back(it.first);
                     }
                 }
+            }
 
-                for (auto &it : tasks_to_remove) {
-                    (*lock_ptr_document_task_doing)->erase(it);
-                }
+            for (auto &it : tasks_to_remove) {
+                (*lock_ptr_document_task_doing)->erase(it);
             }
         }
-
-        {
-            auto lock_ptr_frame_buffer = m_impl->sync_frame_buffer.synchronize();
-            // remove task done documents
-            for (auto &it : m_psgdoc_task_done) {
-                _remove_frame_from_buffer(it->frame.frame_num, *lock_ptr_frame_buffer, false);
-            }
-        }
-
-        // for all done tasks, remove them from memory
-        m_psgdoc_task_done.clear();
     }
+
+    {
+        auto lock_ptr_frame_buffer = m_impl->sync_frame_buffer.synchronize();
+        // remove task done documents
+        for (auto &it : m_psgdoc_task_done) {
+            _remove_frame_from_buffer(it->frame.frame_num, *lock_ptr_frame_buffer, false);
+        }
+    }
+
+    // for all done tasks, remove them from memory
+    m_psgdoc_task_done.clear();
+}
 } // namespace FlowRos2Pipeline
 
 #endif

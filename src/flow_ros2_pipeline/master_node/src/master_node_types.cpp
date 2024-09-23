@@ -16,11 +16,11 @@ void MasterNodeInitConfig::from_parameters(MasterNode *node)
 void MasterNodeRuntimeConfig::from_parameters(MasterNode *node)
 {
     step_interval_ms = node->get_parameter("step_interval_ms").as_double();
-    timeout_ms_send_frame_to_downstream = node->get_parameter("timeout_ms_send_frame_to_downstream").as_double();
+    timeout_ms_send_to_downstream = node->get_parameter("timeout_ms_send_to_downstream").as_double();
 
     const auto &logger = node->get_logger();
     // RCLCPP_INFO(logger, "step_interval_ms: %lf", this->step_interval_ms);
-    // RCLCPP_INFO(logger, "timeout_ms_send_frame_to_downstream: %lf", this->timeout_ms_send_frame_to_downstream);
+    // RCLCPP_INFO(logger, "timeout_ms_send_to_downstream: %lf", this->timeout_ms_send_to_downstream);
 
     buffer_size = node->get_parameter("buffer_size").as_int();
     send_goal_retry_times = node->get_parameter("send_goal_retry_times").as_int();

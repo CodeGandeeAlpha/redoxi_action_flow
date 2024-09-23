@@ -68,14 +68,14 @@ const int MAX_RESERVED_STATUS = 10000;
 
 namespace SignalCode
 {
-  const int RUN = 0;
-  const int FLUSH = 1;
-  const int TERMINATE = 2;
+const int RUN = 0;
+const int FLUSH = 1;
+const int TERMINATE = 2;
 }; // namespace SignalCode
 
 
 const double DefaultTimeoutMs = 10000;
 
 // how many ms to wait before next _step()
-const double DefaultNodeStepIntervalMs = 10;
+const double DefaultNodeStepIntervalMs = 1;
 } // namespace FlowRos2Pipeline

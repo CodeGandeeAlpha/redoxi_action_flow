@@ -13,8 +13,8 @@
     source_file: "/3d/chengxiao/data/passengerflow/0912_badcase_test/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
     # source_file: "/mnt/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.7.164-2023-06-18-17-00-00.mp4"
     # orbbec_net_device_ip: 192.168.32.141
-    # orbbec_net_device_ip: 192.168.32.139
-    orbbec_net_device_ip: 192.168.32.135
+    orbbec_net_device_ip: 192.168.32.139
+    # orbbec_net_device_ip: 192.168.32.135
     source_camera_index: -1
     start_frame_number: -1
     end_frame_number: -1
@@ -28,7 +28,7 @@
     status_query_service: "status_query"
     process_frame_action: "master_node_process_frame"
     step_interval_ms: 1.0
-    timeout_ms_send_to_downstream: 1000.0
+    timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
     send_goal_retry_times: 5
 
@@ -36,7 +36,7 @@
   ros__parameters:
     process_document_action: "detector_in_process_document_action"
     step_interval_ms: 1.0
-    timeout_ms_send_to_downstream: 1000.0
+    timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
     send_goal_retry_times: 5
 
@@ -54,7 +54,7 @@
     process_document_action: "detector_out_process_document_action"
     process_detections_action: "detector_out_process_detections_action"
     step_interval_ms: 1.0
-    timeout_ms_send_to_downstream: 1000.0
+    timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
     send_goal_retry_times: 5
 
@@ -62,7 +62,7 @@
   ros__parameters:
     process_document_action: "person_generator_process_document_action"
     step_interval_ms: 1.0
-    timeout_ms_send_to_downstream: 1000.0
+    timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
     send_goal_retry_times: 5
 
@@ -71,7 +71,7 @@
   ros__parameters:
     process_document_action: "pose_detector_in_process_document_action"
     step_interval_ms: 1.0
-    timeout_ms_send_to_downstream: 1000.0
+    timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
     send_goal_retry_times: 5
 
@@ -88,7 +88,7 @@
     process_document_action: "pose_detector_out_process_document_action"
     process_bodyposes_action: "pose_detector_out_process_bodyposes_action"
     step_interval_ms: 1.0
-    timeout_ms_send_to_downstream: 1000.0
+    timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
     send_goal_retry_times: 5
 
@@ -97,7 +97,7 @@
   ros__parameters:
     process_document_action: "tracker_in_process_document_action"
     step_interval_ms: 1.0
-    timeout_ms_send_to_downstream: 1000.0
+    timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
     send_goal_retry_times: 5
 
@@ -113,7 +113,7 @@
     process_document_action: "tracker_out_process_document_action"
     process_track_targets_action: "tracker_out_process_track_targets_action"
     step_interval_ms: 1.0
-    timeout_ms_send_to_downstream: 1000.0
+    timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
     send_goal_retry_times: 5
 
@@ -121,7 +121,7 @@
   ros__parameters:
     process_document_action: "psg_count_process_document_action"
     step_interval_ms: 1.0
-    timeout_ms_send_to_downstream: 1000.0
+    timeout_ms_send_to_downstream: 10000.0
     # passengerflow_config_path: "/media/ramdisk/20.22.6.30.json"
     passengerflow_config_path: "/3d/chengxiao/data/passengerflow/0912_badcase_test/psg_configs/20.22.6.214.json"
     # passengerflow_config_path: "/mnt/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.7.164.json"

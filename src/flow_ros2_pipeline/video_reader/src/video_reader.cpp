@@ -71,7 +71,7 @@ bool OpencvVideoReader::_send_frame_to_downstreams(
                 // opt.goal_response_callback = callback;
                 auto res = ds->accept_frame->async_send_goal(goal_msg, ds->accept_frame_options);
 
-                auto t = (long)m_runtime_config->timeout_ms_send_frame_to_downstream;
+                auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
                 auto wait_result = res.wait_for(std::chrono::milliseconds(t));
                 if (wait_result == std::future_status::ready) {
                     auto s = res.get()->get_status();
@@ -230,7 +230,7 @@ bool OpencvVideoReader::_check_downstreams_ready()
         auto &ds = it.second;
         auto request = std::make_shared<DownstreamReadyQueryService::Request>();
         auto result = ds->get_status->async_send_request(request);
-        auto timeout_ms = this->m_runtime_config->timeout_ms_send_frame_to_downstream;
+        auto timeout_ms = this->m_runtime_config->timeout_ms_send_to_downstream;
         auto wait_status =
             result.wait_for(std::chrono::milliseconds((long)timeout_ms));
         if (wait_status == std::future_status::timeout) {
@@ -266,7 +266,7 @@ bool OpencvVideoReader::_ping_downstreams()
         // opt.goal_response_callback = callback;
         auto res = ds->accept_frame->async_send_goal(goal_msg, ds->accept_frame_options);
 
-        auto t = (long)m_runtime_config->timeout_ms_send_frame_to_downstream;
+        auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
         auto wait_result = res.wait_for(std::chrono::milliseconds(t));
         if (wait_result == std::future_status::ready) {
             auto s = res.get()->get_status();
