@@ -77,6 +77,7 @@ class PoseDetectorIn : public rclcpp::Node, public IStartStopProtocol
         MSG_Detections detections; // detections associated with this task
         std::shared_ptr<DownstreamModel> downstream;
         GoalHandle_Detections goal_handle; // downstream goal handle
+        int retry_times = 0;               // retry times already
     };
 
     class DSTask_PsgDocument
@@ -85,6 +86,7 @@ class PoseDetectorIn : public rclcpp::Node, public IStartStopProtocol
         MSG_PsgDocument document; // document associated with this task
         std::shared_ptr<DownstreamPipeline> downstream;
         GoalHandle_PsgDocument goal_handle; // downstream goal handle
+        int retry_times = 0;                // retry times already
     };
 
   public:
@@ -136,6 +138,12 @@ class PoseDetectorIn : public rclcpp::Node, public IStartStopProtocol
 
     // find and connect to downstreams
     virtual void _connect_to_downstreams();
+
+    // ping model downstream to check if it is alive
+    virtual bool _ping_model(std::shared_ptr<DownstreamModel> ds);
+
+    // ping pipeline downstream to check if it is alive
+    virtual bool _ping_pipeline(std::shared_ptr<DownstreamPipeline> ds);
 
     // send detections to all model downstreams
     virtual void _send_detections_to_downstreams();

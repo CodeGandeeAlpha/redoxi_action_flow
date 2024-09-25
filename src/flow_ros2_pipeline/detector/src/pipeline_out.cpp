@@ -102,7 +102,7 @@ int DetectorOut::start()
         [this]() {
             while (rclcpp::ok() && m_impl->step_running) {
                 _step();
-                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+                // std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
             }
         });
 
@@ -157,6 +157,25 @@ void DetectorOut::_accept_document_accepted_callback(
 {
 
     const auto &goal = goal_handle->get_goal();
+    const auto &control_msg = goal->control_msg;
+
+    // // if buffer is full, reject the frame
+    // if (m_document_buffer.size() >= m_runtime_config->buffer_size) {
+    //     auto result = std::make_shared<ACT_AcceptDocument::Result>();
+    //     result->return_msg = "Buffer is full";
+    //     result->return_code = ReturnCode::REJECTED;
+    //     goal_handle->abort(result);
+    //     return;
+    // }
+
+    // ping
+    if (control_msg.control_signal == 1) {
+        auto result = std::make_shared<ACT_AcceptDocument::Result>();
+        result->return_msg = "Ping accepted";
+        result->return_code = ReturnCode::SUCCESS;
+        goal_handle->succeed(result);
+        return;
+    }
 
     // cache the document
     auto document = goal->document;
@@ -197,6 +216,25 @@ void DetectorOut::_accept_detections_accepted_callback(
 {
 
     const auto &goal = goal_handle->get_goal();
+    const auto &control_msg = goal->control_msg;
+
+    // // if buffer is full, reject the frame
+    // if (m_detections_buffer.size() >= m_runtime_config->buffer_size) {
+    //     auto result = std::make_shared<ACT_AcceptDetections::Result>();
+    //     result->return_msg = "Buffer is full";
+    //     result->return_code = ReturnCode::REJECTED;
+    //     goal_handle->abort(result);
+    //     return;
+    // }
+
+    // ping
+    if (control_msg.control_signal == 1) {
+        auto result = std::make_shared<ACT_AcceptDetections::Result>();
+        result->return_msg = "Ping accepted";
+        result->return_code = ReturnCode::SUCCESS;
+        goal_handle->succeed(result);
+        return;
+    }
 
     // cache the detections
     const auto &detections = goal->detections;
@@ -272,6 +310,33 @@ void DetectorOut::_connect_to_downstreams()
     }
 }
 
+bool DetectorOut::_ping(const std::shared_ptr<Downstream> &ds)
+{
+    auto goal_msg = ACT_AcceptDocument::Goal();
+    goal_msg.control_msg.control_signal = 1; // ping
+    goal_msg.control_msg.control_msg = "ping";
+
+    // opt.goal_response_callback = callback;
+    auto res = ds->accept_document->async_send_goal(goal_msg, ds->accept_document_options);
+
+    auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
+    auto wait_result = res.wait_for(std::chrono::milliseconds(t));
+    if (wait_result == std::future_status::ready) {
+        auto s = res.get()->get_status();
+        bool ok = false;
+
+        // downstream accepted?
+        ok |= s == rclcpp_action::GoalStatus::STATUS_ACCEPTED;
+        ok |= s == rclcpp_action::GoalStatus::STATUS_SUCCEEDED;
+        ok |= s == rclcpp_action::GoalStatus::STATUS_EXECUTING;
+
+        if (!ok)
+            return false;
+    } else
+        return false;
+    return true;
+}
+
 void DetectorOut::_send_document_to_downstreams()
 {
     std::vector<Map_Document_Waiting::key_type> tasks_to_remove;
@@ -290,48 +355,86 @@ void DetectorOut::_send_document_to_downstreams()
         auto &task = it.second;
         ACT_AcceptDocument::Goal goal;
         goal.document = task->document;
-
-        // time log
-        RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal.document.frame.frame_num, "detector", "OUT", this->now().nanoseconds());
-
         auto ds = task->downstream;
-        auto handle = task->downstream->accept_document->async_send_goal(goal, ds->accept_document_options);
 
-        // FIXME: add timeout condition
-        auto task_response = handle.get();
-        if (task_response != nullptr) {
-            // RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): document async_send_goal: %ld task_response is %d",
-            //              task->document.frame.frame_num, task_response->get_status());
-            // accepted
-            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
-                task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
-                // successfully sent, record this
-                task->goal_handle = task_response;
-                // task->status = DSTask_PSGDocument::TASK_SENT;
-                {
-                    auto lock_ptr_document_task_doing = m_impl->sync_document_doing_map.synchronize();
-                    (**lock_ptr_document_task_doing)[task->goal_handle] = task;
+        while (true) {
+            if (!m_runtime_config->send_goal_retry && task->document.frame.signal_code == SignalCode::RUN) // not retry need to ping
+                if (!_ping(ds))
+                    continue;
+
+            // time log
+            RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal.document.frame.frame_num, "detector", "OUT", this->now().nanoseconds());
+
+            auto handle = task->downstream->accept_document->async_send_goal(goal, ds->accept_document_options);
+
+            // add timeout condition
+            auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
+            // RCLCPP_INFO(m_impl->logger, "send goal %ld", task->frame.frame_num);
+            auto wait_result = handle.wait_for(std::chrono::milliseconds(t));
+            // RCLCPP_INFO(m_impl->logger, "after wait send goal %ld, wait_result is %d", task->frame.frame_num, wait_result);
+            if (wait_result == std::future_status::ready) {
+                auto task_response = handle.get();
+                if (task_response != nullptr) {
+                    // RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): document async_send_goal: %ld task_response is %d",
+                    //              task->document.frame.frame_num, task_response->get_status());
+                    // accepted or executing
+                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
+                        task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
+                        // successfully sent, record this
+                        task->goal_handle = task_response;
+                        {
+                            auto lock_ptr_document_task_doing = m_impl->sync_document_doing_map.synchronize();
+                            (**lock_ptr_document_task_doing)[task->goal_handle] = task;
+                        }
+                        tasks_to_remove.push_back(it.first);
+                        // RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_ACCEPTED tasks_to_remove push_back framenumber %d", std::get<1>(it.first));
+                        break;
+                    }
+
+                    // succeed
+                    else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                        // task->status = DSTask_PSGDocument::TASK_DONE;
+                        m_psgdoc_task_done.push_back(task);
+                        tasks_to_remove.push_back(it.first);
+                        // RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %d", std::get<1>(it.first));
+                        break;
+                    }
+                    // rejected
+                    else {
+                        if (!m_runtime_config->send_goal_retry && task->document.frame.signal_code == SignalCode::RUN) { // failed
+                            m_psgdoc_task_done.push_back(task);
+                            tasks_to_remove.push_back(it.first);
+                            break;
+                        } else { // retry
+                            auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+                            (**lock_ptr_document_task_waiting)[it.first]->retry_times++;
+                            continue;
+                        }
+                    }
+                } else {
+                    // rejected
+                    if (!m_runtime_config->send_goal_retry && task->document.frame.signal_code == SignalCode::RUN) { // failed
+                        m_psgdoc_task_done.push_back(task);
+                        tasks_to_remove.push_back(it.first);
+                        break;
+                    } else { // retry
+                        auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+                        (**lock_ptr_document_task_waiting)[it.first]->retry_times++;
+                        continue;
+                    }
                 }
-                tasks_to_remove.push_back(it.first);
-                // RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_ACCEPTED tasks_to_remove push_back framenumber %d", std::get<1>(it.first));
+            } else {                                                                                             // timeout
+                if (!m_runtime_config->send_goal_retry && task->document.frame.signal_code == SignalCode::RUN) { // failed
+                    m_psgdoc_task_done.push_back(task);
+                    tasks_to_remove.push_back(it.first);
+                    break;
+                } else { // retry
+                    auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+                    (**lock_ptr_document_task_waiting)[it.first]->retry_times++;
+                    continue;
+                }
             }
-
-            // succeed
-            else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                // task->status = DSTask_PSGDocument::TASK_DONE;
-                m_psgdoc_task_done.push_back(task);
-                tasks_to_remove.push_back(it.first);
-                // RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %d", std::get<1>(it.first));
-            } else {
-                // RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): OTHER framenumber %d task_response is %d", std::get<1>(it.first), task_response->get_status());
-            }
-        } else {
-            // rejected
-            // RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_REJECTED framenumber %d", std::get<1>(it.first));
         }
-
-        // FIXME: what if failed to send many times?
-        // you need to terminate a frame, remove it from memory registry
     }
 
     // remove all sent tasks
@@ -375,6 +478,8 @@ void DetectorOut::_declare_all_parameters()
     this->declare_parameter<std::string>("process_detections_action", "");
     this->declare_parameter<double>("step_interval_ms", -1);
     this->declare_parameter<double>("timeout_ms_send_to_downstream", -1);
+    this->declare_parameter<int>("buffer_size", 1);
+    this->declare_parameter<bool>("send_goal_retry", false);
 }
 
 

@@ -125,6 +125,9 @@ class MasterNode : public rclcpp::Node, public IStartStopProtocol
     virtual void _remove_frame_from_buffer(int frame_number, std::map<int, MSG_Frame> *frame_buffer_ptr, bool remove_memory_entry);
     // find and connect to downstreams
     virtual void _connect_to_downstreams();
+    // check if all downstreams are ready to accept new frame
+    virtual bool _ping(std::shared_ptr<Downstream> ds);
+
     // buffer
     std::map<int, MSG_Frame> m_frame_buffer; // indexed by frame number
 

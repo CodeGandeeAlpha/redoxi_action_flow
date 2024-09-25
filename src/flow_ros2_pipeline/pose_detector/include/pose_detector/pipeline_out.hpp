@@ -57,6 +57,7 @@ class PoseDetectorOut : public rclcpp::Node, public IStartStopProtocol
         MSG_PsgDocument document; // frame associated with this task
         std::shared_ptr<Downstream> downstream;
         GoalHandle_PsgDocument goal_handle; // downstream goal handle
+        int retry_times = 0;                // retry times already
     };
 
   public:
@@ -120,6 +121,9 @@ class PoseDetectorOut : public rclcpp::Node, public IStartStopProtocol
 
     // find and connect to downstreams
     virtual void _connect_to_downstreams();
+
+    // ping downstream to check if it is alive
+    virtual bool _ping(const std::shared_ptr<Downstream> &ds);
 
     // send document to all pipeline downstreams
     virtual void _send_document_to_downstreams();

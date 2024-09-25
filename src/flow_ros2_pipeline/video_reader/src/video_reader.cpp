@@ -32,19 +32,11 @@ using namespace vineyard;
 #ifdef COMPILE_THIS
 namespace FlowRos2Pipeline
 {
-bool OpencvVideoReader::_need_to_send_frame_to_downstreams(bool all_downstream_accepted_frame, int failed_count)
-{
-    if (m_init_config->video_type == VideoTypes::Local) {
-        return !all_downstream_accepted_frame;
-    } else {
-        return !all_downstream_accepted_frame && failed_count < m_runtime_config->send_goal_retry_times;
-    }
-}
-
 bool OpencvVideoReader::_send_frame_to_downstreams(
     const MSG_Frame &frame_msg,
     bool check_downstream_ready_before_send)
 {
+    // service call to downstreams
     if (check_downstream_ready_before_send) {
         auto ready = _check_downstreams_ready();
         if (!ready)
@@ -54,56 +46,55 @@ bool OpencvVideoReader::_send_frame_to_downstreams(
     // TODO: record this into protocol
     // If v6d id is sent to downstream, and timeout, the system is in inconsistent state,
     // should be terminated, because we do not know when to delete v6d data.
-    bool all_downstream_accepted_frame = false;
-    std::map<std::string, bool> downstream_accepted_frames;
 
 
     // local video need to wait for all downstreams to accept the frame
-    int failed_count = 0;
-    while (_need_to_send_frame_to_downstreams(all_downstream_accepted_frame, failed_count)) {
-        for (auto &it : m_downstreams) {
-            // if downstream did not accept the frame or never sent to downstream, send it
-            if (downstream_accepted_frames.find(it.first) == downstream_accepted_frames.end() || downstream_accepted_frames.at(it.first) == false) {
-                auto goal_msg = DownstreamAcceptFrameAction::Goal();
-                goal_msg.frame = frame_msg;
-                auto &ds = it.second;
+    for (auto &it : m_downstreams) {
+        while (true) {
+            auto goal_msg = ACT_AcceptFrame::Goal();
+            goal_msg.frame = frame_msg;
+            auto &ds = it.second;
 
-                // opt.goal_response_callback = callback;
-                auto res = ds->accept_frame->async_send_goal(goal_msg, ds->accept_frame_options);
+            // opt.goal_response_callback = callback;
+            auto res = ds->accept_frame->async_send_goal(goal_msg, ds->accept_frame_options);
 
-                auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
-                auto wait_result = res.wait_for(std::chrono::milliseconds(t));
-                if (wait_result == std::future_status::ready) {
-                    auto s = res.get()->get_status();
-                    bool ok = false;
+            auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
+            auto wait_result = res.wait_for(std::chrono::milliseconds(t));
+            if (wait_result == std::future_status::ready) {
+                auto s = res.get()->get_status();
+                bool ok = false;
 
-                    // downstream accepted?
-                    ok |= s == rclcpp_action::GoalStatus::STATUS_ACCEPTED;
-                    ok |= s == rclcpp_action::GoalStatus::STATUS_SUCCEEDED;
-                    ok |= s == rclcpp_action::GoalStatus::STATUS_EXECUTING;
+                // downstream accepted?
+                ok |= s == rclcpp_action::GoalStatus::STATUS_ACCEPTED;
+                ok |= s == rclcpp_action::GoalStatus::STATUS_SUCCEEDED;
+                ok |= s == rclcpp_action::GoalStatus::STATUS_EXECUTING;
 
-                    if (!ok) {
-                        // downstream did not accept the frame, try again
-                        failed_count++;
-                        downstream_accepted_frames[it.first] = false;
-                        break;
+                if (!ok) { // rejected
+                    if (m_runtime_config->send_goal_retry || m_init_config->video_type == VideoTypes::Local ||
+                        frame_msg.signal_code == SignalCode::FLUSH || frame_msg.signal_code == SignalCode::TERMINATE) {
+                        // retry
+                        continue;
                     } else {
-                        downstream_accepted_frames[it.first] = true;
+                        // failed
+                        break;
                     }
+                } else { // accepted
+                    break;
+                }
+            } else {
+                // timeout
+                if (m_runtime_config->send_goal_retry || m_init_config->video_type == VideoTypes::Local ||
+                    frame_msg.signal_code == SignalCode::FLUSH || frame_msg.signal_code == SignalCode::TERMINATE) {
+                    // retry
+                    continue;
                 } else {
-                    // timeout, try again
-                    failed_count++;
-                    downstream_accepted_frames[it.first] = false;
+                    // failed
                     break;
                 }
             }
         }
-        all_downstream_accepted_frame = true;
-        for (auto &it : downstream_accepted_frames) {
-            all_downstream_accepted_frame &= it.second;
-        }
     }
-    return all_downstream_accepted_frame;
+    return true;
 }
 
 uint64_t OpencvVideoReader::_add_frame_to_shared_memory(const cv::Mat &frame)
@@ -228,7 +219,7 @@ bool OpencvVideoReader::_check_downstreams_ready()
     // check if all downstreams can accept new frame
     for (auto it : m_downstreams) {
         auto &ds = it.second;
-        auto request = std::make_shared<DownstreamReadyQueryService::Request>();
+        auto request = std::make_shared<SRV_StatusQuery::Request>();
         auto result = ds->get_status->async_send_request(request);
         auto timeout_ms = this->m_runtime_config->timeout_ms_send_to_downstream;
         auto wait_status =
@@ -250,38 +241,30 @@ bool OpencvVideoReader::_check_downstreams_ready()
     return true;
 }
 
-bool OpencvVideoReader::_ping_downstreams()
+bool OpencvVideoReader::_ping(const std::shared_ptr<Downstream> &ds)
 {
-    // check m_downstreams size first
-    if (m_downstreams.empty())
-        return false;
+    auto goal_msg = ACT_AcceptFrame::Goal();
+    goal_msg.control_msg.control_signal = 1; // ping
+    goal_msg.control_msg.control_msg = "ping";
 
-    // check if all downstreams can accept new frame
-    for (auto it : m_downstreams) {
-        auto goal_msg = DownstreamAcceptFrameAction::Goal();
-        goal_msg.control_msg.control_signal = 1; // ping
-        goal_msg.control_msg.control_msg = "ping";
-        auto &ds = it.second;
+    // opt.goal_response_callback = callback;
+    auto res = ds->accept_frame->async_send_goal(goal_msg, ds->accept_frame_options);
 
-        // opt.goal_response_callback = callback;
-        auto res = ds->accept_frame->async_send_goal(goal_msg, ds->accept_frame_options);
+    auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
+    auto wait_result = res.wait_for(std::chrono::milliseconds(t));
+    if (wait_result == std::future_status::ready) {
+        auto s = res.get()->get_status();
+        bool ok = false;
 
-        auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
-        auto wait_result = res.wait_for(std::chrono::milliseconds(t));
-        if (wait_result == std::future_status::ready) {
-            auto s = res.get()->get_status();
-            bool ok = false;
+        // downstream accepted?
+        ok |= s == rclcpp_action::GoalStatus::STATUS_ACCEPTED;
+        ok |= s == rclcpp_action::GoalStatus::STATUS_SUCCEEDED;
+        ok |= s == rclcpp_action::GoalStatus::STATUS_EXECUTING;
 
-            // downstream accepted?
-            ok |= s == rclcpp_action::GoalStatus::STATUS_ACCEPTED;
-            ok |= s == rclcpp_action::GoalStatus::STATUS_SUCCEEDED;
-            ok |= s == rclcpp_action::GoalStatus::STATUS_EXECUTING;
-
-            if (!ok)
-                return false;
-        } else
+        if (!ok)
             return false;
-    }
+    } else
+        return false;
     return true;
 }
 
@@ -336,83 +319,84 @@ void OpencvVideoReader::_step()
     };
 
     // read a frame and check if all downstreams ready
-    bool downstream_ready = false;
+    // bool downstream_ready = false;
     if (!(m_impl->is_video_end)) {
-        if (m_runtime_config->read_frame_mode == RuntimeConfig::RFM_READ_ALL) {
-            m_impl->read_frame_ok = read_next_frame();
-            // if (!ok) {// read failed, but not end of video
-            //     return;
-            // }
+        // if (m_runtime_config->read_frame_mode == RuntimeConfig::RFM_READ_ALL) {
+        //     m_impl->read_frame_ok = read_next_frame();
+        //     // if (!ok) {// read failed, but not end of video
+        //     //     return;
+        //     // }
 
-            // downstream_ready = _check_downstreams_ready();
-            // RCLCPP_INFO(logger, "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
+        //     // downstream_ready = _check_downstreams_ready();
+        //     // RCLCPP_INFO(logger, "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
 
-            downstream_ready = _ping_downstreams(); // all downstreams are pinged
+        //     downstream_ready = _ping_downstreams(); // all downstreams are pinged
 
-        } else if (m_runtime_config->read_frame_mode == RuntimeConfig::RFM_READ_IF_READY) {
-            // query first, read frame only if all downstreams can accept new frame
-            // downstream_ready = _check_downstreams_ready();
-            // RCLCPP_INFO(logger, "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
+        // } else if (m_runtime_config->read_frame_mode == RuntimeConfig::RFM_READ_IF_READY) {
+        //     // query first, read frame only if all downstreams can accept new frame
+        //     // downstream_ready = _check_downstreams_ready();
+        //     // RCLCPP_INFO(logger, "[OpencvVideoReader] frame %ld downstream ready? %d", m_frame_number, downstream_ready);
 
-            downstream_ready = _ping_downstreams();
+        //     downstream_ready = _ping_downstreams();
 
-            // some downstream can accept this frame, read it write it to v6d and send to all downstreams
-            if (downstream_ready) {
-                m_impl->read_frame_ok = read_next_frame();
-                // if (!ok)
-                //     return;
-            }
-        }
+        //     // some downstream can accept this frame, read it write it to v6d and send to all downstreams
+        //     if (downstream_ready) {
+        //         m_impl->read_frame_ok = read_next_frame();
+        //         // if (!ok)
+        //         //     return;
+        //     }
+        // }
+        m_impl->read_frame_ok = read_next_frame();
     }
 
     // send to downstreams
-    if (downstream_ready) {
-        MSG_Frame frame_msg;
-        if (!(m_impl->is_video_end)) {
-            if (m_impl->read_frame_ok) {
-                auto h = m_runtime_config->image_height;
-                auto w = m_runtime_config->image_width;
-                cv::Mat resized_frame;
+    // if (downstream_ready) {
+    MSG_Frame frame_msg;
+    if (!(m_impl->is_video_end)) {
+        if (m_impl->read_frame_ok) {
+            auto h = m_runtime_config->image_height;
+            auto w = m_runtime_config->image_width;
+            cv::Mat resized_frame;
 
-                if (h > 0 && w > 0) {
-                    // FIXME: if h<0 or w<0, resize by preserving aspect ratio
-                    cv::resize(frame, m_impl->resized_frame, cv::Size(w, h));
-                    resized_frame = m_impl->resized_frame;
-                } else
-                    resized_frame = frame;
-
-                if (m_publish_image)
-                    _publish_frame(resized_frame);
-
-                // cv::imshow("frame", resized_frame);
-
-                // add frame to v6d
-                auto v6d_id = _add_frame_to_shared_memory(resized_frame);
-                frame_msg.cache.id_int = v6d_id;
-                frame_msg.cache.has_int_id = true;
-                frame_msg.cache.id_string = ObjectIDToString(v6d_id);
-                frame_msg.frame_num = m_frame_number;
-                frame_msg.signal_code = SignalCode::RUN;
+            if (h > 0 && w > 0) {
+                // FIXME: if h<0 or w<0, resize by preserving aspect ratio
+                cv::resize(frame, m_impl->resized_frame, cv::Size(w, h));
+                resized_frame = m_impl->resized_frame;
             } else
-                return;
-        } else {
-            frame_msg.frame_num = INT_MAX;
-            frame_msg.signal_code = SignalCode::FLUSH;
-        }
+                resized_frame = frame;
 
-        // send frame to downstreams
-        // RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] before send, ObjectID: %ld", frame_msg.cache.id_int);
+            if (m_publish_image)
+                _publish_frame(resized_frame);
 
-        // downstream actions are alreayd checked, no need to do it again
-        auto frame_sent_ok = _send_frame_to_downstreams(frame_msg, false);
+            // cv::imshow("frame", resized_frame);
 
-        if (!frame_sent_ok) {
-            // not sent to any downstream, the frame can be deleted
-            auto del_ok = m_impl->v6d_client->DelData(frame_msg.cache.id_int);
-            if (!del_ok.ok())
-                RCLCPP_WARN(logger, "[OpencvVideoReader] failed to delete v6d data %lu", frame_msg.cache.id_int);
-        }
+            // add frame to v6d
+            auto v6d_id = _add_frame_to_shared_memory(resized_frame);
+            frame_msg.cache.id_int = v6d_id;
+            frame_msg.cache.has_int_id = true;
+            frame_msg.cache.id_string = ObjectIDToString(v6d_id);
+            frame_msg.frame_num = m_frame_number;
+            frame_msg.signal_code = SignalCode::RUN;
+        } else
+            return;
+    } else {
+        frame_msg.frame_num = INT_MAX;
+        frame_msg.signal_code = SignalCode::FLUSH;
     }
+
+    // send frame to downstreams
+    // RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] before send, ObjectID: %ld", frame_msg.cache.id_int);
+
+    // downstream actions are alreayd checked, no need to do it again
+    auto frame_sent_ok = _send_frame_to_downstreams(frame_msg, false);
+
+    if (!frame_sent_ok) {
+        // not sent to any downstream, the frame can be deleted
+        auto del_ok = m_impl->v6d_client->DelData(frame_msg.cache.id_int);
+        if (!del_ok.ok())
+            RCLCPP_WARN(logger, "[OpencvVideoReader] failed to delete v6d data %lu", frame_msg.cache.id_int);
+    }
+    // }
 }
 
 
@@ -691,7 +675,7 @@ void OpencvVideoReader::_connect_to_downstreams()
         //  创建status_query_client
         {
             std::string name = it.second.status_query_service;
-            auto client = this->create_client<DownstreamReadyQueryService>(name);
+            auto client = this->create_client<SRV_StatusQuery>(name);
             ds->get_status = client;
             // wait until the service server is ready
             // RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] waiting for service server %s", name.c_str());
@@ -702,8 +686,8 @@ void OpencvVideoReader::_connect_to_downstreams()
         // 创建accept_frame_client
         {
             std::string name = it.second.accept_frame_action;
-            auto client = rclcpp_action::create_client<DownstreamAcceptFrameAction>(this, name);
-            // auto opt = rclcpp_action::Client<DownstreamAcceptFrameAction>::SendGoalOptions();
+            auto client = rclcpp_action::create_client<ACT_AcceptFrame>(this, name);
+            // auto opt = rclcpp_action::Client<ACT_AcceptFrame>::SendGoalOptions();
             // opt.result_callback = std::bind(&OpencvVideoReader::send_frame_result_callback, this, _1);
             // opt.feedback_callback = std::bind(&OpencvVideoReader::send_frame_feedback_callback, this, _1, _2);
             // opt.goal_response_callback = std::bind(&OpencvVideoReader::send_frame_goal_response_callback, this, _1);
@@ -737,7 +721,7 @@ void OpencvVideoReader::_declare_all_parameters()
     this->declare_parameter<std::string>("orbbec_net_device_ip", "");
 
     this->declare_parameter<double>("frame_interval_ms", -1.0);
-    this->declare_parameter<int>("send_goal_retry_times", 0);
+    this->declare_parameter<bool>("send_goal_retry", false);
 }
 
 void OpencvVideoReader::_create_image_topic()

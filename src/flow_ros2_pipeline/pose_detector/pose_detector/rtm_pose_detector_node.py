@@ -30,12 +30,21 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         handler : ActionClient = field(default=None)
 
     @define(kw_only=True)
+    class DSTask_BodyPoses:
+        bodyposes_goal : ProcessBodyPoses.Goal = field()
+        downstream: 'PoseDetectorNode.Downstream' = field()
+        retry_times: int = field(default=0)
+
+    @define(kw_only=True)
     class ModelDownstreamNode:
         action_name: str = field()
 
     @define(kw_only=True)
     class RuntimeConfig:
         step_interval_ms : int = field(default=-1)
+
+        send_goal_retry : bool = field(default=False)  # retry when send goal failed
+        buffer_size : int = field(default=1)           # buffer size for sending task to downstream
 
         def from_parameters(node):
             pass
@@ -93,6 +102,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         self.m_logger = self.get_logger()
 
         self.m_model_groups_data : dict[str, PoseDetectorNode.ModelGroupData] = {}  # key: model_name, value: [ModelGroupData...]
+        self.m_bodyposes_task_waiting : queue.Queue[PoseDetectorNode.DSTask_BodyPoses] = queue.Queue()
 
         self.m_step_running = False
         self.m_step_thread : threading.Thread = None
@@ -278,6 +288,22 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
             self.m_logger.debug(f"_connect_to_downstreams(): created ActionClient for {ds_name}")
             self.m_downstreams[ds_name] = client
 
+    def _ping(self, ds_client):
+        goal_msg = ProcessBodyPoses.Goal()
+        goal_msg.control_msg.control_signal = 1 # ping
+        goal_msg.control_msg.control_msg = "ping"
+
+        res = ds_client.send_goal_async(goal_msg,
+                                            feedback_callback=self._goal_feedback_callback)
+
+        # 等待goal被accept
+        while not res.done():
+            time.sleep(DefaultWaitForGoalDoneIntervalMs / 1000)
+
+        goal_handle = res.result()
+        if not goal_handle.accepted:
+            return False
+        return True
 
     def _init_model_groups_data(self):
         self.m_model_groups_data.clear()
@@ -348,6 +374,24 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
 
     def _accept_detections_accepted_callback(self, goal_handle):
         # just accept the frame and add it to buffer, no processing
+        control_msg = goal_handle.request.control_msg
+
+        # # if buffer is full, reject the frame
+        # for _, model_group_data in self.m_model_groups_data.items():
+        #     if model_group_data.in_queue.qsize() >= self.m_runtime_config.buffer_size:
+        #         goal_handle.abort()
+        #         result = ProcessBodyPoses.Result()
+        #         result.return_msg = "Buffer is full"
+        #         result.return_code = ReturnCode.REJECTED
+        #         return result
+
+        # ping
+        if control_msg.control_signal == 1:
+            goal_handle.succeed()
+            result = ProcessBodyPoses.Result()
+            result.return_msg = "Ping accepted"
+            result.return_code = ReturnCode.SUCCESS
+            return result
 
         detections = goal_handle.request.detections
         # self.m_logger.info(f'_accept_detections_accepted_callback(): frame_num: {detections.frame.frame_num}')
@@ -393,6 +437,66 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
             result = goal_handle.get_result().result  # get_result is sync method, get_result_async is async method
             self.m_logger.debug('_send_goal(): Result: {0}'.format(result.return_msg))
 
+
+    def _send_goal(self):
+        while not self.m_bodyposes_task_waiting.empty():
+            bodyposes_task = self.m_bodyposes_task_waiting.get()
+            ds_client = bodyposes_task.downstream
+            ds_client.wait_for_server()
+
+            while True:
+                if (not self.m_runtime_config.send_goal_retry) and \
+                    bodyposes_task.bodyposes_goal.frame.signal_code == SignalCode.RUN:
+                    if not self._ping(ds_client):
+                        continue
+
+                self._send_goal_future = ds_client.send_goal_async(bodyposes_task.bodyposes_goal,
+                                                feedback_callback=self._goal_feedback_callback)
+
+                # TODO: time out for waiting for goal done
+                # import concurrent.futures
+                # import time
+
+                # # 假设 DefaultWaitForGoalDoneIntervalMs 和 timeout_seconds 已定义
+                # DefaultWaitForGoalDoneIntervalMs = 100  # 示例值，单位为毫秒
+                # timeout_seconds = 5  # 超时时间，单位为秒
+
+                # self._send_goal_future = ds_client.send_goal_async(detections_task.detections_goal,
+                #                                                 feedback_callback=self._goal_feedback_callback)
+
+                # # 等待goal被accept
+                # self.m_logger.debug('_send_goal(): waiting for response...')
+
+                # done, not_done = concurrent.futures.wait(
+                #     [self._send_goal_future], timeout=timeout_seconds, return_when=concurrent.futures.FIRST_COMPLETED)
+
+                # if self._send_goal_future in done:
+                #     result = self._send_goal_future.result()
+                #     # 处理结果
+                # else:
+                #     self.m_logger.error('_send_goal(): goal was not accepted within the timeout period')
+                # 等待goal被accept
+                self.m_logger.debug('_send_goal(): waiting for response...')
+                while not self._send_goal_future.done():
+                    self.m_logger.debug(f'_send_goal(): {bodyposes_task.bodyposes_goal.frame.frame_num} waiting...')
+                    time.sleep(DefaultWaitForGoalDoneIntervalMs / 1000)
+
+                goal_handle = self._send_goal_future.result()
+                if not goal_handle.accepted:
+                    self.m_logger.debug(f'_send_goal(): Goal {bodyposes_task.bodyposes_goal.frame.frame_num} rejected :(')
+                    if (not self.m_runtime_config.send_goal_retry) and \
+                        bodyposes_task.bodyposes_goal.frame.signal_code == SignalCode.RUN: # not retry
+                        break
+                    else: # retry
+                        bodyposes_task.retry_times += 1
+                        continue
+                else:
+                    self.m_logger.info(f'_send_goal(): Goal {bodyposes_task.bodyposes_goal.frame.frame_num} accepted :)')
+
+                    # 等待最终结果
+                    result = goal_handle.get_result().result  # get_result is sync method, get_result_async is async method
+                    self.m_logger.debug('_send_goal(): Result: {0}'.format(result.return_msg))
+                    break
 
     def _visualize(self, goal: ProcessBodyPoses.Goal):
         body_poses = goal.body_poses
@@ -477,21 +581,45 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         is_ok, merged_bodyposes = self._merge_bodyposes()
 
         if is_ok:
-            # send the result to downstreams
+            # add task to task waiting queue
             for bodyposes in merged_bodyposes.values():
                 goal_msg = ProcessBodyPoses.Goal()
                 for bodypose in bodyposes:
                     goal_msg.body_poses.append(bodypose)
                 if len(bodyposes) > 0:
                     goal_msg.frame = bodyposes[0].frame
-                self._send_goal(goal_msg)
-                # self.m_logger.info(f"_step(): sent to downstream {bodyposes[0].frame.frame_num}")
+                for ds_name, ds_client in self.m_downstreams.items():
+                    task = PoseDetectorNode.DSTask_BodyPoses(bodyposes_goal=goal_msg, downstream=ds_client)
+                    self.m_bodyposes_task_waiting.put(task)
+
                 if self._visualize_flag:
                     if goal_msg.frame.signal_code == SignalCode.RUN:
                         self._visualize(goal_msg)  # test only
 
                     else:
                         self._out_video.release()
+
+                time1 = time.time()
+                self._send_goal()
+                time2 = time.time()
+                self.m_logger.info(f"_step(): send goal time {time2 - time1}")
+
+
+            # # send the result to downstreams
+            # for bodyposes in merged_bodyposes.values():
+            #     goal_msg = ProcessBodyPoses.Goal()
+            #     for bodypose in bodyposes:
+            #         goal_msg.body_poses.append(bodypose)
+            #     if len(bodyposes) > 0:
+            #         goal_msg.frame = bodyposes[0].frame
+            #     self._send_goal(goal_msg)
+            #     # self.m_logger.info(f"_step(): sent to downstream {bodyposes[0].frame.frame_num}")
+            #     if self._visualize_flag:
+            #         if goal_msg.frame.signal_code == SignalCode.RUN:
+            #             self._visualize(goal_msg)  # test only
+
+            #         else:
+            #             self._out_video.release()
 
                 # # remove the frame from buffer
                 # self._remove_frame_from_buffer(det.frame.frame_num)
@@ -595,7 +723,9 @@ def main(args=None):
 
     # runtime config
     runtime_config = PoseDetectorNode.RuntimeConfig()
-    runtime_config.step_interval_ms = 100
+    runtime_config.step_interval_ms = 100  # 如果设为1反而会变慢
+    runtime_config.buffer_size = 5
+    runtime_config.send_goal_retry = True
 
     rtm_pose_detector_node.init(init_config, runtime_config)
 

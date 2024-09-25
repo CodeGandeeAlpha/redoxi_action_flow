@@ -47,7 +47,7 @@ void MasterNode::_declare_all_parameters()
     this->declare_parameter<double>("step_interval_ms", -1);
     this->declare_parameter<double>("timeout_ms_send_to_downstream", 10000);
     this->declare_parameter<int>("buffer_size", 1);
-    this->declare_parameter<int>("send_goal_retry_times", 0);
+    this->declare_parameter<bool>("send_goal_retry", false);
 }
 
 void MasterNode::_connect_to_downstreams()
@@ -186,14 +186,14 @@ void MasterNode::_accept_frame_accepted_callback(
     const auto &goal = goal_handle->get_goal();
     const auto &control_msg = goal->control_msg;
 
-    // if buffer is full, reject the frame
-    if (m_frame_buffer.size() >= m_runtime_config->buffer_size) {
-        auto result = std::make_shared<ACT_AcceptFrame::Result>();
-        result->return_msg = "Buffer is full";
-        result->return_code = ReturnCode::REJECTED;
-        goal_handle->abort(result);
-        return;
-    }
+    // // if buffer is full, reject the frame
+    // if (m_frame_buffer.size() >= m_runtime_config->buffer_size) {
+    //     auto result = std::make_shared<ACT_AcceptFrame::Result>();
+    //     result->return_msg = "Buffer is full";
+    //     result->return_code = ReturnCode::REJECTED;
+    //     goal_handle->abort(result);
+    //     return;
+    // }
 
     // ping
     if (control_msg.control_signal == 1) {
@@ -280,7 +280,7 @@ int MasterNode::start()
         [this]() {
             while (rclcpp::ok() && m_impl->step_running) {
                 _step();
-                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+                // std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
             }
         });
 
@@ -315,6 +315,33 @@ int MasterNode::stop()
     return ReturnCode::SUCCESS;
 }
 
+bool MasterNode::_ping(std::shared_ptr<Downstream> ds)
+{
+    auto goal_msg = ACT_AcceptDocument::Goal();
+    goal_msg.control_msg.control_signal = 1; // ping
+    goal_msg.control_msg.control_msg = "ping";
+
+    // opt.goal_response_callback = callback;
+    auto res = ds->handler->async_send_goal(goal_msg, ds->options);
+
+    auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
+    auto wait_result = res.wait_for(std::chrono::milliseconds(t));
+    if (wait_result == std::future_status::ready) {
+        auto s = res.get()->get_status();
+        bool ok = false;
+
+        // downstream accepted?
+        ok |= s == rclcpp_action::GoalStatus::STATUS_ACCEPTED;
+        ok |= s == rclcpp_action::GoalStatus::STATUS_SUCCEEDED;
+        ok |= s == rclcpp_action::GoalStatus::STATUS_EXECUTING;
+
+        if (!ok)
+            return false;
+    } else
+        return false;
+    return true;
+}
+
 void MasterNode::_step()
 {
     // RCLCPP_INFO(m_impl->logger, "MasterNode::_step");
@@ -330,66 +357,84 @@ void MasterNode::_step()
 
     for (auto &it : psgdoc_task_waiting_) {
         auto &task = it.second;
-        ACT_AcceptDocument::Goal goal;
-        goal.document.frame = task->frame;
-        goal.document.signal_code = task->frame.signal_code;
-        auto now = this->now();
-        goal.document.header.stamp = now;
-        // time log
-        RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal.document.frame.frame_num, "master_node", "OUT", now.nanoseconds());
-
         auto ds = task->downstream;
-        auto handle = task->downstream->handler->async_send_goal(goal, ds->options);
 
-        // add timeout condition
-        auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
-        // RCLCPP_INFO(m_impl->logger, "send goal %ld", task->frame.frame_num);
-        auto wait_result = handle.wait_for(std::chrono::milliseconds(t));
-        // RCLCPP_INFO(m_impl->logger, "after wait send goal %ld, wait_result is %d", task->frame.frame_num, wait_result);
-        if (wait_result == std::future_status::ready) {
-            auto task_response = handle.get();
-            if (task_response != nullptr) {
-                // accepted or executing
-                if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
-                    task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
-                    // successfully sent, record this
-                    task->goal_handle = task_response;
-                    {
-                        auto lock_ptr_document_task_doing = m_impl->sync_document_doing_map.synchronize();
-                        (**lock_ptr_document_task_doing)[task->goal_handle] = task;
+        while (true) {
+            if (!m_runtime_config->send_goal_retry && task->frame.signal_code == SignalCode::RUN) // not retry need to ping
+                if (!_ping(ds))
+                    continue;
+
+            ACT_AcceptDocument::Goal goal;
+            goal.document.frame = task->frame;
+            goal.document.signal_code = task->frame.signal_code;
+            auto now = this->now();
+            goal.document.header.stamp = now;
+            // time log
+            RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal.document.frame.frame_num, "master_node", "OUT", now.nanoseconds());
+
+            auto handle = task->downstream->handler->async_send_goal(goal, ds->options);
+
+            // add timeout condition
+            auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
+            // RCLCPP_INFO(m_impl->logger, "send goal %ld", task->frame.frame_num);
+            auto wait_result = handle.wait_for(std::chrono::milliseconds(t));
+            // RCLCPP_INFO(m_impl->logger, "after wait send goal %ld, wait_result is %d", task->frame.frame_num, wait_result);
+            if (wait_result == std::future_status::ready) {
+                auto task_response = handle.get();
+                if (task_response != nullptr) {
+                    // accepted or executing
+                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
+                        task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
+                        // successfully sent, record this
+                        task->goal_handle = task_response;
+                        {
+                            auto lock_ptr_document_task_doing = m_impl->sync_document_doing_map.synchronize();
+                            (**lock_ptr_document_task_doing)[task->goal_handle] = task;
+                        }
+                        tasks_to_remove.push_back(it.first);
+                        break;
                     }
-                    tasks_to_remove.push_back(it.first);
-                }
 
-                // succeed
-                else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                    m_psgdoc_task_done.push_back(task);
-                    tasks_to_remove.push_back(it.first);
-                }
-                // rejected
-                else {
-                    auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
-                    (**lock_ptr_document_task_waiting)[it.first]->retry_times++;
-                    if ((**lock_ptr_document_task_waiting)[it.first]->retry_times >= m_runtime_config->send_goal_retry_times) {
+                    // succeed
+                    else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
                         m_psgdoc_task_done.push_back(task);
                         tasks_to_remove.push_back(it.first);
+                        break;
+                    }
+                    // rejected
+                    else {
+                        if (!m_runtime_config->send_goal_retry && task->frame.signal_code == SignalCode::RUN) { // failed
+                            m_psgdoc_task_done.push_back(task);
+                            tasks_to_remove.push_back(it.first);
+                            break;
+                        } else { // retry
+                            auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+                            (**lock_ptr_document_task_waiting)[it.first]->retry_times++;
+                            continue;
+                        }
+                    }
+                } else {
+                    // rejected
+                    if (!m_runtime_config->send_goal_retry && task->frame.signal_code == SignalCode::RUN) { // failed
+                        m_psgdoc_task_done.push_back(task);
+                        tasks_to_remove.push_back(it.first);
+                        break;
+                    } else { // retry
+                        auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+                        (**lock_ptr_document_task_waiting)[it.first]->retry_times++;
+                        continue;
                     }
                 }
-            } else {
-                // rejected
-                auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
-                (**lock_ptr_document_task_waiting)[it.first]->retry_times++;
-                if ((**lock_ptr_document_task_waiting)[it.first]->retry_times >= m_runtime_config->send_goal_retry_times) {
+            } else {                                                                                    // timeout
+                if (!m_runtime_config->send_goal_retry && task->frame.signal_code == SignalCode::RUN) { // failed
                     m_psgdoc_task_done.push_back(task);
                     tasks_to_remove.push_back(it.first);
+                    break;
+                } else { // retry
+                    auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+                    (**lock_ptr_document_task_waiting)[it.first]->retry_times++;
+                    continue;
                 }
-            }
-        } else {
-            auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
-            (**lock_ptr_document_task_waiting)[it.first]->retry_times++;
-            if ((**lock_ptr_document_task_waiting)[it.first]->retry_times >= m_runtime_config->send_goal_retry_times) {
-                m_psgdoc_task_done.push_back(task);
-                tasks_to_remove.push_back(it.first);
             }
         }
     }

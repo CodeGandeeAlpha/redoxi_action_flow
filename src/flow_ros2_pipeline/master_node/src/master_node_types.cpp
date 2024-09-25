@@ -23,6 +23,7 @@ void MasterNodeRuntimeConfig::from_parameters(MasterNode *node)
     // RCLCPP_INFO(logger, "timeout_ms_send_to_downstream: %lf", this->timeout_ms_send_to_downstream);
 
     buffer_size = node->get_parameter("buffer_size").as_int();
-    send_goal_retry_times = node->get_parameter("send_goal_retry_times").as_int();
+    send_goal_retry = node->get_parameter("send_goal_retry").as_bool();
+    RCLCPP_INFO(logger, "send_goal_retry: %d", this->send_goal_retry);
 }
 } // namespace FlowRos2Pipeline

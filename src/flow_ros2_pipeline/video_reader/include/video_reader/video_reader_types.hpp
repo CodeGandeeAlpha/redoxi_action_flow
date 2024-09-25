@@ -76,7 +76,7 @@ class OpencvVideoReaderRuntimeConfig
     };
     ReadFrameMode read_frame_mode = RFM_READ_ALL;
 
-    int send_goal_retry_times = 0; // retry times when send goal failed
+    bool send_goal_retry = false; // retry times when send goal failed
 
 
     void from_parameters(OpencvVideoReader *node);

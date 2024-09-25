@@ -2,7 +2,7 @@ import re
 from collections import defaultdict
 
 # 日志文件路径
-log_file_path = '/home/chengxiao/.ros/log/2024-09-12-09-18-07-418558-06dfefabfabe-99700/launch.log'
+log_file_path = '/home/chengxiao/.ros/log/2024-09-25-15-04-04-393722-528c8217c6d0-206970/launch.log'
 
 # 正则表达式匹配---TIME LOG行
 time_log_pattern = re.compile(

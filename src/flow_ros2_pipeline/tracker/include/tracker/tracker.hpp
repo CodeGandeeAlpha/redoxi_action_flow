@@ -62,6 +62,7 @@ class Tracker : public rclcpp::Node, public IOpenCloseProtocol
         MSG_Frame frame;                // frame associated with this task
         std::shared_ptr<Downstream> downstream;
         GoalHandle_TrackTargets goal_handle; // downstream goal handle
+        int retry_times = 0;                 // retry times already
     };
 
   public:
@@ -131,6 +132,9 @@ class Tracker : public rclcpp::Node, public IOpenCloseProtocol
 
     // find and connect to downstreams
     virtual void _connect_to_downstreams();
+
+    // ping pipeline downstream to check if it is alive
+    virtual bool _ping(std::shared_ptr<Downstream> ds);
 
     // send document to all pipeline downstreams
     virtual void _send_track_targets_to_downstreams();

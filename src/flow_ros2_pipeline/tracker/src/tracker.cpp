@@ -237,7 +237,7 @@ int Tracker::start()
         [this]() {
             while (rclcpp::ok() && m_impl->step_running) {
                 _step();
-                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+                // std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
             }
         });
 
@@ -329,6 +329,25 @@ void Tracker::_accept_detections_accepted_callback(
 {
 
     const auto &goal = goal_handle->get_goal();
+    const auto &control_msg = goal->control_msg;
+
+    // // if buffer is full, reject the frame
+    // if (m_detections_buffer.size() >= m_runtime_config->buffer_size) {
+    //     auto result = std::make_shared<ACT_AcceptDetections::Result>();
+    //     result->return_msg = "Buffer is full";
+    //     result->return_code = ReturnCode::REJECTED;
+    //     goal_handle->abort(result);
+    //     return;
+    // }
+
+    // ping
+    if (control_msg.control_signal == 1) {
+        auto result = std::make_shared<ACT_AcceptDetections::Result>();
+        result->return_msg = "Ping accepted";
+        result->return_code = ReturnCode::SUCCESS;
+        goal_handle->succeed(result);
+        return;
+    }
 
     // cache the detections
     auto detections = goal->detections;
@@ -384,6 +403,7 @@ void Tracker::_step()
     for (auto &it : track_targets_frames_) {
         auto &track_targets = std::get<0>(it);
         auto &frame = std::get<1>(it);
+        // RCLCPP_INFO(m_impl->logger, "_step(): framenum %d", frame.frame_num);
         {
             auto lock_ptr_track_targets_task_waiting = m_impl->sync_track_targets_waiting_map.synchronize();
             _process_track_targets_create_tasks(track_targets, frame, *lock_ptr_track_targets_task_waiting);
@@ -428,7 +448,7 @@ size_t Tracker::_process_step()
 
         auto &frame = detections.frame;
 
-        // RCLCPP_DEBUG(m_impl->logger, "_process_step(): framenum %d", frame_num);
+        // RCLCPP_INFO(m_impl->logger, "_process_step(): framenum %d", frame_num);
 
         MSG_TrackTargets cur_track_targets;
         // no process test only
@@ -585,6 +605,33 @@ void Tracker::_connect_to_downstreams()
     }
 }
 
+bool Tracker::_ping(std::shared_ptr<Downstream> ds)
+{
+    auto goal_msg = ACT_AcceptTrackTargets::Goal();
+    goal_msg.control_msg.control_signal = 1; // ping
+    goal_msg.control_msg.control_msg = "ping";
+
+    // opt.goal_response_callback = callback;
+    auto res = ds->accept_track_targets->async_send_goal(goal_msg, ds->accept_track_targets_options);
+
+    auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
+    auto wait_result = res.wait_for(std::chrono::milliseconds(t));
+    if (wait_result == std::future_status::ready) {
+        auto s = res.get()->get_status();
+        bool ok = false;
+
+        // downstream accepted?
+        ok |= s == rclcpp_action::GoalStatus::STATUS_ACCEPTED;
+        ok |= s == rclcpp_action::GoalStatus::STATUS_SUCCEEDED;
+        ok |= s == rclcpp_action::GoalStatus::STATUS_EXECUTING;
+
+        if (!ok)
+            return false;
+    } else
+        return false;
+    return true;
+}
+
 void Tracker::_send_track_targets_to_downstreams()
 {
     std::vector<Map_TrackTargets_Waiting::key_type> tasks_to_remove;
@@ -608,42 +655,90 @@ void Tracker::_send_track_targets_to_downstreams()
 
     for (auto &it : track_targets_task_waiting_) {
         auto &task = it.second;
-        ACT_AcceptTrackTargets::Goal goal;
-        goal.track_targets = task->track_targets;
-        goal.frame = task->frame;
         auto ds = task->downstream;
-        auto handle = task->downstream->accept_track_targets->async_send_goal(goal, ds->accept_track_targets_options);
 
-        // // test log
-        // for (auto &track_target : goal.track_targets) {
-        //     RCLCPP_DEBUG(m_impl->logger, "_send_track_targets_to_downstreams(): send track target %s",
-        //                 track_target_msg_to_string(track_target).c_str());
-        // }
+        while (true) {
+            if (!m_runtime_config->send_goal_retry && task->frame.signal_code == SignalCode::RUN) // not retry need to ping
+                if (!_ping(ds))
+                    continue;
 
-        // FIXME: add timeout condition
-        auto task_response = handle.get();
-        if (task_response != nullptr) {
-            // accepted
-            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
-                task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
-                // successfully sent, record this
-                task->goal_handle = task_response;
-                {
-                    auto lock_ptr_track_targets_task_doing = m_impl->sync_track_targets_doing_map.synchronize();
-                    (**lock_ptr_track_targets_task_doing)[task->goal_handle] = task;
+            ACT_AcceptTrackTargets::Goal goal;
+            goal.track_targets = task->track_targets;
+            goal.frame = task->frame;
+            auto handle = task->downstream->accept_track_targets->async_send_goal(goal, ds->accept_track_targets_options);
+
+            // // test log
+            // for (auto &track_target : goal.track_targets) {
+            //     RCLCPP_DEBUG(m_impl->logger, "_send_track_targets_to_downstreams(): send track target %s",
+            //                 track_target_msg_to_string(track_target).c_str());
+            // }
+
+            // add timeout condition
+            auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
+            // RCLCPP_INFO(m_impl->logger, "send goal %ld", task->frame.frame_num);
+            auto wait_result = handle.wait_for(std::chrono::milliseconds(t));
+            // RCLCPP_INFO(m_impl->logger, "after wait send goal %ld, wait_result is %d", task->frame.frame_num, wait_result);
+            if (wait_result == std::future_status::ready) {
+                auto task_response = handle.get();
+                if (task_response != nullptr) {
+                    // accepted
+                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
+                        task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
+                        // successfully sent, record this
+                        task->goal_handle = task_response;
+                        {
+                            auto lock_ptr_track_targets_task_doing = m_impl->sync_track_targets_doing_map.synchronize();
+                            (**lock_ptr_track_targets_task_doing)[task->goal_handle] = task;
+                        }
+                        tasks_to_remove.push_back(it.first);
+                        break;
+                    }
+
+                    // succeed
+                    else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                        m_track_targets_task_done.push_back(task);
+                        tasks_to_remove.push_back(it.first);
+                        break;
+                    }
+                    // rejected
+                    else {
+                        if (!m_runtime_config->send_goal_retry && task->frame.signal_code == SignalCode::RUN) { // failed
+                            m_track_targets_task_done.push_back(task);
+                            tasks_to_remove.push_back(it.first);
+                            break;
+                        } else { // retry
+                            auto lock_ptr_track_targets_task_waiting = m_impl->sync_track_targets_waiting_map.synchronize();
+                            (**lock_ptr_track_targets_task_waiting)[it.first]->retry_times++;
+                            continue;
+                        }
+                    }
+                } else {
+                    // rejected
+                    if (!m_runtime_config->send_goal_retry && task->frame.signal_code == SignalCode::RUN) { // failed
+                        m_track_targets_task_done.push_back(task);
+                        tasks_to_remove.push_back(it.first);
+                        break;
+                    } else { // retry
+                        auto lock_ptr_track_targets_task_waiting = m_impl->sync_track_targets_waiting_map.synchronize();
+                        (**lock_ptr_track_targets_task_waiting)[it.first]->retry_times++;
+                        continue;
+                    }
                 }
-                tasks_to_remove.push_back(it.first);
-            }
-
-            // succeed
-            else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                m_track_targets_task_done.push_back(task);
-                tasks_to_remove.push_back(it.first);
+            } else {
+                // timeout
+                if (!m_runtime_config->send_goal_retry && task->frame.signal_code == SignalCode::RUN) { // failed
+                    m_track_targets_task_done.push_back(task);
+                    tasks_to_remove.push_back(it.first);
+                    break;
+                } else { // retry
+                    auto lock_ptr_track_targets_task_waiting = m_impl->sync_track_targets_waiting_map.synchronize();
+                    (**lock_ptr_track_targets_task_waiting)[it.first]->retry_times++;
+                    continue;
+                }
             }
         }
 
-        // FIXME: what if failed to send many times?
-        // you need to terminate a frame, remove it from memory registry
+        // RCLCPP_INFO(m_impl->logger, "send goal %ld success", task->frame.frame_num);
     }
 
     // remove all sent tasks
@@ -693,6 +788,8 @@ void Tracker::_declare_all_parameters()
     this->declare_parameter<std::string>("process_detections_action", "");
     this->declare_parameter<double>("step_interval_ms", -1);
     this->declare_parameter<double>("timeout_ms_send_to_downstream", -1);
+    this->declare_parameter<int>("buffer_size", 1);
+    this->declare_parameter<bool>("send_goal_retry", false);
 }
 
 void Tracker::_add_detections_to_buffer(const MSG_Detections &detections, Map_Detections *detections_map_ptr)

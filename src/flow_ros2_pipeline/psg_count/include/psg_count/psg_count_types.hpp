@@ -45,6 +45,9 @@ class PSGCountRuntimeConfig
 
     double timeout_ms_send_to_downstream = DefaultTimeoutMs;
 
+    bool send_goal_retry = false; // retry when send goal failed
+    int buffer_size = 1;          // buffer size for sending task to downstreams
+
     void from_parameters(PSGCount *node);
 };
 } // namespace FlowRos2Pipeline

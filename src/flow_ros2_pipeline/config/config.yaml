@@ -3,6 +3,7 @@
     frame_pub_rate: 25
     frame_read_pub: "/frame_read_pub"
     frame_pub: "/frame_pub"
+    send_goal_retry: true
 
 
 /video_reader:
@@ -21,7 +22,6 @@
     image_width: 1920
     image_height: 1080
     frame_interval_ms: 40.0
-    send_goal_retry_times: 5
 
 /master_node:
   ros__parameters:
@@ -30,7 +30,6 @@
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
-    send_goal_retry_times: 5
 
 /detector_in_node:
   ros__parameters:
@@ -38,7 +37,6 @@
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
-    send_goal_retry_times: 5
 
 /detector_node:
   ros__parameters:
@@ -46,7 +44,6 @@
     step_interval_ms: 1.0
     pred_score_thr: 0.3
     buffer_size: 5
-    send_goal_retry_times: 5
 
 
 /detector_out_node:
@@ -56,7 +53,6 @@
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
-    send_goal_retry_times: 5
 
 /person_generator_node:
   ros__parameters:
@@ -64,7 +60,6 @@
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
-    send_goal_retry_times: 5
 
 
 /pose_detector_in_node:
@@ -73,7 +68,6 @@
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
-    send_goal_retry_times: 5
 
 /pose_detector_node:
   ros__parameters:
@@ -81,7 +75,6 @@
     step_interval_ms: 1.0
     pred_score_thr: 0.3
     buffer_size: 5
-    send_goal_retry_times: 5
 
 /pose_detector_out_node:
   ros__parameters:
@@ -90,7 +83,6 @@
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
-    send_goal_retry_times: 5
 
 
 /tracker_in_node:
@@ -99,14 +91,13 @@
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
-    send_goal_retry_times: 5
 
 /tracker_node:
   ros__parameters:
     process_detections_action: "tracker_process_detections_action"
     step_interval_ms: 1.0
+    timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
-    send_goal_retry_times: 5
 
 /tracker_out_node:
   ros__parameters:
@@ -115,7 +106,6 @@
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
-    send_goal_retry_times: 5
 
 /psg_count_node:
   ros__parameters:
@@ -126,4 +116,3 @@
     passengerflow_config_path: "/3d/chengxiao/data/passengerflow/0912_badcase_test/psg_configs/20.22.6.214.json"
     # passengerflow_config_path: "/mnt/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.7.164.json"
     buffer_size: 5
-    send_goal_retry_times: 5

@@ -80,6 +80,7 @@ class DetectorIn : public rclcpp::Node, public IStartStopProtocol
         std::shared_ptr<DownstreamModel> downstream;
         MSG_UUID detections_uuid;
         GoalHandle_Frame goal_handle; // downstream goal handle
+        int retry_times = 0;          // retry times already
     };
 
     class DSTask_PsgDocument
@@ -88,6 +89,7 @@ class DetectorIn : public rclcpp::Node, public IStartStopProtocol
         MSG_PsgDocument document; // frame associated with this task
         std::shared_ptr<DownstreamPipeline> downstream;
         GoalHandle_PsgDocument goal_handle; // downstream goal handle
+        int retry_times = 0;                // retry times already
     };
 
   public:
@@ -139,6 +141,12 @@ class DetectorIn : public rclcpp::Node, public IStartStopProtocol
 
     // find and connect to downstreams
     virtual void _connect_to_downstreams();
+
+    // ping model downstream to check if it is alive
+    virtual bool _ping_model(std::shared_ptr<DownstreamModel> ds);
+
+    // ping pipeline downstream to check if it is alive
+    virtual bool _ping_pipeline(std::shared_ptr<DownstreamPipeline> ds);
 
     // send frame to all model downstreams
     virtual void _send_frame_to_downstreams();

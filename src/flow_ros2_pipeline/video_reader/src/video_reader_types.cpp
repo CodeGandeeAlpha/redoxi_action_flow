@@ -29,6 +29,7 @@ void OpencvVideoReaderRuntimeConfig::from_parameters(OpencvVideoReader *node)
     // RCLCPP_INFO(logger_, "image_width: %d", this->image_width);
     this->image_height = node->get_parameter("image_height").as_int();
     // RCLCPP_INFO(logger_, "image_height: %d", this->image_height);
-    this->send_goal_retry_times = node->get_parameter("send_goal_retry_times").as_int();
+    this->send_goal_retry = node->get_parameter("send_goal_retry").as_bool();
+    RCLCPP_INFO(logger_, "send_goal_retry: %d", this->send_goal_retry);
 }
 } // namespace FlowRos2Pipeline
