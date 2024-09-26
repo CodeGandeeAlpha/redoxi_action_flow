@@ -2,7 +2,10 @@ import threading
 import queue
 from typing import Callable, Any
 from attr import define, field
-from constants import DefaultStreamWorkerGetTimeoutSec, DefaultStreamWorkerPutTimeoutSec
+from psg_common.constants import (
+    DefaultStreamWorkerGetTimeoutSec,
+    DefaultStreamWorkerPutTimeoutSec,
+)
 
 
 @define(kw_only=True, eq=False)
@@ -24,10 +27,10 @@ class StreamWorker:
     # otherwise, the input_function will be used
     input_queue: queue.Queue | None = field(factory=queue.Queue)
 
-    # function to publish data, function signature: (data, StreamWorker) -> None
+    # function to publish data, function signature: (data, StreamWorker) -> bool, bool means whether the data is published
     # if this function is defined, then output_queue will be ignored
     # output_function will be called after on_output_callback
-    output_function: Callable[[Any, "StreamWorker"], None] | None = field(default=None)
+    output_function: Callable[[Any, "StreamWorker"], bool] | None = field(default=None)
 
     # output queue to publish data to, if output_function is not defined,
     # otherwise, the output_function will be used
@@ -43,9 +46,12 @@ class StreamWorker:
 
     worker_thread: threading.Thread | None = field(default=None)
 
-    # function to be called in the worker thread, function signature: (data, StreamWorker) -> output
+    # function to be called in the worker thread, function signature: (data, StreamWorker) -> (bool, data)
+    # bool means whether the data is valid
     # output will be published to the output queue and output_callback will be called
-    worker_function_one_step: Callable[[Any, "StreamWorker"], Any] = field(default=None)
+    worker_function_one_step: Callable[[Any, "StreamWorker"], tuple[bool, Any]] = field(
+        default=None
+    )
 
     # flag to stop the worker thread
     should_stop: bool = field(default=False)
@@ -66,9 +72,7 @@ class StreamWorker:
             raise RuntimeError("Worker thread already started")
         if self.worker_function_one_step is None:
             raise RuntimeError("worker_function_one_step is not defined")
-        self.worker_thread = threading.Thread(
-            target=self._worker_function, args=(self,)
-        )
+        self.worker_thread = threading.Thread(target=self._worker_function)
         self.worker_thread.start()
 
     def _write_output(self, output) -> bool:
@@ -89,7 +93,8 @@ class StreamWorker:
             self.on_output_callback(output, self)
 
         if self.output_function is not None:
-            self.output_function(output, self)
+            is_ok = self.output_function(output, self)
+            return is_ok
         elif self.output_queue is not None:
             try:
                 self.output_queue.put(output, timeout=self.output_queue_put_timeout_sec)
@@ -99,8 +104,6 @@ class StreamWorker:
         else:
             # no output queue or output function, regarded as successful
             return True
-
-        return True
 
     def _read_input(self) -> tuple[bool, Any]:
         """
@@ -155,7 +158,11 @@ class StreamWorker:
 
             # read successfully, process the input data
             if self.worker_function_one_step is not None:
-                output = self.worker_function_one_step(input_data, self)
+                is_step_ok, output = self.worker_function_one_step(input_data, self)
+                if not is_step_ok:
+                    # invalid data, continue to the next iteration
+                    output = None
+                    continue
 
             # done with the input data, write the output
             # if failed to write, we will try again in the next iteration
