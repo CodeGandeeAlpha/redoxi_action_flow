@@ -500,9 +500,10 @@ class DetectorNode(Node, IOpenCloseProtocol):
             if frame_msg.signal_code == SignalCode.RUN
             else None
         )
-        self.m_logger.debug(
-            f"_process_frame_create_model_tasks(): framenum {frame_msg.frame_num} img shape {img.shape}"
-        )
+        if img is not None:
+            self.m_logger.debug(
+                f"_process_frame_create_model_tasks(): framenum {frame_msg.frame_num} img shape {img.shape}"
+            )
 
         # add to every model task queue
         input_data = DetectorNode.ModelGroupInputData(
@@ -764,19 +765,20 @@ class DetectorNode(Node, IOpenCloseProtocol):
             detections.uuid = uuid
             detections.frame = frame_msg
 
-            return detections
-
         # test only
         # img = torch.from_numpy(img).float().to(self.m_model_groups_data[model_group_name].group_models[model_idx].model.device).mean(dim=(0, 1))
         # result = []
         # process the image
-        result = model.infer(img, pred_threshold=self.m_runtime_config.pred_score_thr)
+        else:
+            result = model.infer(
+                img, pred_threshold=self.m_runtime_config.pred_score_thr
+            )
 
-        # convert the result to Detections msg
-        detections = self._to_detections_msg(result)
-        # detections = Detections()
-        detections.uuid = uuid
-        detections.frame = frame_msg
+            # convert the result to Detections msg
+            detections = self._to_detections_msg(result)
+            # detections = Detections()
+            detections.uuid = uuid
+            detections.frame = frame_msg
 
         output.output_per_group[model_group_name].detections = detections
         output.output_per_group[model_group_name].event.set()
