@@ -297,9 +297,9 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         # merge the results from all models
         merge_dets = self._merge_detections(input_data)
-        self.m_logger.info(
-            f"_result_processing_worker_step(): frame {merge_dets.frame.frame_num} merged detections"
-        )
+        # self.m_logger.info(
+        #     f"_result_processing_worker_step(): frame {merge_dets.frame.frame_num} merged detections"
+        # )
 
         outputs = []
         goal_msg = ProcessDetections.Goal()
@@ -314,7 +314,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
     def _create_task(self, outputs: list[DSTask_Detections], source: StreamWorker):
         for task in outputs:
             source.output_queue.put(task)
-            self.m_logger.info(f"_create_task(): {task}")
+            # self.m_logger.info(f"_create_task(): {task}")
         return True
 
     def start_merge_worker(self):
@@ -322,9 +322,9 @@ class DetectorNode(Node, IOpenCloseProtocol):
         for model_group_name, model_group_data in self.m_model_groups_data.items():
             if model_group_name == self.m_init_config.main_group_name:
                 output_queue = model_group_data.out_queue
-                self.m_logger.info(
-                    f"get main group output queue, name = {model_group_name}"
-                )
+                # self.m_logger.info(
+                #     f"get main group output queue, name = {model_group_name}"
+                # )
                 break
 
         for i in range(self.m_init_config.merge_worker_num):
@@ -336,7 +336,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 output_function=self._create_task,
             )
             merge_worker.start()
-            self.m_logger.info(f"start_merge_worker(): merge worker {i} started")
+            # self.m_logger.info(f"start_merge_worker(): merge worker {i} started")
             self.m_merge_workers.append(merge_worker)
 
     def stop_merge_worker(self):
@@ -348,19 +348,6 @@ class DetectorNode(Node, IOpenCloseProtocol):
         assert (
             self.m_status_code == NodeStatusCode.OPENED
         ), "cannot start because status code is not OPENED"
-
-        # create models thread
-        # for model_group_name, model_group_data in self.m_model_groups_data.items():
-        #     for model_idx in range(len(model_group_data.models)):
-        #         model_thread = threading.Thread(
-        #             target=self._func_model,
-        #             args=(
-        #                 model_group_name,
-        #                 model_idx,
-        #             ),
-        #         )
-        #         model_thread.start()
-        #         model_group_data.models[model_idx].running_thread = model_thread
 
         self.start_model_workers()
 
@@ -533,9 +520,9 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         for model_group_name, model_group_data in self.m_model_groups_data.items():
             model_group_data.in_queue.put(input_data)
-            self.m_logger.info(
-                f"_process_frame_create_model_tasks(): frame {frame_msg.frame_num} added to model {model_group_name} task queue"
-            )
+            # self.m_logger.info(
+            #     f"_process_frame_create_model_tasks(): frame {frame_msg.frame_num} added to model {model_group_name} task queue"
+            # )
 
     def _get_frame_from_v6d(self, frame_msg):
         if not frame_msg.cache.has_int_id:
@@ -734,57 +721,6 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         return merged_detections
 
-    # def _merge_detections(self):
-    #     # Step 1: Initialize a dictionary to store the count of each uuid
-    #     # uuid_mapping = {}
-    #     uuid_dict = {}
-    #     # dets = []
-    #     merged_detections = {}
-
-    #     temp_lists = {group_name: [] for group_name in self.m_model_groups_data.keys()}
-
-    #     # Step 2: Iterate over each model's task queue
-    #     for model_group_name, model_group_data in self.m_model_groups_data.items():
-    #         while not model_group_data.out_queue.empty():
-    #             detections = model_group_data.out_queue.get()
-    #             temp_lists[model_group_name].append(detections)
-    #             uuid = detections.uuid
-
-    #             # uuid to tuple for dict key
-    #             uuid_tuple = tuple(uuid.uuid)
-    #             # uuid_mapping[uuid_tuple] = uuid
-
-    #             if uuid_tuple not in uuid_dict:
-    #                 uuid_dict[uuid_tuple] = 0
-    #             uuid_dict[uuid_tuple] += 1
-
-    #     # Step 3: Find uuids that are present in all model task queues
-    #     common_uuid_tuples = [
-    #         uuid_tuple
-    #         for uuid_tuple, count in uuid_dict.items()
-    #         if count == len(self.m_model_groups_data)
-    #     ]
-
-    #     # Step 4: Put the non-common elements back into their respective queues, and merge the common elements
-    #     for model_group_name, temp_list in temp_lists.items():
-    #         for detections in temp_list:
-    #             uuid_tuple = tuple(detections.uuid.uuid)
-    #             if uuid_tuple not in common_uuid_tuples:
-    #                 self.m_model_groups_data[model_group_name].out_queue.put(detections)
-    #             else:
-    #                 if uuid_tuple not in merged_detections:
-    #                     merged_detections[uuid_tuple] = detections
-    #                 else:
-    #                     merged_detections[uuid_tuple].detections.extend(
-    #                         detections.detections
-    #                     )
-
-    #     # # Step 5: Add the merged detections to the list
-    #     # for uuid_tuple, detections in merged_detections.items():
-    #     #     dets.append(detections)
-
-    #     return len(common_uuid_tuples) > 0, merged_detections.values()
-
     def _step(self):
         # check status
         if self.m_status_code != NodeStatusCode.STARTED:
@@ -792,7 +728,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
             return
 
         # time1 = time.time()
-        # asyncio.run(self._send_goal_async(lambda: None))
+        asyncio.run(self._send_goal_async(lambda: None))
         # time2 = time.time()
         # self.m_logger.info(f"_step(): send goal time {time2 - time1}")
 
@@ -809,9 +745,9 @@ class DetectorNode(Node, IOpenCloseProtocol):
         main_group_name = input_data.main_group_name
         output = input_data.output
 
-        self.m_logger.info(
-            f"_model_step(): framenum {frame_msg.frame_num} uuid {pyuuid.UUID(bytes=bytes(uuid.uuid))} popped from model task queue"
-        )
+        # self.m_logger.info(
+        #     f"_model_step(): framenum {frame_msg.frame_num} uuid {pyuuid.UUID(bytes=bytes(uuid.uuid))} popped from model task queue"
+        # )
 
         # # for time test
         # if self._time_test:
