@@ -39,11 +39,13 @@ class SharedTestCases(ABC):
             t_uuid = uuid.uuid4()
             goal_msg.detections_uuid.uuid = list(t_uuid.bytes)
 
-            feedbacks, result = env.send_action_goal_and_wait_for_result(name='model_process_frame_action',
-                                                                         goal=goal_msg,
-                                                                         timeout_availability=100000,
-                                                                         timeout_accept_goal=100000,
-                                                                         timeout_get_result=100000)
+            feedbacks, result = env.send_action_goal_and_wait_for_result(
+                name="model_process_frame_action",
+                goal=goal_msg,
+                timeout_availability=100000,
+                timeout_accept_goal=100000,
+                timeout_get_result=100000,
+            )
             # logging.info(f"test_action_by_video() got feedbacks {feedbacks}")
             # logging.info(f"test_action_by_video() got result {result}")
             frame_num += 1
@@ -51,6 +53,7 @@ class SharedTestCases(ABC):
         cap.release()
 
         time.sleep(30)
+
 
 class TestDetectorNode(SharedTestCases, TestCase):
     @with_launch_file("src/flow_ros2_pipeline/launch/single_detector_launch.py")
