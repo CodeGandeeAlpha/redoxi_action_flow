@@ -284,6 +284,11 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 model_group_data.workers.append(stream_worker)
                 stream_worker.start()
 
+    def stop_model_workers(self):
+        for model_group_name, model_group_data in self.m_model_groups_data.items():
+            for worker in model_group_data.workers:
+                worker.stop()
+
     def _result_processing_worker_step(
         self, input_data: ModelGroupOutputData, source: StreamWorker
     ) -> DSTask_Detections:
@@ -292,6 +297,9 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         # merge the results from all models
         merge_dets = self._merge_detections(input_data)
+        self.m_logger.info(
+            f"_result_processing_worker_step(): frame {merge_dets.frame.frame_num} merged detections"
+        )
 
         outputs = []
         goal_msg = ProcessDetections.Goal()
@@ -306,6 +314,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
     def _create_task(self, outputs: list[DSTask_Detections], source: StreamWorker):
         for task in outputs:
             source.output_queue.put(task)
+            self.m_logger.info(f"_create_task(): {task}")
         return True
 
     def start_merge_worker(self):
@@ -313,9 +322,12 @@ class DetectorNode(Node, IOpenCloseProtocol):
         for model_group_name, model_group_data in self.m_model_groups_data.items():
             if model_group_name == self.m_init_config.main_group_name:
                 output_queue = model_group_data.out_queue
+                self.m_logger.info(
+                    f"get main group output queue, name = {model_group_name}"
+                )
                 break
 
-        for _ in range(self.m_init_config.merge_worker_num):
+        for i in range(self.m_init_config.merge_worker_num):
             # create stream_worker for this model
             merge_worker = StreamWorker(
                 input_queue=output_queue,
@@ -324,7 +336,12 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 output_function=self._create_task,
             )
             merge_worker.start()
+            self.m_logger.info(f"start_merge_worker(): merge worker {i} started")
             self.m_merge_workers.append(merge_worker)
+
+    def stop_merge_worker(self):
+        for worker in self.m_merge_workers:
+            worker.stop()
 
     def start(self) -> int:
         # the node must be opened
@@ -378,6 +395,10 @@ class DetectorNode(Node, IOpenCloseProtocol):
         if self.m_step_thread is not None:
             self.m_step_thread.join()
             self.m_logger.debug("stop(): step thread stopped")
+
+        self.stop_model_workers()
+
+        self.stop_merge_worker()
 
         if self.m_model_groups_data:
             for model_group_name, model_group_data in self.m_model_groups_data.items():
@@ -485,19 +506,6 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
             self.m_model_groups_data[model_group_name] = model_group_data
 
-    # def _remove_frame_from_buffer(self, frame_number : int):
-    #     self.m_logger.info(f"remove frame {frame_number} from buffer")
-    #     with self.m_sync_frame_buffer._lock:
-    #         self.m_sync_frame_buffer.get_value().pop(frame_number, None)
-
-    #     self.m_logger.info(f"remove frame {frame_number} from buffer SUCCESS")
-
-    # def _add_frame_to_buffer(self, frame_msg, uuid):
-    #     self.m_logger.info(f"{threading.get_ident()} _add_frame_to_buffer try lock")
-    #     with self.m_sync_frame_buffer._lock:
-    #         self.m_sync_frame_buffer.get_value()[frame_msg.frame_num] = (frame_msg, uuid)
-    #     self.m_logger.info(f"{threading.get_ident()} _add_frame_to_buffer release lock")
-
     def _process_frame_create_model_tasks(self, frame_msg, uuid):
         # get the image from Vineyard
         img = (
@@ -525,7 +533,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         for model_group_name, model_group_data in self.m_model_groups_data.items():
             model_group_data.in_queue.put(input_data)
-            self.m_logger.debug(
+            self.m_logger.info(
                 f"_process_frame_create_model_tasks(): frame {frame_msg.frame_num} added to model {model_group_name} task queue"
             )
 
@@ -629,94 +637,6 @@ class DetectorNode(Node, IOpenCloseProtocol):
             "_goal_feedback_callback(): {0}".format(feedback_msg.feedback.feedback_msg)
         )
 
-    def _send_goal(self):
-        while not self.m_detections_task_waiting.empty():
-            detections_task = self.m_detections_task_waiting.get()
-            ds_client = detections_task.downstream
-            ds_client.wait_for_server()  # FIXME
-
-            while True:
-                if (
-                    (not self.m_runtime_config.send_goal_retry)
-                    and detections_task.detections_goal.detections.frame.signal_code
-                    == SignalCode.RUN
-                ):
-                    if not self._ping(ds_client):
-                        continue  # FIXME: need sleep
-
-                # self._send_goal_future = ds_client.send_goal_async(detections_task.detections_goal,
-                #                                 feedback_callback=self._goal_feedback_callback)
-                # TODO: time out for waiting for goal done
-                # import concurrent.futures
-                # import time
-
-                # # 假设 DefaultWaitForGoalDoneIntervalMs 和 timeout_seconds 已定义
-                # DefaultWaitForGoalDoneIntervalMs = 100  # 示例值，单位为毫秒
-                # timeout_seconds = 5  # 超时时间，单位为秒
-
-                # self._send_goal_future = ds_client.send_goal_async(detections_task.detections_goal,
-                #                                                 feedback_callback=self._goal_feedback_callback)
-
-                # # 等待goal被accept
-                # self.m_logger.debug('_send_goal(): waiting for response...')
-
-                # done, not_done = concurrent.futures.wait(
-                #     [self._send_goal_future], timeout=timeout_seconds, return_when=concurrent.futures.FIRST_COMPLETED)
-
-                # if self._send_goal_future in done:
-                #     result = self._send_goal_future.result()
-                #     # 处理结果
-                # else:
-                #     self.m_logger.error('_send_goal(): goal was not accepted within the timeout period')
-                # 等待goal被accept
-                self.m_logger.debug("_send_goal(): waiting for response...")
-
-                # event = threading.Event()
-
-                # def unblock(future):
-                #     nonlocal event
-                #     event.set()
-
-                # send_goal_future = self.send_goal_async(goal, **kwargs)
-                # send_goal_future.add_done_callback(unblock)
-
-                # event.wait()
-
-                # while not self._send_goal_future.done():
-                #     self.m_logger.debug(f'_send_goal(): {detections_task.detections_goal.detections.frame.frame_num} waiting...')
-                #     time.sleep(DefaultWaitForGoalDoneIntervalMs / 1000)
-
-                # # FIXME: self._send_goal_future.get()
-
-                # goal_handle = self._send_goal_future.result()
-                goal_handle = ds_client.send_goal(detections_task.detections_goal)
-                if not goal_handle.accepted:
-                    self.m_logger.debug(
-                        f"_send_goal(): Goal {detections_task.detections_goal.detections.frame.frame_num} rejected :("
-                    )
-                    if (
-                        (not self.m_runtime_config.send_goal_retry)
-                        and detections_task.detections_goal.detections.frame.signal_code
-                        == SignalCode.RUN
-                    ):  # not retry
-                        break
-                    else:  # retry
-                        detections_task.retry_times += 1
-                        continue
-                else:
-                    self.m_logger.info(
-                        f"_send_goal(): Goal {detections_task.detections_goal.detections.frame.frame_num} accepted :)"
-                    )
-
-                    # 等待最终结果
-                    result = (
-                        goal_handle.get_result().result
-                    )  # get_result is sync method, get_result_async is async method
-                    self.m_logger.debug(
-                        "_send_goal(): Result: {0}".format(result.return_msg)
-                    )
-                    break
-
     async def _send_goal_async(self, callback_func):
         try:
             detections_task = self.m_detections_task_waiting.get(
@@ -814,56 +734,56 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         return merged_detections
 
-    def _merge_detections(self):
-        # Step 1: Initialize a dictionary to store the count of each uuid
-        # uuid_mapping = {}
-        uuid_dict = {}
-        # dets = []
-        merged_detections = {}
+    # def _merge_detections(self):
+    #     # Step 1: Initialize a dictionary to store the count of each uuid
+    #     # uuid_mapping = {}
+    #     uuid_dict = {}
+    #     # dets = []
+    #     merged_detections = {}
 
-        temp_lists = {group_name: [] for group_name in self.m_model_groups_data.keys()}
+    #     temp_lists = {group_name: [] for group_name in self.m_model_groups_data.keys()}
 
-        # Step 2: Iterate over each model's task queue
-        for model_group_name, model_group_data in self.m_model_groups_data.items():
-            while not model_group_data.out_queue.empty():
-                detections = model_group_data.out_queue.get()
-                temp_lists[model_group_name].append(detections)
-                uuid = detections.uuid
+    #     # Step 2: Iterate over each model's task queue
+    #     for model_group_name, model_group_data in self.m_model_groups_data.items():
+    #         while not model_group_data.out_queue.empty():
+    #             detections = model_group_data.out_queue.get()
+    #             temp_lists[model_group_name].append(detections)
+    #             uuid = detections.uuid
 
-                # uuid to tuple for dict key
-                uuid_tuple = tuple(uuid.uuid)
-                # uuid_mapping[uuid_tuple] = uuid
+    #             # uuid to tuple for dict key
+    #             uuid_tuple = tuple(uuid.uuid)
+    #             # uuid_mapping[uuid_tuple] = uuid
 
-                if uuid_tuple not in uuid_dict:
-                    uuid_dict[uuid_tuple] = 0
-                uuid_dict[uuid_tuple] += 1
+    #             if uuid_tuple not in uuid_dict:
+    #                 uuid_dict[uuid_tuple] = 0
+    #             uuid_dict[uuid_tuple] += 1
 
-        # Step 3: Find uuids that are present in all model task queues
-        common_uuid_tuples = [
-            uuid_tuple
-            for uuid_tuple, count in uuid_dict.items()
-            if count == len(self.m_model_groups_data)
-        ]
+    #     # Step 3: Find uuids that are present in all model task queues
+    #     common_uuid_tuples = [
+    #         uuid_tuple
+    #         for uuid_tuple, count in uuid_dict.items()
+    #         if count == len(self.m_model_groups_data)
+    #     ]
 
-        # Step 4: Put the non-common elements back into their respective queues, and merge the common elements
-        for model_group_name, temp_list in temp_lists.items():
-            for detections in temp_list:
-                uuid_tuple = tuple(detections.uuid.uuid)
-                if uuid_tuple not in common_uuid_tuples:
-                    self.m_model_groups_data[model_group_name].out_queue.put(detections)
-                else:
-                    if uuid_tuple not in merged_detections:
-                        merged_detections[uuid_tuple] = detections
-                    else:
-                        merged_detections[uuid_tuple].detections.extend(
-                            detections.detections
-                        )
+    #     # Step 4: Put the non-common elements back into their respective queues, and merge the common elements
+    #     for model_group_name, temp_list in temp_lists.items():
+    #         for detections in temp_list:
+    #             uuid_tuple = tuple(detections.uuid.uuid)
+    #             if uuid_tuple not in common_uuid_tuples:
+    #                 self.m_model_groups_data[model_group_name].out_queue.put(detections)
+    #             else:
+    #                 if uuid_tuple not in merged_detections:
+    #                     merged_detections[uuid_tuple] = detections
+    #                 else:
+    #                     merged_detections[uuid_tuple].detections.extend(
+    #                         detections.detections
+    #                     )
 
-        # # Step 5: Add the merged detections to the list
-        # for uuid_tuple, detections in merged_detections.items():
-        #     dets.append(detections)
+    #     # # Step 5: Add the merged detections to the list
+    #     # for uuid_tuple, detections in merged_detections.items():
+    #     #     dets.append(detections)
 
-        return len(common_uuid_tuples) > 0, merged_detections.values()
+    #     return len(common_uuid_tuples) > 0, merged_detections.values()
 
     def _step(self):
         # check status
@@ -889,7 +809,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
         main_group_name = input_data.main_group_name
         output = input_data.output
 
-        self.m_logger.debug(
+        self.m_logger.info(
             f"_model_step(): framenum {frame_msg.frame_num} uuid {pyuuid.UUID(bytes=bytes(uuid.uuid))} popped from model task queue"
         )
 
@@ -922,10 +842,12 @@ class DetectorNode(Node, IOpenCloseProtocol):
         detections.uuid = uuid
         detections.frame = frame_msg
 
-        output.output_per_group[main_group_name].detections = detections
-        output.output_per_group[main_group_name].event.set()
+        output.output_per_group[model_group_name].detections = detections
+        output.output_per_group[model_group_name].event.set()
 
-        # self.m_logger.debug(f"_model_step(): framenum {frame_msg.frame_num} detections {detections}")
+        # self.m_logger.info(
+        #     f"_model_step(): framenum {frame_msg.frame_num} detections {detections}"
+        # )
 
         # add the Detections msg to downstreams queue
         self.m_logger.debug(
