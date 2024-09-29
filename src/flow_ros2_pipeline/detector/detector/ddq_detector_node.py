@@ -6,6 +6,7 @@ import uuid as pyuuid
 import numpy as np
 import asyncio
 from uuid import uuid4
+import yappi
 
 # for easy test visualization
 import cv2
@@ -148,7 +149,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         self.m_model_groups_data: dict[str, DetectorNode.ModelGroup] = (
             {}
-        )  # key: model_name, value: [ModelGroupData...]
+        )  # key: model_name, value: ModelGroup
         self.m_detections_task_waiting: queue.Queue[DetectorNode.DSTask_Detections] = (
             queue.Queue()
         )
@@ -176,12 +177,6 @@ class DetectorNode(Node, IOpenCloseProtocol):
             t = self.m_runtime_config.step_interval_ms / 1000.0
             if t > 0:
                 time.sleep(t)
-
-    def _func_model(self, model_group_name, model_idx):
-
-        # model interval cannot be changed during runtime
-        while rclpy.ok() and self.m_step_running:
-            self._model_step(model_group_name, model_idx)
 
     def update_init_config(self, init_config: InitConfig) -> int:
         assert (
@@ -649,6 +644,8 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 f"---TIME LOG: framenum {detections_task.detections_goal.detections.frame.frame_num} node ddq_detector_node type OUT time {self.get_clock().now().nanoseconds / 1000000}"
             )
 
+            if ds_client is None:
+                break
             self._send_goal_future = ds_client.send_goal_async(
                 detections_task.detections_goal,
                 feedback_callback=self._goal_feedback_callback,
@@ -849,7 +846,7 @@ def main(args=None):
     # runtime config
     runtime_config = DetectorNode.RuntimeConfig()
     runtime_config.pred_score_thr = 0.3
-    runtime_config.step_interval_ms = 100  # 如果设为1反而会变慢
+    runtime_config.step_interval_ms = 10
     runtime_config.buffer_size = 5
     runtime_config.send_goal_retry = True
 
@@ -862,4 +859,25 @@ def main(args=None):
 
 
 if __name__ == "__main__":
+    # yappi.start()
+    # try:
+    #     main()
+    # except:
+    #     pass
+    # yappi.stop()
+    # yappi.get_func_stats().save(
+    #     "/3d/chengxiao/code/psf_ros2_ws/tmp/ddq_detector_node.out", "pstat"
+    # )
+
+    # with open(
+    #     "/3d/chengxiao/code/psf_ros2_ws/tmp/ddq_detector_node_func_stats.out", "w+"
+    # ) as file:
+    #     # 调用 print_all 方法，将 out 参数设置为文件对象
+    #     yappi.get_func_stats().print_all(out=file)
+
+    # with open(
+    #     "/3d/chengxiao/code/psf_ros2_ws/tmp/ddq_detector_node_thread_stats.out", "w+"
+    # ) as file:
+    #     # 调用 print_all 方法，将 out 参数设置为文件对象
+    #     yappi.get_thread_stats().print_all(out=file)
     main()
