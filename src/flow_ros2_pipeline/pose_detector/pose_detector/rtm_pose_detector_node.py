@@ -99,6 +99,9 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
 
     @define(kw_only=True, eq=False)
     class ModelGroupOutputData:
+        # key: model_group_name, value: ModelGroupSingleOutput
+        # key表示model分组，value表示这个分组的输出
+        # 输出中包括event和body_poses，event用于等待该组模型处理完这张图片，body_poses是这张图片的pose结果
         output_per_group: dict[str, "PoseDetectorNode.ModelGroupSingleOutput"] = field(
             factory=dict
         )
@@ -249,12 +252,15 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
     def start_model_workers(self):
         for model_group_name, model_group_data in self.m_model_groups_data.items():
             for model in model_group_data.models:
-                output_func = None
+                # output_func = None
 
-                # only main group is responsible for sending the result to output queue
-                # other groups will just pretend to send the result
-                if model_group_name != self.m_init_config.main_group_name:
-                    output_func = lambda x, y: True
+                # # only main group is responsible for sending the result to output queue
+                # # other groups will just pretend to send the result
+                # if model_group_name != self.m_init_config.main_group_name:
+                #     output_func = lambda x, y: True
+
+                # 所有的模型都不写入output_queue，因为在创建input_data时output就已经被写入output_queue了
+                output_func = lambda x, y: True
 
                 # create stream_worker for this model
                 stream_worker = StreamWorker(
@@ -275,6 +281,26 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
     def _result_processing_worker_step(
         self, input_data: ModelGroupOutputData, source: StreamWorker
     ) -> DSTask_BodyPoses:
+        """
+        这个函数作为streamworker的worker_function_one_step，等待所有结果中的event都被set后，合并所有结果，然后发送给下游
+
+        parameters
+        ------------
+            input_data: ModelGroupOutputData
+                一个ModelGroupOutputData对象，表示所有模型的输出，key是model_group_name，value是ModelGroupSingleOutput
+
+            source: StreamWorker
+                worker_function_one_step要求的参数，表示调用这个函数的streamworker，用于获取一些streamworker中的信息比如user_data
+
+        returns
+        ------------
+            bool: 表示输出的data是否是valid的，如果是True，即使它是none，
+            这个data会被write到out（若有output_function则以output_function实现为主，反之写入output_queue）
+
+            list[DSTask_BodyPoses]: DSTask_BodyPoses的列表，每个元素表示一个发送给下游的任务
+        """
+        # wait for all models to finish
+        # FIXME: 这里的event.wait()会阻塞，如果有一个模型出现问题，会导致整个流程阻塞
         for group_name, output in input_data.output_per_group.items():
             output.event.wait()
 
@@ -298,7 +324,25 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
                 outputs.append(task)
         return True, outputs
 
-    def _create_task(self, outputs: list[DSTask_BodyPoses], source: StreamWorker):
+    def _create_task(
+        self, outputs: list[DSTask_BodyPoses], source: StreamWorker
+    ) -> bool:
+        """
+        这个函数作为streamworker的output_function，用于将结果发送给下游
+        原本的output_queue是直接将output写入output_queue，但是我们希望单独处理每个task，所以这里需要一个output_function
+        当output_function不为None时，streamworker会调用这个函数，且output_queue不会被使用
+
+        parameters
+        ------------
+            outputs: list[DSTask_BodyPoses]
+                DSTask_BodyPoses的列表，每个元素表示一个发送给下游的任务
+            source: StreamWorker
+                output_function要求的参数，表示调用这个函数的streamworker，用于获取一些streamworker中的信息比如user_data
+
+        returns
+        ------------
+            bool: True表示成功，False表示失败，如果失败了，streamworker会在下一次迭代中再次调用这个函数尝试write output
+        """
         for task in outputs:
             source.output_queue.put(task)
             # self.m_logger.info(f"_create_task(): {task}")
@@ -497,6 +541,10 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
 
         # add to every model task queue
         for model_group_name, model_group_data in self.m_model_groups_data.items():
+            # put result to main group model out queue
+            if model_group_name == self.m_init_config.main_group_name:
+                model_group_data.out_queue.put(input_data.output)
+
             model_group_data.in_queue.put(input_data)
             self.m_logger.debug(
                 f"_process_detections_create_model_tasks(): frame {detections_msg.frame.frame_num} added to model {model_group_name} task queue"
@@ -677,6 +725,18 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
     def _merge_bodyposes(
         self, input_data: ModelGroupOutputData
     ) -> dict[int, list[BodyPose]]:
+        """
+        对于input_data中的每一个model_group_name，将其body_poses合并到一个dict中，key是frame_num，value是BodyPose列表
+
+        parameters
+        ------------
+            input_data: ModelGroupOutputData
+                一个ModelGroupOutputData对象，表示一组模型的输出，key是model_group_name，value是ModelGroupSingleOutput
+
+        returns
+        ------------
+            dict[int, list[BodyPose]]: key是frame_num，value是BodyPose列表，每个BodyPose对象表示一个人的pose结果
+        """
         merged_bodyposes = {}
         for _, output in input_data.output_per_group.items():
             framenumber = output.body_poses[0].frame.frame_num
@@ -701,6 +761,29 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
     def _model_step(
         self, input_data: ModelGroupInputData, source: StreamWorker
     ) -> ModelGroupOutputData:
+        """
+        这个函数作为streamworker的worker_function_one_step，用于处理每个模型的任务
+        从input_data中获取detections，然后根据detections中的bbox和uuid，从img中截取出对应的人体，然后送入模型中进行处理
+        处理完后，将结果转换为BodyPose消息，然后填入output中，注意这里的output是从input_data中获取的
+        最后output被返回，这里的output不会被写入output_queue，因为这个output在创建input_data时就已经被写入output_queue了
+
+        parameters
+        ------------
+            input_data: ModelGroupInputData
+                一个ModelGroupInputData对象，表示一个模型的输入，包括detections，img，main_group_name，output等信息
+
+            source: StreamWorker
+                worker_function_one_step要求的参数，表示调用这个函数的streamworker，用于获取一些streamworker中的信息比如user_data
+
+        returns
+        ------------
+            bool: 表示输出的data是否是valid的，如果是True，即使它是none，
+            这个data会被write到out（若有output_function则以output_function实现为主，反之写入output_queue）
+
+            ModelGroupOutputData: ModelGroupOutputData对象，表示这个模型的输出，包括event和body_poses
+
+        """
+
         model: BasePoseDetector = source.user_data["model"]
         model_group_name: str = source.user_data["model_group_name"]
 
@@ -778,8 +861,8 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         #     f"_model_step(): framenum {frame_msg.frame_num} detections {detections}"
         # )
 
-        if model_group_name == main_group_name:
-            return True, output
+        # if model_group_name == main_group_name:
+        #     return True, output
         return True, None
 
     def _get_bboxes_and_uuids_from_detections(self, detections_msg):
@@ -808,7 +891,7 @@ def main(args=None):
         process_detections_action="model_process_detections_action",
         main_group_name="rtm_bodypose",
     )
-    init_config.merge_worker_num = 2
+    init_config.merge_worker_num = 1
 
     # init body model
     for i in range(2):

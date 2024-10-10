@@ -419,7 +419,32 @@ void Tracker::_step()
 size_t Tracker::_process_step()
 {
     std::vector<std::pair<int, MSG_Detections>> detections_;
-    {
+    std::vector<int> frame_nums_to_remove;
+
+    if (!m_runtime_config->send_goal_retry) { // no retry can drop frame before waiting frame number
+        auto lock_ptr_detections_map = m_impl->sync_detections_map.synchronize();
+
+        for (auto &it : **lock_ptr_detections_map) {
+            auto &frame_num = it.first;
+            auto &detections = it.second;
+            if (frame_num >= m_waiting_frame_number || frame_num == INT_MAX) {
+                if (frame_num != INT_MAX)
+                    m_waiting_frame_number = frame_num + 1;
+                detections_.push_back(it);
+                // RCLCPP_DEBUG(m_impl->logger, "_process_step(): framenum %d detections push_back to detections_", it.first);
+                // // test log
+                // for (const auto &detection : detections.detections) {
+                //     RCLCPP_DEBUG(m_impl->logger, "_process_step(): detection %s",
+                //                 detection_msg_to_string(detection).c_str());
+                // }
+            } else {
+                // std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+                // remove it from buffer
+                frame_nums_to_remove.push_back(frame_num);
+                break;
+            }
+        }
+    } else { // retry need to process all frames
         auto lock_ptr_detections_map = m_impl->sync_detections_map.synchronize();
 
         for (auto &it : **lock_ptr_detections_map) {
@@ -441,6 +466,11 @@ size_t Tracker::_process_step()
         }
     }
 
+    for (auto &frame_num : frame_nums_to_remove) {
+        auto lock_ptr_detections_map = m_impl->sync_detections_map.synchronize();
+        _remove_detections_from_buffer(frame_num, *lock_ptr_detections_map);
+    }
+
     // process detections
     for (auto &it : detections_) {
         auto &frame_num = it.first;
@@ -458,7 +488,7 @@ size_t Tracker::_process_step()
         // }
 
 
-        if (frame.signal_code == SignalCode::FLUSH || frame.signal_code == SignalCode::TERMINATE) { // last frame
+        if (frame.signal_code == SignalCode::FLUSH || frame.signal_code == SignalCode::TERMINATE || frame_num == INT_MAX) { // last frame
             m_impl->ros_track_event_handler->clear();
             m_impl->tracker->finish_track();
             RCLCPP_DEBUG(m_impl->logger, "_process_step(): framenum %d finish_track", frame_num);

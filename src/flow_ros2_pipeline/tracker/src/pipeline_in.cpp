@@ -461,6 +461,17 @@ void TrackerIn::_send_detections_to_downstreams()
                         m_detections_task_done.push_back(it.second);
                         tasks_to_remove.push_back(it.first);
                         // RCLCPP_DEBUG(m_impl->logger, "_send_detections_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %ld", it.second->detections.frame.frame_num);
+                    } else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ABORTED) {
+                        if (!m_runtime_config->send_goal_retry && it.second->detections.frame.signal_code == SignalCode::RUN) { // failed
+                            m_detections_task_done.push_back(it.second);
+                            tasks_to_remove.push_back(it.first);
+                        } else {
+                            auto lock_ptr_detections_task_waiting = m_impl->sync_detections_waiting_map.synchronize();
+                            (**lock_ptr_detections_task_waiting)[std::make_tuple(it.second->downstream.get(),
+                                                                                 it.second->detections.frame.frame_num)] = it.second;
+
+                            tasks_to_remove.push_back(it.first);
+                        }
                     }
                 }
             }
@@ -588,6 +599,17 @@ void TrackerIn::_send_document_to_downstreams()
                     if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
                         m_psgdoc_task_done.push_back(it.second);
                         tasks_to_remove.push_back(it.first);
+                    } else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ABORTED) {
+                        if (!m_runtime_config->send_goal_retry && it.second->document.frame.signal_code == SignalCode::RUN) { // failed
+                            m_psgdoc_task_done.push_back(it.second);
+                            tasks_to_remove.push_back(it.first);
+                        } else {
+                            auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+                            (**lock_ptr_psgdoc_task_waiting)[std::make_tuple(it.second->downstream.get(),
+                                                                             it.second->document.frame.frame_num)] = it.second;
+
+                            tasks_to_remove.push_back(it.first);
+                        }
                     }
                 }
             }

@@ -158,8 +158,17 @@ void MasterNode::_status_query_callback(const std::shared_ptr<SRV_StatusQuery::R
                                         std::shared_ptr<SRV_StatusQuery::Response> response)
 {
     (void)request; // not used
+
+    // if buffer is full, reject the frame
+    if (m_frame_buffer.size() >= m_runtime_config->buffer_size) {
+        response->status = ReturnCode::REJECTED;
+        RCLCPP_INFO(m_impl->logger, "_status_query_callback() REJECTED, buffer size is %d", m_frame_buffer.size());
+        return;
+    }
+
     // RCLCPP_DEBUG(m_impl->logger, "Received status query request");
     response->status = ReturnCode::SUCCESS;
+    RCLCPP_INFO(m_impl->logger, "_status_query_callback() SUCCESS, buffer size is %d", m_frame_buffer.size());
     // RCLCPP_DEBUG(m_impl->logger, "Response status query request");
 }
 
@@ -186,14 +195,17 @@ void MasterNode::_accept_frame_accepted_callback(
     const auto &goal = goal_handle->get_goal();
     const auto &control_msg = goal->control_msg;
 
-    // // if buffer is full, reject the frame
-    // if (m_frame_buffer.size() >= m_runtime_config->buffer_size) {
-    //     auto result = std::make_shared<ACT_AcceptFrame::Result>();
-    //     result->return_msg = "Buffer is full";
-    //     result->return_code = ReturnCode::REJECTED;
-    //     goal_handle->abort(result);
-    //     return;
-    // }
+    RCLCPP_INFO(m_impl->logger, "frame %d m_frame_buffer buffer size: %d", goal->frame.frame_num, m_frame_buffer.size());
+
+    // if buffer is full, reject the frame
+    if (m_frame_buffer.size() >= m_runtime_config->buffer_size) {
+        auto result = std::make_shared<ACT_AcceptFrame::Result>();
+        result->return_msg = "Buffer is full";
+        result->return_code = ReturnCode::REJECTED;
+        goal_handle->abort(result);
+        RCLCPP_INFO(m_impl->logger, "REJECTED!!! Buffer is full");
+        return;
+    }
 
     // ping
     if (control_msg.control_signal == 1) {
@@ -459,6 +471,17 @@ void MasterNode::_step()
                     if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
                         m_psgdoc_task_done.push_back(it.second);
                         tasks_to_remove.push_back(it.first);
+                    } else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ABORTED) {
+                        if (!m_runtime_config->send_goal_retry && it.second->frame.signal_code == SignalCode::RUN) { // failed
+                            m_psgdoc_task_done.push_back(it.second);
+                            tasks_to_remove.push_back(it.first);
+                        } else {
+                            auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+                            (**lock_ptr_psgdoc_task_waiting)[std::make_tuple(it.second->downstream.get(),
+                                                                             it.second->frame.frame_num)] = it.second;
+
+                            tasks_to_remove.push_back(it.first);
+                        }
                     }
                 }
             }

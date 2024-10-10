@@ -154,6 +154,8 @@ class DetectorNode(Node, IOpenCloseProtocol):
             queue.Queue()
         )
 
+        self.m_num_in_process = 0
+
         self.m_step_running = False
         self.m_step_thread: threading.Thread = None
         self._log = self.get_logger().info
@@ -261,12 +263,15 @@ class DetectorNode(Node, IOpenCloseProtocol):
     def start_model_workers(self):
         for model_group_name, model_group_data in self.m_model_groups_data.items():
             for model in model_group_data.models:
-                output_func = None
+                # output_func = None
 
-                # only main group is responsible for sending the result to output queue
-                # other groups will just pretend to send the result
-                if model_group_name != self.m_init_config.main_group_name:
-                    output_func = lambda x, y: True
+                # # only main group is responsible for sending the result to output queue
+                # # other groups will just pretend to send the result
+                # if model_group_name != self.m_init_config.main_group_name:
+                #     output_func = lambda x, y: True
+
+                # 所有的模型都不写入output_queue，因为在创建input_data时output就已经被写入output_queue了
+                output_func = lambda x, y: True
 
                 # create stream_worker for this model
                 stream_worker = StreamWorker(
@@ -286,7 +291,27 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
     def _result_processing_worker_step(
         self, input_data: ModelGroupOutputData, source: StreamWorker
-    ) -> DSTask_Detections:
+    ) -> list[DSTask_Detections]:
+        """
+        这个函数作为streamworker的worker_function_one_step，等待所有结果中的event都被set后，合并所有结果，然后发送给下游
+
+        parameters
+        ------------
+            input_data: ModelGroupOutputData
+                一个ModelGroupOutputData对象，表示所有模型的输出，key是model_group_name，value是ModelGroupSingleOutput
+
+            source: StreamWorker
+                worker_function_one_step要求的参数，表示调用这个函数的streamworker，用于获取一些streamworker中的信息比如user_data
+
+        returns
+        ------------
+            bool: 表示输出的data是否是valid的，如果是True，即使它是none，
+            这个data会被write到out（若有output_function则以output_function实现为主，反之写入output_queue）
+
+            list[DSTask_Detections]: DSTask_Detections的列表，每个元素表示一个发送给下游的任务
+        """
+        # wait for all models to finish
+        # FIXME: 这里的event.wait()会阻塞，如果有一个模型出现问题，会导致整个流程阻塞
         for group_name, output in input_data.output_per_group.items():
             output.event.wait()
 
@@ -306,7 +331,25 @@ class DetectorNode(Node, IOpenCloseProtocol):
             outputs.append(task)
         return True, outputs
 
-    def _create_task(self, outputs: list[DSTask_Detections], source: StreamWorker):
+    def _create_task(
+        self, outputs: list[DSTask_Detections], source: StreamWorker
+    ) -> bool:
+        """
+        这个函数作为streamworker的output_function，用于将结果发送给下游
+        原本的output_queue是直接将output写入output_queue，但是我们希望单独处理每个task，所以这里需要一个output_function
+        当output_function不为None时，streamworker会调用这个函数，且output_queue不会被使用
+
+        parameters
+        ------------
+            outputs: list[DSTask_Detections]
+                DSTask_Detections的列表，每个元素表示一个发送给下游的任务
+            source: StreamWorker
+                output_function要求的参数，表示调用这个函数的streamworker，用于获取一些streamworker中的信息比如user_data
+
+        returns
+        ------------
+            bool: True表示成功，False表示失败，如果失败了，streamworker会在下一次迭代中再次调用这个函数尝试write output
+        """
         for task in outputs:
             source.output_queue.put(task)
             # self.m_logger.info(f"_create_task(): {task}")
@@ -515,6 +558,10 @@ class DetectorNode(Node, IOpenCloseProtocol):
         }
 
         for model_group_name, model_group_data in self.m_model_groups_data.items():
+            # put result to main group model out queue
+            if model_group_name == self.m_init_config.main_group_name:
+                model_group_data.out_queue.put(input_data.output)
+
             model_group_data.in_queue.put(input_data)
             # self.m_logger.info(
             #     f"_process_frame_create_model_tasks(): frame {frame_msg.frame_num} added to model {model_group_name} task queue"
@@ -543,10 +590,10 @@ class DetectorNode(Node, IOpenCloseProtocol):
             self.m_runtime_config.pred_score_thr < 0
             or self.m_runtime_config.pred_score_thr > 1
         ):
-            self.m_logger.warn(
-                "Invalid prediction score threshold: %f, we set it to 0",
-                self.m_runtime_config.pred_score_thr,
-            )
+            # self.m_logger.warn(
+            #     "Invalid prediction score threshold: %f, we set it to 0",
+            #     self.m_runtime_config.pred_score_thr,
+            # )
             pred_score_thr = 0
         else:
             pred_score_thr = self.m_runtime_config.pred_score_thr
@@ -578,14 +625,17 @@ class DetectorNode(Node, IOpenCloseProtocol):
         # just accept the frame and add it to buffer, no processing
         control_msg = goal_handle.request.control_msg
 
-        # # if buffer is full, reject the frame
-        # for _, model_group_data in self.m_model_groups_data.items():
-        #     if model_group_data.in_queue.qsize() >= self.m_runtime_config.buffer_size:
-        #         goal_handle.abort()
-        #         result = ProcessFrame.Result()
-        #         result.return_msg = "Buffer is full"
-        #         result.return_code = ReturnCode.REJECTED
-        #         return result
+        # if buffer is full, reject the frame
+        self.m_logger.info(
+            f"frame {goal_handle.request.frame.frame_num} in_queue size {self.m_num_in_process}"
+        )
+        if self.m_num_in_process >= self.m_runtime_config.buffer_size:
+            self.m_logger.info(f"frame {goal_handle.request.frame.frame_num} REJECTED")
+            goal_handle.abort()
+            result = ProcessFrame.Result()
+            result.return_msg = "Buffer is full"
+            result.return_code = ReturnCode.REJECTED
+            return result
 
         # ping
         if control_msg.control_signal == 1:
@@ -604,6 +654,8 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         # # add to frame buffer
         # self._add_frame_to_buffer(frame, uuid)
+
+        self.m_num_in_process += 1
 
         # add it to every model task queue
         self._process_frame_create_model_tasks(frame, uuid)
@@ -626,8 +678,20 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 timeout=DefaultStreamWorkerGetTimeoutSec
             )
         except queue.Empty:
-            self.m_logger.warn("_send_goal_async(): no detections task in queue")
+            # self.m_logger.warn("_send_goal_async(): no detections task in queue")
             return
+
+        # # 如果是最后一帧且队列里还有别的帧，放回队列
+        # if (
+        #     detections_task.detections_goal.detections.frame.signal_code
+        #     != SignalCode.RUN
+        #     and not self.m_detections_task_waiting.empty()
+        # ):
+        #     self.m_detections_task_waiting.put(detections_task)
+        #     self.m_logger.info(
+        #         f"_send_goal_async(): frame {detections_task.detections_goal.detections.frame.frame_num} put back to queue"
+        #     )
+        #     return
 
         ds_client = detections_task.downstream
 
@@ -656,7 +720,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
             self.m_logger.debug("_send_goal(): waiting for response...")
 
             if not goal_handle.accepted:
-                self.m_logger.debug(
+                self.m_logger.info(
                     f"_send_goal(): Goal {detections_task.detections_goal.detections.frame.frame_num} rejected :("
                 )
                 if (
@@ -664,6 +728,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
                     and detections_task.detections_goal.detections.frame.signal_code
                     == SignalCode.RUN
                 ):  # not retry
+                    self.m_num_in_process -= 1
                     break
                 else:  # retry
                     detections_task.retry_times += 1
@@ -677,9 +742,10 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 result = (
                     goal_handle.get_result().result
                 )  # get_result is sync method, get_result_async is async method
-                self.m_logger.debug(
-                    "_send_goal(): Result: {0}".format(result.return_msg)
+                self.m_logger.info(
+                    f"_send_goal(): {detections_task.detections_goal.detections.frame.frame_num} Result: {result.return_msg}"
                 )
+                self.m_num_in_process -= 1
                 break
         callback_func()
 
@@ -733,6 +799,27 @@ class DetectorNode(Node, IOpenCloseProtocol):
     def _model_step(
         self, input_data: ModelGroupInputData, source: StreamWorker
     ) -> ModelGroupOutputData:
+        """
+        这个函数作为streamworker的worker_function_one_step，用于处理每个模型的任务
+        从input_data中获取img，然后送入模型中进行处理
+        处理完后，将结果转换为detections消息，然后填入output中，注意这里的output是从input_data中获取的
+        最后output被返回，这里的output不会被写入output_queue，因为这个output在创建input_data时就已经被写入output_queue了
+
+        parameters
+        ------------
+            input_data: ModelGroupInputData
+                一个ModelGroupInputData对象，表示一个模型的输入，包括frame_msg，uuid_msg，img，output等信息
+
+            source: StreamWorker
+                worker_function_one_step要求的参数，表示调用这个函数的streamworker，用于获取一些streamworker中的信息比如user_data
+
+        returns
+        ------------
+            bool: 表示输出的data是否是valid的，如果是True，即使它是none，
+            这个data会被write到out（若有output_function则以output_function实现为主，反之写入output_queue）
+
+            ModelGroupOutputData: ModelGroupOutputData对象，表示这个模型的输出，包括event和detections
+        """
         model: BaseDetector = source.user_data["model"]
         model_group_name: str = source.user_data["model_group_name"]
 
@@ -789,8 +876,8 @@ class DetectorNode(Node, IOpenCloseProtocol):
             f"_model_step(): framenum {frame_msg.frame_num} uuid {pyuuid.UUID(bytes=bytes(detections.uuid.uuid))}"
         )
 
-        if model_group_name == main_group_name:
-            return True, output
+        # if model_group_name == main_group_name:
+        #     return True, output
         return True, None
 
 
@@ -803,7 +890,7 @@ def main(args=None):
     init_config = DetectorNode.InitConfig(
         process_frame_action="model_process_frame_action", main_group_name="body"
     )
-    init_config.merge_worker_num = 2
+    init_config.merge_worker_num = 1
 
     # init body model
     num_body_models = 2
@@ -839,9 +926,9 @@ def main(args=None):
         ddq_detector_node.get_logger().info(f"head model {i} initialized")
 
     downstream = DetectorNode.ModelDownstreamNode(
-        action_name="detector_out_process_detections_action"
+        action_name="detector_pipeline_process_model_results_action"
     )
-    init_config.downstreams["detector_out"] = downstream
+    init_config.downstreams["detector_pipeline"] = downstream
 
     # runtime config
     runtime_config = DetectorNode.RuntimeConfig()

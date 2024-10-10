@@ -419,9 +419,9 @@ void PSGCount::_send_document_to_downstreams()
         auto ds = task->downstream;
 
         while (true) {
-            if (!m_runtime_config->send_goal_retry && task->document.frame.signal_code == SignalCode::RUN) // not retry need to ping
-                if (!_ping(ds))
-                    continue;
+            // if (!m_runtime_config->send_goal_retry && task->document.frame.signal_code == SignalCode::RUN) // not retry need to ping
+            //     if (!_ping(ds))
+            //         continue;
             ACT_AcceptDocument::Goal goal;
             goal.document = task->document;
 
@@ -524,6 +524,17 @@ void PSGCount::_send_document_to_downstreams()
                         m_psgdoc_task_done.push_back(it.second);
                         tasks_to_remove.push_back(it.first);
                         // RCLCPP_DEBUG(m_impl->logger, "_send_document_to_downstreams(): STATUS_SUCCEEDED tasks_to_remove push_back framenumber %ld", it.second->document.frame.frame_num);
+                    } else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ABORTED) {
+                        if (!m_runtime_config->send_goal_retry && it.second->document.frame.signal_code == SignalCode::RUN) { // failed
+                            m_psgdoc_task_done.push_back(it.second);
+                            tasks_to_remove.push_back(it.first);
+                        } else {
+                            auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+                            (**lock_ptr_psgdoc_task_waiting)[std::make_tuple(it.second->downstream.get(),
+                                                                             it.second->document.frame.frame_num)] = it.second;
+
+                            tasks_to_remove.push_back(it.first);
+                        }
                     }
                 }
             }

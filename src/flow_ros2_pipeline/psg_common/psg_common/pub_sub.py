@@ -67,6 +67,9 @@ class StreamWorker:
     # user data to be used by the worker function
     user_data: dict[str, Any] = field(factory=dict)
 
+    # TODO: add a step work function to process one step of the input data
+    _output: Any | None = field(init=False, default=None)
+
     def start(self):
         if self.worker_thread is not None:
             raise RuntimeError("Worker thread already started")
@@ -74,6 +77,39 @@ class StreamWorker:
             raise RuntimeError("worker_function_one_step is not defined")
         self.worker_thread = threading.Thread(target=self._worker_function)
         self.worker_thread.start()
+
+    def step_work_function(self):
+        # write until the output is successfully published
+        if self._output is not None:
+            # will wait for the timeout
+            is_ok = self._write_output(self._output)
+            if not is_ok:
+                return
+            else:
+                self._output = None
+
+        assert self._output is None, "some output data is not published"
+
+        # read input data
+        is_read_ok, input_data = self._read_input()
+        if not is_read_ok:
+            # cannot read? continue to the next iteration, try to read again
+            return
+
+        # read successfully, process the input data
+        if self.worker_function_one_step is not None:
+            is_step_ok, self._output = self.worker_function_one_step(input_data, self)
+            if not is_step_ok:
+                # invalid data, continue to the next iteration
+                self._output = None
+                return
+
+        # done with the input data, write the output
+        # if failed to write, we will try again in the next iteration
+        is_write_ok = self._write_output(self._output)
+        if is_write_ok:
+            # done it, reset the output
+            self._output = None
 
     def _write_output(self, output) -> bool:
         """

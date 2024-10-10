@@ -9,19 +9,20 @@
 #include <rclcpp/service.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 
+#include <psg_actions/action/process_detections.hpp>
 #include <psg_actions/action/process_frame.hpp>
 #include <psg_actions/action/process_psg_document.hpp>
 #include <psg_common/psg_common.hpp>
 #include <psg_services/srv/status_query.hpp>
 
-#include <detector/pipeline_in_types.hpp>
+#include <detector/pipeline_types.hpp>
 
 
 namespace FlowRos2Pipeline
 {
-class DetectorInImpl;
+class DetectorPipelineImpl;
 
-class DetectorIn : public rclcpp::Node, public IStartStopProtocol
+class DetectorPipeline : public rclcpp::Node, public IStartStopProtocol
 {
   public:
     class DownstreamPipeline;
@@ -32,10 +33,13 @@ class DetectorIn : public rclcpp::Node, public IStartStopProtocol
   public:
     using ACT_AcceptFrame = psg_actions::action::ProcessFrame;
     using ACT_AcceptDocument = psg_actions::action::ProcessPsgDocument;
+    using ACT_AcceptDetections = psg_actions::action::ProcessDetections;
 
-    using InitConfig = DetectorInInitConfig;
-    using RuntimeConfig = DetectorInRuntimeConfig;
+    using InitConfig = DetectorPipelineInitConfig;
+    using RuntimeConfig = DetectorPipelineRuntimeConfig;
     using MSG_Frame = psg_public_msgs::msg::Frame;
+    using MSG_Detection = psg_public_msgs::msg::Detection;
+    using MSG_Detections = psg_public_msgs::msg::Detections;
     using MSG_PsgDocument = psg_private_msgs::msg::PsgDocument;
     using MSG_UUID = unique_identifier_msgs::msg::UUID;
 
@@ -96,7 +100,7 @@ class DetectorIn : public rclcpp::Node, public IStartStopProtocol
     };
 
   public:
-    explicit DetectorIn();
+    explicit DetectorPipeline();
 
     // initialize with configurations, must be called once before open()
     virtual int init(const std::shared_ptr<InitConfig> &config, const std::shared_ptr<RuntimeConfig> &runtime_config);
@@ -135,14 +139,34 @@ class DetectorIn : public rclcpp::Node, public IStartStopProtocol
     virtual void _accept_document_accepted_callback(
         const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle);
 
+    // accept model results from model downstreams
+    rclcpp_action::Server<ACT_AcceptDetections>::SharedPtr m_act_accept_model_results;
+    virtual rclcpp_action::GoalResponse _accept_model_results_goal_callback(
+        const rclcpp_action::GoalUUID &uuid,
+        std::shared_ptr<const ACT_AcceptDetections::Goal> goal);
+    virtual rclcpp_action::CancelResponse _accept_model_results_cancel_callback(
+        const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDetections>> goal_handle);
+    virtual void _accept_model_results_accepted_callback(
+        const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDetections>> goal_handle);
+
+  protected:
     // create tasks
     virtual void _process_document_create_tasks(const MSG_PsgDocument &document, Map_Document_Waiting *document_waiting_map_ptr);
     virtual void _process_frame_create_tasks(const MSG_Frame &frame, const MSG_UUID &detections_uuid, Map_Frame_Waiting *frame_waiting_map_ptr);
-    virtual void _process_create_tasks(const MSG_PsgDocument &document, const MSG_Frame &frame,
-                                       const MSG_UUID &detections_uuid, Map_Task_Waiting *task_waiting_map_ptr);
+
+    // add document to buffer
+    virtual void _add_document_to_buffer(const MSG_PsgDocument &document, std::map<int, MSG_PsgDocument> *document_buffer_ptr);
+    // remove document from buffer
+    virtual void _remove_document_from_buffer(int frame_number, std::map<int, MSG_PsgDocument> *document_buffer_ptr);
+
+    // add detections to buffer
+    virtual void _add_detections_to_buffer(const MSG_Detections &detections, std::map<int, std::vector<MSG_Detections>> *detections_buffer_ptr);
+    // remove detections from buffer
+    virtual void _remove_detections_from_buffer(int frame_number, std::map<int, std::vector<MSG_Detections>> *detections_buffer_ptr);
 
   protected:
     virtual void _step();
+    virtual void _process_step();
 
     // find and connect to downstreams
     virtual void _connect_to_downstreams();
@@ -159,9 +183,10 @@ class DetectorIn : public rclcpp::Node, public IStartStopProtocol
     // send document to all pipeline downstreams
     virtual void _send_document_to_downstreams();
 
-    // send task to downstream
-    virtual void _send_single_task_to_downstream();
+    // merge detections and documents
+    virtual void _merge_detections_and_documents();
 
+    // declare all parameters
     virtual void _declare_all_parameters();
 
   protected:
@@ -179,7 +204,7 @@ class DetectorIn : public rclcpp::Node, public IStartStopProtocol
     std::shared_ptr<RuntimeConfig> m_runtime_config;
 
     // impl data
-    std::shared_ptr<DetectorInImpl> m_impl;
+    std::shared_ptr<DetectorPipelineImpl> m_impl;
 
 
     // // on-going tasks of psg document processing
@@ -191,9 +216,12 @@ class DetectorIn : public rclcpp::Node, public IStartStopProtocol
     // // on-going tasks of frame processing
     // // indexed by (downstream, frame_number)
     Map_Frame_Waiting m_frame_task_waiting;
-    Map_Frame_Doing m_frame_task_doing;
-    Vec_Frame_Done m_frame_task_done;
+    // Map_Frame_Doing m_frame_task_doing;
+    // Vec_Frame_Done m_frame_task_done;
 
+    // buffer
+    std::map<int, MSG_PsgDocument> m_document_buffer;               // indexed by frame number
+    std::map<int, std::vector<MSG_Detections>> m_detections_buffer; // indexed by frame number
 
     // status code
     int m_status_code = NodeStatusCode::BEFORE_INIT;

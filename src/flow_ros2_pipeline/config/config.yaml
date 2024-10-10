@@ -3,7 +3,7 @@
     frame_pub_rate: 25
     frame_read_pub: "/frame_read_pub"
     frame_pub: "/frame_pub"
-    send_goal_retry: true
+    send_goal_retry: false
 
 
 /video_reader:
@@ -31,9 +31,17 @@
     timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
 
-/detector_in_node:
+# /detector_in_node:
+#   ros__parameters:
+#     process_document_action: "detector_in_process_document_action"
+#     step_interval_ms: 1.0
+#     timeout_ms_send_to_downstream: 10000.0
+#     buffer_size: 5
+
+/detector_pipeline_node:
   ros__parameters:
-    process_document_action: "detector_in_process_document_action"
+    process_document_action: "detector_pipeline_process_document_action"
+    process_model_results_action: "detector_pipeline_process_model_results_action"
     step_interval_ms: 1.0
     timeout_ms_send_to_downstream: 10000.0
     buffer_size: 5
@@ -46,13 +54,13 @@
     buffer_size: 5
 
 
-/detector_out_node:
-  ros__parameters:
-    process_document_action: "detector_out_process_document_action"
-    process_detections_action: "detector_out_process_detections_action"
-    step_interval_ms: 1.0
-    timeout_ms_send_to_downstream: 10000.0
-    buffer_size: 5
+# /detector_out_node:
+#   ros__parameters:
+#     process_document_action: "detector_out_process_document_action"
+#     process_detections_action: "detector_out_process_detections_action"
+#     step_interval_ms: 1.0
+#     timeout_ms_send_to_downstream: 10000.0
+#     buffer_size: 5
 
 /person_generator_node:
   ros__parameters:

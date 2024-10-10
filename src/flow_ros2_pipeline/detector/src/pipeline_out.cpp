@@ -159,14 +159,18 @@ void DetectorOut::_accept_document_accepted_callback(
     const auto &goal = goal_handle->get_goal();
     const auto &control_msg = goal->control_msg;
 
-    // // if buffer is full, reject the frame
-    // if (m_document_buffer.size() >= m_runtime_config->buffer_size) {
-    //     auto result = std::make_shared<ACT_AcceptDocument::Result>();
-    //     result->return_msg = "Buffer is full";
-    //     result->return_code = ReturnCode::REJECTED;
-    //     goal_handle->abort(result);
-    //     return;
-    // }
+    // buffer size log
+    RCLCPP_INFO(m_impl->logger, "frame %d m_document_buffer buffer size: %d", goal->document.frame.frame_num, m_document_buffer.size());
+
+    // if buffer is full, reject the frame
+    if (m_document_buffer.size() >= m_runtime_config->buffer_size) {
+        auto result = std::make_shared<ACT_AcceptDocument::Result>();
+        result->return_msg = "Buffer is full";
+        result->return_code = ReturnCode::REJECTED;
+        goal_handle->abort(result);
+        RCLCPP_INFO(m_impl->logger, "REJECTED!!! Buffer is full");
+        return;
+    }
 
     // ping
     if (control_msg.control_signal == 1) {
@@ -457,6 +461,17 @@ void DetectorOut::_send_document_to_downstreams()
                     if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
                         m_psgdoc_task_done.push_back(it.second);
                         tasks_to_remove.push_back(it.first);
+                    } else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ABORTED) {
+                        if (!m_runtime_config->send_goal_retry && it.second->document.frame.signal_code == SignalCode::RUN) { // failed
+                            m_psgdoc_task_done.push_back(it.second);
+                            tasks_to_remove.push_back(it.first);
+                        } else {
+                            auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
+                            (**lock_ptr_psgdoc_task_waiting)[std::make_tuple(it.second->downstream.get(),
+                                                                             it.second->document.frame.frame_num)] = it.second;
+
+                            tasks_to_remove.push_back(it.first);
+                        }
                     }
                 }
             }
@@ -545,6 +560,7 @@ void DetectorOut::_merge_detections_and_documents()
         //              detections.frame.frame_num, uuid_to_string(detections.uuid.uuid).c_str());
 
         if (document.detections_uuid == detections.uuid) {
+            RCLCPP_INFO(m_impl->logger, "_merge_detections_and_documents() for frame %d", frame_num);
             // merge detections and documents
             document.detections = detections;
             {
