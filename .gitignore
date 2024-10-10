@@ -4,6 +4,7 @@ install/
 libs/
 log/
 Log/
+tmp/
 design.md
 
 # Prerequisites
