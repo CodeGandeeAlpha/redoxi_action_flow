@@ -10,11 +10,12 @@ ssh-keyscan codeup.aliyun.com >> /root/.ssh/known_hosts
 echo "Installing RedoxiTrack"
 
 # Install RedoxiTrack
-git clone git@codeup.aliyun.com:61adcb80e05da4a409ab67b8/intellif/RedoxiTracking.git /tmp/RedoxiTracking
+# git clone git@codeup.aliyun.com:61adcb80e05da4a409ab67b8/intellif/RedoxiTracking.git /tmp/RedoxiTracking
+git clone https://github.com/CodeGandee/RedoxiTrack.git /tmp/RedoxiTracking
 cd /tmp/RedoxiTracking
-git checkout -b ig-refactor origin/ig-refactor
+# git checkout -b ig-refactor origin/ig-refactor
 mkdir build
 cd build
-cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=ON
 make -j 64
 sudo make install
