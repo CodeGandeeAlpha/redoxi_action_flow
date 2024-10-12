@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# install v6d dependencies
+echo "Installing dependencies..."
+sudo apt-get install -y doxygen \
+                   libboost-all-dev \
+                   libcurl4-openssl-dev \
+                   libgflags-dev \
+                   libgoogle-glog-dev \
+                   libgrpc-dev \
+                   libgrpc++-dev \
+                   libmpich-dev \
+                   libprotobuf-dev \
+                   libssl-dev \
+                   libunwind-dev \
+                   libz-dev \
+                   protobuf-compiler-grpc \
+                   wget
+
+sudo pip install libclang -y
+
+echo "Installing apache arrow..."
+wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb \
+    -O /tmp/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
+sudo apt install -y -V /tmp/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
+sudo apt update -y
+sudo apt install -y libarrow-dev
