@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atomic>
 #include <memory>
 #include <string>
 
@@ -9,53 +8,48 @@
 #include <rclcpp/service.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 
+#include <psg_actions/action/process_body_poses.hpp>
 #include <psg_actions/action/process_detections.hpp>
-#include <psg_actions/action/process_frame.hpp>
 #include <psg_actions/action/process_psg_document.hpp>
 #include <psg_common/psg_common.hpp>
 #include <psg_services/srv/status_query.hpp>
 
-#include <detector/pipeline_types.hpp>
+#include <pose_detector/pipeline_types.hpp>
 
 
 namespace FlowRos2Pipeline
 {
-class DetectorPipelineImpl;
+class PoseDetectorPipelineImpl;
 
-class DetectorPipeline : public rclcpp::Node, public IStartStopProtocol
+class PoseDetectorPipeline : public rclcpp::Node, public IStartStopProtocol
 {
   public:
     class DownstreamPipeline;
     class DownstreamModel;
     class DSTask_PsgDocument;
-    class DSTask_Frame;
+    class DSTask_Detections;
 
   public:
-    using ACT_AcceptFrame = psg_actions::action::ProcessFrame;
-    using ACT_AcceptDocument = psg_actions::action::ProcessPsgDocument;
     using ACT_AcceptDetections = psg_actions::action::ProcessDetections;
+    using ACT_AcceptDocument = psg_actions::action::ProcessPsgDocument;
+    using ACT_AcceptBodyposes = psg_actions::action::ProcessBodyPoses;
 
-    using InitConfig = DetectorPipelineInitConfig;
-    using RuntimeConfig = DetectorPipelineRuntimeConfig;
-    using MSG_Frame = psg_public_msgs::msg::Frame;
-    using MSG_Detection = psg_public_msgs::msg::Detection;
+    using InitConfig = PoseDetectorPipelineInitConfig;
+    using RuntimeConfig = PoseDetectorPipelineRuntimeConfig;
     using MSG_Detections = psg_public_msgs::msg::Detections;
     using MSG_PsgDocument = psg_private_msgs::msg::PsgDocument;
-    using MSG_UUID = unique_identifier_msgs::msg::UUID;
+    using MSG_Bodypose = psg_public_msgs::msg::BodyPose;
+    using MSG_Bodyposes = ACT_AcceptBodyposes::Goal::_body_poses_type;
 
     using GoalHandle_PsgDocument = rclcpp_action::ClientGoalHandle<ACT_AcceptDocument>::SharedPtr;
-    using GoalHandle_Frame = rclcpp_action::ClientGoalHandle<ACT_AcceptFrame>::SharedPtr;
+    using GoalHandle_Detections = rclcpp_action::ClientGoalHandle<ACT_AcceptDetections>::SharedPtr;
 
-    // 针对每个下游的任务，key是downstream和frame_number，value是任务
-    // 每个消息会变成多个任务，他们的消息内容是一样的，但是下游不一样
     using Map_Document_Waiting = std::map<std::tuple<DownstreamPipeline *, int>, std::shared_ptr<DSTask_PsgDocument>>;
-    using Map_Document_Doing = std::map<GoalHandle_PsgDocument, std::shared_ptr<DSTask_PsgDocument>>;
-    using Vec_Document_Done = std::vector<std::shared_ptr<DSTask_PsgDocument>>;
-    using Map_Frame_Waiting = std::map<std::tuple<DownstreamModel *, int>, std::shared_ptr<DSTask_Frame>>;
-    using Map_Frame_Doing = std::map<GoalHandle_Frame, std::shared_ptr<DSTask_Frame>>;
-    using Vec_Frame_Done = std::vector<std::shared_ptr<DSTask_Frame>>;
-
-    using Map_Task_Waiting = std::map<int, std::pair<std::shared_ptr<DSTask_PsgDocument>, std::shared_ptr<DSTask_Frame>>>;
+    // using Map_Document_Doing = std::map<GoalHandle_PsgDocument, std::shared_ptr<DSTask_PsgDocument>>;
+    // using Vec_Document_Done = std::vector<std::shared_ptr<DSTask_PsgDocument>>;
+    using Map_Detections_Waiting = std::map<std::tuple<DownstreamModel *, int>, std::shared_ptr<DSTask_Detections>>;
+    // using Map_Detections_Doing = std::map<GoalHandle_Detections, std::shared_ptr<DSTask_Detections>>;
+    // using Vec_Detections_Done = std::vector<std::shared_ptr<DSTask_Detections>>;
 
     class DownstreamPipeline
     {
@@ -75,32 +69,31 @@ class DetectorPipeline : public rclcpp::Node, public IStartStopProtocol
         {
         }
         // client to call query service
-        rclcpp_action::Client<ACT_AcceptFrame>::SharedPtr accept_frame;
-        rclcpp_action::Client<ACT_AcceptFrame>::SendGoalOptions accept_frame_options;
+        rclcpp_action::Client<ACT_AcceptDetections>::SharedPtr accept_detections;
+        rclcpp_action::Client<ACT_AcceptDetections>::SendGoalOptions accept_detections_options;
     };
 
 
-    class DSTask_Frame
+    class DSTask_Detections
     {
       public:
-        MSG_Frame frame; // frame associated with this task
+        MSG_Detections detections; // detections associated with this task
         std::shared_ptr<DownstreamModel> downstream;
-        MSG_UUID detections_uuid;
-        GoalHandle_Frame goal_handle; // downstream goal handle
-        int retry_times = 0;          // retry times already
+        GoalHandle_Detections goal_handle; // downstream goal handle
+        int retry_times = 0;               // retry times already
     };
 
     class DSTask_PsgDocument
     {
       public:
-        MSG_PsgDocument document; // frame associated with this task
+        MSG_PsgDocument document; // document associated with this task
         std::shared_ptr<DownstreamPipeline> downstream;
         GoalHandle_PsgDocument goal_handle; // downstream goal handle
         int retry_times = 0;                // retry times already
     };
 
   public:
-    explicit DetectorPipeline();
+    explicit PoseDetectorPipeline();
 
     // initialize with configurations, must be called once before open()
     virtual int init(const std::shared_ptr<InitConfig> &config, const std::shared_ptr<RuntimeConfig> &runtime_config);
@@ -140,29 +133,29 @@ class DetectorPipeline : public rclcpp::Node, public IStartStopProtocol
         const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle);
 
     // accept model results from model downstreams
-    rclcpp_action::Server<ACT_AcceptDetections>::SharedPtr m_act_accept_model_results;
+    rclcpp_action::Server<ACT_AcceptBodyposes>::SharedPtr m_act_accept_model_results;
     virtual rclcpp_action::GoalResponse _accept_model_results_goal_callback(
         const rclcpp_action::GoalUUID &uuid,
-        std::shared_ptr<const ACT_AcceptDetections::Goal> goal);
+        std::shared_ptr<const ACT_AcceptBodyposes::Goal> goal);
     virtual rclcpp_action::CancelResponse _accept_model_results_cancel_callback(
-        const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDetections>> goal_handle);
+        const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptBodyposes>> goal_handle);
     virtual void _accept_model_results_accepted_callback(
-        const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDetections>> goal_handle);
+        const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptBodyposes>> goal_handle);
 
-  protected:
     // create tasks
     virtual void _process_document_create_tasks(const MSG_PsgDocument &document, Map_Document_Waiting *document_waiting_map_ptr);
-    virtual void _process_frame_create_tasks(const MSG_Frame &frame, const MSG_UUID &detections_uuid, Map_Frame_Waiting *frame_waiting_map_ptr);
+    virtual void _process_detections_create_tasks(const MSG_Detections &detections, Map_Detections_Waiting *detections_waiting_map_ptr);
 
     // add document to buffer
     virtual void _add_document_to_buffer(const MSG_PsgDocument &document, std::map<int, MSG_PsgDocument> *document_buffer_ptr);
     // remove document from buffer
     virtual void _remove_document_from_buffer(int frame_number, std::map<int, MSG_PsgDocument> *document_buffer_ptr);
 
-    // add detections to buffer
-    virtual void _add_detections_to_buffer(const MSG_Detections &detections, std::map<int, std::vector<MSG_Detections>> *detections_buffer_ptr);
-    // remove detections from buffer
-    virtual void _remove_detections_from_buffer(int frame_number, std::map<int, std::vector<MSG_Detections>> *detections_buffer_ptr);
+    // add bodyposes to buffer
+    virtual void _add_bodyposes_to_buffer(const MSG_Bodyposes &bodyposes, const int frame_number,
+                                          std::map<int, std::vector<MSG_Bodyposes>> *bodyposes_buffer_ptr);
+    // remove bodyposes from buffer
+    virtual void _remove_bodyposes_from_buffer(int frame_number, std::map<int, std::vector<MSG_Bodyposes>> *bodyposes_buffer_ptr);
 
   protected:
     virtual void _step();
@@ -177,14 +170,14 @@ class DetectorPipeline : public rclcpp::Node, public IStartStopProtocol
     // ping pipeline downstream to check if it is alive
     virtual bool _ping_pipeline(std::shared_ptr<DownstreamPipeline> ds);
 
-    // send frame to all model downstreams
-    virtual void _send_frame_to_downstreams();
+    // send detections to all model downstreams
+    virtual void _send_detections_to_downstreams();
 
     // send document to all pipeline downstreams
     virtual void _send_document_to_downstreams();
 
-    // merge detections and documents
-    virtual void _merge_detections_and_documents();
+    // merge bodyposes and documents
+    virtual void _merge_bodyposes_and_documents();
 
     // declare all parameters
     virtual void _declare_all_parameters();
@@ -204,7 +197,7 @@ class DetectorPipeline : public rclcpp::Node, public IStartStopProtocol
     std::shared_ptr<RuntimeConfig> m_runtime_config;
 
     // impl data
-    std::shared_ptr<DetectorPipelineImpl> m_impl;
+    std::shared_ptr<PoseDetectorPipelineImpl> m_impl;
 
 
     // // on-going tasks of psg document processing
@@ -215,13 +208,13 @@ class DetectorPipeline : public rclcpp::Node, public IStartStopProtocol
 
     // // on-going tasks of frame processing
     // // indexed by (downstream, frame_number)
-    Map_Frame_Waiting m_frame_task_waiting;
-    // Map_Frame_Doing m_frame_task_doing;
-    // Vec_Frame_Done m_frame_task_done;
+    Map_Detections_Waiting m_detections_task_waiting;
+    // Map_Detections_Doing m_detections_task_doing;
+    // Vec_Detections_Done m_detections_task_done;
 
     // buffer
-    std::map<int, MSG_PsgDocument> m_document_buffer;               // indexed by frame number
-    std::map<int, std::vector<MSG_Detections>> m_detections_buffer; // indexed by frame number
+    std::map<int, MSG_PsgDocument> m_document_buffer;             // indexed by frame number
+    std::map<int, std::vector<MSG_Bodyposes>> m_bodyposes_buffer; // indexed by frame number
 
     // status code
     int m_status_code = NodeStatusCode::BEFORE_INIT;

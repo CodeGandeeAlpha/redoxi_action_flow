@@ -2,8 +2,8 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <rclcpp/utilities.hpp>
 
-#include <detector/_pipeline.hpp>
-#include <detector/pipeline.hpp>
+#include <pose_detector/_pipeline.hpp>
+#include <pose_detector/pipeline.hpp>
 #include <rcpputils/asserts.hpp>
 
 static constexpr auto ROS_ASSERT = rcpputils::assert_true;
@@ -12,51 +12,26 @@ using namespace std::chrono_literals;
 
 namespace FlowRos2Pipeline
 {
-std::string bbox_msg_to_string(const psg_public_msgs::msg::Box2 &bbox)
+PoseDetectorPipeline::PoseDetectorPipeline()
+    : Node("pose_detector_pipeline_node")
 {
-    std::string str = "(";
-    str += std::to_string(bbox.x) + ", ";
-    str += std::to_string(bbox.y) + ", ";
-    str += std::to_string(bbox.width) + ", ";
-    str += std::to_string(bbox.height) + ")";
-
-    return str;
-}
-
-
-std::string detection_msg_to_string(const DetectorPipeline::MSG_Detection &detection)
-{
-    std::string str = "Detection: {\n";
-    str += "frame_num: " + std::to_string(detection.frame.frame_num) + "\n";
-    str += "category: " + std::to_string(detection.category) + "\n";
-    str += "uuid: " + uuid_to_string(detection.uuid.uuid) + "\n";
-    str += "bbox: " + bbox_msg_to_string(detection.bbox) + "\n";
-    str += "confidence: " + std::to_string(detection.confidence) + "\n";
-    str += "}";
-
-    return str;
-}
-
-DetectorPipeline::DetectorPipeline()
-    : Node("detector_pipeline_node")
-{
-    m_impl = std::make_shared<DetectorPipelineImpl>(this);
+    m_impl = std::make_shared<PoseDetectorPipelineImpl>(this);
 
     _declare_all_parameters();
 
     // init impl members
     m_impl->sync_document_waiting_map = &m_psgdoc_task_waiting;
     // m_impl->sync_document_doing_map = &m_psgdoc_task_doing;
-    m_impl->sync_frame_waiting_map = &m_frame_task_waiting;
-    // m_impl->sync_frame_doing_map = &m_frame_task_doing;
+    m_impl->sync_detections_waiting_map = &m_detections_task_waiting;
+    // m_impl->sync_detections_doing_map = &m_detections_task_doing;
     m_impl->sync_document_buffer = &m_document_buffer;
-    m_impl->sync_detections_buffer = &m_detections_buffer;
+    m_impl->sync_bodyposes_buffer = &m_bodyposes_buffer;
 
     // RCLCPP_INFO(m_impl->logger, "constraction success!");
 }
 
-int DetectorPipeline::init(const std::shared_ptr<InitConfig> &config,
-                           const std::shared_ptr<RuntimeConfig> &runtime_config)
+int PoseDetectorPipeline::init(const std::shared_ptr<InitConfig> &config,
+                               const std::shared_ptr<RuntimeConfig> &runtime_config)
 {
     ROS_ASSERT(m_status_code == NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::STOPPED,
                "init FAILED! status code is not BEFORE_INIT or STOPPED");
@@ -70,16 +45,16 @@ int DetectorPipeline::init(const std::shared_ptr<InitConfig> &config,
     // create Pipeline server
     m_act_process_document = rclcpp_action::create_server<ACT_AcceptDocument>(
         this, m_init_config->process_document_action,
-        std::bind(&DetectorPipeline::_accept_document_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
-        std::bind(&DetectorPipeline::_accept_document_cancel_callback, this, std::placeholders::_1),
-        std::bind(&DetectorPipeline::_accept_document_accepted_callback, this, std::placeholders::_1));
+        std::bind(&PoseDetectorPipeline::_accept_document_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
+        std::bind(&PoseDetectorPipeline::_accept_document_cancel_callback, this, std::placeholders::_1),
+        std::bind(&PoseDetectorPipeline::_accept_document_accepted_callback, this, std::placeholders::_1));
 
     // create Model server
-    m_act_accept_model_results = rclcpp_action::create_server<ACT_AcceptDetections>(
+    m_act_accept_model_results = rclcpp_action::create_server<ACT_AcceptBodyposes>(
         this, m_init_config->process_model_results_action,
-        std::bind(&DetectorPipeline::_accept_model_results_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
-        std::bind(&DetectorPipeline::_accept_model_results_cancel_callback, this, std::placeholders::_1),
-        std::bind(&DetectorPipeline::_accept_model_results_accepted_callback, this, std::placeholders::_1));
+        std::bind(&PoseDetectorPipeline::_accept_model_results_goal_callback, this, std::placeholders::_1, std::placeholders::_2),
+        std::bind(&PoseDetectorPipeline::_accept_model_results_cancel_callback, this, std::placeholders::_1),
+        std::bind(&PoseDetectorPipeline::_accept_model_results_accepted_callback, this, std::placeholders::_1));
 
     auto status_before = m_status_code;
     m_status_code = NodeStatusCode::INITIALIZED;
@@ -87,12 +62,12 @@ int DetectorPipeline::init(const std::shared_ptr<InitConfig> &config,
     return ReturnCode::SUCCESS;
 }
 
-const std::shared_ptr<DetectorPipeline::InitConfig> &DetectorPipeline::get_init_config() const
+const std::shared_ptr<PoseDetectorPipeline::InitConfig> &PoseDetectorPipeline::get_init_config() const
 {
     return m_init_config;
 }
 
-int DetectorPipeline::update_runtime_config(const std::shared_ptr<RuntimeConfig> &config)
+int PoseDetectorPipeline::update_runtime_config(const std::shared_ptr<RuntimeConfig> &config)
 {
     ROS_ASSERT(m_status_code != NodeStatusCode::STARTED &&
                    m_status_code != NodeStatusCode::BEFORE_INIT,
@@ -102,13 +77,13 @@ int DetectorPipeline::update_runtime_config(const std::shared_ptr<RuntimeConfig>
     return ReturnCode::SUCCESS;
 }
 
-const std::shared_ptr<DetectorPipeline::RuntimeConfig> &DetectorPipeline::get_runtime_config() const
+const std::shared_ptr<PoseDetectorPipeline::RuntimeConfig> &PoseDetectorPipeline::get_runtime_config() const
 {
     return m_runtime_config;
 }
 
 
-int DetectorPipeline::start()
+int PoseDetectorPipeline::start()
 {
     // the node must be opened
     ROS_ASSERT(m_status_code == NodeStatusCode::INITIALIZED,
@@ -143,7 +118,7 @@ int DetectorPipeline::start()
     return ReturnCode::SUCCESS;
 }
 
-int DetectorPipeline::stop()
+int PoseDetectorPipeline::stop()
 {
     // only stoppable if the node is started
     ROS_ASSERT(m_status_code == NodeStatusCode::STARTED,
@@ -168,13 +143,13 @@ int DetectorPipeline::stop()
 }
 
 
-int DetectorPipeline::get_status_code() const
+int PoseDetectorPipeline::get_status_code() const
 {
     return m_status_code;
 }
 
 
-rclcpp_action::GoalResponse DetectorPipeline::_accept_document_goal_callback(
+rclcpp_action::GoalResponse PoseDetectorPipeline::_accept_document_goal_callback(
     const rclcpp_action::GoalUUID &uuid,
     std::shared_ptr<const ACT_AcceptDocument::Goal> goal)
 {
@@ -183,7 +158,7 @@ rclcpp_action::GoalResponse DetectorPipeline::_accept_document_goal_callback(
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
-rclcpp_action::CancelResponse DetectorPipeline::_accept_document_cancel_callback(
+rclcpp_action::CancelResponse PoseDetectorPipeline::_accept_document_cancel_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle)
 {
     // RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
@@ -191,25 +166,22 @@ rclcpp_action::CancelResponse DetectorPipeline::_accept_document_cancel_callback
     return rclcpp_action::CancelResponse::REJECT;
 }
 
-void DetectorPipeline::_accept_document_accepted_callback(
+void PoseDetectorPipeline::_accept_document_accepted_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle)
 {
     const auto &goal = goal_handle->get_goal();
     const auto &control_msg = goal->control_msg;
 
-    // buffer size log
-    RCLCPP_INFO(m_impl->logger, "frame %d document buffer size: %d", goal->document.frame.frame_num, m_document_buffer.size());
-
-    // if buffer is full, reject the frame
-    // 无论是不是丢帧模式（不尝试重复发送），都会在这里被拦截，避免buffer溢出
-    if (m_document_buffer.size() >= m_runtime_config->buffer_size) {
-        auto result = std::make_shared<ACT_AcceptDocument::Result>();
-        result->return_msg = "Buffer is full";
-        result->return_code = ReturnCode::REJECTED;
-        goal_handle->abort(result);
-        RCLCPP_INFO(m_impl->logger, "REJECTED!!! Buffer is full");
-        return;
-    }
+    // // if buffer is full, reject the frame
+    // // 无论是不是丢帧模式（不尝试重复发送），都会在这里被拦截，避免buffer溢出
+    // if (m_document_buffer.size() >= m_runtime_config->buffer_size) {
+    //     auto result = std::make_shared<ACT_AcceptDocument::Result>();
+    //     result->return_msg = "Buffer is full";
+    //     result->return_code = ReturnCode::REJECTED;
+    //     goal_handle->abort(result);
+    //     RCLCPP_INFO(m_impl->logger, "REJECTED!!! Buffer is full");
+    //     return;
+    // }
 
     // 当没有reject时，ping一定成功
     if (control_msg.control_signal == 1) {
@@ -221,32 +193,44 @@ void DetectorPipeline::_accept_document_accepted_callback(
     }
 
     // time log
-    RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal->document.frame.frame_num, "detector", "IN", this->now().nanoseconds());
+    RCLCPP_INFO(m_impl->logger, "---TIME LOG: framenum %ld node %s type %s time %ld", goal->document.frame.frame_num, "pose_detector", "IN", this->now().nanoseconds());
 
     // cache the document, copy it for modify it
     auto document = goal->document;
-    const auto &frame = document.frame;
+    auto &persons = document.persons;
 
-    // add detections_uuid to document
-    boost::uuids::uuid uuid = boost::uuids::random_generator()();
-    std::copy(uuid.begin(), uuid.end(), document.detections_uuid.uuid.begin());
+    // generate uuid for every Person and then generate body detections from person body
+    MSG_Detections detections;
+    for (size_t i = 0; i < persons.persons.size(); i++) {
+        boost::uuids::uuid uuid = boost::uuids::random_generator()();
 
-    // add to buffer
+        auto &person = document.persons.persons[i];
+        std::copy(uuid.begin(), uuid.end(), person.uuid.uuid.begin());
+
+        auto &body = person.body;
+        if (body.category != -1) { // not empty
+            body.uuid = person.uuid;
+            detections.detections.push_back(body);
+        }
+    }
+    detections.frame = document.frame;
+
+    // add document to buffer
     {
         auto lock_ptr_document_buffer = m_impl->sync_document_buffer.synchronize();
         _add_document_to_buffer(document, *lock_ptr_document_buffer);
     }
 
-    // 设定好m_detections_buffer的初始值
+    // 设定好m_bodyposes_buffer的初始值
     {
-        auto lock_ptr_detections_buffer = m_impl->sync_detections_buffer.synchronize();
-        (**lock_ptr_detections_buffer)[frame.frame_num] = std::vector<MSG_Detections>();
+        auto lock_ptr_bodyposes_buffer = m_impl->sync_bodyposes_buffer.synchronize();
+        (**lock_ptr_bodyposes_buffer)[document.frame.frame_num] = std::vector<MSG_Bodyposes>();
     }
 
     // create tasks for all model downstreams
     {
-        auto lock_ptr_frame_task_waiting = m_impl->sync_frame_waiting_map.synchronize();
-        _process_frame_create_tasks(frame, document.detections_uuid, *lock_ptr_frame_task_waiting);
+        auto lock_ptr_detections_task_waiting = m_impl->sync_detections_waiting_map.synchronize();
+        _process_detections_create_tasks(detections, *lock_ptr_detections_task_waiting);
     }
 
     auto result = std::make_shared<ACT_AcceptDocument::Result>();
@@ -255,52 +239,49 @@ void DetectorPipeline::_accept_document_accepted_callback(
     goal_handle->succeed(result);
 }
 
-rclcpp_action::GoalResponse DetectorPipeline::_accept_model_results_goal_callback(
+rclcpp_action::GoalResponse PoseDetectorPipeline::_accept_model_results_goal_callback(
     const rclcpp_action::GoalUUID &uuid,
-    std::shared_ptr<const ACT_AcceptDetections::Goal> goal)
+    std::shared_ptr<const ACT_AcceptBodyposes::Goal> goal)
 {
-    // RCLCPP_INFO(m_impl->logger, "Received goal request with detections with frame_num %ld", goal->detections.frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "Received goal request with bodyposes with frame_num %ld", goal->frame.frame_num);
     (void)uuid; // not used
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
-
-rclcpp_action::CancelResponse DetectorPipeline::_accept_model_results_cancel_callback(
-    const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDetections>> goal_handle)
+rclcpp_action::CancelResponse PoseDetectorPipeline::_accept_model_results_cancel_callback(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptBodyposes>> goal_handle)
 {
     // RCLCPP_INFO(m_impl->logger, "Received request to cancel goal");
     (void)goal_handle; // not used
     return rclcpp_action::CancelResponse::REJECT;
 }
 
-
-void DetectorPipeline::_accept_model_results_accepted_callback(
-    const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDetections>> goal_handle)
+void PoseDetectorPipeline::_accept_model_results_accepted_callback(
+    const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptBodyposes>> goal_handle)
 {
+
     const auto &goal = goal_handle->get_goal();
     const auto &control_msg = goal->control_msg;
 
-    // cache the detections
-    const auto &detections = goal->detections;
+    // cache the bodyposes
+    const auto &body_poses = goal->body_poses;
+    const auto &frame = goal->frame;
 
     // add to buffer
     {
-        auto lock_ptr_detections_buffer = m_impl->sync_detections_buffer.synchronize();
-        _add_detections_to_buffer(detections, *lock_ptr_detections_buffer);
+        auto lock_ptr_bodyposes_buffer = m_impl->sync_bodyposes_buffer.synchronize();
+        _add_bodyposes_to_buffer(body_poses, frame.frame_num, *lock_ptr_bodyposes_buffer);
     }
 
-    // RCLCPP_INFO(m_impl->logger, "add detections to buffer");
-    // RCLCPP_INFO(m_impl->logger, "Accepted detections %ld with UUID %s and add it to buffer",
-    // detections.frame.frame_num, uuid_to_string(detections.uuid.uuid).c_str());
+    // RCLCPP_INFO(m_impl->logger, "_accept_bodyposes_accepted_callback(): Accepted frame_number %ld and add it to buffer", frame.frame_num);
 
-    auto result = std::make_shared<ACT_AcceptDetections::Result>();
-    result->return_msg = "Detections accepted";
+    auto result = std::make_shared<ACT_AcceptBodyposes::Result>();
+    result->return_msg = "Bodyposes accepted";
     result->return_code = ReturnCode::SUCCESS;
     goal_handle->succeed(result);
 }
 
-
-void DetectorPipeline::_process_document_create_tasks(const MSG_PsgDocument &document, Map_Document_Waiting *psgdoc_task_waiting_ptr)
+void PoseDetectorPipeline::_process_document_create_tasks(const MSG_PsgDocument &document, Map_Document_Waiting *psgdoc_task_waiting_ptr)
 {
     // create tasks of this frame for all downstreams
     for (auto &x : m_pipeline_downstreams) {
@@ -312,30 +293,28 @@ void DetectorPipeline::_process_document_create_tasks(const MSG_PsgDocument &doc
     }
 }
 
-void DetectorPipeline::_process_frame_create_tasks(const MSG_Frame &frame, const MSG_UUID &detections_uuid, Map_Frame_Waiting *frame_waiting_map_ptr)
+void PoseDetectorPipeline::_process_detections_create_tasks(const MSG_Detections &detections, Map_Detections_Waiting *detections_waiting_map_ptr)
 {
-    // RCLCPP_DEBUG(m_impl->logger, "create frame %ld detections uuid %s tasks for downstreams", frame.frame_num,
-    //              uuid_to_string(detections_uuid.uuid).c_str());
+    // RCLCPP_DEBUG(m_impl->logger, "create frame %ld detections tasks for downstreams", detections.frame.frame_num);
 
     // create tasks of this frame for all downstreams
     for (auto &x : m_model_downstreams) {
-        auto task = std::make_shared<DSTask_Frame>();
+        auto task = std::make_shared<DSTask_Detections>();
         task->downstream = x.second;
-        task->frame = frame;
+        task->detections = detections;
 
-        task->detections_uuid = detections_uuid;
-        (*frame_waiting_map_ptr)[std::make_tuple(task->downstream.get(), frame.frame_num)] = task;
+        (*detections_waiting_map_ptr)[std::make_tuple(task->downstream.get(), detections.frame.frame_num)] = task;
     }
 }
 
 // add document to buffer
-void DetectorPipeline::_add_document_to_buffer(const MSG_PsgDocument &document, std::map<int, MSG_PsgDocument> *document_buffer_ptr)
+void PoseDetectorPipeline::_add_document_to_buffer(const MSG_PsgDocument &document, std::map<int, MSG_PsgDocument> *document_buffer_ptr)
 {
     (*document_buffer_ptr)[document.frame.frame_num] = document;
 }
 
 // remove document from buffer
-void DetectorPipeline::_remove_document_from_buffer(int frame_number, std::map<int, MSG_PsgDocument> *document_buffer_ptr)
+void PoseDetectorPipeline::_remove_document_from_buffer(int frame_number, std::map<int, MSG_PsgDocument> *document_buffer_ptr)
 {
     // if frame_number is not in buffer, do nothing
     if (document_buffer_ptr->find(frame_number) != document_buffer_ptr->end()) {
@@ -343,36 +322,35 @@ void DetectorPipeline::_remove_document_from_buffer(int frame_number, std::map<i
     }
 }
 
-// add detections to buffer
-void DetectorPipeline::_add_detections_to_buffer(const MSG_Detections &detections, std::map<int, std::vector<MSG_Detections>> *detections_buffer_ptr)
+void PoseDetectorPipeline::_add_bodyposes_to_buffer(const MSG_Bodyposes &bodyposes, const int frame_number,
+                                                    std::map<int, std::vector<MSG_Bodyposes>> *bodyposes_buffer_ptr)
 {
     // if frame_number is not in buffer, do nothing
-    if (detections_buffer_ptr->find(detections.frame.frame_num) != detections_buffer_ptr->end()) {
-        (*detections_buffer_ptr)[detections.frame.frame_num].push_back(detections);
+    if (bodyposes_buffer_ptr->find(frame_number) != bodyposes_buffer_ptr->end()) {
+        (*bodyposes_buffer_ptr)[frame_number].push_back(bodyposes);
     }
 }
 
-// remove detections from buffer
-void DetectorPipeline::_remove_detections_from_buffer(int frame_number, std::map<int, std::vector<MSG_Detections>> *detections_buffer_ptr)
+void PoseDetectorPipeline::_remove_bodyposes_from_buffer(int frame_number, std::map<int, std::vector<MSG_Bodyposes>> *bodyposes_buffer_ptr)
 {
     // if frame_number is not in buffer, do nothing
-    if (detections_buffer_ptr->find(frame_number) != detections_buffer_ptr->end()) {
-        detections_buffer_ptr->erase(frame_number);
+    if (bodyposes_buffer_ptr->find(frame_number) != bodyposes_buffer_ptr->end()) {
+        bodyposes_buffer_ptr->erase(frame_number);
     }
 }
 
-void DetectorPipeline::_step()
+void PoseDetectorPipeline::_step()
 {
+    _send_detections_to_downstreams();
     _send_document_to_downstreams();
-    _send_frame_to_downstreams();
 }
 
-void DetectorPipeline::_process_step()
+void PoseDetectorPipeline::_process_step()
 {
-    _merge_detections_and_documents();
+    _merge_bodyposes_and_documents();
 }
 
-void DetectorPipeline::_connect_to_downstreams()
+void PoseDetectorPipeline::_connect_to_downstreams()
 {
     ROS_ASSERT(m_init_config != nullptr, "m_init_config is nullptr");
 
@@ -390,15 +368,15 @@ void DetectorPipeline::_connect_to_downstreams()
 
             ds->accept_document = client;
             // ds->accept_document_options.goal_response_callback =
-            //         std::bind(&DetectorPipeline::process_document_goal_response_callback, this, std::placeholders::_1);
+            //         std::bind(&PoseDetectorPipeline::process_document_goal_response_callback, this, std::placeholders::_1);
             // ds->accept_document_options.feedback_callback =
-            //         std::bind(&DetectorPipeline::process_document_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
+            //         std::bind(&PoseDetectorPipeline::process_document_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
             // ds->accept_document_options.result_callback =
-            //         std::bind(&DetectorPipeline::process_document_result_callback, this, std::placeholders::_1);
+            //         std::bind(&PoseDetectorPipeline::process_document_result_callback, this, std::placeholders::_1);
 
             // wait until the action server is ready
             // RCLCPP_INFO(m_impl->logger, "waiting for pipeline action server %s", name.c_str());
-            client->wait_for_action_server();
+            // client->wait_for_action_server();
             // RCLCPP_INFO(m_impl->logger, "pipeline action server %s is ready", name.c_str());
         }
 
@@ -411,16 +389,16 @@ void DetectorPipeline::_connect_to_downstreams()
 
         // 创建pipeline downstream
         {
-            std::string name = it.second.accept_frame_action;
-            auto client = rclcpp_action::create_client<ACT_AcceptFrame>(this, name);
+            std::string name = it.second.accept_detections_action;
+            auto client = rclcpp_action::create_client<ACT_AcceptDetections>(this, name);
 
-            ds->accept_frame = client;
+            ds->accept_detections = client;
             // ds->accept_document_options.goal_response_callback =
-            //         std::bind(&DetectorPipeline::process_document_goal_response_callback, this, std::placeholders::_1);
+            //         std::bind(&PoseDetectorPipeline::process_document_goal_response_callback, this, std::placeholders::_1);
             // ds->accept_document_options.feedback_callback =
-            //         std::bind(&DetectorPipeline::process_document_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
+            //         std::bind(&PoseDetectorPipeline::process_document_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
             // ds->accept_document_options.result_callback =
-            //         std::bind(&DetectorPipeline::process_document_result_callback, this, std::placeholders::_1);
+            //         std::bind(&PoseDetectorPipeline::process_document_result_callback, this, std::placeholders::_1);
 
             // wait until the action server is ready
             // RCLCPP_INFO(m_impl->logger, "waiting for model action server %s", name.c_str());
@@ -432,14 +410,14 @@ void DetectorPipeline::_connect_to_downstreams()
     }
 }
 
-bool DetectorPipeline::_ping_model(std::shared_ptr<DownstreamModel> ds)
+bool PoseDetectorPipeline::_ping_model(std::shared_ptr<DownstreamModel> ds)
 {
-    auto goal_msg = ACT_AcceptFrame::Goal();
+    auto goal_msg = ACT_AcceptDetections::Goal();
     goal_msg.control_msg.control_signal = 1; // ping
     goal_msg.control_msg.control_msg = "ping";
 
     // opt.goal_response_callback = callback;
-    auto res = ds->accept_frame->async_send_goal(goal_msg, ds->accept_frame_options);
+    auto res = ds->accept_detections->async_send_goal(goal_msg, ds->accept_detections_options);
 
     auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
     auto wait_result = res.wait_for(std::chrono::milliseconds(t));
@@ -459,7 +437,7 @@ bool DetectorPipeline::_ping_model(std::shared_ptr<DownstreamModel> ds)
     return true;
 }
 
-bool DetectorPipeline::_ping_pipeline(std::shared_ptr<DownstreamPipeline> ds)
+bool PoseDetectorPipeline::_ping_pipeline(std::shared_ptr<DownstreamPipeline> ds)
 {
     auto goal_msg = ACT_AcceptDocument::Goal();
     goal_msg.control_msg.control_signal = 1; // ping
@@ -486,40 +464,35 @@ bool DetectorPipeline::_ping_pipeline(std::shared_ptr<DownstreamPipeline> ds)
     return true;
 }
 
-// 发送frame到model node，如果失败则重试，这个过程不能丢任何frame
-void DetectorPipeline::_send_frame_to_downstreams()
+// 发送detections到model node，如果失败则重试，这个过程不能丢任何detections
+void PoseDetectorPipeline::_send_detections_to_downstreams()
 {
-    std::vector<decltype(m_frame_task_waiting)::value_type> frame_task_waiting_;
+    std::vector<decltype(m_detections_task_waiting)::value_type> detections_task_waiting_;
     {
-        auto lock_ptr_frame_task_waiting = m_impl->sync_frame_waiting_map.synchronize();
+        auto lock_ptr_detections_task_waiting = m_impl->sync_detections_waiting_map.synchronize();
 
-        for (auto const &it : (**lock_ptr_frame_task_waiting)) {
-            frame_task_waiting_.push_back(it);
+        for (auto const &it : (**lock_ptr_detections_task_waiting)) {
+            detections_task_waiting_.push_back(it);
         }
     }
 
-    std::vector<Map_Frame_Waiting::key_type> tasks_to_remove;
+    std::vector<Map_Detections_Waiting::key_type> tasks_to_remove;
 
-    for (auto &it : frame_task_waiting_) {
+    for (auto &it : detections_task_waiting_) {
         auto &task = it.second;
         auto ds = task->downstream;
 
         while (true) {
-            if (!m_runtime_config->send_goal_retry && task->frame.signal_code == SignalCode::RUN) // not retry need to ping
-                if (!_ping_model(ds)) {
-                    RCLCPP_INFO(m_impl->logger, "ping failed");
+            if (!m_runtime_config->send_goal_retry && task->detections.frame.signal_code == SignalCode::RUN) // not retry need to ping
+                if (!_ping_model(ds))
                     continue;
-                }
 
-            ACT_AcceptFrame::Goal goal;
-            goal.frame = task->frame;
-            // add detections_uuid to goal
-            goal.detections_uuid = task->detections_uuid;
+            ACT_AcceptDetections::Goal goal;
+            goal.detections = task->detections;
 
-            auto handle = task->downstream->accept_frame->async_send_goal(goal, ds->accept_frame_options);
+            auto handle = task->downstream->accept_detections->async_send_goal(goal, ds->accept_detections_options);
 
-            // RCLCPP_INFO(m_impl->logger, "[Request Send]framenum: %ld, detections_uuid: %s", goal.frame.frame_num,
-            // uuid_to_string(goal.detections_uuid.uuid).c_str());
+            // RCLCPP_INFO(m_impl->logger, "[Request Send]framenum: %ld detections", goal.detections.frame.frame_num);
 
             // add timeout condition
             auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
@@ -528,25 +501,26 @@ void DetectorPipeline::_send_frame_to_downstreams()
             // RCLCPP_INFO(m_impl->logger, "after wait send goal %ld, wait_result is %d", task->frame.frame_num, wait_result);
             if (wait_result == std::future_status::ready) {
                 auto task_response = handle.get();
+                // RCLCPP_INFO(m_impl->logger, "_step frame async_send_goal: %ld SUCCESS", task->detections.frame.frame_num);
                 if (task_response != nullptr) {
                     // accepted or executing
                     if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
                         task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
                         // 这里状态为这两个不一定代表成功，可能是下游还在处理中，当下游返回aborted前也会是这两个状态
                         // 所以这里需要等待下游返回成功或者aborted
-                        bool is_frame_task_done = false;
+                        bool is_dets_task_done = false;
                         while (true) {
                             if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                                // 如果发送成功了，is_frame_task_done为true，跳出检查状态的循环，并让外面去判断是否需要重试发送frame
-                                RCLCPP_INFO(m_impl->logger, "frame %ld success because SUCCEED", task->frame.frame_num);
-                                is_frame_task_done = true;
+                                // 如果发送成功了，is_dets_task_done为true，跳出检查状态的循环，并让外面去判断是否需要重试发送detections
+                                RCLCPP_INFO(m_impl->logger, "detections %ld success because SUCCEED", task->detections.frame.frame_num);
+                                is_dets_task_done = true;
                                 break;
                             } else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ABORTED ||
                                        task_response->get_status() == rclcpp_action::GoalStatus::STATUS_CANCELED ||
                                        task_response->get_status() == rclcpp_action::GoalStatus::STATUS_CANCELING) {
-                                // 如果发送失败了，is_frame_task_done为false，跳出检查状态的循环，并让外面去判断是否需要重试发送frame
-                                RCLCPP_INFO(m_impl->logger, "frame %ld failed because ABORTED", task->frame.frame_num);
-                                is_frame_task_done = false;
+                                // 如果发送失败了，is_dets_task_done为true，跳出检查状态的循环，并让外面去判断是否需要重试发送detections
+                                RCLCPP_INFO(m_impl->logger, "detections %ld failed because ABORTED", task->detections.frame.frame_num);
+                                is_dets_task_done = false;
                                 break;
                             } else {
                                 // 其他情况还需要等待状态变化
@@ -554,8 +528,8 @@ void DetectorPipeline::_send_frame_to_downstreams()
                                 std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
                             }
                         }
-                        if (is_frame_task_done) {
-                            // 发送成功了，跳出发送frame的循环
+                        if (is_dets_task_done) {
+                            // 发送成功了，跳出发送detections的循环
                             tasks_to_remove.push_back(it.first);
                             break;
                         } else {
@@ -563,10 +537,8 @@ void DetectorPipeline::_send_frame_to_downstreams()
                             continue;
                         }
                     }
-
                     // succeed
                     else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                        RCLCPP_INFO(m_impl->logger, "frame %ld success because SUCCEEDED", task->frame.frame_num);
                         tasks_to_remove.push_back(it.first);
                         break;
                     }
@@ -574,45 +546,40 @@ void DetectorPipeline::_send_frame_to_downstreams()
                     else {
                         // retry
                         {
-                            auto lock_ptr_frame_task_waiting = m_impl->sync_frame_waiting_map.synchronize();
-                            (**lock_ptr_frame_task_waiting)[it.first]->retry_times++;
+                            auto lock_ptr_detections_task_waiting = m_impl->sync_detections_waiting_map.synchronize();
+                            (**lock_ptr_detections_task_waiting)[it.first]->retry_times++;
                         }
-                        RCLCPP_INFO(m_impl->logger, "frame %ld retry because REJECTED", task->frame.frame_num);
                         continue;
                     }
                 } else { // rejected
                     // retry
                     {
-                        auto lock_ptr_frame_task_waiting = m_impl->sync_frame_waiting_map.synchronize();
-                        (**lock_ptr_frame_task_waiting)[it.first]->retry_times++;
+                        auto lock_ptr_detections_task_waiting = m_impl->sync_detections_waiting_map.synchronize();
+                        (**lock_ptr_detections_task_waiting)[it.first]->retry_times++;
                     }
-                    RCLCPP_INFO(m_impl->logger, "frame %ld retry because REJECTED", task->frame.frame_num);
                     continue;
                 }
             } else { // timeout
                 // retry
                 {
-                    auto lock_ptr_frame_task_waiting = m_impl->sync_frame_waiting_map.synchronize();
-                    (**lock_ptr_frame_task_waiting)[it.first]->retry_times++;
+                    auto lock_ptr_detections_task_waiting = m_impl->sync_detections_waiting_map.synchronize();
+                    (**lock_ptr_detections_task_waiting)[it.first]->retry_times++;
                 }
-                RCLCPP_INFO(m_impl->logger, "frame %ld retry because TIMEOUT", task->frame.frame_num);
                 continue;
             }
         }
     }
 
-
-    // 跳出循环了表明所有frame都发送成功了，在frame_task_waiting中删除这些frame
+    // 跳出循环了表明所有detections都发送成功了，在detections_task_waiting中删除这些frame
     {
-        auto lock_ptr_frame_task_waiting = m_impl->sync_frame_waiting_map.synchronize();
+        auto lock_ptr_detections_task_waiting = m_impl->sync_detections_waiting_map.synchronize();
         for (auto &it : tasks_to_remove) {
-            (*lock_ptr_frame_task_waiting)->erase(it);
+            (*lock_ptr_detections_task_waiting)->erase(it);
         }
     }
 }
 
-
-void DetectorPipeline::_send_document_to_downstreams()
+void PoseDetectorPipeline::_send_document_to_downstreams()
 {
     // initiate all waiting tasks
     std::vector<Map_Document_Waiting::key_type> tasks_to_remove;
@@ -750,9 +717,9 @@ void DetectorPipeline::_send_document_to_downstreams()
     }
 }
 
-// 当document和detections都准备好后，将其合并，并加入到map_document_waiting中
+// 当document和bodyposes都准备好后，将其合并，并加入到map_document_waiting中
 // 注意每次只处理第一个document，如果没准备好就直接返回，等待下一次处理
-void DetectorPipeline::_merge_detections_and_documents()
+void PoseDetectorPipeline::_merge_bodyposes_and_documents()
 {
     // 取第一个document
     MSG_PsgDocument document;
@@ -763,19 +730,27 @@ void DetectorPipeline::_merge_detections_and_documents()
         document = (*lock_ptr_document_buffer)->begin()->second;
     }
 
-    // 判断是否有对应的detections且是否全都准备好了
+    // 判断是否有对应的bodyposes且是否全都准备好了
     {
-        auto lock_ptr_detections_buffer = m_impl->sync_detections_buffer.synchronize();
-        if ((*lock_ptr_detections_buffer)->find(document.frame.frame_num) == (*lock_ptr_detections_buffer)->end())
+        auto lock_ptr_bodyposes_buffer = m_impl->sync_bodyposes_buffer.synchronize();
+        if ((*lock_ptr_bodyposes_buffer)->find(document.frame.frame_num) == (*lock_ptr_bodyposes_buffer)->end())
             return;
-        if ((*lock_ptr_detections_buffer)->at(document.frame.frame_num).size() != m_model_downstreams.size())
+        if ((*lock_ptr_bodyposes_buffer)->at(document.frame.frame_num).size() != m_model_downstreams.size())
             return;
 
         RCLCPP_INFO(m_impl->logger, "_merge_detections_and_documents(): frame %d detections MERGED", document.frame.frame_num);
 
-        // 合并document和detections
-        for (auto &x : (*lock_ptr_detections_buffer)->at(document.frame.frame_num)) {
-            document.detections.detections.insert(document.detections.detections.end(), x.detections.begin(), x.detections.end());
+        // 合并document.persons和bodyposes
+        auto &persons = document.persons;
+        for (auto &bodyposes : (*lock_ptr_bodyposes_buffer)->at(document.frame.frame_num)) { // x: MSG_Bodyposes (std::vector<psg_public_msgs::msg::BodyPose>)
+            for (auto &bodypose : bodyposes) {                                               // y: psg_public_msgs::msg::BodyPose 表示一个人的姿态，里面有多个关键点
+                for (auto &person : persons.persons) {                                       // z: psg_public_msgs::msg::Person 表示一个人的信息，里面有uuid和body
+                    if (bodypose.uuid == person.uuid) {
+                        person.pose = bodypose;
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -791,20 +766,19 @@ void DetectorPipeline::_merge_detections_and_documents()
         _remove_document_from_buffer(document.frame.frame_num, *lock_ptr_document_buffer);
     }
 
-    // 从buffer中删除detections
+    // 从buffer中删除bodyposes
     {
-        auto lock_ptr_detections_buffer = m_impl->sync_detections_buffer.synchronize();
-        _remove_detections_from_buffer(document.frame.frame_num, *lock_ptr_detections_buffer);
+        auto lock_ptr_bodyposes_buffer = m_impl->sync_bodyposes_buffer.synchronize();
+        _remove_bodyposes_from_buffer(document.frame.frame_num, *lock_ptr_bodyposes_buffer);
     }
 }
 
-
-void DetectorPipeline::_declare_all_parameters()
+void PoseDetectorPipeline::_declare_all_parameters()
 {
     this->declare_parameter<std::string>("process_document_action", "");
     this->declare_parameter<std::string>("process_model_results_action", "");
     this->declare_parameter<double>("step_interval_ms", -1);
-    this->declare_parameter<double>("timeout_ms_send_to_downstream", 10000);
+    this->declare_parameter<double>("timeout_ms_send_to_downstream", -1);
     this->declare_parameter<int>("buffer_size", 1);
     this->declare_parameter<bool>("send_goal_retry", false);
 }

@@ -70,11 +70,19 @@
     buffer_size: 5
 
 
-/pose_detector_in_node:
+# /pose_detector_in_node:
+#   ros__parameters:
+#     process_document_action: "pose_detector_in_process_document_action"
+#     step_interval_ms: 1.0
+#     timeout_ms_send_to_downstream: 10000.0
+#     buffer_size: 5
+
+/pose_detector_pipeline_node:
   ros__parameters:
-    process_document_action: "pose_detector_in_process_document_action"
+    process_document_action: "pose_detector_pipeline_process_document_action"
+    process_model_results_action: "pose_detector_pipeline_process_bodyposes_action"
     step_interval_ms: 1.0
-    timeout_ms_send_to_downstream: 10000.0
+    pred_score_thr: 0.3
     buffer_size: 5
 
 /pose_detector_node:
@@ -84,13 +92,14 @@
     pred_score_thr: 0.3
     buffer_size: 5
 
-/pose_detector_out_node:
-  ros__parameters:
-    process_document_action: "pose_detector_out_process_document_action"
-    process_bodyposes_action: "pose_detector_out_process_bodyposes_action"
-    step_interval_ms: 1.0
-    timeout_ms_send_to_downstream: 10000.0
-    buffer_size: 5
+
+# /pose_detector_out_node:
+#   ros__parameters:
+#     process_document_action: "pose_detector_out_process_document_action"
+#     process_bodyposes_action: "pose_detector_out_process_bodyposes_action"
+#     step_interval_ms: 1.0
+#     timeout_ms_send_to_downstream: 10000.0
+#     buffer_size: 5
 
 
 /tracker_in_node:

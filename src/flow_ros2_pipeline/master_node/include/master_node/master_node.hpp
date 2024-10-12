@@ -134,7 +134,7 @@ class MasterNode : public rclcpp::Node, public IStartStopProtocol
     // on-going tasks of psg document processing
     // indexed by (downstream, frame_number)
     Map_Document_Waiting m_psgdoc_task_waiting;
-    Map_Document_Doing m_psgdoc_task_doing;
+    // Map_Document_Doing m_psgdoc_task_doing;
     Vec_Document_Done m_psgdoc_task_done;
 
     // configuration

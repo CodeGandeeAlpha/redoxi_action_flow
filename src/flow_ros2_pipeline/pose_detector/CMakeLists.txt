@@ -28,18 +28,45 @@ include_directories(include ${Boost_INCLUDE_DIRS} ${VINEYARD_INCLUDE_DIRS} ${Ope
 install(DIRECTORY include/
   DESTINATION include)
 
-add_executable(pipeline_in_node
-  src/pipeline_in_node.cpp
-  src/pipeline_in.cpp
-  src/pipeline_in_types.cpp
-)
-add_executable(pipeline_out_node
-  src/pipeline_out_node.cpp
-  src/pipeline_out.cpp
-  src/pipeline_out_types.cpp
+# add_executable(pipeline_in_node
+#   src/pipeline_in_node.cpp
+#   src/pipeline_in.cpp
+#   src/pipeline_in_types.cpp
+# )
+# add_executable(pipeline_out_node
+#   src/pipeline_out_node.cpp
+#   src/pipeline_out.cpp
+#   src/pipeline_out_types.cpp
+# )
+add_executable(pipeline_node
+  src/pipeline_node.cpp
+  src/pipeline.cpp
+  src/pipeline_types.cpp
 )
 
-ament_target_dependencies(pipeline_in_node
+# ament_target_dependencies(pipeline_in_node
+#   rclcpp
+#   rclcpp_action
+#   rclpy
+#   std_msgs
+#   psg_actions
+#   psg_services
+#   psg_common
+#   sensor_msgs
+# )
+
+# ament_target_dependencies(pipeline_out_node
+#   rclcpp
+#   rclcpp_action
+#   rclpy
+#   std_msgs
+#   psg_actions
+#   psg_services
+#   psg_common
+#   sensor_msgs
+# )
+
+ament_target_dependencies(pipeline_node
   rclcpp
   rclcpp_action
   rclpy
@@ -50,23 +77,13 @@ ament_target_dependencies(pipeline_in_node
   sensor_msgs
 )
 
-ament_target_dependencies(pipeline_out_node
-  rclcpp
-  rclcpp_action
-  rclpy
-  std_msgs
-  psg_actions
-  psg_services
-  psg_common
-  sensor_msgs
-)
+# target_link_libraries(pipeline_in_node ${Boost_LIBRARIES} ${VINEYARD_LIBRARIES} ${OpenCV_LIBS})
+# target_link_libraries(pipeline_out_node ${Boost_LIBRARIES} ${VINEYARD_LIBRARIES} ${OpenCV_LIBS})
+target_link_libraries(pipeline_node ${Boost_LIBRARIES} ${VINEYARD_LIBRARIES} ${OpenCV_LIBS})
 
-
-target_link_libraries(pipeline_in_node ${Boost_LIBRARIES} ${VINEYARD_LIBRARIES} ${OpenCV_LIBS})
-target_link_libraries(pipeline_out_node ${Boost_LIBRARIES} ${VINEYARD_LIBRARIES} ${OpenCV_LIBS})
-
-install(TARGETS pipeline_in_node
-                pipeline_out_node
+install(TARGETS pipeline_node
+                # pipeline_in_node
+                # pipeline_out_node
 DESTINATION lib/${PROJECT_NAME})
 
 ament_python_install_package(${PROJECT_NAME})

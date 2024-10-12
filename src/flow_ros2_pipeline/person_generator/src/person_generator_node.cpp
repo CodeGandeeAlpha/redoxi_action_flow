@@ -11,9 +11,9 @@ int main(int argc, char *argv[])
     init_config->from_parameters(node.get());
 
     // init_config->process_document_action = "detector_in_process_document_action";
-    FlowRos2Pipeline::PersonGeneratorInitConfig::DownstreamPipelineNode pose_in_pipeline_node;
-    pose_in_pipeline_node.accept_document_action = "pose_detector_in_process_document_action";
-    init_config->pipeline_downstreams["pose_detector_in"] = pose_in_pipeline_node;
+    FlowRos2Pipeline::PersonGeneratorInitConfig::DownstreamPipelineNode pose_pipeline_node;
+    pose_pipeline_node.accept_document_action = "pose_detector_pipeline_process_document_action";
+    init_config->pipeline_downstreams["pose_detector_pipeline"] = pose_pipeline_node;
 
 
     runtime_config->from_parameters(node.get());

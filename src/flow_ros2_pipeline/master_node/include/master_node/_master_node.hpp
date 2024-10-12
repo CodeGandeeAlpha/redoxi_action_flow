@@ -23,7 +23,7 @@ class MasterNodeImpl
     rclcpp::Logger logger;
 
     boost::synchronized_value<MasterNode::Map_Document_Waiting *> sync_document_waiting_map;
-    boost::synchronized_value<MasterNode::Map_Document_Doing *> sync_document_doing_map;
+    // boost::synchronized_value<MasterNode::Map_Document_Doing *> sync_document_doing_map;
 
     boost::synchronized_value<std::map<int, MasterNode::MSG_Frame> *> sync_frame_buffer;
 

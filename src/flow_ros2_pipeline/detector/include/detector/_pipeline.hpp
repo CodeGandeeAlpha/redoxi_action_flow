@@ -22,7 +22,7 @@ class DetectorPipelineImpl
 
 
     boost::synchronized_value<DetectorPipeline::Map_Document_Waiting *> sync_document_waiting_map;
-    boost::synchronized_value<DetectorPipeline::Map_Document_Doing *> sync_document_doing_map;
+    // boost::synchronized_value<DetectorPipeline::Map_Document_Doing *> sync_document_doing_map;
     boost::synchronized_value<DetectorPipeline::Map_Frame_Waiting *> sync_frame_waiting_map;
     // boost::synchronized_value<DetectorPipeline::Map_Frame_Doing *> sync_frame_doing_map;
 

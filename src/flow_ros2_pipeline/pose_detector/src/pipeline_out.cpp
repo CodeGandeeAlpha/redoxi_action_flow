@@ -526,6 +526,15 @@ void PoseDetectorOut::_remove_bodyposes_from_buffer(int frame_number, std::map<i
     }
 }
 
+/**
+ * @brief 合并 bodyposes 和 documents。
+ *
+ * 该函数从文档缓冲区中提取文档，并尝试将其与 bodyposes 缓冲区中的 bodyposes 合并。
+ * 如果文档的信号代码为 FLUSH 或 TERMINATE，则创建文档任务并从缓冲区中移除相应的 bodyposes 和文档。
+ * 否则，将 bodyposes 与文档中的人员信息合并，并创建文档任务，然后从缓冲区中移除相应的 bodyposes 和文档。
+ *
+ * @note 该函数使用多个同步锁来确保线程安全。
+ */
 void PoseDetectorOut::_merge_bodyposes_and_documents()
 {
     std::vector<decltype(m_document_buffer)::value_type> document_buffer_;

@@ -5,9 +5,9 @@
 #include <vineyard/basic/ds/tensor.h>
 
 #include <rclcpp/create_client.hpp>
-#include <rclcpp/executors.hpp>
 #include <rclcpp/logger.hpp>
 #include <rclcpp/logging.hpp>
+#include <rclcpp/rclcpp/executors.hpp>
 #include <rclcpp/utilities.hpp>
 #include <rclcpp_action/types.hpp>
 #include <rcpputils/asserts.hpp>
@@ -18,8 +18,6 @@
 static constexpr auto ROS_ASSERT = rcpputils::assert_true;
 
 using namespace std::chrono_literals;
-// using std::placeholders::_1;
-// using std::placeholders::_2;
 using namespace vineyard;
 
 // static rclcpp::Logger& get_logger(rclcpp::Node* node)
@@ -61,15 +59,70 @@ bool OpencvVideoReader::_send_frame_to_downstreams(
             auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
             auto wait_result = res.wait_for(std::chrono::milliseconds(t));
             if (wait_result == std::future_status::ready) {
-                auto s = res.get()->get_status();
-                bool ok = false;
-
-                // downstream accepted?
-                ok |= s == rclcpp_action::GoalStatus::STATUS_ACCEPTED;
-                ok |= s == rclcpp_action::GoalStatus::STATUS_SUCCEEDED;
-                ok |= s == rclcpp_action::GoalStatus::STATUS_EXECUTING;
-
-                if (!ok) { // rejected
+                auto task_response = res.get();
+                if (task_response != nullptr) {
+                    // accepted or executing
+                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
+                        task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
+                        // 这里状态为这两个不一定代表成功，可能是下游还在处理中，当下游返回aborted前也会是这两个状态
+                        // 所以这里需要等待下游返回成功或者aborted
+                        bool is_frame_task_done = false;
+                        while (true) {
+                            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                                // 如果发送成功了，is_frame_task_done为true，跳出发送frame的循环
+                                RCLCPP_INFO(m_impl->logger, "frame %ld success because SUCCEED", frame_msg.frame_num);
+                                is_frame_task_done = true;
+                                break;
+                            } else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ABORTED ||
+                                       task_response->get_status() == rclcpp_action::GoalStatus::STATUS_CANCELED ||
+                                       task_response->get_status() == rclcpp_action::GoalStatus::STATUS_CANCELING) {
+                                // 如果发送失败了，is_frame_task_done为false，跳出发送frame的循环，并让外面去判断是否需要重试发送frame
+                                RCLCPP_INFO(m_impl->logger, "frame %ld failed because ABORTED", frame_msg.frame_num);
+                                is_frame_task_done = false;
+                                break;
+                            } else {
+                                // 其他情况还需要等待状态变化
+                                // sleep一些时间再去查询状态
+                                RCLCPP_INFO(m_impl->logger, "frame %ld waiting for status change, now status is %d", frame_msg.frame_num, task_response->get_status());
+                                // std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+                                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                                task_response = res.get(); // 重要！！获取最新状态
+                            }
+                        }
+                        if (is_frame_task_done) {
+                            // 发送成功了，跳出发送frame的循环
+                            break;
+                        } else {
+                            // 发送失败了，判断是否需要重发
+                            if (m_runtime_config->send_goal_retry || m_init_config->video_type == VideoTypes::Local ||
+                                frame_msg.signal_code == SignalCode::FLUSH || frame_msg.signal_code == SignalCode::TERMINATE) {
+                                // retry
+                                continue;
+                            } else {
+                                // failed
+                                break;
+                            }
+                        }
+                    }
+                    // succeed
+                    else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                        break;
+                    }
+                    // rejected
+                    else {
+                        // 发送失败了，判断是否需要重发
+                        if (m_runtime_config->send_goal_retry || m_init_config->video_type == VideoTypes::Local ||
+                            frame_msg.signal_code == SignalCode::FLUSH || frame_msg.signal_code == SignalCode::TERMINATE) {
+                            // retry
+                            continue;
+                        } else {
+                            // failed
+                            break;
+                        }
+                    }
+                } else {
+                    // rejected
+                    // 发送失败了，判断是否需要重发
                     if (m_runtime_config->send_goal_retry || m_init_config->video_type == VideoTypes::Local ||
                         frame_msg.signal_code == SignalCode::FLUSH || frame_msg.signal_code == SignalCode::TERMINATE) {
                         // retry
@@ -78,19 +131,8 @@ bool OpencvVideoReader::_send_frame_to_downstreams(
                         // failed
                         break;
                     }
-                } else { // accepted
-                    break;
                 }
             } else {
-                // timeout
-                if (m_runtime_config->send_goal_retry || m_init_config->video_type == VideoTypes::Local ||
-                    frame_msg.signal_code == SignalCode::FLUSH || frame_msg.signal_code == SignalCode::TERMINATE) {
-                    // retry
-                    continue;
-                } else {
-                    // failed
-                    break;
-                }
             }
         }
     }
@@ -109,16 +151,6 @@ uint64_t OpencvVideoReader::_add_frame_to_shared_memory(const cv::Mat &frame)
     auto tensor_data = builder.data();
 
     memcpy(tensor_data, frame.data, height * width * elem_size);
-
-    // // 将图像数据复制到 Tensor 中
-    // for (int row = 0; row < height; ++row) {
-    //     for (int col = 0; col < width; ++col) {
-    //         cv::Vec3b pixel = frame.at<cv::Vec3b>(row, col);
-    //         tensor_data[row * width * 3 + col * 3 + 0] = pixel[0]; // Blue
-    //         tensor_data[row * width * 3 + col * 3 + 1] = pixel[1]; // Green
-    //         tensor_data[row * width * 3 + col * 3 + 2] = pixel[2]; // Red
-    //     }
-    // }
 
     // 封存 Tensor 并持久化到 Vineyard
     auto sealed = std::dynamic_pointer_cast<Tensor<uint8_t>>(builder.Seal(*m_impl->v6d_client));
@@ -385,10 +417,12 @@ void OpencvVideoReader::_step()
     }
 
     // send frame to downstreams
-    // RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] before send, ObjectID: %ld", frame_msg.cache.id_int);
+    RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] before send frame: %ld", m_frame_number);
 
     // downstream actions are alreayd checked, no need to do it again
     auto frame_sent_ok = _send_frame_to_downstreams(frame_msg, false);
+
+    RCLCPP_INFO(m_impl->logger, "[OpencvVideoReader] after send frame: %ld", m_frame_number);
 
     if (!frame_sent_ok) {
         // not sent to any downstream, the frame can be deleted

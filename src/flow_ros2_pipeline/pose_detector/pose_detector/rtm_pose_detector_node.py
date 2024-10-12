@@ -909,9 +909,9 @@ def main(args=None):
         init_config.model_groups["rtm_bodypose"].append(rtm_pose_model)
         rtm_pose_detector_node.get_logger().info(f"model {i} initialized")
     downstream = PoseDetectorNode.ModelDownstreamNode(
-        action_name="pose_detector_out_process_bodyposes_action"
+        action_name="pose_detector_pipeline_process_bodyposes_action"
     )
-    init_config.downstreams["detector_out"] = downstream
+    init_config.downstreams["pose_detector_pipeline"] = downstream
 
     # runtime config
     runtime_config = PoseDetectorNode.RuntimeConfig()

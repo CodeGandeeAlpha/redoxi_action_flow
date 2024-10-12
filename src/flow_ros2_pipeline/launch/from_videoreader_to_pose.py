@@ -20,11 +20,18 @@ def generate_launch_description():
                 name="master_node",
                 parameters=[params_file],
             ),
+            # Node(
+            #     package="detector",
+            #     namespace="",
+            #     executable="pipeline_in_node",
+            #     name="detector_in_node",
+            #     parameters=[params_file],
+            # ),
             Node(
                 package="detector",
                 namespace="",
-                executable="pipeline_in_node",
-                name="detector_in_node",
+                executable="pipeline_node",
+                name="detector_pipeline_node",
                 parameters=[params_file],
             ),
             Node(
@@ -34,13 +41,13 @@ def generate_launch_description():
                 name="ddq_detector_node",
                 parameters=[params_file],
             ),
-            Node(
-                package="detector",
-                namespace="",
-                executable="pipeline_out_node",
-                name="detector_out_node",
-                parameters=[params_file],
-            ),
+            # Node(
+            #     package="detector",
+            #     namespace="",
+            #     executable="pipeline_out_node",
+            #     name="detector_out_node",
+            #     parameters=[params_file],
+            # ),
             Node(
                 package="person_generator",
                 namespace="",
@@ -48,11 +55,18 @@ def generate_launch_description():
                 name="person_generator_node",
                 parameters=[params_file],
             ),
+            # Node(
+            #     package="pose_detector",
+            #     namespace="",
+            #     executable="pipeline_in_node",
+            #     name="pose_detector_in_node",
+            #     parameters=[params_file],
+            # ),
             Node(
                 package="pose_detector",
                 namespace="",
-                executable="pipeline_in_node",
-                name="pose_detector_in_node",
+                executable="pipeline_node",
+                name="pose_detector_pipeline_node",
                 parameters=[params_file],
             ),
             Node(
@@ -62,12 +76,12 @@ def generate_launch_description():
                 name="pose_detector_node",
                 parameters=[params_file],
             ),
-            Node(
-                package="pose_detector",
-                namespace="",
-                executable="pipeline_out_node",
-                name="pose_detector_out_node",
-                parameters=[params_file],
-            ),
+            # Node(
+            #     package="pose_detector",
+            #     namespace="",
+            #     executable="pipeline_out_node",
+            #     name="pose_detector_out_node",
+            #     parameters=[params_file],
+            # ),
         ]
     )

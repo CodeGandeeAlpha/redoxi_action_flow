@@ -30,7 +30,7 @@ MasterNode::MasterNode()
     _declare_all_parameters();
 
     m_impl->sync_document_waiting_map = &m_psgdoc_task_waiting;
-    m_impl->sync_document_doing_map = &m_psgdoc_task_doing;
+    // m_impl->sync_document_doing_map = &m_psgdoc_task_doing;
     m_impl->sync_frame_buffer = &m_frame_buffer;
 
     m_memory_registry = std::make_shared<MemoryRegistry>(this);
@@ -198,6 +198,7 @@ void MasterNode::_accept_frame_accepted_callback(
     RCLCPP_INFO(m_impl->logger, "frame %d m_frame_buffer buffer size: %d", goal->frame.frame_num, m_frame_buffer.size());
 
     // if buffer is full, reject the frame
+    // 无论是不是丢帧模式（不尝试重复发送），都会在这里被拦截，避免buffer溢出
     if (m_frame_buffer.size() >= m_runtime_config->buffer_size) {
         auto result = std::make_shared<ACT_AcceptFrame::Result>();
         result->return_msg = "Buffer is full";
@@ -207,7 +208,7 @@ void MasterNode::_accept_frame_accepted_callback(
         return;
     }
 
-    // ping
+    // 当没有reject时，ping一定成功
     if (control_msg.control_signal == 1) {
         auto result = std::make_shared<ACT_AcceptFrame::Result>();
         result->return_msg = "Ping accepted";
@@ -240,7 +241,7 @@ void MasterNode::_accept_frame_accepted_callback(
     result->return_msg = "Frame accepted";
     result->return_code = ReturnCode::SUCCESS;
     goal_handle->succeed(result);
-    // RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and succeed", frame.frame_num);
+    RCLCPP_INFO(m_impl->logger, "Accepted frame %ld and set STATUS_SUCCEED", frame.frame_num);
 }
 
 void MasterNode::_add_frame_to_buffer(const MSG_Frame &frame, std::map<int, MasterNode::MSG_Frame> *frame_buffer_ptr)
@@ -397,14 +398,46 @@ void MasterNode::_step()
                     // accepted or executing
                     if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
                         task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
-                        // successfully sent, record this
-                        task->goal_handle = task_response;
-                        {
-                            auto lock_ptr_document_task_doing = m_impl->sync_document_doing_map.synchronize();
-                            (**lock_ptr_document_task_doing)[task->goal_handle] = task;
+                        // 这里状态为这两个不一定代表成功，可能是下游还在处理中，当下游返回aborted前也会是这两个状态
+                        // 所以这里需要等待下游返回成功或者aborted
+                        bool is_doc_task_done = false;
+                        while (true) {
+                            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                                // 如果发送成功了，is_doc_task_done为true，跳出发送document的循环
+                                RCLCPP_INFO(m_impl->logger, "document %ld success because SUCCEED", task->frame.frame_num);
+                                is_doc_task_done = true;
+                                break;
+                            } else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ABORTED ||
+                                       task_response->get_status() == rclcpp_action::GoalStatus::STATUS_CANCELED ||
+                                       task_response->get_status() == rclcpp_action::GoalStatus::STATUS_CANCELING) {
+                                // 如果发送失败了，is_doc_task_done为false，跳出发送document的循环，并让外面去判断是否需要重试发送document
+                                RCLCPP_INFO(m_impl->logger, "document %ld failed because ABORTED", task->frame.frame_num);
+                                is_doc_task_done = false;
+                                break;
+                            } else {
+                                // 其他情况还需要等待状态变化
+                                // sleep一些时间再去查询状态
+                                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+                            }
                         }
-                        tasks_to_remove.push_back(it.first);
-                        break;
+                        if (is_doc_task_done) {
+                            // 发送成功了，跳出发送doc的循环
+                            m_psgdoc_task_done.push_back(task);
+                            tasks_to_remove.push_back(it.first);
+                            break;
+                        } else {
+                            // 发送失败了，判断是否需要重发
+                            if (!m_runtime_config->send_goal_retry && task->frame.signal_code == SignalCode::RUN) {
+                                // 不需要重发，跳出发送doc的循环
+                                m_psgdoc_task_done.push_back(task);
+                                tasks_to_remove.push_back(it.first);
+                                RCLCPP_INFO(m_impl->logger, "document %ld drop because ABORTED", task->frame.frame_num);
+                                break;
+                            } else {
+                                // 需要重发，继续发送
+                                continue;
+                            }
+                        }
                     }
 
                     // succeed
@@ -451,7 +484,7 @@ void MasterNode::_step()
         }
     }
 
-    // remove all sent tasks from waiting list
+    // 出现在tasks_to_remove中的task都已经发送成功或被丢弃，从psgdoc_task_waiting中删除这些task
     {
         auto lock_ptr_document_task_waiting = m_impl->sync_document_waiting_map.synchronize();
         for (auto &it : tasks_to_remove) {
@@ -460,38 +493,7 @@ void MasterNode::_step()
         }
     }
 
-    {
-        auto lock_ptr_document_task_doing = m_impl->sync_document_doing_map.synchronize();
-        // for on-going tasks, if it is done, remove it
-        if (!(*lock_ptr_document_task_doing)->empty()) {
-            std::vector<GoalHandle> tasks_to_remove;
-            for (auto &it : (**lock_ptr_document_task_doing)) {
-                auto &task_response = it.first;
-                if (task_response) {
-                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                        m_psgdoc_task_done.push_back(it.second);
-                        tasks_to_remove.push_back(it.first);
-                    } else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ABORTED) {
-                        if (!m_runtime_config->send_goal_retry && it.second->frame.signal_code == SignalCode::RUN) { // failed
-                            m_psgdoc_task_done.push_back(it.second);
-                            tasks_to_remove.push_back(it.first);
-                        } else {
-                            auto lock_ptr_psgdoc_task_waiting = m_impl->sync_document_waiting_map.synchronize();
-                            (**lock_ptr_psgdoc_task_waiting)[std::make_tuple(it.second->downstream.get(),
-                                                                             it.second->frame.frame_num)] = it.second;
-
-                            tasks_to_remove.push_back(it.first);
-                        }
-                    }
-                }
-            }
-
-            for (auto &it : tasks_to_remove) {
-                (*lock_ptr_document_task_doing)->erase(it);
-            }
-        }
-    }
-
+    // 完成的task，从buffer中删除
     {
         auto lock_ptr_frame_buffer = m_impl->sync_frame_buffer.synchronize();
         // remove task done documents
