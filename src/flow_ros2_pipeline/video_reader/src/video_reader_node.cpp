@@ -1,5 +1,6 @@
 #include <memory>
 
+#include <rclcpp/executors.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include <video_reader/video_reader.hpp>
@@ -25,11 +26,7 @@ int main(int argc, char *argv[])
     node->set_image_topic_enable(true);
     node->open();
     node->start();
-
-    rclcpp::executors::MultiThreadedExecutor executor;
-    executor.add_node(node);
-    executor.spin();
-    // rclcpp::spin(node);
+    rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
 }

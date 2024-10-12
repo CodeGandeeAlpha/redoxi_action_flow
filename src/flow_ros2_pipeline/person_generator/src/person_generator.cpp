@@ -281,7 +281,7 @@ void PersonGenerator::_connect_to_downstreams()
 
             // wait until the action server is ready
             // RCLCPP_INFO(m_impl->logger, "waiting for pipeline action server %s", name.c_str());
-            // client->wait_for_action_server();
+            client->wait_for_action_server();
             // RCLCPP_INFO(m_impl->logger, "pipeline action server %s is ready", name.c_str());
         }
 
@@ -383,7 +383,11 @@ void PersonGenerator::_send_document_to_downstreams()
                             } else {
                                 // 其他情况还需要等待状态变化
                                 // sleep一些时间再去查询状态
-                                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+                                // std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+
+                                // FIXME: 暂时当做发送成功处理
+                                is_doc_task_done = true;
+                                break;
                             }
                         }
                         if (is_doc_task_done) {

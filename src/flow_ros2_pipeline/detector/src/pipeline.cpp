@@ -201,8 +201,8 @@ void DetectorPipeline::_accept_document_accepted_callback(
     RCLCPP_INFO(m_impl->logger, "frame %d document buffer size: %d", goal->document.frame.frame_num, m_document_buffer.size());
 
     // if buffer is full, reject the frame
-    // 无论是不是丢帧模式（不尝试重复发送），都会在这里被拦截，避免buffer溢出
-    if (m_document_buffer.size() >= m_runtime_config->buffer_size) {
+    // 只有丢帧模式（不尝试重复发送），才会在这里被拦截，避免buffer溢出
+    if (!m_runtime_config->send_goal_retry && m_document_buffer.size() >= m_runtime_config->buffer_size) {
         auto result = std::make_shared<ACT_AcceptDocument::Result>();
         result->return_msg = "Buffer is full";
         result->return_code = ReturnCode::REJECTED;
@@ -551,7 +551,11 @@ void DetectorPipeline::_send_frame_to_downstreams()
                             } else {
                                 // 其他情况还需要等待状态变化
                                 // sleep一些时间再去查询状态
-                                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+                                // std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+
+                                // FIXME: 暂时当做发送成功处理
+                                is_frame_task_done = true;
+                                break;
                             }
                         }
                         if (is_frame_task_done) {
@@ -670,7 +674,11 @@ void DetectorPipeline::_send_document_to_downstreams()
                             } else {
                                 // 其他情况还需要等待状态变化
                                 // sleep一些时间再去查询状态
-                                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+                                // std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+
+                                // FIXME: 暂时当做发送成功处理
+                                is_doc_task_done = true;
+                                break;
                             }
                         }
                         if (is_doc_task_done) {
@@ -763,6 +771,8 @@ void DetectorPipeline::_merge_detections_and_documents()
         document = (*lock_ptr_document_buffer)->begin()->second;
     }
 
+    document.detections.frame = document.frame;
+
     // 判断是否有对应的detections且是否全都准备好了
     {
         auto lock_ptr_detections_buffer = m_impl->sync_detections_buffer.synchronize();
@@ -778,6 +788,12 @@ void DetectorPipeline::_merge_detections_and_documents()
             document.detections.detections.insert(document.detections.detections.end(), x.detections.begin(), x.detections.end());
         }
     }
+
+    // // test log
+    // for (const auto &detection : document.detections.detections) {
+    //     RCLCPP_INFO(m_impl->logger, "_merge_detections_and_documents(): detection %s",
+    //                 detection_msg_to_string(detection).c_str());
+    // }
 
     // 加入到map_document_waiting中
     {

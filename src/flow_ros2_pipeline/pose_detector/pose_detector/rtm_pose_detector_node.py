@@ -616,6 +616,10 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         detections = goal_handle.request.detections
         # self.m_logger.info(f'_accept_detections_accepted_callback(): frame_num: {detections.frame.frame_num}')
 
+        self.m_logger.info(
+            f"---TIME LOG: framenum {detections.frame.frame_num} node rtm_pose_detector_node type IN time {self.get_clock().now().nanoseconds}"
+        )
+
         # add it to every model task queue
         self._process_detections_create_model_tasks(detections)
 
@@ -650,7 +654,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
                     continue  # FIXME: need sleep
 
             self.m_logger.info(
-                f"---TIME LOG: framenum {bodyposes_task.bodyposes_goal.frame.frame_num} node ddq_detector_node type OUT time {self.get_clock().now().nanoseconds / 1000000}"
+                f"---TIME LOG: framenum {bodyposes_task.bodyposes_goal.frame.frame_num} node rtm_pose_detector_node type OUT time {self.get_clock().now().nanoseconds / 1000000}"
             )
 
             if ds_client is None:
@@ -910,6 +914,7 @@ def main(args=None):
         rtm_pose_detector_node.get_logger().info(f"model {i} initialized")
     downstream = PoseDetectorNode.ModelDownstreamNode(
         action_name="pose_detector_pipeline_process_bodyposes_action"
+        # action_name="pose_detector_out_process_bodyposes_action"
     )
     init_config.downstreams["pose_detector_pipeline"] = downstream
 

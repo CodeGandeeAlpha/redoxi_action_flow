@@ -58,71 +58,99 @@ bool OpencvVideoReader::_send_frame_to_downstreams(
 
             auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
             auto wait_result = res.wait_for(std::chrono::milliseconds(t));
+            // if (wait_result == std::future_status::ready) {
+            //     auto task_response = res.get();
+            //     if (task_response != nullptr) {
+            //         // accepted or executing
+            //         if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
+            //             task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
+            //             // 这里状态为这两个不一定代表成功，可能是下游还在处理中，当下游返回aborted前也会是这两个状态
+            //             // 所以这里需要等待下游返回成功或者aborted
+            //             bool is_frame_task_done = false;
+            //             while (true) {
+            //                 if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+            //                     // 如果发送成功了，is_frame_task_done为true，跳出发送frame的循环
+            //                     RCLCPP_INFO(m_impl->logger, "frame %ld success because SUCCEED", frame_msg.frame_num);
+            //                     is_frame_task_done = true;
+            //                     break;
+            //                 } else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ABORTED ||
+            //                            task_response->get_status() == rclcpp_action::GoalStatus::STATUS_CANCELED ||
+            //                            task_response->get_status() == rclcpp_action::GoalStatus::STATUS_CANCELING) {
+            //                     // 如果发送失败了，is_frame_task_done为false，跳出发送frame的循环，并让外面去判断是否需要重试发送frame
+            //                     RCLCPP_INFO(m_impl->logger, "frame %ld failed because ABORTED", frame_msg.frame_num);
+            //                     is_frame_task_done = false;
+            //                     break;
+            //                 } else {
+            //                     // 其他情况还需要等待状态变化
+            //                     // sleep一些时间再去查询状态
+            //                     RCLCPP_INFO(m_impl->logger, "frame %ld waiting for status change, now status is %d", frame_msg.frame_num, task_response->get_status());
+            //                     // std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+            //                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            //                     task_response = res.get(); // 重要！！获取最新状态
+            //                 }
+            //             }
+            //             if (is_frame_task_done) {
+            //                 // 发送成功了，跳出发送frame的循环
+            //                 break;
+            //             } else {
+            //                 // 发送失败了，判断是否需要重发
+            //                 if (m_runtime_config->send_goal_retry || m_init_config->video_type == VideoTypes::Local ||
+            //                     frame_msg.signal_code == SignalCode::FLUSH || frame_msg.signal_code == SignalCode::TERMINATE) {
+            //                     // retry
+            //                     continue;
+            //                 } else {
+            //                     // failed
+            //                     break;
+            //                 }
+            //             }
+            //         }
+            //         // succeed
+            //         else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+            //             break;
+            //         }
+            //         // rejected
+            //         else {
+            //             // 发送失败了，判断是否需要重发
+            //             if (m_runtime_config->send_goal_retry || m_init_config->video_type == VideoTypes::Local ||
+            //                 frame_msg.signal_code == SignalCode::FLUSH || frame_msg.signal_code == SignalCode::TERMINATE) {
+            //                 // retry
+            //                 continue;
+            //             } else {
+            //                 // failed
+            //                 break;
+            //             }
+            //         }
+            //     } else {
+            //         // rejected
+            //         // 发送失败了，判断是否需要重发
+            //         if (m_runtime_config->send_goal_retry || m_init_config->video_type == VideoTypes::Local ||
+            //             frame_msg.signal_code == SignalCode::FLUSH || frame_msg.signal_code == SignalCode::TERMINATE) {
+            //             // retry
+            //             continue;
+            //         } else {
+            //             // failed
+            //             break;
+            //         }
+            //     }
+            // } else {
+            //     if (m_runtime_config->send_goal_retry || m_init_config->video_type == VideoTypes::Local ||
+            //         frame_msg.signal_code == SignalCode::FLUSH || frame_msg.signal_code == SignalCode::TERMINATE) {
+            //         // retry
+            //         continue;
+            //     } else {
+            //         // failed
+            //         break;
+            //     }
+            // }
+
             if (wait_result == std::future_status::ready) {
-                auto task_response = res.get();
-                if (task_response != nullptr) {
-                    // accepted or executing
-                    if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ACCEPTED ||
-                        task_response->get_status() == rclcpp_action::GoalStatus::STATUS_EXECUTING) {
-                        // 这里状态为这两个不一定代表成功，可能是下游还在处理中，当下游返回aborted前也会是这两个状态
-                        // 所以这里需要等待下游返回成功或者aborted
-                        bool is_frame_task_done = false;
-                        while (true) {
-                            if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                                // 如果发送成功了，is_frame_task_done为true，跳出发送frame的循环
-                                RCLCPP_INFO(m_impl->logger, "frame %ld success because SUCCEED", frame_msg.frame_num);
-                                is_frame_task_done = true;
-                                break;
-                            } else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_ABORTED ||
-                                       task_response->get_status() == rclcpp_action::GoalStatus::STATUS_CANCELED ||
-                                       task_response->get_status() == rclcpp_action::GoalStatus::STATUS_CANCELING) {
-                                // 如果发送失败了，is_frame_task_done为false，跳出发送frame的循环，并让外面去判断是否需要重试发送frame
-                                RCLCPP_INFO(m_impl->logger, "frame %ld failed because ABORTED", frame_msg.frame_num);
-                                is_frame_task_done = false;
-                                break;
-                            } else {
-                                // 其他情况还需要等待状态变化
-                                // sleep一些时间再去查询状态
-                                RCLCPP_INFO(m_impl->logger, "frame %ld waiting for status change, now status is %d", frame_msg.frame_num, task_response->get_status());
-                                // std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
-                                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                                task_response = res.get(); // 重要！！获取最新状态
-                            }
-                        }
-                        if (is_frame_task_done) {
-                            // 发送成功了，跳出发送frame的循环
-                            break;
-                        } else {
-                            // 发送失败了，判断是否需要重发
-                            if (m_runtime_config->send_goal_retry || m_init_config->video_type == VideoTypes::Local ||
-                                frame_msg.signal_code == SignalCode::FLUSH || frame_msg.signal_code == SignalCode::TERMINATE) {
-                                // retry
-                                continue;
-                            } else {
-                                // failed
-                                break;
-                            }
-                        }
-                    }
-                    // succeed
-                    else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
-                        break;
-                    }
-                    // rejected
-                    else {
-                        // 发送失败了，判断是否需要重发
-                        if (m_runtime_config->send_goal_retry || m_init_config->video_type == VideoTypes::Local ||
-                            frame_msg.signal_code == SignalCode::FLUSH || frame_msg.signal_code == SignalCode::TERMINATE) {
-                            // retry
-                            continue;
-                        } else {
-                            // failed
-                            break;
-                        }
-                    }
-                } else {
-                    // rejected
-                    // 发送失败了，判断是否需要重发
+                auto s = res.get()->get_status();
+                bool ok = false;
+                // downstream accepted?
+                ok |= s == rclcpp_action::GoalStatus::STATUS_ACCEPTED;
+                ok |= s == rclcpp_action::GoalStatus::STATUS_SUCCEEDED;
+                ok |= s == rclcpp_action::GoalStatus::STATUS_EXECUTING;
+                if (!ok) { // rejected
                     if (m_runtime_config->send_goal_retry || m_init_config->video_type == VideoTypes::Local ||
                         frame_msg.signal_code == SignalCode::FLUSH || frame_msg.signal_code == SignalCode::TERMINATE) {
                         // retry
@@ -131,8 +159,19 @@ bool OpencvVideoReader::_send_frame_to_downstreams(
                         // failed
                         break;
                     }
+                } else { // accepted
+                    break;
                 }
             } else {
+                // timeout
+                if (m_runtime_config->send_goal_retry || m_init_config->video_type == VideoTypes::Local ||
+                    frame_msg.signal_code == SignalCode::FLUSH || frame_msg.signal_code == SignalCode::TERMINATE) {
+                    // retry
+                    continue;
+                } else {
+                    // failed
+                    break;
+                }
             }
         }
     }
