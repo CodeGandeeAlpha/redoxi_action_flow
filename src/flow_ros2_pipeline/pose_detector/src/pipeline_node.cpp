@@ -13,8 +13,8 @@ int main(int argc, char *argv[])
 
     // init_config->process_document_action = "detector_in_process_document_action";
     FlowRos2Pipeline::PoseDetectorPipelineInitConfig::DownstreamPipelineNode downstream_pipeline_node;
-    downstream_pipeline_node.accept_document_action = "tracker_pipeline_process_document_action";
-    init_config->pipeline_downstreams["tracker_pipeline"] = downstream_pipeline_node;
+    downstream_pipeline_node.accept_document_action = "tracker_in_process_document_action";
+    init_config->pipeline_downstreams["tracker_in"] = downstream_pipeline_node;
     FlowRos2Pipeline::PoseDetectorPipelineInitConfig::DownstreamModelNode model_node;
     model_node.accept_detections_action = "model_process_detections_action";
     init_config->model_downstreams["rtmpose"] = model_node;

@@ -574,7 +574,11 @@ void DetectorIn::_send_single_task_to_downstream()
                         } else {
                             // 其他情况还需要等待状态变化
                             // sleep一些时间再去查询状态
-                            std::this_thread::sleep_for(m_runtime_config->step_interval_ms);
+                            // std::this_thread::sleep_for(m_runtime_config->step_interval_ms);
+
+                            // FIXME: 暂时当做发送成功处理
+                            is_doc_task_done = true;
+                            break;
                         }
                     }
                 } else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
@@ -657,7 +661,11 @@ void DetectorIn::_send_single_task_to_downstream()
                             } else {
                                 // 其他情况还需要等待状态变化
                                 // sleep一些时间再去查询状态
-                                std::this_thread::sleep_for(m_runtime_config->step_interval_ms);
+                                // std::this_thread::sleep_for(m_runtime_config->step_interval_ms);
+
+                                // FIXME: 暂时当做发送成功处理
+                                is_doc_task_done = true;
+                                break;
                             }
                         }
                         if (is_frame_task_done) // 如果发送成功了，跳出发送frame的循环

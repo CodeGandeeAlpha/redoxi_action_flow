@@ -577,7 +577,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         return image
 
-    def _to_detections_msg(self, result):
+    def _to_detections_msg(self, result, frame_msg):
         """
         [
             # image 1
@@ -609,6 +609,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
                     f"_to_detections_msg(): category {pred.class_id}, confidence {pred.score}, bbox {pred.xyxy}"
                 )
                 detection_msg = Detection()
+                detection_msg.frame = frame_msg
                 detection_msg.category = pred.class_id
                 detection_msg.confidence = pred.score
                 detection_msg.bbox.x = pred.xyxy[0]
@@ -629,7 +630,9 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self.m_logger.info(
             f"frame {goal_handle.request.frame.frame_num} in_queue size {self.m_num_in_process}"
         )
-        if self.m_num_in_process >= self.m_runtime_config.buffer_size:
+        if (
+            not self.m_runtime_config.send_goal_retry
+        ) and self.m_num_in_process >= self.m_runtime_config.buffer_size:
             self.m_logger.info(f"frame {goal_handle.request.frame.frame_num} REJECTED")
             goal_handle.abort()
             result = ProcessFrame.Result()
@@ -859,7 +862,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
             )
 
             # convert the result to Detections msg
-            detections = self._to_detections_msg(result)
+            detections = self._to_detections_msg(result, frame_msg)
             # detections = Detections()
             detections.uuid = uuid
             detections.frame = frame_msg

@@ -295,7 +295,7 @@ void PoseDetectorPipeline::_process_document_create_tasks(const MSG_PsgDocument 
 
 void PoseDetectorPipeline::_process_detections_create_tasks(const MSG_Detections &detections, Map_Detections_Waiting *detections_waiting_map_ptr)
 {
-    // RCLCPP_DEBUG(m_impl->logger, "create frame %ld detections tasks for downstreams", detections.frame.frame_num);
+    // RCLCPP_INFO(m_impl->logger, "_process_detections_create_tasks(): create frame %ld detections tasks for downstreams", detections.frame.frame_num);
 
     // create tasks of this frame for all downstreams
     for (auto &x : m_model_downstreams) {
@@ -341,8 +341,8 @@ void PoseDetectorPipeline::_remove_bodyposes_from_buffer(int frame_number, std::
 
 void PoseDetectorPipeline::_step()
 {
-    _send_detections_to_downstreams();
     _send_document_to_downstreams();
+    _send_detections_to_downstreams();
 }
 
 void PoseDetectorPipeline::_process_step()
@@ -376,7 +376,7 @@ void PoseDetectorPipeline::_connect_to_downstreams()
 
             // wait until the action server is ready
             // RCLCPP_INFO(m_impl->logger, "waiting for pipeline action server %s", name.c_str());
-            // client->wait_for_action_server();
+            client->wait_for_action_server();
             // RCLCPP_INFO(m_impl->logger, "pipeline action server %s is ready", name.c_str());
         }
 
@@ -525,7 +525,11 @@ void PoseDetectorPipeline::_send_detections_to_downstreams()
                             } else {
                                 // 其他情况还需要等待状态变化
                                 // sleep一些时间再去查询状态
-                                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+                                // std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+
+                                // FIXME: 暂时当做发送成功处理
+                                is_dets_task_done = true;
+                                break;
                             }
                         }
                         if (is_dets_task_done) {
@@ -539,6 +543,7 @@ void PoseDetectorPipeline::_send_detections_to_downstreams()
                     }
                     // succeed
                     else if (task_response->get_status() == rclcpp_action::GoalStatus::STATUS_SUCCEEDED) {
+                        RCLCPP_INFO(m_impl->logger, "detections %ld success because SUCCEEDED", task->detections.frame.frame_num);
                         tasks_to_remove.push_back(it.first);
                         break;
                     }
@@ -549,6 +554,7 @@ void PoseDetectorPipeline::_send_detections_to_downstreams()
                             auto lock_ptr_detections_task_waiting = m_impl->sync_detections_waiting_map.synchronize();
                             (**lock_ptr_detections_task_waiting)[it.first]->retry_times++;
                         }
+                        RCLCPP_INFO(m_impl->logger, "detections %ld retry because REJECTED", task->detections.frame.frame_num);
                         continue;
                     }
                 } else { // rejected
@@ -557,6 +563,7 @@ void PoseDetectorPipeline::_send_detections_to_downstreams()
                         auto lock_ptr_detections_task_waiting = m_impl->sync_detections_waiting_map.synchronize();
                         (**lock_ptr_detections_task_waiting)[it.first]->retry_times++;
                     }
+                    RCLCPP_INFO(m_impl->logger, "detections %ld retry because REJECTED", task->detections.frame.frame_num);
                     continue;
                 }
             } else { // timeout
@@ -565,9 +572,12 @@ void PoseDetectorPipeline::_send_detections_to_downstreams()
                     auto lock_ptr_detections_task_waiting = m_impl->sync_detections_waiting_map.synchronize();
                     (**lock_ptr_detections_task_waiting)[it.first]->retry_times++;
                 }
+                RCLCPP_INFO(m_impl->logger, "detections %ld retry because TIMEOUT", task->detections.frame.frame_num);
                 continue;
             }
         }
+
+        RCLCPP_INFO(m_impl->logger, "_send_detections_to_downstreams(): detections %ld success because SUCCEED", task->detections.frame.frame_num);
     }
 
     // 跳出循环了表明所有detections都发送成功了，在detections_task_waiting中删除这些frame
@@ -637,7 +647,11 @@ void PoseDetectorPipeline::_send_document_to_downstreams()
                             } else {
                                 // 其他情况还需要等待状态变化
                                 // sleep一些时间再去查询状态
-                                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+                                // std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+
+                                // FIXME: 暂时当做发送成功处理
+                                is_doc_task_done = true;
+                                break;
                             }
                         }
                         if (is_doc_task_done) {
@@ -738,7 +752,7 @@ void PoseDetectorPipeline::_merge_bodyposes_and_documents()
         if ((*lock_ptr_bodyposes_buffer)->at(document.frame.frame_num).size() != m_model_downstreams.size())
             return;
 
-        RCLCPP_INFO(m_impl->logger, "_merge_detections_and_documents(): frame %d detections MERGED", document.frame.frame_num);
+        RCLCPP_INFO(m_impl->logger, "_merge_bodyposes_and_documents(): frame %d bodyposes MERGED", document.frame.frame_num);
 
         // 合并document.persons和bodyposes
         auto &persons = document.persons;

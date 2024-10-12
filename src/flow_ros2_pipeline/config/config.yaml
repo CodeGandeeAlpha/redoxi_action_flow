@@ -3,7 +3,7 @@
     frame_pub_rate: 25
     frame_read_pub: "/frame_read_pub"
     frame_pub: "/frame_pub"
-    send_goal_retry: false
+    send_goal_retry: true
 
 
 /video_reader:
@@ -11,7 +11,7 @@
     # source_file: "/mnt/chengxiao/test.mp4"
     # source_file: "/mnt/chengxiao/20.22.7.164-2023-06-18-17-00-00-00.00.00.000-00.00.04.240.mp4"
     # source_file: "/media/ramdisk/20.22.6.30-2023-06-18-15-00-02_27908_28658-00.00.00.000-00.00.06.926.mp4"
-    source_file: "/3d/chengxiao/data/passengerflow/0912_badcase_test/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+    source_file: "data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
     # source_file: "/mnt/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.7.164-2023-06-18-17-00-00.mp4"
     # orbbec_net_device_ip: 192.168.32.141
     orbbec_net_device_ip: 192.168.32.139
@@ -70,12 +70,12 @@
     buffer_size: 5
 
 
-# /pose_detector_in_node:
-#   ros__parameters:
-#     process_document_action: "pose_detector_in_process_document_action"
-#     step_interval_ms: 1.0
-#     timeout_ms_send_to_downstream: 10000.0
-#     buffer_size: 5
+/pose_detector_in_node:
+  ros__parameters:
+    process_document_action: "pose_detector_in_process_document_action"
+    step_interval_ms: 1.0
+    timeout_ms_send_to_downstream: 10000.0
+    buffer_size: 5
 
 /pose_detector_pipeline_node:
   ros__parameters:
@@ -84,6 +84,7 @@
     step_interval_ms: 1.0
     pred_score_thr: 0.3
     buffer_size: 5
+    timeout_ms_send_to_downstream: 10000.0
 
 /pose_detector_node:
   ros__parameters:
@@ -93,13 +94,13 @@
     buffer_size: 5
 
 
-# /pose_detector_out_node:
-#   ros__parameters:
-#     process_document_action: "pose_detector_out_process_document_action"
-#     process_bodyposes_action: "pose_detector_out_process_bodyposes_action"
-#     step_interval_ms: 1.0
-#     timeout_ms_send_to_downstream: 10000.0
-#     buffer_size: 5
+/pose_detector_out_node:
+  ros__parameters:
+    process_document_action: "pose_detector_out_process_document_action"
+    process_bodyposes_action: "pose_detector_out_process_bodyposes_action"
+    step_interval_ms: 1.0
+    timeout_ms_send_to_downstream: 10000.0
+    buffer_size: 5
 
 
 /tracker_in_node:

@@ -198,8 +198,8 @@ void MasterNode::_accept_frame_accepted_callback(
     RCLCPP_INFO(m_impl->logger, "frame %d m_frame_buffer buffer size: %d", goal->frame.frame_num, m_frame_buffer.size());
 
     // if buffer is full, reject the frame
-    // 无论是不是丢帧模式（不尝试重复发送），都会在这里被拦截，避免buffer溢出
-    if (m_frame_buffer.size() >= m_runtime_config->buffer_size) {
+    // 只有丢帧模式（不尝试重复发送），才会在这里被拦截，避免buffer溢出
+    if (!m_runtime_config->send_goal_retry && m_frame_buffer.size() >= m_runtime_config->buffer_size) {
         auto result = std::make_shared<ACT_AcceptFrame::Result>();
         result->return_msg = "Buffer is full";
         result->return_code = ReturnCode::REJECTED;
@@ -417,7 +417,11 @@ void MasterNode::_step()
                             } else {
                                 // 其他情况还需要等待状态变化
                                 // sleep一些时间再去查询状态
-                                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+                                // std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(m_runtime_config->step_interval_ms)));
+
+                                // FIXME: 暂时当做发送成功处理
+                                is_doc_task_done = true;
+                                break;
                             }
                         }
                         if (is_doc_task_done) {
