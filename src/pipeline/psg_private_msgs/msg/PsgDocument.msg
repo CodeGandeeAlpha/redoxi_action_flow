@@ -5,8 +5,8 @@ unique_identifier_msgs/UUID trajectories_uuid
 
 std_msgs/Header header
 Persons persons
-psg_public_msgs/Detections detections
+redoxi_public_msgs/Detections detections
 PersonTrajectories trajectories
 TrajectoryEvents trajectory_events
-psg_public_msgs/Frame frame
+redoxi_public_msgs/Frame frame
 int64 signal_code
