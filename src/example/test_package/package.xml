@@ -12,6 +12,7 @@
   <depend>rclcpp</depend>
   <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
+  <depend>redoxi_common_cpp</depend>
 
   <depend>redoxi_public_msgs</depend>
   <depend>psg_private_msgs</depend>

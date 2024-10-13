@@ -16,13 +16,13 @@ std::shared_ptr<vineyard::Client> create_v6d_client(const std::string &socket)
     return v6d_client;
 }
 
-std::shared_ptr<vineyard::Tensor<uint8_t>> get_tensor_by_v6d_id(uint64_t id, std::shared_ptr<vineyard::Client> &client)
-{
-    // 从 v6d_client 中获取 Tensor 对象
-    auto tensor = std::dynamic_pointer_cast<vineyard::Tensor<uint8_t>>(client->GetObject(id));
+// std::shared_ptr<vineyard::Tensor<uint8_t>> get_tensor_by_v6d_id(uint64_t id, std::shared_ptr<vineyard::Client> &client)
+// {
+//     // 从 v6d_client 中获取 Tensor 对象
+//     auto tensor = std::dynamic_pointer_cast<vineyard::Tensor<uint8_t>>(client->GetObject(id));
 
-    return tensor;
-}
+//     return tensor;
+// }
 
 cv::Mat from_v6d_tensor_to_cvmat(const std::shared_ptr<vineyard::Tensor<uint8_t>> &tensor)
 {
@@ -57,7 +57,7 @@ int VineyardClient::connect(const std::string &socket)
 int VineyardClient::read_cvmat(vineyard::ObjectID object_id, cv::Mat &output)
 {
     try {
-        auto tensor = get_tensor_by_v6d_id(object_id, m_client);
+        auto tensor = get_tensor_by_v6d_id<uint8_t>(object_id, m_client);
         if (!tensor) {
             return -1;
         }

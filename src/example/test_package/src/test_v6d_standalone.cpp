@@ -27,7 +27,17 @@ int test_v6d_client()
     }
 
     // Create a test cv::Mat
-    cv::Mat test_mat(100, 100, CV_8UC3, cv::Scalar(255, 0, 0));
+    cv::Mat test_mat(3, 4, CV_8UC3);
+    cv::randu(test_mat, cv::Scalar(0, 0, 0), cv::Scalar(255, 255, 255));
+
+    // Print the original cv::Mat
+    spdlog::info("Original cv::Mat:");
+    for (int i = 0; i < test_mat.rows; ++i) {
+        for (int j = 0; j < test_mat.cols; ++j) {
+            cv::Vec3b pixel = test_mat.at<cv::Vec3b>(i, j);
+            spdlog::info("({}, {}, {})", pixel[0], pixel[1], pixel[2]);
+        }
+    }
 
     // Write the cv::Mat to vineyard
     vineyard::ObjectID object_id;
@@ -45,11 +55,28 @@ int test_v6d_client()
         return -1;
     }
 
+    // Print the retrieved cv::Mat
+    spdlog::info("Retrieved cv::Mat:");
+    for (int i = 0; i < retrieved_mat.rows; ++i) {
+        for (int j = 0; j < retrieved_mat.cols; ++j) {
+            cv::Vec3b pixel = retrieved_mat.at<cv::Vec3b>(i, j);
+            spdlog::info("({}, {}, {})", pixel[0], pixel[1], pixel[2]);
+        }
+    }
+
     // Check if the retrieved cv::Mat matches the original
-    if (cv::countNonZero(test_mat != retrieved_mat) == 0) {
-        spdlog::info("Test passed: Retrieved cv::Mat matches the original");
+    if (test_mat.size() == retrieved_mat.size() && test_mat.type() == retrieved_mat.type()) {
+        cv::Mat diff;
+        cv::absdiff(test_mat, retrieved_mat, diff);
+        bool matrices_equal = (cv::countNonZero(diff.reshape(1)) == 0);
+
+        if (matrices_equal) {
+            spdlog::info("Test passed: Retrieved cv::Mat matches the original");
+        } else {
+            spdlog::error("Test failed: Retrieved cv::Mat does not match the original");
+        }
     } else {
-        spdlog::error("Test failed: Retrieved cv::Mat does not match the original");
+        spdlog::error("Test failed: Retrieved cv::Mat has different size or type");
     }
 
     // Clean up (assuming there's a method to delete objects, if not, you may need to implement one)
