@@ -40,4 +40,56 @@ cv::Mat from_v6d_tensor_to_cvmat(const std::shared_ptr<vineyard::Tensor<uint8_t>
 
     return frame;
 }
+
+VineyardClient::~VineyardClient() = default;
+
+int VineyardClient::connect(const std::string &socket)
+{
+    try {
+        m_client = create_v6d_client(socket);
+        return 0;
+    } catch (const std::exception &e) {
+        // Handle any exceptions that might occur during connection
+        return -1;
+    }
+}
+
+int VineyardClient::read_cvmat(vineyard::ObjectID object_id, cv::Mat &output)
+{
+    try {
+        auto tensor = get_tensor_by_v6d_id(object_id, m_client);
+        if (!tensor) {
+            return -1;
+        }
+        output = from_v6d_tensor_to_cvmat(tensor);
+        return 0;
+    } catch (const std::exception &e) {
+        // Handle any exceptions that might occur during the process
+        return -1;
+    }
+}
+
+int VineyardClient::write_cvmat(const cv::Mat &input, vineyard::ObjectID &object_id)
+{
+    try {
+        int height = input.rows;
+        int width = input.cols;
+        int elem_size = input.elemSize();
+
+        vineyard::TensorBuilder<uint8_t> builder(*m_client, {height, width, elem_size});
+        auto tensor_data = builder.data();
+
+        std::memcpy(tensor_data, input.data, height * width * elem_size);
+
+        auto sealed = std::dynamic_pointer_cast<vineyard::Tensor<uint8_t>>(builder.Seal(*m_client));
+        VINEYARD_CHECK_OK(m_client->Persist(sealed->id()));
+
+        object_id = sealed->id();
+        return 0;
+    } catch (const std::exception &e) {
+        // Handle any exceptions that might occur during the process
+        return -1;
+    }
+}
+
 } // namespace redoxi_works

@@ -17,7 +17,7 @@ sudo apt-get install -y doxygen \
                    protobuf-compiler-grpc \
                    wget
 
-sudo pip install libclang -y
+sudo pip3 install libclang -y
 
 echo "Installing apache arrow..."
 wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb \

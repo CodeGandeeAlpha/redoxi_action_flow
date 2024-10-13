@@ -46,6 +46,7 @@ echo "Building with BUILD_TYPE=$BUILD_TYPE"
 
 colcon build --packages-select $PackagesToBuild \
     $VERBOSE \
+    --symlink-install \
     --cmake-args \
     -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
     -DCMAKE_CXX_STANDARD=17 \
