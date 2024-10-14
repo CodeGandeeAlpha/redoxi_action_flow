@@ -21,7 +21,7 @@ int test_v6d_client()
     redoxi_works::VineyardClient v6d_client;
 
     // Connect to the vineyard server
-    if (v6d_client.connect("/tmp/vineyard.sock") != 0) {
+    if (v6d_client.connect(redoxi_works::get_default_v6d_socket()) != 0) {
         spdlog::error("Failed to connect to vineyard server");
         return -1;
     }
@@ -88,7 +88,7 @@ int test_v6d_raw()
 {
     // Create a vineyard client
     vineyard::Client client;
-    VINEYARD_CHECK_OK(client.Connect("/tmp/vineyard.sock"));
+    VINEYARD_CHECK_OK(client.Connect(redoxi_works::get_default_v6d_socket()));
 
     // Create a vineyard tensor
     std::vector<int64_t> shape = {3, 4, 5};

@@ -8,7 +8,7 @@
 namespace redoxi_works
 {
 std::shared_ptr<vineyard::Client> create_v6d_client(const std::string &socket = "");
-// std::shared_ptr<vineyard::Tensor<uint8_t>> get_tensor_by_v6d_id(uint64_t id, std::shared_ptr<vineyard::Client> &client);
+std::string get_default_v6d_socket();
 cv::Mat from_v6d_tensor_to_cvmat(const std::shared_ptr<vineyard::Tensor<uint8_t>> &tensor);
 
 template <typename T>
