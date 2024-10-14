@@ -30,8 +30,13 @@ if cmake --build build -j$(nproc); then
     sudo cmake --install ./build
 
     # Install v6d python binding and etcd
+    echo "Installing v6d python binding and etcd..."
     sudo python3 setup.py bdist_wheel
     sudo pip3 install dist/vineyard-*.whl
+
+    # Update ldconfig to include the newly installed libraries
+    echo "Updating ldconfig..."
+    sudo ldconfig
 else
     echo "Build failed. Skipping installation."
     exit 1
