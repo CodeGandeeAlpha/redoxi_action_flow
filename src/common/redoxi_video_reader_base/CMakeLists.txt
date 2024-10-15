@@ -12,9 +12,15 @@ find_package(rclcpp REQUIRED)
 find_package(redoxi_common_cpp REQUIRED)
 find_package(redoxi_public_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(TBB REQUIRED)
 
-add_library(redoxi_video_reader_base src/redoxi_video_reader_base.cpp)
+set(source_files
+  src/redoxi_video_reader_base.cpp
+  src/redoxi_video_reader_types.cpp
+)
+
+add_library(redoxi_video_reader_base ${source_files})
 add_library(redoxi_video_reader_base::redoxi_video_reader_base ALIAS redoxi_video_reader_base)
 target_compile_features(redoxi_video_reader_base PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 target_include_directories(redoxi_video_reader_base PUBLIC
@@ -28,6 +34,7 @@ ament_target_dependencies(
   "rclcpp_action"
   "redoxi_common_cpp"
   "redoxi_public_msgs"
+  "sensor_msgs"
 )
 
 # Causes the visibility macros to use dllexport rather than dllimport,

@@ -6,10 +6,15 @@
 #include <redoxi_video_reader_base/visibility_control.h>
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
 #include <redoxi_video_reader_base/redoxi_video_reader_types.hpp>
-
+#include <sensor_msgs/msg/image.hpp>
 namespace redoxi_works
 {
+class RedoxiVideoReaderImpl;
 
+/**
+ * @brief The base class for all video readers.
+ * A frame is considered successfully sent if any downstream accepts it, in which case the frame is written into shared memory. Otherwise the frame is dropped.
+ */
 class REDOXI_VIDEO_READER_BASE_PUBLIC
     RedoxiVideoReaderBase : public rclcpp::Node,
                             public IOpenCloseProtocol
@@ -33,21 +38,18 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
 
   public:
     //! debug topic for visualization
-    virtual std::string get_debug_topic_name() const
+    virtual std::string get_publish_image_topic_name() const
     {
         return "Image";
     }
 
     //! debug topic for visualization
-    virtual int get_debug_topic_queue_size() const
+    virtual int get_publish_image_queue_size() const
     {
         return 10;
     }
 
-    virtual void set_debug_topic_enable(bool enable)
-    {
-        m_debug_topic_enable = enable;
-    }
+    virtual void set_publish_image(bool enable);
 
   public:
     //! Initialize with configurations, must be called once before open()
@@ -74,13 +76,74 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     //! Call this before you want to modify init config
     virtual int close() override;
 
-    //! Can modify init config, runtime config
-
     //! Get the status code of this node
     virtual int get_status_code() const;
 
-  private:
-    bool m_debug_topic_enable = false;
+  protected:
+    virtual void _step();
+
+    // create publisher for visualization
+    virtual void _create_image_topic();
+
+    // find and connect to downstreams
+    virtual void _connect_to_downstreams();
+
+    // check if all downstreams are ready to accept new frame
+    virtual bool _check_downstreams_ready();
+
+    // ping downstream to check if they are ready to accept new frame
+    virtual bool _ping(const std::shared_ptr<Downstream> &ds);
+
+    // add a frame to shared memory, return object id
+    virtual uint64_t _add_frame_to_shared_memory(const cv::Mat &frame);
+
+    // send frame in shared memory to all downstreams
+    // return whether the frame is actually sent
+    virtual bool _send_frame_to_downstreams(
+        const MSG_Frame &frame_msg,
+        bool check_downstream_ready_before_send);
+
+    virtual void _declare_all_parameters();
+
+    // read next frame and return true if success
+    virtual bool _read_frame_local(cv::Mat &frame);
+
+    // read next frame from orbbec net device and return true if success
+    virtual bool _read_frame_orbbec(cv::Mat &frame);
+
+    // publish frame msg for visualization
+    virtual void _publish_frame(const cv::Mat &frame);
+
+  protected:
+    /**
+     * @brief Read next frame, intended to be overridden by subclass
+     * @param frame the frame to be filled with the read frame
+     * @return 0 if success, otherwise error code
+     */
+    virtual int _read_frame(cv::Mat &frame) = 0;
+
+
+  protected:
+    // member of downstreams
+    std::map<std::string, std::shared_ptr<Downstream>> m_downstreams;
+
+    // configuration
+    std::shared_ptr<InitConfig> m_init_config;
+    std::shared_ptr<RuntimeConfig> m_runtime_config;
+
+    // impl data
+    std::shared_ptr<RedoxiVideoReaderImpl> m_impl;
+
+    // status code
+    int m_status_code = NodeStatusCode::BEFORE_INIT;
+
+    // publish info for visualization
+    bool m_publish_image = false;
+    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_topic_image;
+
+    // current frame number read by this reader
+    // -1 means not read any frame, starting from 0 regardless of the absolute frame number in cv::VideoCapture
+    int64_t m_frame_number = -1;
 };
 
 } // namespace redoxi_works
