@@ -1,0 +1,1 @@
+# Rule: in C++, for short comment, prefer to use one-line dxygen style comment //! instead of block comment

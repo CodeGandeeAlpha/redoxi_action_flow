@@ -7,12 +7,14 @@
 
 namespace redoxi_works
 {
-std::shared_ptr<vineyard::Client> create_v6d_client(const std::string &socket = "");
-std::string get_default_v6d_socket();
-cv::Mat from_v6d_tensor_to_cvmat(const std::shared_ptr<vineyard::Tensor<uint8_t>> &tensor);
+REDOXI_COMMON_CPP_PUBLIC std::shared_ptr<vineyard::Client> create_v6d_client(const std::string &socket = "");
+REDOXI_COMMON_CPP_PUBLIC std::string get_default_v6d_socket();
+REDOXI_COMMON_CPP_PUBLIC cv::Mat from_v6d_tensor_to_cvmat(const std::shared_ptr<vineyard::Tensor<uint8_t>> &tensor);
 
 template <typename T>
-std::shared_ptr<vineyard::Tensor<T>> get_tensor_by_v6d_id(uint64_t id, std::shared_ptr<vineyard::Client> &client)
+REDOXI_COMMON_CPP_PUBLIC
+    std::shared_ptr<vineyard::Tensor<T>>
+    get_tensor_by_v6d_id(uint64_t id, std::shared_ptr<vineyard::Client> &client)
 {
     // Attempt to get the object from the vineyard client
     auto object = client->GetObject(id);
@@ -29,7 +31,7 @@ std::shared_ptr<vineyard::Tensor<T>> get_tensor_by_v6d_id(uint64_t id, std::shar
     return tensor;
 }
 
-class VineyardClient
+class REDOXI_COMMON_CPP_PUBLIC VineyardClient
 {
   public:
     VineyardClient(){};

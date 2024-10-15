@@ -1,0 +1,8 @@
+redoxi_public_msgs/Detections detections
+redoxi_public_msgs/Control control_msg
+---
+string return_msg
+int64 return_code
+---
+string feedback_msg
+int64 feedback_code

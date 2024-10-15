@@ -18,6 +18,7 @@ display_help() {
 PackagesToBuild="psg_private_msgs \
                  redoxi_public_msgs \
                  redoxi_common_cpp \
+                 redoxi_video_reader_base \
                  test_package"
 
 # Check if --help flag is provided
