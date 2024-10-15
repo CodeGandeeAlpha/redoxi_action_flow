@@ -12,6 +12,7 @@ endif()
 # Find required packages
 find_package(ament_cmake REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(TBB REQUIRED)
 
 # Set dependencies
 set(DEPENDENCIES
@@ -24,46 +25,57 @@ set(DEPENDENCIES
   redoxi_common_cpp
 )
 
-set(additional_dependencies spdlog::spdlog)
+set(additional_dependencies spdlog::spdlog TBB::tbb)
 
 # Find each dependency
 foreach(dependency ${DEPENDENCIES})
   find_package(${dependency} REQUIRED)
 endforeach()
 
-# Add executable for test_node
-add_executable(test_node src/test_node.cpp)
-target_include_directories(test_node PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_compile_features(test_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-target_link_libraries(test_node PUBLIC ${additional_dependencies})
-ament_target_dependencies(test_node PUBLIC ${DEPENDENCIES})
+set(ALL_TEST_TARGETS "")
 
-# Add executable for test_public_msgs
-add_executable(test_public_msgs src/test_public_msgs.cpp)
-target_compile_features(test_public_msgs PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-ament_target_dependencies(test_public_msgs PUBLIC ${DEPENDENCIES})
-target_link_libraries(test_public_msgs PUBLIC ${additional_dependencies})
+# Define options to control building of each target
+option(BUILD_TEST_NODE "Build test_node target" OFF)
+option(BUILD_TEST_PUBLIC_MSGS "Build test_public_msgs target" OFF)
+option(BUILD_TEST_PRIVATE_MSGS "Build test_private_msgs target" OFF)
+option(BUILD_TEST_V6D_STANDALONE "Build test_v6d_standalone target" OFF)
+option(BUILD_TEST_TBB "Build test_tbb target" ON)
 
-# Add executable for test_private_msgs
-add_executable(test_private_msgs src/test_private_msgs.cpp)
-target_compile_features(test_private_msgs PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-target_link_libraries(test_private_msgs PUBLIC ${additional_dependencies})
-ament_target_dependencies(test_private_msgs PUBLIC ${DEPENDENCIES})
+# Function to configure a target
+function(configure_target target_name)
+  add_executable(${target_name} src/${target_name}.cpp)
+  target_compile_features(${target_name} PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+  target_link_libraries(${target_name} PUBLIC ${additional_dependencies})
+  ament_target_dependencies(${target_name} PUBLIC ${DEPENDENCIES})
+  target_include_directories(${target_name} PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>)
+  set(ALL_TEST_TARGETS ${ALL_TEST_TARGETS} ${target_name} PARENT_SCOPE)
+endfunction()
 
-# Add executable for test_v6d
-add_executable(test_v6d_standalone src/test_v6d_standalone.cpp)
-target_compile_features(test_v6d_standalone PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-target_link_libraries(test_v6d_standalone PUBLIC ${additional_dependencies})
-ament_target_dependencies(test_v6d_standalone PUBLIC ${DEPENDENCIES})
+# Configure targets based on options
+if(BUILD_TEST_NODE)
+  configure_target(test_node)
+endif()
 
-# Update the install targets to include test_v6d
-install(TARGETS test_v6d_standalone
-  DESTINATION lib/${PROJECT_NAME})
+if(BUILD_TEST_PUBLIC_MSGS)
+  configure_target(test_public_msgs)
+endif()
+
+if(BUILD_TEST_PRIVATE_MSGS)
+  configure_target(test_private_msgs)
+endif()
+
+if(BUILD_TEST_V6D_STANDALONE)
+  configure_target(test_v6d_standalone)
+endif()
+
+if(BUILD_TEST_TBB)
+  configure_target(test_tbb)
+endif()
 
 # Install targets
-install(TARGETS test_public_msgs test_node test_private_msgs test_v6d_standalone
+install(TARGETS ${ALL_TEST_TARGETS}
   DESTINATION lib/${PROJECT_NAME})
 
 # Finalize ament package
