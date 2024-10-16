@@ -12,12 +12,60 @@ namespace redoxi_works
 namespace async_processor
 {
 
+
 // useful when development, because clangd fails to auto suggest with template parameters
 // using InputDataType = int;
 // using OutputDataType = int;
 // using InputGateTokenType = DefaultInputGateToken;
 // using ExecuteTokenType = DefaultExecToken;
 
+
+// FIXME: it seems that the processor always keep the output order, even if the preserve_order is false
+
+/**
+//! Single overwrite execution node, used for single producer and single consumer
+//! @tparam InputDataType The type of the input data
+//! @tparam OutputDataType The type of the output data
+//! @tparam InputGateTokenType The type of the input gate token, must inherit from DefaultInputGateToken
+//! @tparam ExecuteTokenType The type of the execution token, must inherit from DefaultExecToken
+//!
+//! This class represents a node in an asynchronous processing pipeline that allows
+//! single producer and single consumer operations. It overwrites the previous input
+//! data when new data is put into the node. It has a data token which controls when the
+//! data is consumeable (i.e. the input data has been updated). You are supposed to
+//! use put_data() to put data into the node, and fire() to fire a data token.
+//!
+//! The node is designed to work with TBB (Threading Building Blocks) flow graph,
+//! providing a composite node that processes input data and produces output data
+//! along with associated tokens for synchronization and error handling.
+//!
+//! Usage example:
+//! @code
+//! tbb::flow::graph g;
+//! struct InputData { size_t value; };
+//! struct OutputData { size_t result; };
+//! struct InputGateToken : public redoxi_works::async_processor::DefaultInputGateToken {
+//!     size_t pushed_seq = 0;
+//! };
+//!
+//! redoxi_works::async_processor::SingleOverwriteExecNode<InputData, OutputData, InputGateToken> node(g);
+//! node.set_preserve_order(false);
+//!
+//! node.set_work_function([](const auto &input, auto &output) {
+//!     std::get<0>(output).result = std::get<0>(input).value * 100;
+//!     return 0; // Success
+//! });
+//!
+//! node.set_output_callback([](const auto &output) {
+//!     auto result = std::get<0>(output).result;
+//!     auto token = std::get<1>(output);
+//!     spdlog::info("Output: Result = {}, Token sequence = {}", result, token.sequence_number);
+//!     return 0; // Success
+//! });
+//!
+//! node.build();
+//! @endcode
+*/
 template <typename InputDataType,
           typename OutputDataType,
           typename InputGateTokenType = DefaultInputGateToken,
@@ -26,13 +74,15 @@ template <typename InputDataType,
           typename = std::enable_if_t<std::is_base_of_v<DefaultExecToken, ExecuteTokenType>>>
 class SingleOverwriteExecNode : public tbb::flow::composite_node<
                                     std::tuple<InputDataType, InputGateTokenType>,
-                                    std::tuple<OutputDataType, InputGateTokenType>>
+                                    std::tuple<std::tuple<OutputDataType, InputGateTokenType>>>
 {
   public:
     using InputData_t = InputDataType;
     using OutputData_t = OutputDataType;
+
     using InputWithTokens_t = std::tuple<InputDataType, InputGateTokenType, ExecuteTokenType>;
     using OutputWithTokens_t = std::tuple<OutputDataType, InputGateTokenType, ExecuteTokenType>;
+    using OutputWithDataToken_t = std::tuple<OutputDataType, InputGateTokenType>;
 
     /**
      * @brief Work function type, update output by input,
@@ -52,13 +102,41 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
 
     using CompositeNode_t = tbb::flow::composite_node<
         std::tuple<InputDataType, InputGateTokenType>,
-        std::tuple<OutputDataType, InputGateTokenType>>;
+        std::tuple<std::tuple<OutputDataType, InputGateTokenType>>>;
+
+  public:
+    //! Put data into the node, will overwrite the previous data, return true if success
+    virtual bool put_data(const InputDataType &data)
+    {
+        if (m_input_data_node)
+            return m_input_data_node->try_put(data);
+        return false;
+    }
+
+    //! Try to fire the data into the processing pipeline, using the given token
+    //! @return true if the token is accepted, false otherwise (previous token is not consumed).
+    //! In either case, the pipeline will be notified that a new data is available, and will process it later
+    bool fire(InputGateTokenType &token)
+    {
+        if (m_input_gate_token_limiter) {
+            generate_input_gate_token(token);
+            return m_input_gate_token_limiter->try_put(token);
+        }
+        return false;
+    }
+
+    //! Try to fire the data into the processing pipeline, return true if a new token is accepted
+    bool fire()
+    {
+        InputGateTokenType token;
+        return fire(token);
+    }
 
   public:
     SingleOverwriteExecNode(tbb::flow::graph &g,
                             const WorkFunction_t &work_function = WorkFunction_t(),
                             const OutputCallback_t &output_callback = OutputCallback_t(),
-                            size_t execute_token_size = 1,
+                            size_t execute_token_size = DEFAULT_EXECUTE_TOKEN_SIZE,
                             bool preserve_order = true,
                             bool is_serial = false)
         : CompositeNode_t(g),
@@ -85,92 +163,116 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
         tbb::flow::graph &g = this->my_graph;
 
         // buffer the execute tokens
-        m_execute_token_buf = std::make_shared<tbb::flow::queue_node<ExecuteTokenType>>(g);
+        m_execute_token_buf = std::make_shared<ExecTokenBuf_t>(g);
 
         // limit the number of input gate tokens to 1
-        m_input_gate_token_limiter = std::make_shared<tbb::flow::limiter_node<InputGateTokenType>>(g, 1);
+        m_input_gate_token_limiter = std::make_shared<InputGateTokenLimiter_t>(g, 1);
 
         // buffer the input gate tokens
-        m_input_gate_token_buf = std::make_shared<tbb::flow::queue_node<InputGateTokenType>>(g);
+        m_input_gate_token_buf = std::make_shared<InputGateTokenBuf_t>(g);
 
         // overwrite the input data
-        m_input_overwrite_node = std::make_shared<tbb::flow::overwrite_node<InputDataType>>(g);
+        m_input_data_node = std::make_shared<InputDataNode_t>(g);
 
         // join the input data
-        m_input_join_node = std::make_shared<tbb::flow::join_node<InputWithTokens_t, tbb::flow::reserving>>(g);
-
-        // broadcast the input data
-        m_input_broadcast_node = std::make_shared<tbb::flow::broadcast_node<InputWithTokens_t>>(g);
+        m_input_join_node = std::make_shared<InputJoinNode_t>(g);
 
         // reset the input gate token buffer limiter
-        m_input_gate_token_consumed_node = std::make_shared<tbb::flow::function_node<InputWithTokens_t, tbb::flow::continue_msg>>(
-            g, concurrency_type, [this](const InputWithTokens_t &input_data) {
-                this->_consumed_input_gate_token(std::get<1>(input_data));
-                return tbb::flow::continue_msg();
+        m_input_stamp_node = std::make_shared<InputStampNode_t>(
+            g, tbb::flow::serial,
+            [this](const InputWithTokens_t &input_data, typename InputStampNode_t::output_ports_type &ports) {
+                // stamp the input data with the input gate token
+                InputWithTokens_t stamped_data = input_data;
+                this->_stamp_data_token(stamped_data);
+
+                // output the stamped data, assuming always success
+                std::get<0>(ports).try_put(stamped_data);
+
+                // output the continue message, assuming always success
+                std::get<1>(ports).try_put(tbb::flow::continue_msg());
             });
 
         // sequencer node
         m_output_sequencer_node = nullptr;
         if (m_preserve_order)
-            m_output_sequencer_node = std::make_shared<tbb::flow::sequencer_node<OutputWithTokens_t>>(
+            m_output_sequencer_node = std::make_shared<OutputSequencerNode_t>(
                 g, [](const OutputWithTokens_t &output_data) {
                     return std::get<1>(output_data).sequence_number;
                 });
 
         // work node
-        m_work_node = std::make_shared<tbb::flow::function_node<InputWithTokens_t, OutputWithTokens_t>>(
+        m_work_node = std::make_shared<WorkNode_t>(
             g, concurrency_type, [this](const InputWithTokens_t &input_data) {
                 return this->_nodefunc_work_output(input_data);
             });
 
-        // finalize node
-        m_finalize_node = std::make_shared<tbb::flow::function_node<OutputWithTokens_t, OutputWithTokens_t>>(
-            g, concurrency_type,
-            [this](const OutputWithTokens_t &output_data) {
-                return this->_nodefunc_finalize(output_data);
+        // if preserve order is requested, the finalize node must be serial
+        // otherwise it will undo the work of sequencer node
+        auto finalize_concurrency_type = tbb::flow::unlimited;
+        if (m_preserve_order || m_is_serial)
+            finalize_concurrency_type = tbb::flow::serial;
+        m_finalize_node = std::make_shared<FinalizeNode_t>(
+            g, finalize_concurrency_type,
+            [this](const OutputWithTokens_t &output_data,
+                   typename FinalizeNode_t::output_ports_type &ports) {
+                const auto &output = std::get<0>(output_data);
+                const auto &data_token = std::get<1>(output_data);
+                const auto &exec_token = std::get<2>(output_data);
+
+                // notify user callback
+                this->_nodefunc_finalize(output_data);
+
+                // output to data port
+                std::get<0>(ports).try_put(std::make_tuple(output, data_token));
+
+                // return execution token
+                std::get<1>(ports).try_put(exec_token);
             });
 
-        // output split node
-        m_output_split_node = std::make_shared<tbb::flow::split_node<OutputWithTokens_t>>(g);
-
         // build the main graph
+
+        // create a limited buffer for input gate tokens
         tbb::flow::make_edge(*m_input_gate_token_limiter, *m_input_gate_token_buf);
-        tbb::flow::make_edge(*m_input_overwrite_node, tbb::flow::input_port<0>(*m_input_join_node));
+
+        // (input_data, input_gate_token, exec_token) -> join_node
+        tbb::flow::make_edge(*m_input_data_node, tbb::flow::input_port<0>(*m_input_join_node));
         tbb::flow::make_edge(*m_input_gate_token_buf, tbb::flow::input_port<1>(*m_input_join_node));
         tbb::flow::make_edge(*m_execute_token_buf, tbb::flow::input_port<2>(*m_input_join_node));
-        tbb::flow::make_edge(*m_input_join_node, *m_input_broadcast_node);
-        tbb::flow::make_edge(*m_input_broadcast_node, *m_work_node);
+
+        // (input_data, input_gate_token, exec_token) -> stamp_node
+        tbb::flow::make_edge(*m_input_join_node, *m_input_stamp_node);
+
+        // stamp_node.port[0] -> work_node
+        tbb::flow::make_edge(tbb::flow::output_port<0>(*m_input_stamp_node), *m_work_node);
+
+        // stamp_node.port[1] -> release the input gate token slot
+        tbb::flow::make_edge(tbb::flow::output_port<1>(*m_input_stamp_node), m_input_gate_token_limiter->decrementer());
 
         if (m_preserve_order) {
-            // if preserve order is requested, we need to sequence the output
+            // if preserve order is requested, work_node -> sequencer_node -> finalize_node
             assert(m_output_sequencer_node != nullptr);
             tbb::flow::make_edge(*m_work_node, *m_output_sequencer_node);
             tbb::flow::make_edge(*m_output_sequencer_node, *m_finalize_node);
         } else {
+            // if preserve order is not requested, work_node -> finalize_node
             tbb::flow::make_edge(*m_work_node, *m_finalize_node);
         }
 
-        // side graph: reset input gate token limit, to allow new tokens to enter
-        tbb::flow::make_edge(*m_input_broadcast_node, *m_input_gate_token_consumed_node);
-        tbb::flow::make_edge(*m_input_gate_token_consumed_node, m_input_gate_token_limiter->decrementer());
-
-        // side graph: return exec token to the buffer, so that it can be reused
-        tbb::flow::make_edge(*m_finalize_node, *m_output_split_node);
-        tbb::flow::make_edge(tbb::flow::output_port<2>(*m_output_split_node), *m_execute_token_buf);
+        // return exec token to the buffer, so that it can be reused
+        tbb::flow::make_edge(tbb::flow::output_port<1>(*m_finalize_node), *m_execute_token_buf);
 
         // define input ports
         using CompositeInputPorts_t = typename CompositeNode_t::input_ports_type;
         using CompositeOutputPorts_t = typename CompositeNode_t::output_ports_type;
         this->set_external_ports(
             CompositeInputPorts_t(
-                *m_input_overwrite_node,
+                *m_input_data_node,
                 *m_input_gate_token_limiter),
             CompositeOutputPorts_t(
-                tbb::flow::output_port<0>(*m_output_split_node),
-                tbb::flow::output_port<1>(*m_output_split_node)));
+                tbb::flow::output_port<0>(*m_finalize_node)));
 
         // prepare the node
-        _reset();
+        prepare();
     }
 
     //! Generate input gate token, created by user
@@ -246,22 +348,10 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
         m_output_callback = output_callback;
     }
 
-  protected:
-    //! Consumed input gate token, increase the sequence number
-    virtual void _consumed_input_gate_token(const InputGateTokenType &)
-    {
-        spdlog::info("[GRAPH] Consumed input gate token, sequence number = {}", (*m_next_sequence_number));
-        (*m_next_sequence_number)++;
-    }
-
-    //! Reset the node and prepare tokens
-    virtual void _reset()
+    //! call this after the graph is reset, or otherwise the node will be blocked
+    virtual void prepare()
     {
         *m_next_sequence_number = 0;
-
-        // reset the input gate token buffer
-        if (m_input_gate_token_buf)
-            m_input_gate_token_buf->reset();
 
         // reset the execute token buffer
         if (m_execute_token_buf) {
@@ -272,15 +362,17 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
         }
     }
 
-    //! Reset the node
-    virtual void reset_node(tbb::flow::reset_flags flags) override
+  protected:
+    //! Stamp data token, mark it as consumed
+    virtual void _stamp_data_token(InputWithTokens_t &input_data)
     {
-        CompositeNode_t::reset_node(flags);
-        _reset();
+        // assign the sequence number to the token
+        std::get<1>(input_data).sequence_number = (*m_next_sequence_number)++;
+        spdlog::info("[GRAPH] stamped, value={}, token={}", std::get<0>(input_data).value, std::get<1>(input_data).sequence_number);
     }
 
     //! Function to process work output
-    OutputWithTokens_t _nodefunc_work_output(const InputWithTokens_t &input_data)
+    virtual OutputWithTokens_t _nodefunc_work_output(const InputWithTokens_t &input_data)
     {
         OutputWithTokens_t output_data;
 
@@ -298,7 +390,7 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
     }
 
     //! Function to call user output callback
-    OutputWithTokens_t _nodefunc_finalize(const OutputWithTokens_t &output_data)
+    virtual OutputWithTokens_t _nodefunc_finalize(const OutputWithTokens_t &output_data)
     {
         OutputWithTokens_t _output = output_data;
         auto &exec_token = std::get<2>(_output);
@@ -307,6 +399,41 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
 
         return _output;
     }
+
+  protected:
+    // Node types
+
+    //! used to provide input data, always overwrite the previous data
+    using InputDataNode_t = tbb::flow::overwrite_node<InputDataType>;
+
+    //! only allow one input gate token to enter at a time
+    using InputGateTokenLimiter_t = tbb::flow::limiter_node<InputGateTokenType>;
+
+    //! signals that the input data is updated and ready to be consumed
+    using InputGateTokenBuf_t = tbb::flow::queue_node<InputGateTokenType>;
+
+    //! signals that execution quota is available
+    using ExecTokenBuf_t = tbb::flow::queue_node<ExecuteTokenType>;
+
+    //! read input when required tokens are ready
+    using InputJoinNode_t = tbb::flow::join_node<InputWithTokens_t, tbb::flow::reserving>;
+
+    //! after join, stamp the input data with the input gate token
+    using InputStampNode_t = tbb::flow::multifunction_node<
+        InputWithTokens_t,
+        std::tuple<InputWithTokens_t, tbb::flow::continue_msg>>;
+
+    //! execute work function
+    using WorkNode_t = tbb::flow::function_node<InputWithTokens_t, OutputWithTokens_t>;
+
+    //! output sequencer, only necessary when preserve order is true
+    using OutputSequencerNode_t = tbb::flow::sequencer_node<OutputWithTokens_t>;
+
+    //! finalize output
+    using FinalizeNode_t = tbb::flow::multifunction_node<
+        OutputWithTokens_t,
+        std::tuple<OutputWithDataToken_t, ExecuteTokenType>>;
+
 
   protected:
     WorkFunction_t m_work_function;
@@ -326,39 +453,17 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
 
     //! use shared_ptr so that you do not have to create them in constructor
     //! Limiter for execute token buffer
-    std::shared_ptr<
-        typename tbb::flow::queue_node<ExecuteTokenType>>
-        m_execute_token_buf;
-    std::shared_ptr<
-        typename tbb::flow::limiter_node<InputGateTokenType>>
-        m_input_gate_token_limiter;
-    std::shared_ptr<
-        typename tbb::flow::queue_node<InputGateTokenType>>
-        m_input_gate_token_buf;
-    std::shared_ptr<
-        typename tbb::flow::overwrite_node<InputDataType>>
-        m_input_overwrite_node;
-    std::shared_ptr<
-        typename tbb::flow::join_node<InputWithTokens_t, tbb::flow::reserving>>
-        m_input_join_node;
-    std::shared_ptr<
-        typename tbb::flow::broadcast_node<InputWithTokens_t>>
-        m_input_broadcast_node;
-    std::shared_ptr<
-        typename tbb::flow::function_node<InputWithTokens_t>>
-        m_input_gate_token_consumed_node;
-    std::shared_ptr<
-        typename tbb::flow::function_node<InputWithTokens_t, OutputWithTokens_t>>
-        m_work_node;
-    std::shared_ptr<
-        typename tbb::flow::sequencer_node<OutputWithTokens_t>>
-        m_output_sequencer_node;
-    std::shared_ptr<
-        typename tbb::flow::function_node<OutputWithTokens_t, OutputWithTokens_t>>
-        m_finalize_node;
-    std::shared_ptr<
-        typename tbb::flow::split_node<OutputWithTokens_t>>
-        m_output_split_node;
+    std::shared_ptr<ExecTokenBuf_t> m_execute_token_buf;
+    std::shared_ptr<InputGateTokenLimiter_t> m_input_gate_token_limiter;
+    std::shared_ptr<InputGateTokenBuf_t> m_input_gate_token_buf;
+
+    std::shared_ptr<InputDataNode_t> m_input_data_node;
+    std::shared_ptr<InputJoinNode_t> m_input_join_node;
+    std::shared_ptr<InputStampNode_t> m_input_stamp_node;
+
+    std::shared_ptr<WorkNode_t> m_work_node;
+    std::shared_ptr<OutputSequencerNode_t> m_output_sequencer_node;
+    std::shared_ptr<FinalizeNode_t> m_finalize_node;
 };
 
 } // namespace async_processor

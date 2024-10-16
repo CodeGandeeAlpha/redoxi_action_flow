@@ -1,8 +1,6 @@
 #pragma once
 
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
-#include <tuple>
-#include <atomic>
 #include <cstddef>
 
 namespace redoxi_works
@@ -10,6 +8,9 @@ namespace redoxi_works
 
 namespace async_processor
 {
+
+//! Default execute token size for async processor nodes
+const int DEFAULT_EXECUTE_TOKEN_SIZE = 4;
 
 //! Dummy token for use with tbb graph
 struct DefaultExecToken {
