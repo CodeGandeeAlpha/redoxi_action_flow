@@ -10,6 +10,8 @@
 #include <spdlog/spdlog.h>
 #include <tuple>
 
+#include "redoxi_common_cpp/async_processor/SingleOverwriteExecNode.hpp"
+
 
 using TokenType = int;
 int test_token_system();
@@ -33,6 +35,9 @@ int main()
 
     // test async node
     tbb::flow::graph g;
+
+    // just create this to compile
+    redoxi_works::async_processor::SingleOverwriteExecNode<int, int> my_composite_node(g);
 
     // create a concurrent queue to store the data
     tbb::concurrent_bounded_queue<std::shared_ptr<AsyncTask>> ext_data_queue;
