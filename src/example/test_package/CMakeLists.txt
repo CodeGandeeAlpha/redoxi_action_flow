@@ -39,8 +39,8 @@ option(BUILD_TEST_NODE "Build test_node target" OFF)
 option(BUILD_TEST_PUBLIC_MSGS "Build test_public_msgs target" OFF)
 option(BUILD_TEST_PRIVATE_MSGS "Build test_private_msgs target" OFF)
 option(BUILD_TEST_V6D_STANDALONE "Build test_v6d_standalone target" OFF)
-option(BUILD_TEST_TBB "Build test_tbb target" ON)
-
+option(BUILD_TEST_TBB "Build test_tbb target" OFF)
+option(BUILD_TEST_ASYNC_SINGLE_OVERWRITE "Build test_async_single_overwrite target" ON)
 # Function to configure a target
 function(configure_target target_name)
   add_executable(${target_name} src/${target_name}.cpp)
@@ -72,6 +72,10 @@ endif()
 
 if(BUILD_TEST_TBB)
   configure_target(test_tbb)
+endif()
+
+if(BUILD_TEST_ASYNC_SINGLE_OVERWRITE)
+  configure_target(test_async_single_overwrite)
 endif()
 
 # Install targets

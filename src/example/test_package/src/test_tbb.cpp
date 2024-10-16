@@ -36,9 +36,6 @@ int main()
     // test async node
     tbb::flow::graph g;
 
-    // just create this to compile
-    redoxi_works::async_processor::SingleOverwriteExecNode<int, int> my_composite_node(g);
-
     // create a concurrent queue to store the data
     tbb::concurrent_bounded_queue<std::shared_ptr<AsyncTask>> ext_data_queue;
     tbb::concurrent_bounded_queue<int> sync_output_queue;
