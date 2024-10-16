@@ -4,6 +4,8 @@
 #include <tbb/tbb.h>
 #include <cassert>
 #include <type_traits>
+#include <spdlog/spdlog.h>
+
 namespace redoxi_works
 {
 
@@ -101,8 +103,9 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
         m_input_broadcast_node = std::make_shared<tbb::flow::broadcast_node<InputWithTokens_t>>(g);
 
         // reset the input gate token buffer limiter
-        m_input_gate_token_buf_reset_node = std::make_shared<tbb::flow::function_node<InputWithTokens_t, tbb::flow::continue_msg>>(
-            g, concurrency_type, [](const InputWithTokens_t &) {
+        m_input_gate_token_consumed_node = std::make_shared<tbb::flow::function_node<InputWithTokens_t, tbb::flow::continue_msg>>(
+            g, concurrency_type, [this](const InputWithTokens_t &input_data) {
+                this->_consumed_input_gate_token(std::get<1>(input_data));
                 return tbb::flow::continue_msg();
             });
 
@@ -148,8 +151,8 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
         }
 
         // side graph: reset input gate token limit, to allow new tokens to enter
-        tbb::flow::make_edge(*m_input_broadcast_node, *m_input_gate_token_buf_reset_node);
-        tbb::flow::make_edge(*m_input_gate_token_buf_reset_node, m_input_gate_token_limiter->decrementer());
+        tbb::flow::make_edge(*m_input_broadcast_node, *m_input_gate_token_consumed_node);
+        tbb::flow::make_edge(*m_input_gate_token_consumed_node, m_input_gate_token_limiter->decrementer());
 
         // side graph: return exec token to the buffer, so that it can be reused
         tbb::flow::make_edge(*m_finalize_node, *m_output_split_node);
@@ -161,7 +164,7 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
         this->set_external_ports(
             CompositeInputPorts_t(
                 *m_input_overwrite_node,
-                *m_input_gate_token_buf),
+                *m_input_gate_token_limiter),
             CompositeOutputPorts_t(
                 tbb::flow::output_port<0>(*m_output_split_node),
                 tbb::flow::output_port<1>(*m_output_split_node)));
@@ -175,6 +178,32 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
     {
         // sequence number is only incremented by the finalize node
         token.sequence_number = *m_next_sequence_number;
+    }
+
+    virtual bool is_built() const
+    {
+        return m_execute_token_buf != nullptr;
+    }
+
+    //! Set if the node is serial, only callable before build()
+    virtual void set_is_serial(bool is_serial)
+    {
+        assert(!is_built());
+        m_is_serial = is_serial;
+    }
+
+    //! Set if the node is preserving the order, only callable before build()
+    virtual void set_preserve_order(bool preserve_order)
+    {
+        assert(!is_built());
+        m_preserve_order = preserve_order;
+    }
+
+    //! Set the execute token size, only callable before build()
+    virtual void set_execute_token_size(size_t execute_token_size)
+    {
+        assert(!is_built());
+        m_execute_token_size = execute_token_size;
     }
 
     //! Generate input gate token
@@ -206,16 +235,25 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
     //! Set the work function, must be done before build()
     virtual void set_work_function(const WorkFunction_t &work_function)
     {
+        assert(!is_built());
         m_work_function = work_function;
     }
 
     //! Set the output callback, must be done before build()
     virtual void set_output_callback(const OutputCallback_t &output_callback)
     {
+        assert(!is_built());
         m_output_callback = output_callback;
     }
 
   protected:
+    //! Consumed input gate token, increase the sequence number
+    virtual void _consumed_input_gate_token(const InputGateTokenType &)
+    {
+        spdlog::info("[GRAPH] Consumed input gate token, sequence number = {}", (*m_next_sequence_number));
+        (*m_next_sequence_number)++;
+    }
+
     //! Reset the node and prepare tokens
     virtual void _reset()
     {
@@ -267,9 +305,6 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
         if (m_output_callback)
             exec_token.error_code = m_output_callback(_output);
 
-        // gate token consumed, increase the sequence number
-        (*m_next_sequence_number)++;
-
         return _output;
     }
 
@@ -311,7 +346,7 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
         m_input_broadcast_node;
     std::shared_ptr<
         typename tbb::flow::function_node<InputWithTokens_t>>
-        m_input_gate_token_buf_reset_node;
+        m_input_gate_token_consumed_node;
     std::shared_ptr<
         typename tbb::flow::function_node<InputWithTokens_t, OutputWithTokens_t>>
         m_work_node;
