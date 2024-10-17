@@ -21,8 +21,8 @@ struct DefaultExecToken {
     int error_code = 0;
 };
 
-struct DefaultInputGateToken : public DefaultExecToken {
-    ~DefaultInputGateToken() = default;
+struct DefaultInputDataToken : public DefaultExecToken {
+    ~DefaultInputDataToken() = default;
 
     /*!
      * @brief When preserved order is required, the output data will be sequenced using this number.
@@ -30,6 +30,10 @@ struct DefaultInputGateToken : public DefaultExecToken {
      * If sequence number is the same, the output will be ignored. It must be set to 0 again when the graph is reset.
      */
     std::size_t sequence_number = 0;
+
+    //! Error code, 0 means success
+    //! This code will be set during the execution of the pipeline
+    int error_code = 0;
 };
 
 struct DummyInputData {
