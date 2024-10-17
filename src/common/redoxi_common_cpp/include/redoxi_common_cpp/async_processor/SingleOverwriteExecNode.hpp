@@ -14,8 +14,8 @@ namespace async_processor
 
 
 // useful when development, because clangd fails to auto suggest with template parameters
-// using InputDataType = int;
-// using OutputDataType = int;
+// using InputDataType = DummyInputData;
+// using OutputDataType = DummyOutputData;
 // using InputGateTokenType = DefaultInputGateToken;
 // using ExecuteTokenType = DefaultExecToken;
 
@@ -84,6 +84,10 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
     using OutputWithTokens_t = std::tuple<OutputDataType, InputGateTokenType, ExecuteTokenType>;
     using OutputWithDataToken_t = std::tuple<OutputDataType, InputGateTokenType>;
 
+    //! use when is_async is true
+    using AsyncWorkNode_t = tbb::flow::async_node<InputWithTokens_t, OutputWithTokens_t>;
+    using AsyncOutputCallbackNode_t = tbb::flow::async_node<OutputWithTokens_t, OutputWithTokens_t>;
+
     /**
      * @brief Work function type, update output by input,
      *        (input, output) -> error_code, error_code = 0 means success
@@ -91,6 +95,8 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
      *       so you HAVE TO care about the thread safety.
      */
     using WorkFunction_t = std::function<int(const InputWithTokens_t &, OutputWithTokens_t &)>;
+    using WorkFunctionAsync_t = std::function<
+        void(const InputWithTokens_t &, OutputWithTokens_t &, typename AsyncWorkNode_t::gateway_type &)>;
 
     /**
      * @brief User callback over the output data,
@@ -99,6 +105,8 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
      *       so you HAVE TO care about the thread safety.
      */
     using OutputCallback_t = std::function<int(const OutputWithTokens_t &)>;
+    using OutputCallbackAsync_t = std::function<
+        void(const OutputWithTokens_t &, typename AsyncOutputCallbackNode_t::gateway_type &)>;
 
     using CompositeNode_t = tbb::flow::composite_node<
         std::tuple<InputDataType, InputGateTokenType>,
@@ -134,20 +142,19 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
 
   public:
     SingleOverwriteExecNode(tbb::flow::graph &g,
-                            const WorkFunction_t &work_function = WorkFunction_t(),
-                            const OutputCallback_t &output_callback = OutputCallback_t(),
-                            size_t execute_token_size = DEFAULT_EXECUTE_TOKEN_SIZE,
+                            bool is_async = false,
                             bool preserve_order = true,
-                            bool is_serial = false)
-        : CompositeNode_t(g),
-          m_work_function(work_function),
-          m_output_callback(output_callback),
-          m_execute_token_size(execute_token_size),
-          m_preserve_order(preserve_order),
-          m_is_serial(is_serial)
+                            bool is_serial = false,
+                            size_t execute_token_size = DEFAULT_EXECUTE_TOKEN_SIZE)
+        : CompositeNode_t(g)
     {
+        m_is_serial = is_serial;
+        m_is_async = is_async;
+        m_preserve_order = preserve_order;
+        m_execute_token_size = execute_token_size;
         m_next_sequence_number = std::make_shared<std::atomic<std::size_t>>(0);
     }
+
     virtual ~SingleOverwriteExecNode() = default;
 
     //! Build the node, must be called once and only once before the node is used
@@ -201,26 +208,50 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
                 });
 
         // work node
-        m_work_node = std::make_shared<WorkNode_t>(
-            g, concurrency_type, [this](const InputWithTokens_t &input_data) {
-                return this->_nodefunc_work_output(input_data);
-            });
+        m_work_node = nullptr;
+        m_async_work_node = nullptr;
+        if (m_is_async)
+            m_async_work_node = std::make_shared<AsyncWorkNode_t>(
+                g, concurrency_type, [this](const InputWithTokens_t &input_data, typename AsyncWorkNode_t::gateway_type &gateway) {
+                    this->_nodefunc_work_async(input_data, gateway);
+                });
+        else
+            m_work_node = std::make_shared<WorkNode_t>(
+                g, concurrency_type, [this](const InputWithTokens_t &input_data) {
+                    return this->_nodefunc_work(input_data);
+                });
 
-        // if preserve order is requested, the finalize node must be serial
-        // otherwise it will undo the work of sequencer node
-        auto finalize_concurrency_type = tbb::flow::unlimited;
+        // if sequencer node is applied, then after sequencer node, the output pipeline should be serial
+        // otherwise the output will be out of order
+        auto output_pipeline_concurrency_type = tbb::flow::unlimited;
         if (m_preserve_order || m_is_serial)
-            finalize_concurrency_type = tbb::flow::serial;
+            output_pipeline_concurrency_type = tbb::flow::serial;
+
+        // output node, call user callback
+        m_output_callback_node = nullptr;
+        m_async_output_callback_node = nullptr;
+        if (m_is_async)
+            m_async_output_callback_node = std::make_shared<AsyncOutputCallbackNode_t>(
+                g, output_pipeline_concurrency_type,
+                [this](const OutputWithTokens_t &output_data, typename AsyncOutputCallbackNode_t::gateway_type &gateway) {
+                    this->_nodefunc_output_callback_async(output_data, gateway);
+                });
+        else
+            m_output_callback_node = std::make_shared<OutputCallbackNode_t>(
+                g, output_pipeline_concurrency_type,
+                [this](const OutputWithTokens_t &output_data) {
+                    return this->_nodefunc_output_callback(output_data);
+                });
+
+        // finalize output, do some predefined work and write to output port
         m_finalize_node = std::make_shared<FinalizeNode_t>(
-            g, finalize_concurrency_type,
-            [this](const OutputWithTokens_t &output_data,
-                   typename FinalizeNode_t::output_ports_type &ports) {
+            g, output_pipeline_concurrency_type,
+            [](const OutputWithTokens_t &output_data,
+               typename FinalizeNode_t::output_ports_type &ports) {
+                spdlog::info("[GRAPH] Finalize node, output_data={}, input_gate_token={}", std::get<0>(output_data).result, std::get<1>(output_data).sequence_number);
                 const auto &output = std::get<0>(output_data);
                 const auto &data_token = std::get<1>(output_data);
                 const auto &exec_token = std::get<2>(output_data);
-
-                // notify user callback
-                this->_nodefunc_finalize(output_data);
 
                 // output to data port
                 std::get<0>(ports).try_put(std::make_tuple(output, data_token));
@@ -232,6 +263,7 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
         // build the main graph
 
         // create a limited buffer for input gate tokens
+        // (external input) -> input_gate_token_limiter -> input_gate_token_buf
         tbb::flow::make_edge(*m_input_gate_token_limiter, *m_input_gate_token_buf);
 
         // (input_data, input_gate_token, exec_token) -> join_node
@@ -242,26 +274,46 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
         // (input_data, input_gate_token, exec_token) -> stamp_node
         tbb::flow::make_edge(*m_input_join_node, *m_input_stamp_node);
 
-        // stamp_node.port[0] -> work_node
-        tbb::flow::make_edge(tbb::flow::output_port<0>(*m_input_stamp_node), *m_work_node);
+        // stamp_node.port[0] -> work_node or async_work_node
+        if (m_is_async)
+            tbb::flow::make_edge(tbb::flow::output_port<0>(*m_input_stamp_node), *m_async_work_node);
+        else
+            tbb::flow::make_edge(tbb::flow::output_port<0>(*m_input_stamp_node), *m_work_node);
 
         // stamp_node.port[1] -> release the input gate token slot
         tbb::flow::make_edge(tbb::flow::output_port<1>(*m_input_stamp_node), m_input_gate_token_limiter->decrementer());
 
+        // work_node -> (output_sequencer_node) -> finalize_node
         if (m_preserve_order) {
-            // if preserve order is requested, work_node -> sequencer_node -> finalize_node
+            // if preserve order is requested, work_node -> sequencer_node -> output_callback_node -> finalize_node
             assert(m_output_sequencer_node != nullptr);
-            tbb::flow::make_edge(*m_work_node, *m_output_sequencer_node);
-            tbb::flow::make_edge(*m_output_sequencer_node, *m_finalize_node);
+            if (m_is_async) {
+                tbb::flow::make_edge(*m_async_work_node, *m_output_sequencer_node);
+                tbb::flow::make_edge(*m_output_sequencer_node, *m_async_output_callback_node);
+                tbb::flow::make_edge(*m_async_output_callback_node, *m_finalize_node);
+            } else {
+                tbb::flow::make_edge(*m_work_node, *m_output_sequencer_node);
+                tbb::flow::make_edge(*m_output_sequencer_node, *m_output_callback_node);
+                tbb::flow::make_edge(*m_output_callback_node, *m_finalize_node);
+            }
         } else {
-            // if preserve order is not requested, work_node -> finalize_node
-            tbb::flow::make_edge(*m_work_node, *m_finalize_node);
+            // if preserve order is not requested, work_node -> output_callback_node -> finalize_node
+            if (m_is_async) {
+                tbb::flow::make_edge(*m_async_work_node, *m_async_output_callback_node);
+                tbb::flow::make_edge(*m_async_output_callback_node, *m_finalize_node);
+            } else {
+                tbb::flow::make_edge(*m_work_node, *m_output_callback_node);
+                tbb::flow::make_edge(*m_output_callback_node, *m_finalize_node);
+            }
         }
 
+        // finalize_node.port[1] -> execute token buffer
         // return exec token to the buffer, so that it can be reused
         tbb::flow::make_edge(tbb::flow::output_port<1>(*m_finalize_node), *m_execute_token_buf);
 
-        // define input ports
+        // input.port[0] -> input_data_node, use to refresh data
+        // input.port[1] -> input_gate_token_limiter, signal the input data has been updated, ready to be consumed
+        // (output_data, input_gate_token) -> output.port[0]
         using CompositeInputPorts_t = typename CompositeNode_t::input_ports_type;
         using CompositeOutputPorts_t = typename CompositeNode_t::output_ports_type;
         this->set_external_ports(
@@ -280,6 +332,19 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
     {
         // sequence number is only incremented by the finalize node
         token.sequence_number = *m_next_sequence_number;
+    }
+
+    //! Set if the node is async, only callable before build()
+    virtual void set_is_async(bool is_async)
+    {
+        assert(!is_built());
+        m_is_async = is_async;
+    }
+
+    //! Check if the node is async
+    virtual bool is_async() const
+    {
+        return m_is_async;
     }
 
     virtual bool is_built() const
@@ -341,11 +406,25 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
         m_work_function = work_function;
     }
 
+    //! Set the work function for async mode, must be done before build(), only useful when is_async is true
+    virtual void set_work_function_async(const WorkFunctionAsync_t &work_function)
+    {
+        assert(!is_built());
+        m_work_function_async = work_function;
+    }
+
     //! Set the output callback, must be done before build()
     virtual void set_output_callback(const OutputCallback_t &output_callback)
     {
         assert(!is_built());
         m_output_callback = output_callback;
+    }
+
+    //! Set the output callback for async mode, must be done before build(), only useful when is_async is true
+    virtual void set_output_callback_async(const OutputCallbackAsync_t &output_callback)
+    {
+        assert(!is_built());
+        m_output_callback_async = output_callback;
     }
 
     //! call this after the graph is reset, or otherwise the node will be blocked
@@ -372,7 +451,7 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
     }
 
     //! Function to process work output
-    virtual OutputWithTokens_t _nodefunc_work_output(const InputWithTokens_t &input_data)
+    virtual OutputWithTokens_t _nodefunc_work(const InputWithTokens_t &input_data)
     {
         OutputWithTokens_t output_data;
 
@@ -389,8 +468,24 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
         return output_data;
     }
 
+    virtual void _nodefunc_work_async(const InputWithTokens_t &input_data,
+                                      typename AsyncWorkNode_t::gateway_type &gateway)
+    {
+        OutputWithTokens_t output_data;
+
+        // copy tokens
+        std::get<1>(output_data) = std::get<1>(input_data);
+        std::get<2>(output_data) = std::get<2>(input_data);
+
+        if (m_work_function_async) {
+            m_work_function_async(input_data, output_data, gateway);
+        } else {
+            gateway.try_put(output_data);
+        }
+    }
+
     //! Function to call user output callback
-    virtual OutputWithTokens_t _nodefunc_finalize(const OutputWithTokens_t &output_data)
+    virtual OutputWithTokens_t _nodefunc_output_callback(const OutputWithTokens_t &output_data)
     {
         OutputWithTokens_t _output = output_data;
         auto &exec_token = std::get<2>(_output);
@@ -398,6 +493,19 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
             exec_token.error_code = m_output_callback(_output);
 
         return _output;
+    }
+
+    virtual void _nodefunc_output_callback_async(const OutputWithTokens_t &output_data,
+                                                 typename AsyncOutputCallbackNode_t::gateway_type &gateway)
+    {
+        if (m_output_callback_async) {
+            m_output_callback_async(output_data, gateway);
+        } else {
+            // nothing to work, just put the output data
+            // gateway.reserve_wait();
+            gateway.try_put(output_data);
+            // gateway.release_wait();
+        }
     }
 
   protected:
@@ -429,6 +537,9 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
     //! output sequencer, only necessary when preserve order is true
     using OutputSequencerNode_t = tbb::flow::sequencer_node<OutputWithTokens_t>;
 
+    //! output callback node which calls the user callback
+    using OutputCallbackNode_t = tbb::flow::function_node<OutputWithTokens_t, OutputWithTokens_t>;
+
     //! finalize output
     using FinalizeNode_t = tbb::flow::multifunction_node<
         OutputWithTokens_t,
@@ -437,9 +548,12 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
 
   protected:
     WorkFunction_t m_work_function;
+    WorkFunctionAsync_t m_work_function_async;
     OutputCallback_t m_output_callback;
-    size_t m_execute_token_size = 1;
+    OutputCallbackAsync_t m_output_callback_async;
 
+    size_t m_execute_token_size = 1;
+    bool m_is_async = false;
     //! if true, the output callback will be called in the order of the input data
     //! @note this requires the user to set the sequence number of the input gate token properly
     //! and reset the graph in order to restart the sequencing
@@ -462,7 +576,11 @@ class SingleOverwriteExecNode : public tbb::flow::composite_node<
     std::shared_ptr<InputStampNode_t> m_input_stamp_node;
 
     std::shared_ptr<WorkNode_t> m_work_node;
+    std::shared_ptr<AsyncWorkNode_t> m_async_work_node;
     std::shared_ptr<OutputSequencerNode_t> m_output_sequencer_node;
+
+    std::shared_ptr<OutputCallbackNode_t> m_output_callback_node;
+    std::shared_ptr<AsyncOutputCallbackNode_t> m_async_output_callback_node;
     std::shared_ptr<FinalizeNode_t> m_finalize_node;
 };
 
