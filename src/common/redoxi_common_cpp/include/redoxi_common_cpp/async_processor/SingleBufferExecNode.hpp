@@ -99,7 +99,7 @@ namespace async_processor
 //! This example demonstrates how to create, configure, and use a SingleBufferExecNode
 //! for both synchronous and asynchronous processing of input data.
 template <typename InputDataType,
-          typename OutputDataType,
+          typename OutputDataType = DummyOutputData,
           typename InputDataTokenType = DefaultInputDataToken,
           typename ExecuteTokenType = DefaultExecToken,
           typename = std::enable_if_t<std::is_base_of_v<DefaultInputDataToken, InputDataTokenType>>,

@@ -1,13 +1,11 @@
 //! Test the SingleBufferExecNode in both synchronous and asynchronous modes
 
-#include <iostream>
 #include <tbb/flow_graph.h>
 #include <redoxi_common_cpp/async_processor/SingleBufferExecNode.hpp>
 #include <vector>
 #include <spdlog/spdlog.h>
 #include <chrono>
 #include <thread>
-#include <future>
 
 //! Define input and output structures
 struct InputData {

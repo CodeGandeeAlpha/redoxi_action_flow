@@ -19,13 +19,14 @@ namespace redoxi_works
 {
 class RedoxiVideoReaderBase;
 
-
+namespace RedoxiVideoReaderBaseTypes
+{
 //! The downstream node for RedoxiVideoReaderBase
-class REDOXI_VIDEO_READER_BASE_PUBLIC RedoxiVideoReaderDownstreamNode
+class REDOXI_VIDEO_READER_BASE_PUBLIC DownstreamNode
 {
   public:
-    virtual ~RedoxiVideoReaderDownstreamNode() = default;
-    RedoxiVideoReaderDownstreamNode()
+    virtual ~DownstreamNode() = default;
+    DownstreamNode()
     {
         retry_strategy = std::make_shared<DefaultRetryStrategy>();
     }
@@ -39,23 +40,23 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC RedoxiVideoReaderDownstreamNode
 
 
 //! The init config for RedoxiVideoReaderBase or its subclass
-class REDOXI_VIDEO_READER_BASE_PUBLIC RedoxiVideoReaderInitConfig
+class REDOXI_VIDEO_READER_BASE_PUBLIC InitConfig
 {
   public:
-    virtual ~RedoxiVideoReaderInitConfig() = default;
+    virtual ~InitConfig() = default;
 
     //! The downstream nodes, indexed by node name
-    std::map<std::string, std::shared_ptr<RedoxiVideoReaderDownstreamNode>> downstreams;
+    std::map<std::string, std::shared_ptr<DownstreamNode>> downstreams;
 
     //! Load parameters from node
     virtual void from_parameters(RedoxiVideoReaderBase *node);
 };
 
 //! The runtime config for RedoxiVideoReaderBase or its subclass
-class REDOXI_VIDEO_READER_BASE_PUBLIC RedoxiVideoReaderRuntimeConfig
+class REDOXI_VIDEO_READER_BASE_PUBLIC RuntimeConfig
 {
   public:
-    virtual ~RedoxiVideoReaderRuntimeConfig() = default;
+    virtual ~RuntimeConfig() = default;
 
     //! The step interval in ms
     double step_interval_ms = DefaultNodeStepIntervalMs;
@@ -77,26 +78,43 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC RedoxiVideoReaderRuntimeConfig
     virtual void from_parameters(RedoxiVideoReaderBase *node);
 };
 
-//! The internal types for RedoxiVideoReaderBase
+//! The internal types for RedoxiVideoReaderBase, very specific types inside class
 //! in subclass, you can override these types to customize the behavior
-namespace RedoxiVideoReaderInternalTypes
+namespace InternalTypes
 {
 using ACT_AcceptFrame = redoxi_public_msgs::action::ProcessFrame;
-using InitConfig = RedoxiVideoReaderInitConfig;
-using RuntimeConfig = RedoxiVideoReaderRuntimeConfig;
 using MSG_Frame = redoxi_public_msgs::msg::Frame;
 using GoalHandle = rclcpp_action::ClientGoalHandle<ACT_AcceptFrame>::SharedPtr;
 
+} // namespace InternalTypes
+
+//! The downstream node for RedoxiVideoReaderBase
 class REDOXI_VIDEO_READER_BASE_PUBLIC Downstream
 {
   public:
     virtual ~Downstream() = default;
 
     // client to call query service
-    rclcpp_action::Client<ACT_AcceptFrame>::SharedPtr accept_frame;
-    rclcpp_action::Client<ACT_AcceptFrame>::SendGoalOptions accept_frame_options;
+    rclcpp_action::Client<InternalTypes::ACT_AcceptFrame>::SharedPtr accept_frame;
+    rclcpp_action::Client<InternalTypes::ACT_AcceptFrame>::SendGoalOptions accept_frame_options;
 };
-}; // namespace RedoxiVideoReaderInternalTypes
 
+//! The frame delivery task
+class REDOXI_VIDEO_READER_BASE_PUBLIC FrameDeliveryTask
+{
+  public:
+    virtual ~FrameDeliveryTask() = default;
+
+    //! The frame to deliver
+    cv::Mat frame;
+    size_t frame_number = 0;
+    double timestamp = 0;
+
+    //! The v6d id of the frame, if the frame is pushed to v6d
+    uint64_t v6d_id = 0;
+    bool is_v6d_pushed = false;
+};
+
+}; // namespace RedoxiVideoReaderBaseTypes
 
 } // namespace redoxi_works

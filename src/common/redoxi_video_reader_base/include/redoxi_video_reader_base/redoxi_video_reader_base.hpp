@@ -19,15 +19,17 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     RedoxiVideoReaderBase : public rclcpp::Node,
                             public IOpenCloseProtocol
 {
+    friend class RedoxiVideoReaderImpl;
+
   public:
     //! Import all names from RedoxiVideoReaderInternalTypes
     //! @note: this is to allow subclass to override the type definitions
-    using ACT_AcceptFrame = RedoxiVideoReaderInternalTypes::ACT_AcceptFrame;
-    using InitConfig = RedoxiVideoReaderInternalTypes::InitConfig;
-    using RuntimeConfig = RedoxiVideoReaderInternalTypes::RuntimeConfig;
-    using MSG_Frame = RedoxiVideoReaderInternalTypes::MSG_Frame;
-    using GoalHandle = RedoxiVideoReaderInternalTypes::GoalHandle;
-    using Downstream = RedoxiVideoReaderInternalTypes::Downstream;
+    using ACT_AcceptFrame = RedoxiVideoReaderBaseTypes::InternalTypes::ACT_AcceptFrame;
+    using InitConfig = RedoxiVideoReaderBaseTypes::InitConfig;
+    using RuntimeConfig = RedoxiVideoReaderBaseTypes::RuntimeConfig;
+    using MSG_Frame = RedoxiVideoReaderBaseTypes::InternalTypes::MSG_Frame;
+    using GoalHandle = RedoxiVideoReaderBaseTypes::InternalTypes::GoalHandle;
+    using Downstream = RedoxiVideoReaderBaseTypes::Downstream;
 
   public:
     //! Constructor with node options and name
@@ -80,6 +82,22 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     virtual int get_status_code() const;
 
   protected:
+    //! Declare all parameters (non-overridable)
+    //! should be called in subclass constructor
+    void _declare_all_parameters();
+
+    /**
+     * @brief Read next frame, intended to be overridden by subclass
+     * @param frame the frame to be filled with the read frame
+     * @return 0 if success, otherwise error code
+     */
+    virtual int _read_frame(cv::Mat &frame) = 0;
+
+    //! Initialize frame delivery tasks processor
+    //! should be called in init()
+    virtual void _init_frame_delivery_tasks();
+
+  protected:
     virtual void _step();
 
     // create publisher for visualization
@@ -103,7 +121,6 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
         const MSG_Frame &frame_msg,
         bool check_downstream_ready_before_send);
 
-    virtual void _declare_all_parameters();
 
     // read next frame and return true if success
     virtual bool _read_frame_local(cv::Mat &frame);
@@ -115,14 +132,6 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     virtual void _publish_frame(const cv::Mat &frame);
 
   protected:
-    /**
-     * @brief Read next frame, intended to be overridden by subclass
-     * @param frame the frame to be filled with the read frame
-     * @return 0 if success, otherwise error code
-     */
-    virtual int _read_frame(cv::Mat &frame) = 0;
-
-
   protected:
     // member of downstreams
     std::map<std::string, std::shared_ptr<Downstream>> m_downstreams;
