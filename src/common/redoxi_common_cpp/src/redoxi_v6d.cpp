@@ -46,8 +46,6 @@ cv::Mat from_v6d_tensor_to_cvmat(const std::shared_ptr<vineyard::Tensor<uint8_t>
     return frame;
 }
 
-VineyardClient::~VineyardClient() = default;
-
 int VineyardClient::connect(const std::string &socket)
 {
     try {
@@ -93,6 +91,48 @@ int VineyardClient::write_cvmat(const cv::Mat &input, vineyard::ObjectID &object
         return 0;
     } catch (const std::exception &e) {
         // Handle any exceptions that might occur during the process
+        return -1;
+    }
+}
+
+bool VineyardClient::is_connected() const
+{
+    if (m_client)
+        return m_client->Connected();
+    return false;
+}
+
+int VineyardClient::delete_object(vineyard::ObjectID object_id)
+{
+    if (!m_client || !m_client->Connected()) {
+        return -1;
+    }
+
+    try {
+        VINEYARD_CHECK_OK(m_client->DelData(object_id));
+        return 0;
+    } catch (const std::exception &e) {
+        //! Handle any exceptions that might occur during the process
+        return -1;
+    }
+}
+
+std::shared_ptr<vineyard::Client> VineyardClient::get_client() const
+{
+    return m_client;
+}
+
+int VineyardClient::close()
+{
+    if (!m_client || !m_client->Connected()) {
+        return 0;
+    }
+
+    try {
+        m_client->CloseSession();
+        return 0;
+    } catch (const std::exception &e) {
+        //! Handle any exceptions that might occur during the process
         return -1;
     }
 }

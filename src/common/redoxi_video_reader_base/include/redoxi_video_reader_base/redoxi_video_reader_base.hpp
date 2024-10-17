@@ -1,6 +1,7 @@
 #ifndef REDOXI_VIDEO_READER_BASE__REDOXI_VIDEO_READER_BASE_HPP_
 #define REDOXI_VIDEO_READER_BASE__REDOXI_VIDEO_READER_BASE_HPP_
 
+#include <optional>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <redoxi_video_reader_base/visibility_control.h>
@@ -24,12 +25,13 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
   public:
     //! Import all names from RedoxiVideoReaderInternalTypes
     //! @note: this is to allow subclass to override the type definitions
-    using ACT_AcceptFrame = RedoxiVideoReaderBaseTypes::InternalTypes::ACT_AcceptFrame;
-    using InitConfig = RedoxiVideoReaderBaseTypes::InitConfig;
-    using RuntimeConfig = RedoxiVideoReaderBaseTypes::RuntimeConfig;
-    using MSG_Frame = RedoxiVideoReaderBaseTypes::InternalTypes::MSG_Frame;
-    using GoalHandle = RedoxiVideoReaderBaseTypes::InternalTypes::GoalHandle;
-    using Downstream = RedoxiVideoReaderBaseTypes::Downstream;
+    using ACT_AcceptFrame_t = RedoxiVideoReaderBaseTypes::InternalTypes::ACT_AcceptFrame;
+    using InitConfig_t = RedoxiVideoReaderBaseTypes::InitConfig;
+    using RuntimeConfig_t = RedoxiVideoReaderBaseTypes::RuntimeConfig;
+    using FrameMessage_t = RedoxiVideoReaderBaseTypes::InternalTypes::MSG_Frame;
+    using GoalHandle_t = RedoxiVideoReaderBaseTypes::InternalTypes::GoalHandle;
+    using Downstream_t = RedoxiVideoReaderBaseTypes::Downstream;
+    using FrameDeliveryTask_t = RedoxiVideoReaderBaseTypes::FrameDeliveryTask;
 
   public:
     //! Constructor with node options and name
@@ -55,16 +57,16 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
 
   public:
     //! Initialize with configurations, must be called once before open()
-    virtual int init(const std::shared_ptr<InitConfig> &config,
-                     const std::shared_ptr<RuntimeConfig> &runtime_config);
+    virtual int init(const std::shared_ptr<InitConfig_t> &config,
+                     const std::shared_ptr<RuntimeConfig_t> &runtime_config);
 
     //! You can set configuration before open() or after close()
-    virtual int update_init_config(const std::shared_ptr<InitConfig> &config);
-    virtual const std::shared_ptr<InitConfig> &get_init_config() const;
+    virtual int update_init_config(const std::shared_ptr<InitConfig_t> &config);
+    virtual const std::shared_ptr<InitConfig_t> &get_init_config() const;
 
     //! Modify runtime settings, must be called before start(), after stop() or close()
-    virtual int update_runtime_config(const std::shared_ptr<RuntimeConfig> &config);
-    virtual const std::shared_ptr<RuntimeConfig> &get_runtime_config() const;
+    virtual int update_runtime_config(const std::shared_ptr<RuntimeConfig_t> &config);
+    virtual const std::shared_ptr<RuntimeConfig_t> &get_runtime_config() const;
 
     //! Open video source, get ready to read
     virtual int open() override;
@@ -82,10 +84,6 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     virtual int get_status_code() const;
 
   protected:
-    //! Declare all parameters (non-overridable)
-    //! should be called in subclass constructor
-    void _declare_all_parameters();
-
     /**
      * @brief Read next frame, intended to be overridden by subclass
      * @param frame the frame to be filled with the read frame
@@ -93,34 +91,83 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
      */
     virtual int _read_frame(cv::Mat &frame) = 0;
 
-    //! Initialize frame delivery tasks processor
-    //! should be called in init()
-    virtual void _init_frame_delivery_tasks();
+    /**
+     * @brief Initialize frame delivery tasks processor
+     * @details Should be called in init()
+     * @return 0 if success, otherwise error code
+     */
+    virtual int _init_frame_delivery_tasks();
 
-  protected:
-    virtual void _step();
+    /**
+     * @brief Preprocess frame for delivery, can be done out of order
+     * @param task_input the input task
+     * @param task_output the output task
+     * @return 0 if success, otherwise error code
+     */
+    virtual int _do_frame_delivery_preprocess(
+        const FrameDeliveryTask_t &task_input,
+        FrameDeliveryTask_t &task_output);
+
+    /**
+     * @brief Deliver frame to downstreams
+     * @param task_input the input task
+     * @return 0 if success, otherwise error code
+     */
+    virtual int _do_frame_delivery_main(const FrameDeliveryTask_t &task_input);
+
+    /**
+     * @brief Create a frame delivery task
+     * @param frame the frame to be delivered
+     * @param task_output the output task
+     */
+    virtual void _create_frame_delivery_task(const cv::Mat &frame, FrameDeliveryTask_t &task_output);
+
+    /**
+     * @brief Add a frame to shared memory
+     * @param frame the frame to be added
+     * @param object_id output the object id of the frame
+     * @return 0 if success, otherwise error code
+     */
+    virtual int _add_frame_to_shared_memory(const cv::Mat &frame, uint64_t &object_id);
+
+    /**
+     * @brief Remove a frame from shared memory
+     * @param shared_memory_id the object id of the frame
+     * @return 0 if success, otherwise error code
+     */
+    virtual int _remove_frame_from_shared_memory(uint64_t shared_memory_id);
+
+    /**
+     * @brief Create a frame message from delivery task
+     * @param task_input the input task
+     * @param shared_memory_id the object id of the frame
+     * @return the frame message
+     */
+    virtual FrameMessage_t _create_frame_message(
+        const FrameDeliveryTask_t &task_input,
+        std::optional<uint64_t> shared_memory_id = std::nullopt);
 
     // create publisher for visualization
-    virtual void _create_image_topic();
+    virtual void _create_debug_topics();
 
     // find and connect to downstreams
     virtual void _connect_to_downstreams();
+
+    // change status code
+    virtual void _set_status_code(int status_code);
+
+  protected:
+    virtual void _step();
 
     // check if all downstreams are ready to accept new frame
     virtual bool _check_downstreams_ready();
 
     // ping downstream to check if they are ready to accept new frame
-    virtual bool _ping(const std::shared_ptr<Downstream> &ds);
-
-    // add a frame to shared memory, return object id
-    virtual uint64_t _add_frame_to_shared_memory(const cv::Mat &frame);
+    virtual bool _ping(const std::shared_ptr<Downstream_t> &ds);
 
     // send frame in shared memory to all downstreams
     // return whether the frame is actually sent
-    virtual bool _send_frame_to_downstreams(
-        const MSG_Frame &frame_msg,
-        bool check_downstream_ready_before_send);
-
+    virtual bool _send_frame_to_downstreams(const FrameMessage_t &frame_msg);
 
     // read next frame and return true if success
     virtual bool _read_frame_local(cv::Mat &frame);
@@ -131,14 +178,18 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     // publish frame msg for visualization
     virtual void _publish_frame(const cv::Mat &frame);
 
-  protected:
+  private:
+    //! Declare all parameters (non-overridable)
+    //! should be called in subclass constructor
+    void _declare_all_parameters();
+
   protected:
     // member of downstreams
-    std::map<std::string, std::shared_ptr<Downstream>> m_downstreams;
+    std::map<std::string, std::shared_ptr<Downstream_t>> m_downstreams;
 
     // configuration
-    std::shared_ptr<InitConfig> m_init_config;
-    std::shared_ptr<RuntimeConfig> m_runtime_config;
+    std::shared_ptr<InitConfig_t> m_init_config;
+    std::shared_ptr<RuntimeConfig_t> m_runtime_config;
 
     // impl data
     std::shared_ptr<RedoxiVideoReaderImpl> m_impl;

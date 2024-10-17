@@ -1,4 +1,5 @@
 #include "redoxi_video_reader_base/redoxi_video_reader_base.hpp"
+#include "redoxi_video_reader_base/redoxi_video_reader_types.hpp"
 #include <redoxi_common_cpp/async_processor/SingleBufferExecNode.hpp>
 #include <redoxi_common_cpp/redoxi_v6d.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
@@ -14,14 +15,42 @@ class RedoxiVideoReaderImpl
   public:
     virtual ~RedoxiVideoReaderImpl()
     {
+        if (frame_delivery_graph) {
+            frame_delivery_graph->wait_for_all();
+        }
     }
     RedoxiVideoReaderImpl(RedoxiVideoReaderBase *node)
         : logger(node->get_logger())
     {
+        this->ros_node = node;
     }
 
+    // create vineyard client
+    int _init_v6d_client()
+    {
+        // get parameters
+        auto v6d_socket_name = ros_node->declare_parameter<std::string>(RosParams::Keys::v6d_socket_name, "");
+        if (v6d_socket_name.empty()) {
+            //! Vineyard socket name is not set
+            RCLCPP_WARN(logger, "[%s][_init_v6d_client()] Vineyard socket name is not set, using default socket", ros_node->get_name());
+        }
+
+        // create vineyard client
+        v6d_client = std::make_shared<VineyardClient>();
+
+        // connect to vineyard server
+        auto ret = v6d_client->connect(v6d_socket_name);
+        if (!ret) {
+            RCLCPP_ERROR(logger, "[%s][_init_v6d_client()] Failed to connect to vineyard server", ros_node->get_name());
+            v6d_client = nullptr;
+            return -1;
+        }
+        return 0;
+    }
+
+    RedoxiVideoReaderBase *ros_node = nullptr;
+
     rclcpp::Logger logger;
-    std::shared_ptr<vineyard::Client> v6d_client;
     std::shared_ptr<cv::VideoCapture> video_capture;
 
     rclcpp::TimerBase::SharedPtr step_timer;
@@ -41,26 +70,106 @@ class RedoxiVideoReaderImpl
     std::shared_ptr<RosTimeToken_ms> read_frame_token;
 
     // frame delivery node
-    std::shared_ptr<
-        ap::SingleBufferExecNode<
-            mytypes::FrameDeliveryTask,
-            mytypes::FrameDeliveryTask>>
-        frame_delivery_node;
+    using FrameDeliveryNode_t = ap::SingleBufferExecNode<mytypes::FrameDeliveryTask, mytypes::FrameDeliveryTask>;
+    std::shared_ptr<FrameDeliveryNode_t> frame_delivery_node;
     std::shared_ptr<tbb::flow::graph> frame_delivery_graph;
+
+    // vineyard client, used to interact with vineyard shared memory
+    std::shared_ptr<VineyardClient> v6d_client;
 };
 
 RedoxiVideoReaderBase::RedoxiVideoReaderBase(const std::string &name, const rclcpp::NodeOptions &options)
     : rclcpp::Node(name, options)
 {
-    // in subclass, you should declare your own parameters
+    // declare parameters, should be called in constructor before everything else
     _declare_all_parameters();
+
+    // in subclass, you should declare your own parameters
     m_impl = std::make_shared<RedoxiVideoReaderImpl>(this);
+
+    // init vineyard client
+    int ret = m_impl->_init_v6d_client();
+    if (ret != 0) {
+        RCLCPP_WARN(this->get_logger(), "[%s][constructor()] Failed to connect to vineyard server, continue without vineyard", this->get_name());
+    }
 
     // FIXME: moved these to init() later
     _init_frame_delivery_tasks();
 }
 
-void RedoxiVideoReaderBase::_init_frame_delivery_tasks()
+void RedoxiVideoReaderBase::_set_status_code(int status_code)
+{
+    m_status_code = status_code;
+}
+
+int RedoxiVideoReaderBase::init(const std::shared_ptr<InitConfig_t> &config,
+                                const std::shared_ptr<RuntimeConfig_t> &runtime_config)
+{
+    // must be in BEFORE_INIT status
+    //! Ensure node is in BEFORE_INIT status
+    RDX_ASSERT_CHECK_TRUE(m_status_code == NodeStatusCode::BEFORE_INIT,
+                          "[{}][init()] Invalid node status for initialization: {}", this->get_name(), m_status_code);
+
+    // both config and runtime config must be set
+    RDX_ASSERT_CHECK_TRUE(config != nullptr,
+                          "[{}][init()] Init config is not set", this->get_name());
+    RDX_ASSERT_CHECK_TRUE(runtime_config != nullptr,
+                          "[{}][init()] Runtime config is not set", this->get_name());
+
+    // init vineyard client
+    int ret = m_impl->_init_v6d_client();
+    if (ret != 0) {
+        RCLCPP_WARN(this->get_logger(), "[%s][init()] Failed to connect to vineyard server, continue without vineyard", this->get_name());
+    }
+
+    // assign config and runtime config
+    m_init_config = config;
+    m_runtime_config = runtime_config;
+
+    // create debug topics
+    _create_debug_topics();
+
+    // connect to downstreams
+    _connect_to_downstreams();
+
+    // set status code to INITIALIZED
+    _set_status_code(NodeStatusCode::INITIALIZED);
+
+    return 0;
+}
+
+void RedoxiVideoReaderBase::_connect_to_downstreams()
+{
+    // must be initialized first
+    RDX_ASSERT_CHECK_TRUE(m_status_code == NodeStatusCode::INITIALIZED ||
+                              m_status_code == NodeStatusCode::STOPPED,
+                          "[{}][_connect_to_downstreams()] Invalid node status for connecting to downstreams: {}", this->get_name(), m_status_code);
+
+    //! Ensure m_init_config is set before connecting to downstreams
+    RDX_ASSERT_CHECK_TRUE(m_init_config != nullptr,
+                          "[{}][_connect_to_downstreams()] Init config is not set", this->get_name());
+
+    // find and connect to downstreams
+    for (auto &it : m_init_config->downstreams) {
+        auto ds = std::make_shared<Downstream_t>();
+
+        // connect to accept_frame action server of downstream
+        {
+            std::string name = it.second->accept_frame_action;
+            auto client = rclcpp_action::create_client<ACT_AcceptFrame_t>(this, name);
+            ds->accept_frame = client;
+
+            // wait until the action server becomes online
+            RCLCPP_DEBUG(this->get_logger(), "[%s][_connect_to_downstreams()] Waiting for action server %s to be online", this->get_name(), name.c_str());
+            client->wait_for_action_server();
+            RCLCPP_DEBUG(this->get_logger(), "[%s][_connect_to_downstreams()] Action server %s connected", this->get_name(), name.c_str());
+        }
+
+        m_downstreams[it.first] = ds;
+    }
+}
+
+int RedoxiVideoReaderBase::_init_frame_delivery_tasks()
 {
     // create graph and node
     m_impl->frame_delivery_graph = std::make_shared<tbb::flow::graph>();
@@ -78,9 +187,38 @@ void RedoxiVideoReaderBase::_init_frame_delivery_tasks()
 
     // sync mode, all functions are executed in the graph
     node.set_is_async(false);
+    using FrameDeliveryNode_t = ap::SingleBufferExecNode<mytypes::FrameDeliveryTask, mytypes::FrameDeliveryTask>;
+    using WorkInput_t = FrameDeliveryNode_t::InputWithTokens_t;
+    using WorkOutput_t = FrameDeliveryNode_t::OutputWithTokens_t;
 
-    // setup work function
-    // TODO:
+    // setup work function, nothing to do because during work function
+    // frames are out of order
+    node.set_work_function(
+        [this](const WorkInput_t &input, WorkOutput_t &output) -> int {
+            // copy input to output
+            auto &out_payload = std::get<0>(output);
+            const auto &in_payload = std::get<0>(input);
+            auto ret = this->_do_frame_delivery_preprocess(in_payload, out_payload);
+            if (ret != 0) {
+                RCLCPP_ERROR(this->get_logger(), "[%s][WorkFunc] Failed to preprocess frame, error code: %d", this->get_name(), ret);
+            }
+
+            return ret;
+        });
+
+    // output callback
+    // send frame to downstreams
+    node.set_output_callback(
+        [this](const WorkOutput_t &output) -> int {
+            auto &out_payload = std::get<0>(output);
+            auto ret = this->_do_frame_delivery_main(out_payload);
+            if (ret != 0) {
+                RCLCPP_ERROR(this->get_logger(), "[%s][WorkFunc] Failed to deliver frame, error code: %d", this->get_name(), ret);
+            }
+            return ret;
+        });
+
+    return 0;
 }
 
 RedoxiVideoReaderBase::~RedoxiVideoReaderBase()
@@ -102,6 +240,122 @@ void RedoxiVideoReaderBase::_declare_all_parameters()
     this->declare_parameter<bool>("send_goal_retry", false);
 }
 
+int RedoxiVideoReaderBase::_do_frame_delivery_preprocess(
+    const FrameDeliveryTask_t &task_input,
+    FrameDeliveryTask_t &task_output)
+{
+    //! Copy input to output
+    task_output = task_input;
+
+    // resize image
+    auto target_image_size = this->m_runtime_config->output_image_size;
+    if (target_image_size.width != -1 || target_image_size.height != -1) {
+        cv::resize(task_input.frame, task_output.frame, target_image_size);
+    }
+
+    return 0;
+}
+
+void RedoxiVideoReaderBase::_create_frame_delivery_task(
+    const cv::Mat &frame,
+    FrameDeliveryTask_t &task_output)
+{
+    //! Create a unique identifier for this task
+    task_output.create_uuid();
+
+    //! Shallow copy the frame
+    task_output.frame = frame;
+
+    //! Set the frame number
+    task_output.frame_number = ++m_frame_number;
+
+    //! Set the timestamp
+    task_output.timestamp_sec = this->now().seconds();
+}
+
+int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &task_input)
+{
+    // check if any downstream is ready to accept new frame
+    bool downstream_ready = _check_downstreams_ready();
+    if (!downstream_ready) {
+        RCLCPP_WARN(this->get_logger(), "[%s][_do_frame_delivery_main()] No downstream is ready to accept new frame", this->get_name());
+        return 0;
+    }
+
+    // add frame to shared memory
+    uint64_t shared_memory_id = 0;
+    auto ret = _add_frame_to_shared_memory(task_input.frame, shared_memory_id);
+    if (ret != 0) {
+        RCLCPP_ERROR(this->get_logger(), "[%s][_do_frame_delivery_main()] Failed to add frame to shared memory", this->get_name());
+        return -1;
+    }
+
+    // create a frame message
+    FrameMessage_t frame_msg = _create_frame_message(task_input, shared_memory_id);
+
+    // send frame to downstreams
+    bool sent = _send_frame_to_downstreams(frame_msg);
+
+    // clean up resources
+    if (!sent) {
+        // if not sent, remove the frame from shared memory
+        RCLCPP_ERROR(this->get_logger(), "[%s][_do_frame_delivery_main()] Failed to send frame to downstreams", this->get_name());
+        _remove_frame_from_shared_memory(shared_memory_id);
+    } else {
+        // if sent, we are done, the shared memory is managed by downstreams
+        RCLCPP_INFO(this->get_logger(), "[%s][_do_frame_delivery_main()] Frame sent to downstreams", this->get_name());
+    }
+
+    return 0;
+}
+
+RedoxiVideoReaderBase::FrameMessage_t RedoxiVideoReaderBase::_create_frame_message(
+    const FrameDeliveryTask_t &task_input,
+    std::optional<uint64_t> shared_memory_id)
+{
+    FrameMessage_t frame_msg;
+    frame_msg.frame_num = task_input.frame_number;
+    frame_msg.signal_code = SignalCode::RUN; // this is an actual frame with payload
+    if (shared_memory_id) {
+        frame_msg.cache.id_int = shared_memory_id.value();
+        frame_msg.cache.has_int_id = true;
+        frame_msg.cache.id_string = vineyard::ObjectIDToString(shared_memory_id.value());
+    }
+    return frame_msg;
+}
+
+int RedoxiVideoReaderBase::_add_frame_to_shared_memory(
+    const cv::Mat &frame, uint64_t &shared_memory_id)
+{
+    if (!m_impl->v6d_client || !m_impl->v6d_client->is_connected()) {
+        RCLCPP_ERROR(this->get_logger(), "[%s][_add_frame_to_shared_memory()] Vineyard client is not initialized or not connected", this->get_name());
+        return -1;
+    }
+
+    // add frame to vineyard shared memory
+    auto ret = m_impl->v6d_client->write_cvmat(frame, shared_memory_id);
+    if (ret != 0) {
+        RCLCPP_ERROR(this->get_logger(), "[%s][_add_frame_to_shared_memory()] Failed to add frame to shared memory", this->get_name());
+    }
+    return ret;
+}
+
+int RedoxiVideoReaderBase::_remove_frame_from_shared_memory(
+    uint64_t shared_memory_id)
+{
+    if (!m_impl->v6d_client || !m_impl->v6d_client->is_connected()) {
+        RCLCPP_ERROR(this->get_logger(), "[%s][_remove_frame_from_shared_memory()] Vineyard client is not initialized or not connected", this->get_name());
+        return -1;
+    }
+
+    auto ret = m_impl->v6d_client->delete_object(shared_memory_id);
+    if (ret != 0) {
+        RCLCPP_ERROR(this->get_logger(), "[%s][_remove_frame_from_shared_memory()] Failed to remove frame from shared memory", this->get_name());
+    }
+    return ret;
+}
+
+
 void RedoxiVideoReaderBase::_step()
 {
     // if not started yet, do nothing
@@ -117,12 +371,18 @@ void RedoxiVideoReaderBase::_step()
             cv::Mat frame;
             int ret = _read_frame(frame);
             if (ret != 0) {
-                RCLCPP_ERROR(this->get_logger(), "Failed to read frame, error code: %d", ret);
+                RCLCPP_ERROR(this->get_logger(), "[%s][_step()] Failed to read frame, error code: %d", this->get_name(), ret);
             } else {
-                // send frame to downstreams
-                _send_frame_to_downstreams(frame);
+                // create a frame delivery task and deliver
+                FrameDeliveryTask_t task;
+                _create_frame_delivery_task(frame, task);
+                auto ret = m_impl->frame_delivery_node->put_data(task);
+                if (!ret) {
+                    RCLCPP_ERROR(this->get_logger(), "[%s][_step()] Failed to deliver frame", this->get_name());
+                }
             }
         }
     }
+}
 
 } // namespace redoxi_works

@@ -11,12 +11,14 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(vineyard REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rcpputils REQUIRED)
+find_package(fmt REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
 set(source_files src/redoxi_common_cpp.cpp src/redoxi_v6d.cpp src/redoxi_ros_util.cpp)
-set(required_dependencies ${VINEYARD_LIBRARIES} ${OpenCV_LIBS})
+set(required_dependencies ${VINEYARD_LIBRARIES} ${OpenCV_LIBS} fmt::fmt)
 set(required_includes ${OpenCV_INCLUDE_DIRS} ${VINEYARD_INCLUDE_DIRS})
 
 add_library(redoxi_common_cpp ${source_files})
@@ -28,7 +30,7 @@ target_include_directories(redoxi_common_cpp PUBLIC
   ${required_includes})
 target_link_libraries(redoxi_common_cpp PUBLIC ${required_dependencies})
 
-ament_target_dependencies(redoxi_common_cpp PUBLIC rclcpp)
+ament_target_dependencies(redoxi_common_cpp PUBLIC rclcpp rcpputils)
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.

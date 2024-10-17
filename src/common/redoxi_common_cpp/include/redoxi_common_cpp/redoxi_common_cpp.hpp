@@ -2,6 +2,7 @@
 #define REDOXI_COMMON_CPP__REDOXI_COMMON_CPP_HPP_
 
 #include "redoxi_common_cpp/visibility_control.h"
+#include <string>
 
 namespace redoxi_works
 {
@@ -11,6 +12,18 @@ const double DefaultTimeoutMs = 10000;
 const int DefaultMaxNumberOfRetries = 10;
 // how many ms to wait before next _step()
 const double DefaultNodeStepIntervalMs = 1;
+
+// globally accessible parameters in ROS related to this application
+namespace RosParams
+{
+
+namespace Keys
+{
+const std::string v6d_socket_name = "v6d_socket_name";
+} // namespace Keys
+
+} // namespace RosParams
+
 class IOpenCloseProtocol
 {
   public:

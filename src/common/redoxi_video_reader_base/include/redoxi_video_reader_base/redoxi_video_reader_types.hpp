@@ -1,9 +1,12 @@
 #pragma once
 
-#include <opencv2/opencv.hpp>
 #include <string>
 #include <map>
 #include <memory>
+
+#include <opencv2/opencv.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
 
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
@@ -11,7 +14,6 @@
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
 #include <redoxi_public_msgs/msg/frame.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
-
 #include <redoxi_video_reader_base/visibility_control.h>
 
 
@@ -21,6 +23,18 @@ class RedoxiVideoReaderBase;
 
 namespace RedoxiVideoReaderBaseTypes
 {
+
+// globally accessible parameters in ROS related to this node
+namespace RosParams
+{
+
+const std::string StepIntervalMs = "step_interval_ms";
+const std::string FrameIntervalMs = "frame_interval_ms";
+const std::string OutputImageSize = "output_image_size";
+const std::string ReadFrameMode = "read_frame_mode";
+
+} // namespace RosParams
+
 //! The downstream node for RedoxiVideoReaderBase
 class REDOXI_VIDEO_READER_BASE_PUBLIC DownstreamNode
 {
@@ -49,7 +63,9 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC InitConfig
     std::map<std::string, std::shared_ptr<DownstreamNode>> downstreams;
 
     //! Load parameters from node
-    virtual void from_parameters(RedoxiVideoReaderBase *node);
+    virtual void from_parameters(RedoxiVideoReaderBase *)
+    {
+    }
 };
 
 //! The runtime config for RedoxiVideoReaderBase or its subclass
@@ -75,7 +91,9 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC RuntimeConfig
     };
     ReadFrameMode read_frame_mode = ReadFrameMode::ReadAll;
 
-    virtual void from_parameters(RedoxiVideoReaderBase *node);
+    virtual void from_parameters(RedoxiVideoReaderBase *)
+    {
+    }
 };
 
 //! The internal types for RedoxiVideoReaderBase, very specific types inside class
@@ -104,15 +122,23 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC FrameDeliveryTask
 {
   public:
     virtual ~FrameDeliveryTask() = default;
+    const boost::uuids::uuid &create_uuid()
+    {
+        // generate a random uuid
+        uid = boost::uuids::random_generator()();
+        return uid;
+    }
+
+    boost::uuids::uuid uid;
 
     //! The frame to deliver
     cv::Mat frame;
     size_t frame_number = 0;
-    double timestamp = 0;
+    double timestamp_sec = 0;
 
-    //! The v6d id of the frame, if the frame is pushed to v6d
-    uint64_t v6d_id = 0;
-    bool is_v6d_pushed = false;
+    //! The shared memory id of the frame, in v6d
+    // uint64_t shared_memory_id = 0;
+    // bool is_shared_memory_allocated = false;
 };
 
 }; // namespace RedoxiVideoReaderBaseTypes

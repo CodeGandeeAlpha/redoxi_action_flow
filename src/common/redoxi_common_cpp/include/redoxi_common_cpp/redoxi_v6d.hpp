@@ -34,8 +34,8 @@ REDOXI_COMMON_CPP_PUBLIC
 class REDOXI_COMMON_CPP_PUBLIC VineyardClient
 {
   public:
-    VineyardClient(){};
-    virtual ~VineyardClient();
+    VineyardClient() = default;
+    virtual ~VineyardClient() = default;
 
     /**
      * @brief Connect to the vineyard server
@@ -61,6 +61,29 @@ class REDOXI_COMMON_CPP_PUBLIC VineyardClient
      * @return 0 if success, -1 if failed
      */
     int write_cvmat(const cv::Mat &input, vineyard::ObjectID &object_id);
+
+    /**
+     * @brief Check if the vineyard client is connected
+     * @return true if connected, false otherwise
+     */
+    bool is_connected() const;
+
+    /**
+     * @brief Release a vineyard object
+     * @param object_id The ID of the vineyard object to release
+     * @return 0 if success, -1 if failed
+     */
+    int delete_object(vineyard::ObjectID object_id);
+
+    /**
+     * @brief Close the connection to the vineyard server
+     * @return 0 if success, -1 if failed
+     */
+    int close();
+
+  public:
+    //! Get the underlying vineyard client
+    std::shared_ptr<vineyard::Client> get_client() const;
 
   private:
     std::shared_ptr<vineyard::Client> m_client;

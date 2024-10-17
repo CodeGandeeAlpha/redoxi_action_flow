@@ -12,8 +12,14 @@ find_package(rclcpp REQUIRED)
 find_package(redoxi_common_cpp REQUIRED)
 find_package(redoxi_public_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(rcutils REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(fmt REQUIRED)
 find_package(TBB REQUIRED)
+
+# Find Boost (header-only)
+find_package(Boost REQUIRED)
+
 
 set(source_files
   src/redoxi_video_reader_base.cpp
@@ -26,7 +32,7 @@ target_compile_features(redoxi_video_reader_base PUBLIC c_std_99 cxx_std_17)  # 
 target_include_directories(redoxi_video_reader_base PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_link_libraries(redoxi_video_reader_base PUBLIC TBB::tbb)  # Link TBB to your target
+target_link_libraries(redoxi_video_reader_base PUBLIC TBB::tbb Boost::boost fmt::fmt)  # Link TBB to your target
 
 ament_target_dependencies(
   redoxi_video_reader_base PUBLIC
@@ -35,6 +41,7 @@ ament_target_dependencies(
   "redoxi_common_cpp"
   "redoxi_public_msgs"
   "sensor_msgs"
+  "rcutils"
 )
 
 # Causes the visibility macros to use dllexport rather than dllimport,
