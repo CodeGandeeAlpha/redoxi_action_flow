@@ -193,7 +193,7 @@ void MasterNode::_accept_frame_accepted_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptFrame>> goal_handle)
 {
     const auto &goal = goal_handle->get_goal();
-    const auto &control_msg = goal->control_msg;
+    const auto &x_control = goal->x_control;
 
     RCLCPP_INFO(m_impl->logger, "frame %d m_frame_buffer buffer size: %d", goal->frame.frame_num, m_frame_buffer.size());
 
@@ -209,7 +209,7 @@ void MasterNode::_accept_frame_accepted_callback(
     }
 
     // 当没有reject时，ping一定成功
-    if (control_msg.control_signal == 1) {
+    if (x_control.code == 1) {
         auto result = std::make_shared<ACT_AcceptFrame::Result>();
         result->return_msg = "Ping accepted";
         result->return_code = ReturnCode::SUCCESS;
@@ -331,8 +331,8 @@ int MasterNode::stop()
 bool MasterNode::_ping(std::shared_ptr<Downstream> ds)
 {
     auto goal_msg = ACT_AcceptDocument::Goal();
-    goal_msg.control_msg.control_signal = 1; // ping
-    goal_msg.control_msg.control_msg = "ping";
+    goal_msg.x_control.code = 1; // ping
+    goal_msg.x_control.text_msg = "ping";
 
     // opt.goal_response_callback = callback;
     auto res = ds->handler->async_send_goal(goal_msg, ds->options);

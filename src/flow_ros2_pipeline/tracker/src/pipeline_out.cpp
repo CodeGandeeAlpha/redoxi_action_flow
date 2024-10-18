@@ -199,7 +199,7 @@ void TrackerOut::_accept_document_accepted_callback(
 {
 
     const auto &goal = goal_handle->get_goal();
-    const auto &control_msg = goal->control_msg;
+    const auto &x_control = goal->x_control;
 
     // // if buffer is full, reject the frame
     // if (m_document_buffer.size() >= m_runtime_config->buffer_size) {
@@ -211,7 +211,7 @@ void TrackerOut::_accept_document_accepted_callback(
     // }
 
     // ping
-    if (control_msg.control_signal == 1) {
+    if (x_control.code == 1) {
         auto result = std::make_shared<ACT_AcceptDocument::Result>();
         result->return_msg = "Ping accepted";
         result->return_code = ReturnCode::SUCCESS;
@@ -241,7 +241,7 @@ void TrackerOut::_accept_document_accepted_callback(
     }
 
     // RCLCPP_INFO(m_impl->logger, "_accept_document_accepted_callback(): Accepted document %ld with UUID %s and add it to buffer",
-    // document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
+    // document.frame.frame_num, uuid_to_string(document.x_uid.uuid).c_str());
 
     auto result = std::make_shared<ACT_AcceptDocument::Result>();
     result->return_msg = "Document accepted";
@@ -271,7 +271,7 @@ void TrackerOut::_accept_track_targets_accepted_callback(
 {
 
     const auto &goal = goal_handle->get_goal();
-    const auto &control_msg = goal->control_msg;
+    const auto &x_control = goal->x_control;
 
     // // if buffer is full, reject the frame
     // if (m_detections_buffer.size() >= m_runtime_config->buffer_size) {
@@ -283,7 +283,7 @@ void TrackerOut::_accept_track_targets_accepted_callback(
     // }
 
     // ping
-    if (control_msg.control_signal == 1) {
+    if (x_control.code == 1) {
         auto result = std::make_shared<ACT_AcceptTrackTargets::Result>();
         result->return_msg = "Ping accepted";
         result->return_code = ReturnCode::SUCCESS;
@@ -373,8 +373,8 @@ void TrackerOut::_connect_to_downstreams()
 bool TrackerOut::_ping(const std::shared_ptr<Downstream> &ds)
 {
     auto goal_msg = ACT_AcceptDocument::Goal();
-    goal_msg.control_msg.control_signal = 1; // ping
-    goal_msg.control_msg.control_msg = "ping";
+    goal_msg.x_control.code = 1; // ping
+    goal_msg.x_control.text_msg = "ping";
 
     // opt.goal_response_callback = callback;
     auto res = ds->accept_document->async_send_goal(goal_msg, ds->accept_document_options);

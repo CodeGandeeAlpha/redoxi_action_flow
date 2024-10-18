@@ -4,7 +4,7 @@ id_int="$1"
 action_name="$2"
 action_type="$3"
 frame_num="$4"
-detections_uuid="$5"
+x_uid="$5"
 
 # create a multiline string which is a json
 # store into variable named goal_msg
@@ -16,8 +16,8 @@ goal_msg='{
       },
       "frame_num": '"$frame_num"'
     },
-    "detections_uuid": {
-      "uuid": '"$detections_uuid"'
+    "x_uid": {
+      "uuid": '"$x_uid"'
     }
   }'
 

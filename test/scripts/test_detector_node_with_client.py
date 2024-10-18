@@ -22,7 +22,7 @@ def main(args=None):
 
         goal_msg = ProcessFrame.Goal()
         # psg_public_msgs/Frame frame
-        # unique_identifier_msgs/UUID detections_uuid
+        # unique_identifier_msgs/UUID x_uid
         goal_msg.frame.cache.id_int = int_id
         goal_msg.frame.cache.has_int_id = True
         goal_msg.frame.frame_num = i

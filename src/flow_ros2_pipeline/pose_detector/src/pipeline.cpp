@@ -170,7 +170,7 @@ void PoseDetectorPipeline::_accept_document_accepted_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle)
 {
     const auto &goal = goal_handle->get_goal();
-    const auto &control_msg = goal->control_msg;
+    const auto &x_control = goal->x_control;
 
     // // if buffer is full, reject the frame
     // // 无论是不是丢帧模式（不尝试重复发送），都会在这里被拦截，避免buffer溢出
@@ -184,7 +184,7 @@ void PoseDetectorPipeline::_accept_document_accepted_callback(
     // }
 
     // 当没有reject时，ping一定成功
-    if (control_msg.control_signal == 1) {
+    if (x_control.code == 1) {
         auto result = std::make_shared<ACT_AcceptDocument::Result>();
         result->return_msg = "Ping accepted";
         result->return_code = ReturnCode::SUCCESS;
@@ -261,7 +261,7 @@ void PoseDetectorPipeline::_accept_model_results_accepted_callback(
 {
 
     const auto &goal = goal_handle->get_goal();
-    const auto &control_msg = goal->control_msg;
+    const auto &x_control = goal->x_control;
 
     // cache the bodyposes
     const auto &body_poses = goal->body_poses;
@@ -413,8 +413,8 @@ void PoseDetectorPipeline::_connect_to_downstreams()
 bool PoseDetectorPipeline::_ping_model(std::shared_ptr<DownstreamModel> ds)
 {
     auto goal_msg = ACT_AcceptDetections::Goal();
-    goal_msg.control_msg.control_signal = 1; // ping
-    goal_msg.control_msg.control_msg = "ping";
+    goal_msg.x_control.code = 1; // ping
+    goal_msg.x_control.text_msg = "ping";
 
     // opt.goal_response_callback = callback;
     auto res = ds->accept_detections->async_send_goal(goal_msg, ds->accept_detections_options);
@@ -440,8 +440,8 @@ bool PoseDetectorPipeline::_ping_model(std::shared_ptr<DownstreamModel> ds)
 bool PoseDetectorPipeline::_ping_pipeline(std::shared_ptr<DownstreamPipeline> ds)
 {
     auto goal_msg = ACT_AcceptDocument::Goal();
-    goal_msg.control_msg.control_signal = 1; // ping
-    goal_msg.control_msg.control_msg = "ping";
+    goal_msg.x_control.code = 1; // ping
+    goal_msg.x_control.text_msg = "ping";
 
     // opt.goal_response_callback = callback;
     auto res = ds->accept_document->async_send_goal(goal_msg, ds->accept_document_options);

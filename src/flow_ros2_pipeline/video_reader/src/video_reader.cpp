@@ -315,8 +315,8 @@ bool OpencvVideoReader::_check_downstreams_ready()
 bool OpencvVideoReader::_ping(const std::shared_ptr<Downstream> &ds)
 {
     auto goal_msg = ACT_AcceptFrame::Goal();
-    goal_msg.control_msg.control_signal = 1; // ping
-    goal_msg.control_msg.control_msg = "ping";
+    goal_msg.x_control.code = 1; // ping
+    goal_msg.x_control.text_msg = "ping";
 
     // opt.goal_response_callback = callback;
     auto res = ds->accept_frame->async_send_goal(goal_msg, ds->accept_frame_options);

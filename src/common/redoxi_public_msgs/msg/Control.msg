@@ -1,5 +1,9 @@
 # control signal codes, attached to a message to indicate the special action
 
+# IMPORTANT:
+# if a message contains other message that contains control msg
+# only the top level control message is used
+
 # this signal means nothing, please ignore it
 int64 NORMAL=0
 
@@ -22,5 +26,5 @@ int64 RESET=3
 # after receiving this signal, the upstream will not send any more data
 int64 TERMINATE=4
 
-int64 control_signal 0
-string control_msg
+int64 code 0
+string text_msg

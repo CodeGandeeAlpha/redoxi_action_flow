@@ -1,6 +1,6 @@
 # empty data: frame_num == -1
 unique_identifier_msgs/UUID uuid
-Control control
+Control x_control
 
 std_msgs/Header header
 CacheData cache

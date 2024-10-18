@@ -1,6 +1,6 @@
 psg_public_msgs/Frame frame
-unique_identifier_msgs/UUID detections_uuid
-psg_public_msgs/Control control_msg
+unique_identifier_msgs/UUID x_uid
+psg_public_msgs/Control x_control
 ---
 string return_msg
 int64 return_code

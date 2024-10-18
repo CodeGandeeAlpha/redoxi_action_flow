@@ -491,8 +491,8 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
     def _ping(self, ds_client):
         goal_msg = ProcessDetections.Goal()
-        goal_msg.control_msg.control_signal = 1  # ping
-        goal_msg.control_msg.control_msg = "ping"
+        goal_msg.x_control.code = 1  # ping
+        goal_msg.x_control.text_msg = "ping"
 
         res = ds_client.send_goal_async(
             goal_msg, feedback_callback=self._goal_feedback_callback
@@ -624,7 +624,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
     def _accept_frame_accepted_callback(self, goal_handle):
         # just accept the frame and add it to buffer, no processing
-        control_msg = goal_handle.request.control_msg
+        x_control = goal_handle.request.x_control
 
         # if buffer is full, reject the frame
         self.m_logger.info(
@@ -641,7 +641,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
             return result
 
         # ping
-        if control_msg.control_signal == 1:
+        if x_control.code == 1:
             goal_handle.succeed()
             result = ProcessFrame.Result()
             result.return_msg = "Ping accepted"
@@ -652,8 +652,8 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self.m_logger.info(
             f"---TIME LOG: framenum {frame.frame_num} node ddq_detector_node type IN time {self.get_clock().now().nanoseconds}"
         )
-        uuid = goal_handle.request.detections_uuid
-        # self.m_logger.info(f'_accept_frame_accepted_callback(): frame_num: {frame.frame_num}, detections_uuid: {pyuuid.UUID(bytes=bytes(uuid.uuid))}')
+        uuid = goal_handle.request.x_uid
+        # self.m_logger.info(f'_accept_frame_accepted_callback(): frame_num: {frame.frame_num}, x_uid: {pyuuid.UUID(bytes=bytes(uuid.uuid))}')
 
         # # add to frame buffer
         # self._add_frame_to_buffer(frame, uuid)

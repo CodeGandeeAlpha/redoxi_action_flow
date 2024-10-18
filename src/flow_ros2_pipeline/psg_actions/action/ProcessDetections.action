@@ -1,5 +1,5 @@
 psg_public_msgs/Detections detections
-psg_public_msgs/Control control_msg
+psg_public_msgs/Control x_control
 ---
 string return_msg
 int64 return_code

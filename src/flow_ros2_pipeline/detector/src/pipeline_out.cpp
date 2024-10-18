@@ -157,7 +157,7 @@ void DetectorOut::_accept_document_accepted_callback(
 {
 
     const auto &goal = goal_handle->get_goal();
-    const auto &control_msg = goal->control_msg;
+    const auto &x_control = goal->x_control;
 
     // buffer size log
     RCLCPP_INFO(m_impl->logger, "frame %d m_document_buffer buffer size: %d", goal->document.frame.frame_num, m_document_buffer.size());
@@ -173,7 +173,7 @@ void DetectorOut::_accept_document_accepted_callback(
     }
 
     // ping
-    if (control_msg.control_signal == 1) {
+    if (x_control.code == 1) {
         auto result = std::make_shared<ACT_AcceptDocument::Result>();
         result->return_msg = "Ping accepted";
         result->return_code = ReturnCode::SUCCESS;
@@ -189,7 +189,7 @@ void DetectorOut::_accept_document_accepted_callback(
         _add_document_to_buffer(document, *lock_ptr_document_buffer);
 
         // RCLCPP_DEBUG(m_impl->logger, "Accepted document %ld with UUID %s and add it to buffer",
-        //              document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
+        //              document.frame.frame_num, uuid_to_string(document.x_uid.uuid).c_str());
     }
 
     auto result = std::make_shared<ACT_AcceptDocument::Result>();
@@ -220,7 +220,7 @@ void DetectorOut::_accept_detections_accepted_callback(
 {
 
     const auto &goal = goal_handle->get_goal();
-    const auto &control_msg = goal->control_msg;
+    const auto &x_control = goal->x_control;
 
     // // if buffer is full, reject the frame
     // if (m_detections_buffer.size() >= m_runtime_config->buffer_size) {
@@ -232,7 +232,7 @@ void DetectorOut::_accept_detections_accepted_callback(
     // }
 
     // ping
-    if (control_msg.control_signal == 1) {
+    if (x_control.code == 1) {
         auto result = std::make_shared<ACT_AcceptDetections::Result>();
         result->return_msg = "Ping accepted";
         result->return_code = ReturnCode::SUCCESS;
@@ -317,8 +317,8 @@ void DetectorOut::_connect_to_downstreams()
 bool DetectorOut::_ping(const std::shared_ptr<Downstream> &ds)
 {
     auto goal_msg = ACT_AcceptDocument::Goal();
-    goal_msg.control_msg.control_signal = 1; // ping
-    goal_msg.control_msg.control_msg = "ping";
+    goal_msg.x_control.code = 1; // ping
+    goal_msg.x_control.text_msg = "ping";
 
     // opt.goal_response_callback = callback;
     auto res = ds->accept_document->async_send_goal(goal_msg, ds->accept_document_options);
@@ -555,11 +555,11 @@ void DetectorOut::_merge_detections_and_documents()
 
         // RCLCPP_DEBUG(m_impl->logger, "_merge_detections_and_documents for frame %d", frame_num);
         // RCLCPP_DEBUG(m_impl->logger, "_merge document %ld with UUID %s",
-        //              document.frame.frame_num, uuid_to_string(document.detections_uuid.uuid).c_str());
+        //              document.frame.frame_num, uuid_to_string(document.x_uid.uuid).c_str());
         // RCLCPP_DEBUG(m_impl->logger, "_merge detections %ld with UUID %s",
         //              detections.frame.frame_num, uuid_to_string(detections.uuid.uuid).c_str());
 
-        if (document.detections_uuid == detections.uuid) {
+        if (document.x_uid == detections.uuid) {
             RCLCPP_INFO(m_impl->logger, "_merge_detections_and_documents() for frame %d", frame_num);
             // merge detections and documents
             document.detections = detections;

@@ -329,7 +329,7 @@ void Tracker::_accept_detections_accepted_callback(
 {
 
     const auto &goal = goal_handle->get_goal();
-    const auto &control_msg = goal->control_msg;
+    const auto &x_control = goal->x_control;
 
     // // if buffer is full, reject the frame
     // if (m_detections_buffer.size() >= m_runtime_config->buffer_size) {
@@ -341,7 +341,7 @@ void Tracker::_accept_detections_accepted_callback(
     // }
 
     // ping
-    if (control_msg.control_signal == 1) {
+    if (x_control.code == 1) {
         auto result = std::make_shared<ACT_AcceptDetections::Result>();
         result->return_msg = "Ping accepted";
         result->return_code = ReturnCode::SUCCESS;
@@ -638,8 +638,8 @@ void Tracker::_connect_to_downstreams()
 bool Tracker::_ping(std::shared_ptr<Downstream> ds)
 {
     auto goal_msg = ACT_AcceptTrackTargets::Goal();
-    goal_msg.control_msg.control_signal = 1; // ping
-    goal_msg.control_msg.control_msg = "ping";
+    goal_msg.x_control.code = 1; // ping
+    goal_msg.x_control.text_msg = "ping";
 
     // opt.goal_response_callback = callback;
     auto res = ds->accept_track_targets->async_send_goal(goal_msg, ds->accept_track_targets_options);

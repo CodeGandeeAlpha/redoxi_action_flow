@@ -483,8 +483,8 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
 
     def _ping(self, ds_client):
         goal_msg = ProcessBodyPoses.Goal()
-        goal_msg.control_msg.control_signal = 1  # ping
-        goal_msg.control_msg.control_msg = "ping"
+        goal_msg.x_control.code = 1  # ping
+        goal_msg.x_control.text_msg = "ping"
 
         res = ds_client.send_goal_async(
             goal_msg, feedback_callback=self._goal_feedback_callback
@@ -594,7 +594,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
 
     def _accept_detections_accepted_callback(self, goal_handle):
         # just accept the frame and add it to buffer, no processing
-        control_msg = goal_handle.request.control_msg
+        x_control = goal_handle.request.x_control
 
         # # if buffer is full, reject the frame
         # for _, model_group_data in self.m_model_groups_data.items():
@@ -606,7 +606,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         #         return result
 
         # ping
-        if control_msg.control_signal == 1:
+        if x_control.code == 1:
             goal_handle.succeed()
             result = ProcessBodyPoses.Result()
             result.return_msg = "Ping accepted"

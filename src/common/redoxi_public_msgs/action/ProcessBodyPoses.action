@@ -1,6 +1,6 @@
 redoxi_public_msgs/BodyPose[] body_poses
 redoxi_public_msgs/Frame frame
-redoxi_public_msgs/Control control_msg
+redoxi_public_msgs/Control x_control
 ---
 string return_msg
 int64 return_code

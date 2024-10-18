@@ -81,7 +81,7 @@ class DetectorIn : public rclcpp::Node, public IStartStopProtocol
       public:
         MSG_Frame frame; // frame associated with this task
         std::shared_ptr<DownstreamModel> downstream;
-        MSG_UUID detections_uuid;
+        MSG_UUID x_uid;
         GoalHandle_Frame goal_handle; // downstream goal handle
         int retry_times = 0;          // retry times already
     };
@@ -137,9 +137,9 @@ class DetectorIn : public rclcpp::Node, public IStartStopProtocol
 
     // create tasks
     virtual void _process_document_create_tasks(const MSG_PsgDocument &document, Map_Document_Waiting *document_waiting_map_ptr);
-    virtual void _process_frame_create_tasks(const MSG_Frame &frame, const MSG_UUID &detections_uuid, Map_Frame_Waiting *frame_waiting_map_ptr);
+    virtual void _process_frame_create_tasks(const MSG_Frame &frame, const MSG_UUID &x_uid, Map_Frame_Waiting *frame_waiting_map_ptr);
     virtual void _process_create_tasks(const MSG_PsgDocument &document, const MSG_Frame &frame,
-                                       const MSG_UUID &detections_uuid, Map_Task_Waiting *task_waiting_map_ptr);
+                                       const MSG_UUID &x_uid, Map_Task_Waiting *task_waiting_map_ptr);
 
   protected:
     virtual void _step();

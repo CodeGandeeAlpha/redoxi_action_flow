@@ -37,7 +37,7 @@ class SharedTestCases(ABC):
             goal_msg.frame.cache.has_int_id = True
             goal_msg.frame.frame_num = frame_num
             t_uuid = uuid.uuid4()
-            goal_msg.detections_uuid.uuid = list(t_uuid.bytes)
+            goal_msg.x_uid.uuid = list(t_uuid.bytes)
 
             feedbacks, result = env.send_action_goal_and_wait_for_result(
                 name="model_process_frame_action",

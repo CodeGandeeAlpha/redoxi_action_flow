@@ -143,7 +143,7 @@ void DetectorIn::_accept_document_accepted_callback(
     const std::shared_ptr<rclcpp_action::ServerGoalHandle<ACT_AcceptDocument>> goal_handle)
 {
     const auto &goal = goal_handle->get_goal();
-    const auto &control_msg = goal->control_msg;
+    const auto &x_control = goal->x_control;
 
     // buffer size log
     RCLCPP_INFO(m_impl->logger, "frame %d m_psgdoc_task_waiting buffer size: %d", goal->document.frame.frame_num, m_psgdoc_task_waiting.size());
@@ -160,7 +160,7 @@ void DetectorIn::_accept_document_accepted_callback(
     }
 
     // ping
-    if (control_msg.control_signal == 1) {
+    if (x_control.code == 1) {
         auto result = std::make_shared<ACT_AcceptDocument::Result>();
         result->return_msg = "Ping accepted";
         result->return_code = ReturnCode::SUCCESS;
@@ -175,9 +175,9 @@ void DetectorIn::_accept_document_accepted_callback(
     auto document = goal->document;
     const auto &frame = document.frame;
 
-    // add detections_uuid to document
+    // add x_uid to document
     boost::uuids::uuid uuid = boost::uuids::random_generator()();
-    std::copy(uuid.begin(), uuid.end(), document.detections_uuid.uuid.begin());
+    std::copy(uuid.begin(), uuid.end(), document.x_uid.uuid.begin());
 
     // create tasks for all downstreams
     {
@@ -186,7 +186,7 @@ void DetectorIn::_accept_document_accepted_callback(
     }
     {
         auto lock_ptr_frame_task_waiting = m_impl->sync_frame_waiting_map.synchronize();
-        _process_frame_create_tasks(frame, document.detections_uuid, *lock_ptr_frame_task_waiting);
+        _process_frame_create_tasks(frame, document.x_uid, *lock_ptr_frame_task_waiting);
     }
 
     auto result = std::make_shared<ACT_AcceptDocument::Result>();
@@ -208,10 +208,10 @@ void DetectorIn::_process_document_create_tasks(const MSG_PsgDocument &document,
     }
 }
 
-void DetectorIn::_process_frame_create_tasks(const MSG_Frame &frame, const MSG_UUID &detections_uuid, Map_Frame_Waiting *frame_waiting_map_ptr)
+void DetectorIn::_process_frame_create_tasks(const MSG_Frame &frame, const MSG_UUID &x_uid, Map_Frame_Waiting *frame_waiting_map_ptr)
 {
     // RCLCPP_DEBUG(m_impl->logger, "create frame %ld detections uuid %s tasks for downstreams", frame.frame_num,
-    //              uuid_to_string(detections_uuid.uuid).c_str());
+    //              uuid_to_string(x_uid.uuid).c_str());
 
     // create tasks of this frame for all downstreams
     for (auto &x : m_model_downstreams) {
@@ -219,13 +219,13 @@ void DetectorIn::_process_frame_create_tasks(const MSG_Frame &frame, const MSG_U
         task->downstream = x.second;
         task->frame = frame;
 
-        task->detections_uuid = detections_uuid;
+        task->x_uid = x_uid;
         (*frame_waiting_map_ptr)[std::make_tuple(task->downstream.get(), frame.frame_num)] = task;
     }
 }
 
 void DetectorIn::_process_create_tasks(const MSG_PsgDocument &document, const MSG_Frame &frame,
-                                       const MSG_UUID &detections_uuid, Map_Task_Waiting *task_waiting_map_ptr)
+                                       const MSG_UUID &x_uid, Map_Task_Waiting *task_waiting_map_ptr)
 {
     // create tasks of this frame for all downstreams
     for (auto &x : m_model_downstreams) {
@@ -233,7 +233,7 @@ void DetectorIn::_process_create_tasks(const MSG_PsgDocument &document, const MS
         task->downstream = x.second;
         task->frame = frame;
 
-        task->detections_uuid = detections_uuid;
+        task->x_uid = x_uid;
         (*task_waiting_map_ptr)[frame.frame_num] = std::make_pair(T1 && x, T2 && y) task;
     }
 }
@@ -308,8 +308,8 @@ void DetectorIn::_connect_to_downstreams()
 bool DetectorIn::_ping_model(std::shared_ptr<DownstreamModel> ds)
 {
     auto goal_msg = ACT_AcceptFrame::Goal();
-    goal_msg.control_msg.control_signal = 1; // ping
-    goal_msg.control_msg.control_msg = "ping";
+    goal_msg.x_control.code = 1; // ping
+    goal_msg.x_control.text_msg = "ping";
 
     // opt.goal_response_callback = callback;
     auto res = ds->accept_frame->async_send_goal(goal_msg, ds->accept_frame_options);
@@ -335,8 +335,8 @@ bool DetectorIn::_ping_model(std::shared_ptr<DownstreamModel> ds)
 bool DetectorIn::_ping_pipeline(std::shared_ptr<DownstreamPipeline> ds)
 {
     auto goal_msg = ACT_AcceptDocument::Goal();
-    goal_msg.control_msg.control_signal = 1; // ping
-    goal_msg.control_msg.control_msg = "ping";
+    goal_msg.x_control.code = 1; // ping
+    goal_msg.x_control.text_msg = "ping";
 
     // opt.goal_response_callback = callback;
     auto res = ds->accept_document->async_send_goal(goal_msg, ds->accept_document_options);
@@ -385,13 +385,13 @@ void DetectorIn::_send_frame_to_downstreams()
 
             ACT_AcceptFrame::Goal goal;
             goal.frame = task->frame;
-            // add detections_uuid to goal
-            goal.detections_uuid = task->detections_uuid;
+            // add x_uid to goal
+            goal.x_uid = task->x_uid;
 
             auto handle = task->downstream->accept_frame->async_send_goal(goal, ds->accept_frame_options);
 
-            // RCLCPP_INFO(m_impl->logger, "[Request Send]framenum: %ld, detections_uuid: %s", goal.frame.frame_num,
-            // uuid_to_string(goal.detections_uuid.uuid).c_str());
+            // RCLCPP_INFO(m_impl->logger, "[Request Send]framenum: %ld, x_uid: %s", goal.frame.frame_num,
+            // uuid_to_string(goal.x_uid.uuid).c_str());
 
             // add timeout condition
             auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;
@@ -622,13 +622,13 @@ void DetectorIn::_send_single_task_to_downstream()
 
             ACT_AcceptFrame::Goal frame_goal;
             frame_goal.frame = frame_task->frame;
-            // add detections_uuid to goal
-            frame_goal.detections_uuid = frame_task->detections_uuid;
+            // add x_uid to goal
+            frame_goal.x_uid = frame_task->x_uid;
 
             auto frame_handle = frame_task->downstream->accept_frame->async_send_goal(frame_goal, frame_ds->accept_frame_options);
 
-            // RCLCPP_INFO(m_impl->logger, "[Request Send]framenum: %ld, detections_uuid: %s", goal.frame.frame_num,
-            // uuid_to_string(goal.detections_uuid.uuid).c_str());
+            // RCLCPP_INFO(m_impl->logger, "[Request Send]framenum: %ld, x_uid: %s", goal.frame.frame_num,
+            // uuid_to_string(goal.x_uid.uuid).c_str());
 
             // add timeout condition
             auto t = (long)m_runtime_config->timeout_ms_send_to_downstream;

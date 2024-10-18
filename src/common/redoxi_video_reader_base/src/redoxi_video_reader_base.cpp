@@ -555,6 +555,9 @@ int RedoxiVideoReaderBase::_send_frame_to_downstream(const FrameMessage_t &frame
     // create goal
     auto goal = Downstream_t::Goal_t();
     goal.frame = frame_msg;
+    goal.x_control = frame_msg.control;
+
+    // TODO: here
 
     if (is_blocking) {
         auto goal_handle = client->send_goal(goal, ds->accept_frame_options);

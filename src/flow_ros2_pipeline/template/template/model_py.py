@@ -59,7 +59,7 @@ class ModelServer(Node, IOpenCloseProtocol):
         # self.frame_timer = None
         self.m_feed_back_call : bool = False
 
-        self.m_frame_buffer : SortedDict[int, (Frame, UUID)] = {} # key: frame_num, value: (frame_msg, detections_uuid)
+        self.m_frame_buffer : SortedDict[int, (Frame, UUID)] = {} # key: frame_num, value: (frame_msg, x_uid)
 
     def update_init_config(self, init_config: InitConfig) -> int:
         assert self.m_status_code == NodeStatusCode.INITIALIZED or \
@@ -313,7 +313,7 @@ class ModelServer(Node, IOpenCloseProtocol):
         # just accept the frame and add it to buffer, no processing
 
         frame = goal_handle.request.frame
-        uuid = goal_handle.request.detections_uuid
+        uuid = goal_handle.request.x_uid
 
         # add to frame buffer
         self._add_frame_to_buffer(frame, uuid)
