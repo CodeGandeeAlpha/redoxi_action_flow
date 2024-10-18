@@ -219,24 +219,41 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     //! change status code
     virtual void _set_status_code(int status_code);
 
-    // check if all downstreams are ready to accept new frame
-    virtual bool _check_downstreams_ready();
+    // check if any downstream is ready to accept new frame
+    virtual bool _check_if_any_downstream_is_ready();
 
     /**
      * @brief Send frame in shared memory to all downstreams
      * @param frame_msg The frame message to be sent
-     * @return True if the frame is actually sent, false otherwise
+     * @param timeout_ms The maximum time to wait for all downstreams to accept the frame, 0 means no timeout
+     * @return 0 if success, otherwise error code
      */
-    virtual bool _send_frame_to_downstreams(const FrameMessage_t &frame_msg);
+    virtual int _send_frame_to_downstreams(const FrameMessage_t &frame_msg,
+                                           std::chrono::milliseconds timeout_ms = std::chrono::milliseconds(0));
+
+    /**
+     * @brief Send frame to a specific downstream
+     * @param frame_msg The frame message to be sent
+     * @param ds The downstream to send the frame to
+     * @param is_blocking whether to block until the frame is accepted by the downstream
+     * @param timeout_ms The maximum time to wait for the downstream to accept the frame (in blocking mode), 0 means no timeout
+     * @return 0 if success, otherwise error code
+     */
+    virtual int _send_frame_to_downstream(const FrameMessage_t &frame_msg,
+                                          const std::shared_ptr<Downstream_t> &ds,
+                                          bool is_blocking = true,
+                                          std::chrono::milliseconds timeout_ms = std::chrono::milliseconds(0));
+
+    // ping downstream to check if they are ready to accept new frame
+    // this function will block for a maximum of timeout_ms, 0 means no timeout
+    // return true if the downstream is ready to accept new frame, false otherwise
+    virtual bool _ping(const std::shared_ptr<Downstream_t> &ds,
+                       std::chrono::milliseconds timeout_ms = std::chrono::milliseconds(0));
 
     //! do periodic step operation
     virtual void _step();
 
   protected:
-    // ping downstream to check if they are ready to accept new frame
-    virtual bool _ping(const std::shared_ptr<Downstream_t> &ds);
-
-
     // read next frame and return true if success
     virtual bool _read_frame_local(cv::Mat &frame);
 

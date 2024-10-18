@@ -113,9 +113,13 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC Downstream
   public:
     virtual ~Downstream() = default;
 
+    using GoalClient_t = rclcpp_action::Client<InternalTypes::ACT_AcceptFrame>;
+    using GoalHandle_t = GoalClient_t::GoalHandle;
+    using Goal_t = GoalClient_t::Goal;
+
     // client to call query service
-    rclcpp_action::Client<InternalTypes::ACT_AcceptFrame>::SharedPtr accept_frame;
-    rclcpp_action::Client<InternalTypes::ACT_AcceptFrame>::SendGoalOptions accept_frame_options;
+    GoalClient_t::SharedPtr accept_frame;
+    GoalClient_t::SendGoalOptions accept_frame_options;
 };
 
 //! The frame delivery task

@@ -467,7 +467,7 @@ void RedoxiVideoReaderBase::_create_frame_delivery_task(
 int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &task_input)
 {
     // check if any downstream is ready to accept new frame
-    bool downstream_ready = _check_downstreams_ready();
+    bool downstream_ready = _check_if_any_downstream_is_ready();
     if (!downstream_ready) {
         RCLCPP_WARN(this->get_logger(), "[%s][_do_frame_delivery_main()] No downstream is ready to accept new frame", this->get_name());
         return 0;
@@ -543,6 +543,26 @@ int RedoxiVideoReaderBase::_remove_frame_from_shared_memory(
         RCLCPP_ERROR(this->get_logger(), "[%s][_remove_frame_from_shared_memory()] Failed to remove frame from shared memory", this->get_name());
     }
     return ret;
+}
+
+int RedoxiVideoReaderBase::_send_frame_to_downstream(const FrameMessage_t &frame_msg,
+                                                     const std::shared_ptr<Downstream_t> &ds,
+                                                     bool is_blocking,
+                                                     std::chrono::milliseconds timeout_ms)
+{
+    auto &client = ds->accept_frame;
+
+    // create goal
+    auto goal = Downstream_t::Goal_t();
+    goal.frame = frame_msg;
+
+    if (is_blocking) {
+        auto goal_handle = client->send_goal(goal, ds->accept_frame_options);
+    } else {
+        auto goal_handle = client->async_send_goal(frame_msg, ds->accept_frame_options);
+    }
+
+    return 0;
 }
 
 
