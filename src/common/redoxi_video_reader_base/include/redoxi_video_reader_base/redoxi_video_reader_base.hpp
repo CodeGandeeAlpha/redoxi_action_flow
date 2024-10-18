@@ -7,6 +7,7 @@
 #include <redoxi_video_reader_base/visibility_control.h>
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
 #include <redoxi_video_reader_base/redoxi_video_reader_types.hpp>
+#include <redoxi_common_cpp/ros_utils/SyncActionSender.hpp>
 #include <sensor_msgs/msg/image.hpp>
 namespace redoxi_works
 {
@@ -29,13 +30,12 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
   public:
     //! Import all names from RedoxiVideoReaderInternalTypes
     //! @note: this is to allow subclass to override the type definitions
-    using ACT_AcceptFrame_t = RedoxiVideoReaderBaseTypes::InternalTypes::ACT_AcceptFrame;
     using InitConfig_t = RedoxiVideoReaderBaseTypes::InitConfig;
     using RuntimeConfig_t = RedoxiVideoReaderBaseTypes::RuntimeConfig;
     using FrameMessage_t = RedoxiVideoReaderBaseTypes::InternalTypes::MSG_Frame;
     using Downstream_t = RedoxiVideoReaderBaseTypes::Downstream;
     using FrameDeliveryTask_t = RedoxiVideoReaderBaseTypes::FrameDeliveryTask;
-    using SendFrameResult_t = RedoxiVideoReaderBaseTypes::SendFrameResult;
+    using SendFrameResult_t = SyncActionSender<Downstream_t::ActionType_t>::_SendResult;
 
   public:
     //! Constructor with node options and name
@@ -226,22 +226,22 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
      * @brief Send a frame to a specific downstream
      *
      * @details This function sends a frame to a given downstream, with optional waiting.
-     * By default, it will not wait, and the user is expected to wait by themselves using
-     * the goal future, or just ignore it if not concerned. If waiting is specified, the
-     * function will wait for the given timeout_ms. If the downstream gives a definite
-     * result within the timeout, then the error_code in the result will be set to 0, and the
-     * goal future can be resolved using its get() without further waiting. If the
-     * downstream does not respond before the timeout, the error_code will be set to -1,
-     * and the user can get further info from the goal future themselves.
+     * If no timeout is specified, it will wait indefinitely until the goal is received.
      *
      * @param frame_msg The frame message to be sent
      * @param ds The downstream to send the frame to
      * @param wait_for_ms Optional timeout for waiting for the downstream response
-     * @return SendFrameResult_t The result of sending the frame
+     * @return SendFrameResult_t A struct containing:
+     *         - response_code: An optional ActionDownstreamResponse indicating the result (ACCEPTED, REJECTED, TIMEOUT, or not set)
+     *         - goal_handle_future: A shared future that can be used to retrieve the goal handle
+     *
+     * @note If no timeout is specified, the response_code in the result will not be set, and the user should use
+     *       goal_handle_future.wait() to wait for and process the result.
      */
-    virtual SendFrameResult_t _send_frame_to_downstream(const FrameMessage_t &frame_msg,
-                                                        const std::shared_ptr<Downstream_t> &ds,
-                                                        std::optional<std::chrono::milliseconds> wait_for_ms = std::nullopt);
+    virtual SendFrameResult_t _send_frame_to_downstream(
+        const FrameMessage_t &frame_msg,
+        const std::shared_ptr<Downstream_t> &ds,
+        std::optional<std::chrono::milliseconds> wait_for_ms = std::nullopt);
 
 
     // TODO: implement this function

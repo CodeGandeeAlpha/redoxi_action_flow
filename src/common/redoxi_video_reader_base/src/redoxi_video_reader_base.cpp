@@ -348,7 +348,7 @@ int RedoxiVideoReaderBase::_connect_to_downstreams()
         // connect to accept_frame action server of downstream
         {
             std::string name = it.second->accept_frame_action;
-            auto client = rclcpp_action::create_client<ACT_AcceptFrame_t>(this, name);
+            auto client = rclcpp_action::create_client<Downstream_t::ActionType_t>(this, name);
             ds->accept_frame = client;
 
             // wait until the action server becomes online
@@ -562,42 +562,9 @@ RedoxiVideoReaderBase::SendFrameResult_t
     goal.frame = frame_msg;
     goal.x_control = frame_msg.x_control;
 
-    //! Initialize result, synchronization primitives, and response flag
-    SendFrameResult_t result;
-    std::mutex mutex;
-    std::condition_variable cv;
-    bool goal_response_received = false;
-
-    //! Configure goal send options with a callback
-    Downstream_t::SendGoalOptions_t opt;
-    opt.goal_response_callback =
-        [&](const auto &goal_handle) {
-            std::lock_guard<std::mutex> lock(mutex);
-            //! Set error code based on goal handle validity
-            result.error_code = goal_handle ? 0 : -1;
-            goal_response_received = true;
-            cv.notify_one(); //! Notify waiting thread
-        };
-
-    //! Send goal asynchronously and store the future
-    auto goal_handle_future = client->async_send_goal(goal, opt);
-    result.goal_handle_future = goal_handle_future;
-
-    //! Handle waiting behavior if specified
-    if (wait_for_ms.has_value()) {
-        std::unique_lock<std::mutex> lock(mutex);
-        //! Wait for the specified duration or until goal response is received
-        if (cv.wait_for(lock, wait_for_ms.value(), [&] { return goal_response_received; })) {
-            //! Goal response received within timeout
-            //! No action needed as result is set in callback
-        } else {
-            //! Timeout occurred, set error code
-            result.error_code = -1;
-        }
-    } else {
-        //! No waiting specified
-        //! Result remains unknown, user must handle the future
-    }
+    //! Use SyncActionSender to send the goal and wait for the response
+    SyncActionSender<Downstream_t::ActionType_t> sender;
+    auto result = sender.send(goal, *client, wait_for_ms);
 
     return result;
 }

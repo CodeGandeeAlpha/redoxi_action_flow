@@ -1,1 +1,2 @@
 # Rule: in C++, for short comment, prefer to use one-line dxygen style comment //! instead of block comment
+# Rule: in C++, for multi line comment, prefer to use doxygen block comment

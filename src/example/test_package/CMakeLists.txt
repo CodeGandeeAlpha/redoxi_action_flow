@@ -16,14 +16,14 @@ find_package(TBB REQUIRED)
 
 # Set dependencies
 set(DEPENDENCIES
-  rclcpp
-  std_msgs
-  geometry_msgs
-  redoxi_public_msgs
-  psg_private_msgs
-  unique_identifier_msgs
-  redoxi_common_cpp
-)
+    rclcpp
+    std_msgs
+    geometry_msgs
+    redoxi_public_msgs
+    psg_private_msgs
+    unique_identifier_msgs
+    redoxi_common_cpp
+    rclcpp_action)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb)
 
@@ -40,19 +40,24 @@ option(BUILD_TEST_PUBLIC_MSGS "Build test_public_msgs target" OFF)
 option(BUILD_TEST_PRIVATE_MSGS "Build test_private_msgs target" OFF)
 option(BUILD_TEST_V6D_STANDALONE "Build test_v6d_standalone target" OFF)
 option(BUILD_TEST_TBB "Build test_tbb target" OFF)
-option(BUILD_TEST_ASYNC_SINGLE_OVERWRITE "Build test_async_single_overwrite target" OFF)
-option(BUILD_TEST_ASYNC_SINGLE_BUFFER "Build test_async_single_buffer target" ON)
+option(BUILD_TEST_ASYNC_SINGLE_OVERWRITE
+       "Build test_async_single_overwrite target" OFF)
+option(BUILD_TEST_ASYNC_SINGLE_BUFFER "Build test_async_single_buffer target"
+       ON)
 
 # Function to configure a target
 function(configure_target target_name)
   add_executable(${target_name} src/${target_name}.cpp)
-  target_compile_features(${target_name} PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+  target_compile_features(
+    ${target_name} PUBLIC c_std_99 cxx_std_17) # Require C99 and C++17
   target_link_libraries(${target_name} PUBLIC ${additional_dependencies})
   ament_target_dependencies(${target_name} PUBLIC ${DEPENDENCIES})
-  target_include_directories(${target_name} PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>)
-  set(ALL_TEST_TARGETS ${ALL_TEST_TARGETS} ${target_name} PARENT_SCOPE)
+  target_include_directories(
+    ${target_name} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+                          $<INSTALL_INTERFACE:include>)
+  set(ALL_TEST_TARGETS
+      ${ALL_TEST_TARGETS} ${target_name}
+      PARENT_SCOPE)
 endfunction()
 
 # Configure targets based on options
@@ -85,8 +90,7 @@ if(BUILD_TEST_ASYNC_SINGLE_BUFFER)
 endif()
 
 # Install targets
-install(TARGETS ${ALL_TEST_TARGETS}
-  DESTINATION lib/${PROJECT_NAME})
+install(TARGETS ${ALL_TEST_TARGETS} DESTINATION lib/${PROJECT_NAME})
 
 # Finalize ament package
 ament_package()
