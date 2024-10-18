@@ -213,14 +213,21 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     //! create publisher for visualization
     virtual void _create_debug_topics();
 
-    // find and connect to downstreams
-    virtual void _connect_to_downstreams();
+    //! find and connect to downstreams, return 0 if success, otherwise error code
+    virtual int _connect_to_downstreams();
 
-    // change status code
+    //! change status code
     virtual void _set_status_code(int status_code);
 
     // check if all downstreams are ready to accept new frame
     virtual bool _check_downstreams_ready();
+
+    /**
+     * @brief Send frame in shared memory to all downstreams
+     * @param frame_msg The frame message to be sent
+     * @return True if the frame is actually sent, false otherwise
+     */
+    virtual bool _send_frame_to_downstreams(const FrameMessage_t &frame_msg);
 
     //! do periodic step operation
     virtual void _step();
@@ -229,9 +236,6 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     // ping downstream to check if they are ready to accept new frame
     virtual bool _ping(const std::shared_ptr<Downstream_t> &ds);
 
-    // send frame in shared memory to all downstreams
-    // return whether the frame is actually sent
-    virtual bool _send_frame_to_downstreams(const FrameMessage_t &frame_msg);
 
     // read next frame and return true if success
     virtual bool _read_frame_local(cv::Mat &frame);

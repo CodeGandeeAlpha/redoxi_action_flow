@@ -173,7 +173,11 @@ int RedoxiVideoReaderBase::update_init_config(const std::shared_ptr<InitConfig_t
     m_init_config = config;
 
     //! Reconnect to downstreams with the new config
-    _connect_to_downstreams();
+    auto ret = _connect_to_downstreams();
+    if (ret != 0) {
+        RCLCPP_ERROR(this->get_logger(), "[%s][update_init_config()] Failed to connect to downstreams, error code: %d", this->get_name(), ret);
+        return ret;
+    }
 
     //! Set status code to closed
     _set_status_code(NodeStatusCode::CLOSED);
@@ -327,7 +331,7 @@ int RedoxiVideoReaderBase::get_status_code() const
 }
 
 
-void RedoxiVideoReaderBase::_connect_to_downstreams()
+int RedoxiVideoReaderBase::_connect_to_downstreams()
 {
     //! Ensure m_init_config is set before connecting to downstreams
     RDX_ASSERT_CHECK_TRUE(m_init_config != nullptr,
@@ -352,6 +356,8 @@ void RedoxiVideoReaderBase::_connect_to_downstreams()
 
         m_downstreams[it.first] = ds;
     }
+
+    return 0;
 }
 
 int RedoxiVideoReaderBase::_init_frame_delivery_tasks()
