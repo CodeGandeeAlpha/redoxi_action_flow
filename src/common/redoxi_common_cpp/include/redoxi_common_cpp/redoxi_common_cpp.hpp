@@ -138,11 +138,12 @@ const int MAX_RESERVED_STATUS = 10000;
 namespace NodeStatusCode
 {
 const int BEFORE_INIT = 0;
-const int INITIALIZED = 1;
 const int OPENED = 2;
 const int STARTED = 3;
 const int STOPPED = 4;
 const int CLOSED = 5;
+
+const int INITIALIZED = 1; // NOT USED anymore
 
 // reserved status code, your custom status code should be greater than this
 const int MAX_RESERVED_STATUS = 10000;

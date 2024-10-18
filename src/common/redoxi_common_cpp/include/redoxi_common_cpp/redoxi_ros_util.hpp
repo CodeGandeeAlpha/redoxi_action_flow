@@ -2,6 +2,7 @@
 #include <chrono>
 #include <atomic>
 #include <type_traits>
+#include <optional>
 
 #include <tbb/concurrent_queue.h>
 #include <rclcpp/rclcpp.hpp>
@@ -78,12 +79,18 @@ class _RosTimeToken
     }
 
     //! start the timer, which creates tokens at the specified interval
+    //! @param interval the interval of the timer, if not specified, the interval is the same as the one in constructor
+    //! @note if interval is 0, the token is always available
     //! @return true if the timer is successfully started
     //! @return false if the timer is already started
-    virtual bool start()
+    virtual bool start(std::optional<IntervalType> interval = std::nullopt)
     {
         if (m_is_started) {
             return false;
+        }
+
+        if (interval) {
+            m_interval = interval.value();
         }
 
         if (m_interval > IntervalType(0)) {

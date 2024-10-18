@@ -78,6 +78,11 @@ class RedoxiVideoReaderImpl
     std::shared_ptr<VineyardClient> v6d_client;
 };
 
+void RedoxiVideoReaderBase::set_publish_image(bool enable)
+{
+    m_publish_image = enable;
+}
+
 RedoxiVideoReaderBase::RedoxiVideoReaderBase(const std::string &name, const rclcpp::NodeOptions &options)
     : rclcpp::Node(name, options)
 {
@@ -92,9 +97,6 @@ RedoxiVideoReaderBase::RedoxiVideoReaderBase(const std::string &name, const rclc
     if (ret != 0) {
         RCLCPP_WARN(this->get_logger(), "[%s][constructor()] Failed to connect to vineyard server, continue without vineyard", this->get_name());
     }
-
-    // FIXME: moved these to init() later
-    _init_frame_delivery_tasks();
 }
 
 void RedoxiVideoReaderBase::_set_status_code(int status_code)
@@ -122,34 +124,217 @@ int RedoxiVideoReaderBase::init(const std::shared_ptr<InitConfig_t> &config,
         RCLCPP_WARN(this->get_logger(), "[%s][init()] Failed to connect to vineyard server, continue without vineyard", this->get_name());
     }
 
-    // assign config and runtime config
-    m_init_config = config;
-    m_runtime_config = runtime_config;
+    //! create frame delivery tasks
+    {
+        int ret = _init_frame_delivery_tasks();
+        if (ret != 0) {
+            RCLCPP_ERROR(this->get_logger(), "[%s][update_init_config()] Failed to initialize frame delivery tasks", this->get_name());
+            return ret;
+        }
+    }
 
     // create debug topics
     _create_debug_topics();
 
-    // connect to downstreams
-    _connect_to_downstreams();
+    // set init_config
+    {
+        auto ret = update_init_config(config);
+        if (ret != 0) {
+            RCLCPP_ERROR(this->get_logger(), "[%s][init()] Failed to update init config", this->get_name());
+            return ret;
+        }
+    }
 
-    // set status code to INITIALIZED
-    _set_status_code(NodeStatusCode::INITIALIZED);
+    // set runtime_config
+    {
+        auto ret = update_runtime_config(runtime_config);
+        if (ret != 0) {
+            RCLCPP_ERROR(this->get_logger(), "[%s][init()] Failed to update runtime config", this->get_name());
+            return ret;
+        }
+    }
 
     return 0;
 }
 
+int RedoxiVideoReaderBase::update_init_config(const std::shared_ptr<InitConfig_t> &config)
+{
+    //! Ensure the node is in CLOSED or BEFORE_INIT status
+    RDX_ASSERT_CHECK_TRUE(m_status_code == NodeStatusCode::CLOSED ||
+                              m_status_code == NodeStatusCode::BEFORE_INIT,
+                          "[{}][update_init_config()] Invalid node status for updating init config: {}",
+                          this->get_name(), m_status_code);
+
+    //! Ensure the new config is not null
+    RDX_ASSERT_CHECK_TRUE(config != nullptr,
+                          "[{}][update_init_config()] New init config is null", this->get_name());
+
+    //! Update the init config
+    m_init_config = config;
+
+    //! Reconnect to downstreams with the new config
+    _connect_to_downstreams();
+
+    //! Set status code to closed
+    _set_status_code(NodeStatusCode::CLOSED);
+
+    return 0;
+}
+
+int RedoxiVideoReaderBase::update_runtime_config(const std::shared_ptr<RuntimeConfig_t> &config)
+{
+    //! Ensure the node is in CLOSED or STOPPED
+    RDX_ASSERT_CHECK_TRUE(m_status_code == NodeStatusCode::CLOSED ||
+                              m_status_code == NodeStatusCode::STOPPED,
+                          "[{}][update_runtime_config()] Invalid node status for updating runtime config: {}",
+                          this->get_name(), m_status_code);
+
+    //! Ensure the new config is not null
+    RDX_ASSERT_CHECK_TRUE(config != nullptr,
+                          "[{}][update_runtime_config()] New runtime config is null", this->get_name());
+
+    //! Update the runtime config
+    m_runtime_config = config;
+
+    // create timer based token for reading a new frame every x-milliseconds
+    {
+        auto frame_interval_ms = (int64_t)m_runtime_config->frame_interval_ms;
+        m_impl->read_frame_token = std::make_shared<RosTimeToken_ms>(this, std::chrono::milliseconds(frame_interval_ms));
+    }
+
+    //! Apply any necessary changes based on the new runtime config
+    //! This might involve updating internal parameters or reconfiguring components
+
+    RCLCPP_INFO(this->get_logger(), "[%s][update_runtime_config()] Runtime config updated successfully", this->get_name());
+
+    return 0;
+}
+
+const std::shared_ptr<RedoxiVideoReaderBase::InitConfig_t> &RedoxiVideoReaderBase::get_init_config() const
+{
+    //! Return the current init configuration
+    return m_init_config;
+}
+
+
+void RedoxiVideoReaderBase::_create_debug_topics()
+{
+    //! Create publisher for debug image topic if enabled
+    std::string topic_name = get_publish_image_topic_name();
+    int queue_size = get_publish_image_queue_size();
+
+    m_topic_image = this->create_publisher<sensor_msgs::msg::Image>(
+        topic_name,
+        rclcpp::QoS(rclcpp::KeepLast(queue_size)).reliable());
+
+    RCLCPP_DEBUG(this->get_logger(),
+                 "[%s][_create_debug_topics()] Created debug image topic: %s",
+                 this->get_name(),
+                 topic_name.c_str());
+}
+
+int RedoxiVideoReaderBase::open()
+{
+    //! Ensure the node is in CLOSED state
+    RDX_ASSERT_CHECK_TRUE(m_status_code == NodeStatusCode::CLOSED,
+                          "[{}][open()] Invalid node status for opening: {}", this->get_name(), m_status_code);
+
+    // do subclass work first, to avoid side effect on failure
+    auto ret = _open();
+    if (ret != 0) {
+        RCLCPP_ERROR(this->get_logger(), "[%s][open()] Failed to open node", this->get_name());
+        return ret;
+    }
+
+    //! Set status code to opened
+    _set_status_code(NodeStatusCode::OPENED);
+
+    return 0;
+}
+
+int RedoxiVideoReaderBase::start()
+{
+    //! Ensure the node is in OPENED state
+    RDX_ASSERT_CHECK_TRUE(m_status_code == NodeStatusCode::OPENED ||
+                              m_status_code == NodeStatusCode::STOPPED,
+                          "[{}][start()] Invalid node status for starting: {}", this->get_name(), m_status_code);
+
+    // do subclass work first, to avoid side effect on failure
+    auto ret = _start();
+    if (ret != 0) {
+        RCLCPP_ERROR(this->get_logger(), "[%s][start()] Failed to start node", this->get_name());
+        return ret;
+    }
+
+    // create a timer based token for reading a new frame every x-milliseconds
+    {
+        auto frame_interval_ms = (int64_t)m_runtime_config->frame_interval_ms;
+        m_impl->read_frame_token->start(std::chrono::milliseconds(frame_interval_ms));
+    }
+
+
+    //! Set status code to STARTED
+    _set_status_code(NodeStatusCode::STARTED);
+
+    return 0;
+}
+
+int RedoxiVideoReaderBase::stop()
+{
+    //! Ensure the node is in STARTED state
+    RDX_ASSERT_CHECK_TRUE(m_status_code == NodeStatusCode::STARTED,
+                          "[{}][stop()] Invalid node status for stopping: {}", this->get_name(), m_status_code);
+
+    // do subclass work first, to avoid side effect on failure
+    auto ret = _stop();
+    if (ret != 0) {
+        RCLCPP_ERROR(this->get_logger(), "[%s][stop()] Failed to stop node", this->get_name());
+        return ret;
+    }
+    //! Stop the token-based timer and reset it
+    if (m_impl->read_frame_token) {
+        m_impl->read_frame_token->stop();
+    }
+
+    //! Set status code to STOPPED
+    _set_status_code(NodeStatusCode::STOPPED);
+    return 0;
+}
+
+int RedoxiVideoReaderBase::close()
+{
+    //! Ensure the node is in OPENED or STOPPED state
+    RDX_ASSERT_CHECK_TRUE(m_status_code == NodeStatusCode::OPENED ||
+                              m_status_code == NodeStatusCode::STOPPED,
+                          "[{}][close()] Invalid node status for closing: {}", this->get_name(), m_status_code);
+
+    // do subclass work first, to avoid side effect on failure
+    auto ret = _close();
+    if (ret != 0) {
+        RCLCPP_ERROR(this->get_logger(), "[%s][close()] Failed to close node", this->get_name());
+        return ret;
+    }
+
+    //! Set status code to CLOSED
+    _set_status_code(NodeStatusCode::CLOSED);
+
+    return 0;
+}
+
+int RedoxiVideoReaderBase::get_status_code() const
+{
+    return m_status_code;
+}
+
+
 void RedoxiVideoReaderBase::_connect_to_downstreams()
 {
-    // must be initialized first
-    RDX_ASSERT_CHECK_TRUE(m_status_code == NodeStatusCode::INITIALIZED ||
-                              m_status_code == NodeStatusCode::STOPPED,
-                          "[{}][_connect_to_downstreams()] Invalid node status for connecting to downstreams: {}", this->get_name(), m_status_code);
-
     //! Ensure m_init_config is set before connecting to downstreams
     RDX_ASSERT_CHECK_TRUE(m_init_config != nullptr,
                           "[{}][_connect_to_downstreams()] Init config is not set", this->get_name());
 
     // find and connect to downstreams
+    m_downstreams.clear();
     for (auto &it : m_init_config->downstreams) {
         auto ds = std::make_shared<Downstream_t>();
 
@@ -315,7 +500,6 @@ RedoxiVideoReaderBase::FrameMessage_t RedoxiVideoReaderBase::_create_frame_messa
 {
     FrameMessage_t frame_msg;
     frame_msg.frame_num = task_input.frame_number;
-    frame_msg.signal_code = SignalCode::RUN; // this is an actual frame with payload
     if (shared_memory_id) {
         frame_msg.cache.id_int = shared_memory_id.value();
         frame_msg.cache.has_int_id = true;

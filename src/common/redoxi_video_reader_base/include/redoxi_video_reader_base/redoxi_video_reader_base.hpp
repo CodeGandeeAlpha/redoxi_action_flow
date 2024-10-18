@@ -15,6 +15,10 @@ class RedoxiVideoReaderImpl;
 /**
  * @brief The base class for all video readers.
  * A frame is considered successfully sent if any downstream accepts it, in which case the frame is written into shared memory. Otherwise the frame is dropped.
+ * @note: this is a stateful node, the status code is used to indicate the current state
+ * state changes as following:
+ * BEFORE_INIT -> [init()] -> CLOSED -> [open()] -> OPENED -> [start()] -> STARTED -> [stop()] -> STOPPED -> [close()] -> CLOSED
+ * the action allowed at each state is shown in the comments of each function
  */
 class REDOXI_VIDEO_READER_BASE_PUBLIC
     RedoxiVideoReaderBase : public rclcpp::Node,
@@ -44,7 +48,7 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     //! debug topic for visualization
     virtual std::string get_publish_image_topic_name() const
     {
-        return "Image";
+        return "debug_port/image";
     }
 
     //! debug topic for visualization
@@ -53,6 +57,7 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
         return 10;
     }
 
+    //! enable or disable image publishing
     virtual void set_publish_image(bool enable);
 
   public:
@@ -60,30 +65,88 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     virtual int init(const std::shared_ptr<InitConfig_t> &config,
                      const std::shared_ptr<RuntimeConfig_t> &runtime_config);
 
-    //! You can set configuration before open() or after close()
+    /**
+     * @brief Update the init config, only when the node is in CLOSED status
+     * @param config the new init config
+     * @return 0 if success, otherwise error code
+     */
     virtual int update_init_config(const std::shared_ptr<InitConfig_t> &config);
+
+    /**
+     * @brief Get the init config
+     * @return the init config
+     */
     virtual const std::shared_ptr<InitConfig_t> &get_init_config() const;
 
-    //! Modify runtime settings, must be called before start(), after stop() or close()
+    /**
+     * @brief Update the runtime config, only when the node is in CLOSED or STOPPED status
+     * @param config the new runtime config
+     * @return 0 if success, otherwise error code
+     */
     virtual int update_runtime_config(const std::shared_ptr<RuntimeConfig_t> &config);
+
+    /**
+     * @brief Get the runtime config
+     * @return the runtime config
+     */
     virtual const std::shared_ptr<RuntimeConfig_t> &get_runtime_config() const;
 
-    //! Open video source, get ready to read
-    virtual int open() override;
+    /**
+     * @brief Open video source, get ready to read, must be called in CLOSED status
+     * @return 0 if success, otherwise error code
+     */
+    int open() final;
 
-    //! After calling this, you cannot modify runtime config
-    virtual int start() override;
+    /**
+     * @brief Start the node, must be called in OPENED or STOPPED status,
+     * after which you cannot modify runtime config
+     * @return 0 if success, otherwise error code
+     */
+    int start() final;
 
-    //! Call this before you modify runtime config
-    virtual int stop() override;
+    /**
+     * @brief Stop the node, must be called in STARTED status
+     * @return 0 if success, otherwise error code
+     */
+    int stop() final;
 
-    //! Call this before you want to modify init config
-    virtual int close() override;
+    /**
+     * @brief Close the node, must be called in OPENED or STOPPED status
+     * @return 0 if success, otherwise error code
+     */
+    int close() final;
 
-    //! Get the status code of this node
+    /**
+     * @brief Get the status code of this node
+     * @return the status code
+     */
     virtual int get_status_code() const;
 
   protected:
+    //! Open video source, intended to be overridden by subclass
+    //! @note State transition is handled by base class
+    //! @return 0 if success, otherwise error code
+    //! @note If return != 0, state transition will not be applied
+    virtual int _open() = 0;
+
+    //! Close video source, intended to be overridden by subclass
+    //! @note State transition is handled by base class
+    //! @return 0 if success, otherwise error code
+    //! @note If return != 0, state transition will not be applied
+    virtual int _close() = 0;
+
+    //! Start reading frames, intended to be overridden by subclass
+    //! @note State transition is handled by base class
+    //! @return 0 if success, otherwise error code
+    //! @note If return != 0, state transition will not be applied
+    virtual int _start() = 0;
+
+    //! Stop reading frames, intended to be overridden by subclass
+    //! @note State transition is handled by base class
+    //! @return 0 if success, otherwise error code
+    //! @note If return != 0, state transition will not be applied
+    virtual int _stop() = 0;
+
     /**
      * @brief Read next frame, intended to be overridden by subclass
      * @param frame the frame to be filled with the read frame
@@ -147,7 +210,7 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
         const FrameDeliveryTask_t &task_input,
         std::optional<uint64_t> shared_memory_id = std::nullopt);
 
-    // create publisher for visualization
+    //! create publisher for visualization
     virtual void _create_debug_topics();
 
     // find and connect to downstreams
@@ -156,12 +219,13 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     // change status code
     virtual void _set_status_code(int status_code);
 
-  protected:
-    virtual void _step();
-
     // check if all downstreams are ready to accept new frame
     virtual bool _check_downstreams_ready();
 
+    //! do periodic step operation
+    virtual void _step();
+
+  protected:
     // ping downstream to check if they are ready to accept new frame
     virtual bool _ping(const std::shared_ptr<Downstream_t> &ds);
 

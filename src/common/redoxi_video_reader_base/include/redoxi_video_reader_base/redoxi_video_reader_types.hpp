@@ -3,6 +3,7 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <optional>
 
 #include <opencv2/opencv.hpp>
 #include <boost/uuid/uuid.hpp>
@@ -77,8 +78,8 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC RuntimeConfig
     //! The step interval in ms
     double step_interval_ms = DefaultNodeStepIntervalMs;
 
-    //! The frame interval in ms
-    double frame_interval_ms = -1;
+    //! The frame interval in ms, 0 means as fast as possible
+    double frame_interval_ms = 0;
 
     //! The output image size. If input is different, resize to output_image_size.
     //! If output_image_size.width=-1 or output_image_size.height=-1, keep aspect ratio.
