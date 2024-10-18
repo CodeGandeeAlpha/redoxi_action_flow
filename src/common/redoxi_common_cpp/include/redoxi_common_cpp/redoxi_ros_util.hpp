@@ -71,7 +71,8 @@ class _RosTimeToken
         m_node = node;
         m_interval = interval;
         m_token_capacity = token_capacity;
-        m_queue.set_capacity(token_capacity);
+        m_queue = std::make_shared<tbb::concurrent_bounded_queue<TokenType>>();
+        m_queue->set_capacity(token_capacity);
     }
     virtual ~_RosTimeToken()
     {
@@ -124,9 +125,9 @@ class _RosTimeToken
         }
 
         // clear the queue and create a new one
-        m_queue.abort();
-        m_queue = tbb::concurrent_bounded_queue<TokenType>();
-        m_queue.set_capacity(m_token_capacity);
+        // m_queue->abort();
+        m_queue = std::make_shared<tbb::concurrent_bounded_queue<TokenType>>();
+        m_queue->set_capacity(m_token_capacity);
 
         // reset the started flag
         m_is_started = false;
@@ -142,7 +143,7 @@ class _RosTimeToken
     //! pop a token from the queue, does not wait until the token is available if not present
     virtual bool try_pop_token(TokenType &token)
     {
-        bool ok = m_queue.try_pop(token);
+        bool ok = m_queue->try_pop(token);
         if (ok && m_is_started && m_interval == IntervalType(0)) {
             // if the interval is 0, the token is always available
             // so we need to create a new token
@@ -154,7 +155,7 @@ class _RosTimeToken
     //! pop a token from the queue, wait until the token is available if necessary
     virtual bool pop_token(TokenType &token)
     {
-        bool ok = m_queue.pop(token);
+        bool ok = m_queue->pop(token);
         if (ok && m_is_started && m_interval == IntervalType(0)) {
             // if the interval is 0, the token is always available
             // so we need to create a new token
@@ -171,7 +172,7 @@ class _RosTimeToken
     virtual bool _create_token()
     {
         TokenType token = _generate_token();
-        return m_queue.try_push(token);
+        return m_queue->try_push(token);
     }
 
   protected:
@@ -186,7 +187,7 @@ class _RosTimeToken
     size_t m_token_capacity;
     std::atomic<bool> m_is_started{false};
     IntervalType m_interval;
-    tbb::concurrent_bounded_queue<TokenType> m_queue;
+    std::shared_ptr<tbb::concurrent_bounded_queue<TokenType>> m_queue;
 };
 
 //! @brief a token generator that generates a token by every x-milliseconds

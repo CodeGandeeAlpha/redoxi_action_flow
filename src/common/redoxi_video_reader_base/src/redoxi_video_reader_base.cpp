@@ -1,3 +1,6 @@
+#include <thread>
+#include <condition_variable>
+
 #include "redoxi_video_reader_base/redoxi_video_reader_base.hpp"
 #include "redoxi_video_reader_base/redoxi_video_reader_types.hpp"
 #include <redoxi_common_cpp/async_processor/SingleBufferExecNode.hpp>
@@ -545,27 +548,58 @@ int RedoxiVideoReaderBase::_remove_frame_from_shared_memory(
     return ret;
 }
 
-int RedoxiVideoReaderBase::_send_frame_to_downstream(const FrameMessage_t &frame_msg,
-                                                     const std::shared_ptr<Downstream_t> &ds,
-                                                     bool is_blocking,
-                                                     std::chrono::milliseconds timeout_ms)
+RedoxiVideoReaderBase::SendFrameResult_t
+    RedoxiVideoReaderBase::_send_frame_to_downstream(
+        const FrameMessage_t &frame_msg,
+        const std::shared_ptr<Downstream_t> &ds,
+        std::optional<std::chrono::milliseconds> wait_for_ms)
 {
+    //! Get the action client for the downstream
     auto &client = ds->accept_frame;
 
-    // create goal
+    //! Create a goal object and populate it with frame message data
     auto goal = Downstream_t::Goal_t();
     goal.frame = frame_msg;
-    goal.x_control = frame_msg.control;
+    goal.x_control = frame_msg.x_control;
 
-    // TODO: here
+    //! Initialize result, synchronization primitives, and response flag
+    SendFrameResult_t result;
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool goal_response_received = false;
 
-    if (is_blocking) {
-        auto goal_handle = client->send_goal(goal, ds->accept_frame_options);
+    //! Configure goal send options with a callback
+    Downstream_t::SendGoalOptions_t opt;
+    opt.goal_response_callback =
+        [&](const auto &goal_handle) {
+            std::lock_guard<std::mutex> lock(mutex);
+            //! Set error code based on goal handle validity
+            result.error_code = goal_handle ? 0 : -1;
+            goal_response_received = true;
+            cv.notify_one(); //! Notify waiting thread
+        };
+
+    //! Send goal asynchronously and store the future
+    auto goal_handle_future = client->async_send_goal(goal, opt);
+    result.goal_handle_future = goal_handle_future;
+
+    //! Handle waiting behavior if specified
+    if (wait_for_ms.has_value()) {
+        std::unique_lock<std::mutex> lock(mutex);
+        //! Wait for the specified duration or until goal response is received
+        if (cv.wait_for(lock, wait_for_ms.value(), [&] { return goal_response_received; })) {
+            //! Goal response received within timeout
+            //! No action needed as result is set in callback
+        } else {
+            //! Timeout occurred, set error code
+            result.error_code = -1;
+        }
     } else {
-        auto goal_handle = client->async_send_goal(frame_msg, ds->accept_frame_options);
+        //! No waiting specified
+        //! Result remains unknown, user must handle the future
     }
 
-    return 0;
+    return result;
 }
 
 

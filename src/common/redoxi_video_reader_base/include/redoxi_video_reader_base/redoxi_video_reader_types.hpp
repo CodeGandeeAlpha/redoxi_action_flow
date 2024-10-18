@@ -103,7 +103,6 @@ namespace InternalTypes
 {
 using ACT_AcceptFrame = redoxi_public_msgs::action::ProcessFrame;
 using MSG_Frame = redoxi_public_msgs::msg::Frame;
-using GoalHandle = rclcpp_action::ClientGoalHandle<ACT_AcceptFrame>::SharedPtr;
 
 } // namespace InternalTypes
 
@@ -116,10 +115,35 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC Downstream
     using GoalClient_t = rclcpp_action::Client<InternalTypes::ACT_AcceptFrame>;
     using GoalHandle_t = GoalClient_t::GoalHandle;
     using Goal_t = GoalClient_t::Goal;
+    using SendGoalOptions_t = GoalClient_t::SendGoalOptions;
 
     // client to call query service
     GoalClient_t::SharedPtr accept_frame;
     GoalClient_t::SendGoalOptions accept_frame_options;
+};
+
+/**
+ * @brief The result of sending a frame to downstream
+ * @details If error_code is set, it is already resolved, you can use
+ *          goal_handle_future.get() to get the goal handle without waiting,
+ *          otherwise, you can use goal_handle_future.wait() to wait for the result
+ */
+struct REDOXI_VIDEO_READER_BASE_PUBLIC SendFrameResult {
+    /**
+     * @brief The error code, 0 means success, otherwise means failure
+     * @note If it is not set, it means the result is unknown
+     */
+    std::optional<int> error_code;
+
+    /**
+     * @brief The goal handle future, got from ROS action
+     * @details You can resolve it by yourself to get the goal handle
+     *          If error_code is set to 0, it means the goal is accepted,
+     *          you can use goal_handle_future.get() to get the goal handle without waiting.
+     *          If error_code is set to non-zero, it means we do not know the result yet,
+     *          you can use goal_handle_future.wait() to wait for the result.
+     */
+    std::shared_future<Downstream::GoalHandle_t::SharedPtr> goal_handle_future;
 };
 
 //! The frame delivery task

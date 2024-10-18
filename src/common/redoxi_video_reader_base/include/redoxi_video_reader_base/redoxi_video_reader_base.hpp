@@ -33,9 +33,9 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     using InitConfig_t = RedoxiVideoReaderBaseTypes::InitConfig;
     using RuntimeConfig_t = RedoxiVideoReaderBaseTypes::RuntimeConfig;
     using FrameMessage_t = RedoxiVideoReaderBaseTypes::InternalTypes::MSG_Frame;
-    using GoalHandle_t = RedoxiVideoReaderBaseTypes::InternalTypes::GoalHandle;
     using Downstream_t = RedoxiVideoReaderBaseTypes::Downstream;
     using FrameDeliveryTask_t = RedoxiVideoReaderBaseTypes::FrameDeliveryTask;
+    using SendFrameResult_t = RedoxiVideoReaderBaseTypes::SendFrameResult;
 
   public:
     //! Constructor with node options and name
@@ -223,32 +223,37 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     virtual bool _check_if_any_downstream_is_ready();
 
     /**
-     * @brief Send frame in shared memory to all downstreams
-     * @param frame_msg The frame message to be sent
-     * @param timeout_ms The maximum time to wait for all downstreams to accept the frame, 0 means no timeout
-     * @return 0 if success, otherwise error code
-     */
-    virtual int _send_frame_to_downstreams(const FrameMessage_t &frame_msg,
-                                           std::chrono::milliseconds timeout_ms = std::chrono::milliseconds(0));
-
-    /**
-     * @brief Send frame to a specific downstream
+     * @brief Send a frame to a specific downstream
+     *
+     * @details This function sends a frame to a given downstream, with optional waiting.
+     * By default, it will not wait, and the user is expected to wait by themselves using
+     * the goal future, or just ignore it if not concerned. If waiting is specified, the
+     * function will wait for the given timeout_ms. If the downstream gives a definite
+     * result within the timeout, then the error_code in the result will be set to 0, and the
+     * goal future can be resolved using its get() without further waiting. If the
+     * downstream does not respond before the timeout, the error_code will be set to -1,
+     * and the user can get further info from the goal future themselves.
+     *
      * @param frame_msg The frame message to be sent
      * @param ds The downstream to send the frame to
-     * @param is_blocking whether to block until the frame is accepted by the downstream
-     * @param timeout_ms The maximum time to wait for the downstream to accept the frame (in blocking mode), 0 means no timeout
-     * @return 0 if success, otherwise error code
+     * @param wait_for_ms Optional timeout for waiting for the downstream response
+     * @return SendFrameResult_t The result of sending the frame
      */
-    virtual int _send_frame_to_downstream(const FrameMessage_t &frame_msg,
-                                          const std::shared_ptr<Downstream_t> &ds,
-                                          bool is_blocking = true,
-                                          std::chrono::milliseconds timeout_ms = std::chrono::milliseconds(0));
+    virtual SendFrameResult_t _send_frame_to_downstream(const FrameMessage_t &frame_msg,
+                                                        const std::shared_ptr<Downstream_t> &ds,
+                                                        std::optional<std::chrono::milliseconds> wait_for_ms = std::nullopt);
 
-    // ping downstream to check if they are ready to accept new frame
-    // this function will block for a maximum of timeout_ms, 0 means no timeout
-    // return true if the downstream is ready to accept new frame, false otherwise
+
+    // TODO: implement this function
+    /**
+     * @brief Ping downstream to check if they are ready to accept new frame
+     * @details By default, this function will not block, unless timeout_ms is specified
+     * @param ds The downstream to ping
+     * @param timeout_ms Optional timeout for waiting for the downstream response
+     * @return true if the downstream is ready to accept new frame, false otherwise (including timeout)
+     */
     virtual bool _ping(const std::shared_ptr<Downstream_t> &ds,
-                       std::chrono::milliseconds timeout_ms = std::chrono::milliseconds(0));
+                       std::optional<std::chrono::milliseconds> timeout_ms = std::nullopt);
 
     //! do periodic step operation
     virtual void _step();
