@@ -15,6 +15,9 @@ const int DefaultMaxNumberOfRetries = 10;
 // how many ms to wait before next _step()
 const double DefaultNodeStepIntervalMs = 1;
 
+// default time unit for processing and waiting
+using DefaultTimeUnit_t = std::chrono::microseconds;
+
 // globally accessible parameters in ROS related to this application
 namespace RosParams
 {

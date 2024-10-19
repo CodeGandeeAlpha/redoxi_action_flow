@@ -552,7 +552,7 @@ RedoxiVideoReaderBase::SendFrameResult_t
     RedoxiVideoReaderBase::_send_frame_to_downstream(
         const FrameMessage_t &frame_msg,
         const std::shared_ptr<Downstream_t> &ds,
-        std::optional<std::chrono::milliseconds> wait_for_ms)
+        std::optional<DefaultTimeUnit_t> timeout)
 {
     //! Get the action client for the downstream
     auto &client = ds->accept_frame;
@@ -564,30 +564,34 @@ RedoxiVideoReaderBase::SendFrameResult_t
 
     //! Use SyncActionSender to send the goal and wait for the response
     SyncActionSender<Downstream_t::ActionType_t> sender;
-    auto result = sender.send(goal, *client, wait_for_ms);
+    auto result = sender.send(goal, *client, timeout);
 
     return result;
 }
 
 bool RedoxiVideoReaderBase::_ping(const std::shared_ptr<Downstream_t> &ds,
-                                  std::optional<std::chrono::milliseconds> timeout_ms)
+                                  std::optional<DefaultTimeUnit_t> timeout)
 {
     //! Create an empty frame message for pinging
     FrameMessage_t ping_msg;
     ping_msg.x_control.code = ping_msg.x_control.PING;
 
     //! Send the ping message to the downstream
-    auto result = _send_frame_to_downstream(ping_msg, ds, timeout_ms);
+    auto result = _send_frame_to_downstream(ping_msg, ds, timeout);
 
     //! Check the response
-    if (timeout_ms.has_value()) {
+    if (timeout.has_value()) {
         //! If timeout is specified, check the response code
+        //! Anything other than ACCEPTED is considered not ready
         return result.response_code.has_value() &&
                result.response_code.value() == ActionDownstreamResponse::ACCEPTED;
     } else {
         //! If no timeout, wait for the future and check the result
         auto goal_handle = result.goal_handle_future.get();
-        return goal_handle != nullptr && goal_handle->is_goal_response_success();
+
+        // as long as the goal handle is not nullptr, the downstream is considered ready
+        // because it accepts the goal
+        return goal_handle != nullptr;
     }
 }
 

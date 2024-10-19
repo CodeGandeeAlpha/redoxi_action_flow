@@ -150,6 +150,9 @@ class _RosTimeToken
     std::shared_ptr<tbb::concurrent_bounded_queue<TokenType>> m_queue;
 };
 
+//! @brief a token generator that generates a token by every x-default-time-unit
+using RosTimeToken = _RosTimeToken<DummyTimeToken, DefaultTimeUnit_t>;
+
 //! @brief a token generator that generates a token by every x-milliseconds
 using RosTimeToken_ms = _RosTimeToken<DummyTimeToken, std::chrono::milliseconds>;
 

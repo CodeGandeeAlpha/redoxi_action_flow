@@ -95,6 +95,20 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC RuntimeConfig
     virtual void from_parameters(RedoxiVideoReaderBase *)
     {
     }
+
+    //! Get the frame interval as std::chrono::duration
+    template <typename TimeUnit_t = DefaultTimeUnit_t>
+    TimeUnit_t get_frame_interval_as_std_chrono() const
+    {
+        return std::chrono::nanoseconds(static_cast<int64_t>(frame_interval_ms * 1e6));
+    }
+
+    //! Get the step interval as std::chrono::duration
+    template <typename TimeUnit_t = DefaultTimeUnit_t>
+    TimeUnit_t get_step_interval_as_std_chrono() const
+    {
+        return std::chrono::nanoseconds(static_cast<int64_t>(step_interval_ms * 1e6));
+    }
 };
 
 //! The internal types for RedoxiVideoReaderBase, very specific types inside class
@@ -141,6 +155,12 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC FrameDeliveryTask
     cv::Mat frame;
     size_t frame_number = 0;
     double timestamp_sec = 0;
+
+    //! delivery quality request
+    bool try_until_success = false;
+
+    //! The timeout for each delivery attempt
+    std::optional<DefaultTimeUnit_t> timeout = std::nullopt;
 
     //! The shared memory id of the frame, in v6d
     // uint64_t shared_memory_id = 0;

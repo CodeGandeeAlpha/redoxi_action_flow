@@ -230,7 +230,7 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
      *
      * @param frame_msg The frame message to be sent
      * @param ds The downstream to send the frame to
-     * @param wait_for_ms Optional timeout for waiting for the downstream response
+     * @param timeout Optional timeout for waiting for the downstream response, in DefaultTimeUnit_t
      * @return SendFrameResult_t A struct containing:
      *         - response_code: An optional ActionDownstreamResponse indicating the result (ACCEPTED, REJECTED, TIMEOUT, or not set)
      *         - goal_handle_future: A shared future that can be used to retrieve the goal handle
@@ -241,7 +241,7 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     virtual SendFrameResult_t _send_frame_to_downstream(
         const FrameMessage_t &frame_msg,
         const std::shared_ptr<Downstream_t> &ds,
-        std::optional<std::chrono::milliseconds> wait_for_ms = std::nullopt);
+        std::optional<DefaultTimeUnit_t> timeout = std::nullopt);
 
 
     // TODO: implement this function
@@ -249,11 +249,11 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
      * @brief Ping downstream to check if they are ready to accept new frame
      * @details By default, this function will not block, unless timeout_ms is specified
      * @param ds The downstream to ping
-     * @param timeout_ms Optional timeout for waiting for the downstream response
+     * @param timeout Optional timeout for waiting for the downstream response, in DefaultTimeUnit_t
      * @return true if the downstream is ready to accept new frame, false otherwise (including timeout)
      */
     virtual bool _ping(const std::shared_ptr<Downstream_t> &ds,
-                       std::optional<std::chrono::milliseconds> timeout_ms = std::nullopt);
+                       std::optional<DefaultTimeUnit_t> timeout = std::nullopt);
 
     //! do periodic step operation
     virtual void _step();

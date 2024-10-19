@@ -58,7 +58,7 @@ namespace redoxi_works
  * }
  */
 template <typename ActionType,
-          typename DurationType = std::chrono::milliseconds,
+          typename DurationType = DefaultTimeUnit_t,
           typename = std::enable_if_t<hacky::is_duration<DurationType>::value>>
 class SyncActionSender
 {

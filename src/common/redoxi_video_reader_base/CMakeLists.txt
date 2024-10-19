@@ -22,7 +22,7 @@ find_package(Boost REQUIRED)
 
 
 set(source_files
-  # src/redoxi_video_reader_base.cpp
+  src/redoxi_video_reader_base.cpp
   src/redoxi_video_reader_types.cpp
 )
 
