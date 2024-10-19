@@ -569,6 +569,28 @@ RedoxiVideoReaderBase::SendFrameResult_t
     return result;
 }
 
+bool RedoxiVideoReaderBase::_ping(const std::shared_ptr<Downstream_t> &ds,
+                                  std::optional<std::chrono::milliseconds> timeout_ms)
+{
+    //! Create an empty frame message for pinging
+    FrameMessage_t ping_msg;
+    ping_msg.x_control.code = ping_msg.x_control.PING;
+
+    //! Send the ping message to the downstream
+    auto result = _send_frame_to_downstream(ping_msg, ds, timeout_ms);
+
+    //! Check the response
+    if (timeout_ms.has_value()) {
+        //! If timeout is specified, check the response code
+        return result.response_code.has_value() &&
+               result.response_code.value() == ActionDownstreamResponse::ACCEPTED;
+    } else {
+        //! If no timeout, wait for the future and check the result
+        auto goal_handle = result.goal_handle_future.get();
+        return goal_handle != nullptr && goal_handle->is_goal_response_success();
+    }
+}
+
 
 void RedoxiVideoReaderBase::_step()
 {

@@ -43,8 +43,8 @@ option(BUILD_TEST_TBB "Build test_tbb target" OFF)
 option(BUILD_TEST_ASYNC_SINGLE_OVERWRITE
        "Build test_async_single_overwrite target" OFF)
 option(BUILD_TEST_ASYNC_SINGLE_BUFFER "Build test_async_single_buffer target"
-       ON)
-
+       OFF)
+option(BUILD_TEST_TBB_TASK_MANAGEMENT "Build test_tbb_task_management target" ON)
 # Function to configure a target
 function(configure_target target_name)
   add_executable(${target_name} src/${target_name}.cpp)
@@ -87,6 +87,10 @@ endif()
 
 if(BUILD_TEST_ASYNC_SINGLE_BUFFER)
   configure_target(test_async_single_buffer)
+endif()
+
+if(BUILD_TEST_TBB_TASK_MANAGEMENT)
+  configure_target(test_tbb_task_management)
 endif()
 
 # Install targets
