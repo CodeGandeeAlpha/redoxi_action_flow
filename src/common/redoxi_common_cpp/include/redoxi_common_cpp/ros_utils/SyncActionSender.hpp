@@ -101,25 +101,35 @@ class SyncActionSender
      * @brief Send an action goal and wait for the response
      *
      * @details This method sends an action goal to the specified client and waits for a response.
-     * If a timeout is specified, it will wait for that duration before considering the request timed out.
+     * The waiting behavior is determined by the timeout parameter.
      *
      * @param goal The action goal to send
      * @param client The action client to use for sending the goal
-     * @param timeout Optional timeout duration. If not specified, the method will wait indefinitely until the goal is received.
+     * @param timeout Timeout duration.
+     *                If timeout < 0, wait indefinitely until the goal is received.
+     *                If timeout == 0, no wait (returns immediately).
+     *                If timeout > 0, wait for that duration before considering the request timed out.
      *
      * @return SendResult_t A struct containing:
      *         - response_code: An optional ActionDownstreamResponse indicating the result (ACCEPTED, REJECTED, TIMEOUT, or not set)
      *         - goal_handle_future: A shared future that can be used to retrieve the goal handle
      *
-     * @note If no timeout is specified, the response_code in the result will not be set, and the user should use
+     * @note If timeout < 0, the response_code in the result will not be set, and the user should use
      *       goal_handle_future.wait() to wait for and process the result.
      */
     SendResult_t send(
         const Goal_t &goal,
         ActionClient_t &client,
-        std::optional<DurationType> timeout = std::nullopt) const
+        DurationType timeout = DurationType(-1)) const
     {
         SendResult_t result;
+
+        if (timeout == DurationType::zero()) {
+            //! No waiting, send goal without callback and return immediately
+            auto goal_handle_future = client.async_send_goal(goal);
+            result.goal_handle_future = goal_handle_future;
+            return result;
+        }
 
         //! Initialize synchronization primitives and response flag
         std::mutex mutex;
@@ -146,20 +156,18 @@ class SyncActionSender
 
         //! Handle waiting behavior
         std::unique_lock<std::mutex> lock(mutex);
-        if (timeout.has_value()) {
+        if (timeout > DurationType::zero()) {
             //! Wait for the specified duration or until goal response is received
-            if (!cv.wait_for(lock, timeout.value(), [&] { return goal_response_received; })) {
+            if (!cv.wait_for(lock, timeout, [&] { return goal_response_received; })) {
                 //! Timeout occurred
                 result.response_code = ActionDownstreamResponse::TIMEOUT;
-            } else {
-                //! Goal response received within timeout
-                //! No action needed as result is set in callback
             }
+            //! No action needed if goal response received within timeout, as result is set in callback
         } else {
-            //! No timeout specified, wait indefinitely until goal response is received
-            //! result is set in callback
+            //! Negative timeout specified, wait indefinitely until goal response is received
             cv.wait(lock, [&] { return goal_response_received; });
         }
+        //! Result is set in callback for non-timeout cases
 
         return result;
     }

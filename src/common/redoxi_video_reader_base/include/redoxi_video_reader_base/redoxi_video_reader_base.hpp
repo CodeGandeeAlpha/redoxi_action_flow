@@ -35,6 +35,7 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     using FrameMessage_t = RedoxiVideoReaderBaseTypes::InternalTypes::MSG_Frame;
     using Downstream_t = RedoxiVideoReaderBaseTypes::Downstream;
     using FrameDeliveryTask_t = RedoxiVideoReaderBaseTypes::FrameDeliveryTask;
+    using FrameDeliveryQoS_t = RedoxiVideoReaderBaseTypes::FrameDeliveryQoS;
     using SendFrameResult_t = SyncActionSender<Downstream_t::ActionType_t>::_SendResult;
 
   public:
@@ -219,53 +220,58 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     //! change status code
     virtual void _set_status_code(int status_code);
 
-    // check if any downstream is ready to accept new frame
-    virtual bool _check_if_any_downstream_is_ready();
+    /**
+     * @brief Deliver a frame to a specific downstream, optionally applying retry and waiting for response,
+     *        according to the downstream's retry strategy
+     * @param frame_msg the frame message to be delivered
+     * @param ds the downstream to deliver the frame to
+     * @return 0 if success, otherwise error code
+     */
+    virtual int _deliver_frame(
+        const FrameMessage_t &frame_msg,
+        const std::shared_ptr<Downstream_t> &ds);
 
     /**
      * @brief Send a frame to a specific downstream
      *
      * @details This function sends a frame to a given downstream, with optional waiting.
-     * If no timeout is specified, it will wait indefinitely until the goal is received.
+     * If timeout is negative, it will wait indefinitely until the goal is received.
      *
      * @param frame_msg The frame message to be sent
      * @param ds The downstream to send the frame to
-     * @param timeout Optional timeout for waiting for the downstream response, in DefaultTimeUnit_t
+     * @param timeout Timeout for waiting for the downstream response, in DefaultTimeUnit_t.
+     *                Negative value means wait indefinitely, 0 means no wait, positive value means wait for that duration.
      * @return SendFrameResult_t A struct containing:
      *         - response_code: An optional ActionDownstreamResponse indicating the result (ACCEPTED, REJECTED, TIMEOUT, or not set)
      *         - goal_handle_future: A shared future that can be used to retrieve the goal handle
      *
-     * @note If no timeout is specified, the response_code in the result will not be set, and the user should use
+     * @note If timeout is negative, the response_code in the result will not be set, and the user should use
      *       goal_handle_future.wait() to wait for and process the result.
      */
     virtual SendFrameResult_t _send_frame_to_downstream(
         const FrameMessage_t &frame_msg,
         const std::shared_ptr<Downstream_t> &ds,
-        std::optional<DefaultTimeUnit_t> timeout = std::nullopt);
+        DefaultTimeUnit_t timeout = DefaultTimeUnit_t(-1));
 
-
-    // TODO: implement this function
     /**
      * @brief Ping downstream to check if they are ready to accept new frame
-     * @details By default, this function will not block, unless timeout_ms is specified
+     * @details If timeout is negative, it will wait indefinitely until the goal is received.
+     *          If timeout is 0, a ping message will still be sent to downstream, but this function
+     *          will return false regardless of the downstream reply (because we cannot get it in no time).
      * @param ds The downstream to ping
-     * @param timeout Optional timeout for waiting for the downstream response, in DefaultTimeUnit_t
-     * @return true if the downstream is ready to accept new frame, false otherwise (including timeout)
+     * @param timeout Timeout for waiting for the downstream response, in DefaultTimeUnit_t.
+     *                Negative value means wait indefinitely, 0 means no wait (returns false but still sends ping),
+     *                positive value means wait for that duration.
+     * @return true if the downstream is ready to accept new frame, false otherwise (including timeout or when timeout is 0)
      */
     virtual bool _ping(const std::shared_ptr<Downstream_t> &ds,
-                       std::optional<DefaultTimeUnit_t> timeout = std::nullopt);
+                       DefaultTimeUnit_t timeout = DefaultParams::PingActionWaitTime);
 
     //! do periodic step operation
     virtual void _step();
 
   protected:
-    // read next frame and return true if success
-    virtual bool _read_frame_local(cv::Mat &frame);
-
-    // read next frame from orbbec net device and return true if success
-    virtual bool _read_frame_orbbec(cv::Mat &frame);
-
-    // publish frame msg for visualization
+    // publish frame msg for visualization, by default assumes bgr8 or mono8format
     virtual void _publish_frame(const cv::Mat &frame);
 
   private:

@@ -70,15 +70,20 @@ class RedoxiVideoReaderImpl
     bool step_running = false; // for stopping the step thread
 
     // token for reading a new frame every x-milliseconds
-    std::shared_ptr<RosTimeToken_ms> read_frame_token;
+    std::shared_ptr<RosTimeToken> read_frame_token;
 
     // frame delivery node
     using FrameDeliveryNode_t = ap::SingleBufferExecNode<mytypes::FrameDeliveryTask, mytypes::FrameDeliveryTask>;
     std::shared_ptr<FrameDeliveryNode_t> frame_delivery_node;
     std::shared_ptr<tbb::flow::graph> frame_delivery_graph;
+    tbb::task_group frame_delivery_tg;
+
 
     // vineyard client, used to interact with vineyard shared memory
     std::shared_ptr<VineyardClient> v6d_client;
+
+    // frame delivery buffer, used to store frames for delivery
+    // tbb::concurrent_bounded_queue<cv::Mat> frames_to_deliver;
 };
 
 void RedoxiVideoReaderBase::set_publish_image(bool enable)
@@ -205,8 +210,8 @@ int RedoxiVideoReaderBase::update_runtime_config(const std::shared_ptr<RuntimeCo
 
     // create timer based token for reading a new frame every x-milliseconds
     {
-        auto frame_interval_ms = (int64_t)m_runtime_config->frame_interval_ms;
-        m_impl->read_frame_token = std::make_shared<RosTimeToken_ms>(this, std::chrono::milliseconds(frame_interval_ms));
+        auto interval = m_runtime_config->get_frame_interval_as_std_chrono();
+        m_impl->read_frame_token = std::make_shared<RosTimeToken>(this, interval);
     }
 
     //! Apply any necessary changes based on the new runtime config
@@ -275,10 +280,9 @@ int RedoxiVideoReaderBase::start()
 
     // create a timer based token for reading a new frame every x-milliseconds
     {
-        auto frame_interval_ms = (int64_t)m_runtime_config->frame_interval_ms;
-        m_impl->read_frame_token->start(std::chrono::milliseconds(frame_interval_ms));
+        auto interval = m_runtime_config->get_frame_interval_as_std_chrono();
+        m_impl->read_frame_token->start(interval);
     }
-
 
     //! Set status code to STARTED
     _set_status_code(NodeStatusCode::STARTED);
@@ -350,6 +354,7 @@ int RedoxiVideoReaderBase::_connect_to_downstreams()
             std::string name = it.second->accept_frame_action;
             auto client = rclcpp_action::create_client<Downstream_t::ActionType_t>(this, name);
             ds->accept_frame = client;
+            ds->spec = it.second;
 
             // wait until the action server becomes online
             RCLCPP_DEBUG(this->get_logger(), "[%s][_connect_to_downstreams()] Waiting for action server %s to be online", this->get_name(), name.c_str());
@@ -470,7 +475,14 @@ void RedoxiVideoReaderBase::_create_frame_delivery_task(
 int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &task_input)
 {
     // check if any downstream is ready to accept new frame
-    bool downstream_ready = _check_if_any_downstream_is_ready();
+    bool downstream_ready = false;
+    for (auto &it : m_downstreams) {
+        auto ds = it.second;
+        downstream_ready = _ping(ds, DefaultParams::PingActionWaitTime);
+        if (downstream_ready) {
+            break;
+        }
+    }
     if (!downstream_ready) {
         RCLCPP_WARN(this->get_logger(), "[%s][_do_frame_delivery_main()] No downstream is ready to accept new frame", this->get_name());
         return 0;
@@ -488,20 +500,89 @@ int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &ta
     FrameMessage_t frame_msg = _create_frame_message(task_input, shared_memory_id);
 
     // send frame to downstreams
-    bool sent = _send_frame_to_downstreams(frame_msg);
+    bool sent = false; // true if at least one downstream accepted the frame
+    for (auto &it : m_downstreams) {
+        auto ds = it.second;
+        auto ret = _deliver_frame(frame_msg, ds);
+        if (ret != 0) {
+            RCLCPP_ERROR(this->get_logger(),
+                         "[%s][_do_frame_delivery_main()] Failed to deliver frame to downstream %s",
+                         this->get_name(), ds->spec->accept_frame_action.c_str());
+        } else {
+            sent = true;
+        }
+    }
 
     // clean up resources
     if (!sent) {
         // if not sent, remove the frame from shared memory
         RCLCPP_ERROR(this->get_logger(), "[%s][_do_frame_delivery_main()] Failed to send frame to downstreams", this->get_name());
         _remove_frame_from_shared_memory(shared_memory_id);
-    } else {
-        // if sent, we are done, the shared memory is managed by downstreams
-        RCLCPP_INFO(this->get_logger(), "[%s][_do_frame_delivery_main()] Frame sent to downstreams", this->get_name());
     }
 
     return 0;
 }
+
+int RedoxiVideoReaderBase::_deliver_frame(
+    const FrameMessage_t &frame_msg,
+    const std::shared_ptr<Downstream_t> &ds)
+{
+    //! Prepare the goal
+    auto goal = Downstream_t::Goal_t();
+    goal.frame = frame_msg;
+
+    //! Set up retry strategy
+    int attempts = 0;
+    const int max_attempts = ds->spec->retry_strategy->get_max_number_of_retries();
+    auto timeout_each_attempt = ds->spec->retry_strategy->get_wait_time_for_retry();
+
+    while (attempts < max_attempts) {
+        //! Send the frame to the downstream
+        auto result = _send_frame_to_downstream(frame_msg, ds, timeout_each_attempt);
+        bool wait_indefinitely = timeout_each_attempt < DefaultTimeUnit_t::zero();
+
+        if (result.response_code) {
+            // it has a response code, check it
+            switch (*result.response_code) {
+                case ActionDownstreamResponse::ACCEPTED:
+                    return 0; // Success
+                case ActionDownstreamResponse::REJECTED:
+                    RCLCPP_WARN(this->get_logger(), "[%s][_deliver_frame()] Frame rejected by downstream %s",
+                                this->get_name(), ds->spec->accept_frame_action.c_str());
+                    break;
+                case ActionDownstreamResponse::TIMEOUT:
+                    RCLCPP_WARN(this->get_logger(), "[%s][_deliver_frame()] Timeout while sending frame to downstream %s",
+                                this->get_name(), ds->spec->accept_frame_action.c_str());
+                    break;
+            }
+        } else {
+            // may or maynot have a response code, check the goal handle future
+            if (wait_indefinitely) {
+                //! Wait indefinitely for the goal handle future
+                result.goal_handle_future.wait();
+                auto goal_handle = result.goal_handle_future.get();
+                if (goal_handle) {
+                    return 0; // Success
+                }
+            } else {
+                //! Regard as failure without additional waiting
+                RCLCPP_WARN(this->get_logger(), "[%s][_deliver_frame()] Timeout while waiting for goal handle from downstream %s",
+                            this->get_name(), ds->spec->accept_frame_action.c_str());
+            }
+        }
+
+        attempts++;
+        if (attempts < max_attempts) {
+            RCLCPP_INFO(this->get_logger(), "[%s][_deliver_frame()] Retrying frame delivery to downstream %s (attempt %d/%d)",
+                        this->get_name(), ds->spec->accept_frame_action.c_str(), attempts + 1, max_attempts);
+        }
+    }
+
+    RCLCPP_ERROR(this->get_logger(), "[%s][_deliver_frame()] Failed to deliver frame to downstream %s after %d attempts",
+                 this->get_name(), ds->spec->accept_frame_action.c_str(), max_attempts);
+    return -1;
+}
+
 
 RedoxiVideoReaderBase::FrameMessage_t RedoxiVideoReaderBase::_create_frame_message(
     const FrameDeliveryTask_t &task_input,
@@ -552,7 +633,7 @@ RedoxiVideoReaderBase::SendFrameResult_t
     RedoxiVideoReaderBase::_send_frame_to_downstream(
         const FrameMessage_t &frame_msg,
         const std::shared_ptr<Downstream_t> &ds,
-        std::optional<DefaultTimeUnit_t> timeout)
+        DefaultTimeUnit_t timeout)
 {
     //! Get the action client for the downstream
     auto &client = ds->accept_frame;
@@ -570,7 +651,7 @@ RedoxiVideoReaderBase::SendFrameResult_t
 }
 
 bool RedoxiVideoReaderBase::_ping(const std::shared_ptr<Downstream_t> &ds,
-                                  std::optional<DefaultTimeUnit_t> timeout)
+                                  DefaultTimeUnit_t timeout)
 {
     //! Create an empty frame message for pinging
     FrameMessage_t ping_msg;
@@ -580,19 +661,58 @@ bool RedoxiVideoReaderBase::_ping(const std::shared_ptr<Downstream_t> &ds,
     auto result = _send_frame_to_downstream(ping_msg, ds, timeout);
 
     //! Check the response
-    if (timeout.has_value()) {
-        //! If timeout is specified, check the response code
+    if (timeout == DefaultTimeUnit_t(0)) {
+        //! If timeout is 0, return false as we cannot get a response in no time
+        return false;
+    } else if (timeout > DefaultTimeUnit_t(0)) {
+        //! If timeout is positive, check the response code
         //! Anything other than ACCEPTED is considered not ready
         return result.response_code.has_value() &&
                result.response_code.value() == ActionDownstreamResponse::ACCEPTED;
     } else {
-        //! If no timeout, wait for the future and check the result
+        //! If timeout is negative, wait indefinitely for the goal handle future
+        result.goal_handle_future.wait();
         auto goal_handle = result.goal_handle_future.get();
-
-        // as long as the goal handle is not nullptr, the downstream is considered ready
-        // because it accepts the goal
         return goal_handle != nullptr;
     }
+}
+
+void RedoxiVideoReaderBase::_publish_frame(const cv::Mat &frame)
+{
+    //! Check if image publishing is enabled
+    if (!m_publish_image || !m_topic_image) {
+        return;
+    }
+
+    //! Create a sensor_msgs::msg::Image message
+    auto image_msg = std::make_unique<sensor_msgs::msg::Image>();
+
+    //! Set the image encoding based on the number of channels
+    std::string encoding;
+    switch (frame.channels()) {
+        case 1:
+            encoding = "mono8";
+            break;
+        case 3:
+            encoding = "bgr8";
+            break;
+        default:
+            RCLCPP_ERROR(this->get_logger(), "Unsupported number of channels: %d", frame.channels());
+            return;
+    }
+
+    //! Fill in the image message
+    image_msg->header.stamp = this->now();
+    image_msg->header.frame_id = "camera_frame";
+    image_msg->height = frame.rows;
+    image_msg->width = frame.cols;
+    image_msg->encoding = encoding;
+    image_msg->is_bigendian = false;
+    image_msg->step = static_cast<sensor_msgs::msg::Image::_step_type>(frame.step);
+    image_msg->data.assign(frame.datastart, frame.dataend);
+
+    //! Publish the image message
+    m_topic_image->publish(std::move(image_msg));
 }
 
 
@@ -614,11 +734,39 @@ void RedoxiVideoReaderBase::_step()
                 RCLCPP_ERROR(this->get_logger(), "[%s][_step()] Failed to read frame, error code: %d", this->get_name(), ret);
             } else {
                 // create a frame delivery task and deliver
-                FrameDeliveryTask_t task;
-                _create_frame_delivery_task(frame, task);
-                auto ret = m_impl->frame_delivery_node->put_data(task);
-                if (!ret) {
-                    RCLCPP_ERROR(this->get_logger(), "[%s][_step()] Failed to deliver frame", this->get_name());
+                FrameDeliveryTask_t delivery_task;
+                _create_frame_delivery_task(frame, delivery_task);
+
+                const auto &qos = m_runtime_config->frame_delivery_qos;
+
+                if (qos->drop_frame_strategy == FrameDeliveryQoS_t::DropFrameStrategy::DropAsNeeded) {
+                    // just drop frame if put data fails, do not worry about it
+                    auto ret = m_impl->frame_delivery_node->put_data(delivery_task);
+                    if (!ret) {
+                        RCLCPP_ERROR(this->get_logger(), "[%s][_step()] Failed to deliver frame, just drop it", this->get_name());
+                    }
+                } else if (qos->drop_frame_strategy == FrameDeliveryQoS_t::DropFrameStrategy::NoDrop) {
+                    // block until the buffer has space
+                    tbb::task_group tg;
+                    tbb::this_task_arena::isolate([&] {
+                        tg.run([&] {
+                            bool ret = m_impl->frame_delivery_node->put_data(delivery_task);
+                            auto max_attempts = DefaultParams::MaxNumberOfRetries;
+                            int attempts = 0;
+                            while (!ret && attempts < max_attempts) {
+                                attempts++;
+                                if (attempts < max_attempts) {
+                                    //! Wait for the retry interval before next attempt
+                                    std::this_thread::sleep_for(qos->deliver_retry_interval);
+                                    ret = m_impl->frame_delivery_node->put_data(delivery_task);
+                                }
+                            }
+                            if (!ret) {
+                                RCLCPP_ERROR(this->get_logger(), "[%s][_step()] Failed to deliver frame after %d attempts", this->get_name(), max_attempts);
+                            }
+                        });
+                    });
+                    tg.wait();
                 }
             }
         }

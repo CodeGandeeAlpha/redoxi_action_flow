@@ -18,6 +18,24 @@ const double DefaultNodeStepIntervalMs = 1;
 // default time unit for processing and waiting
 using DefaultTimeUnit_t = std::chrono::microseconds;
 
+namespace DefaultParams
+{
+
+//! maximum timeout for any operation that may block
+const DefaultTimeUnit_t MaxTimeout = std::chrono::seconds(30);
+
+//! maximum number of retries for any operation that may fail
+const int MaxNumberOfRetries = 100;
+
+//! interval between each retry for any operation that may fail
+const DefaultTimeUnit_t FastRetryInterval = std::chrono::microseconds(100);
+const DefaultTimeUnit_t SlowRetryInterval = std::chrono::milliseconds(1);
+
+//! wait time for ping action
+const DefaultTimeUnit_t PingActionWaitTime = std::chrono::milliseconds(10);
+
+} // namespace DefaultParams
+
 // globally accessible parameters in ROS related to this application
 namespace RosParams
 {
@@ -70,30 +88,30 @@ class IRetryStrategy
     /**
      * @brief get the maximum number of retries
      *
-     * @return the maximum number of retries, -1 means no limit
+     * @return the maximum number of retries, negative means no limit
      */
     virtual int get_max_number_of_retries() = 0;
 
     /**
      * @brief set the maximum number of retries
      *
-     * @param max_retries the maximum number of retries, -1 means no limit
+     * @param max_retries the maximum number of retries, negative means no limit
      */
     virtual void set_max_number_of_retries(int max_retries) = 0;
 
     /**
-     * @brief get the maximum wait time in ms
+     * @brief get the maximum wait time for each retry
      *
-     * @return the maximum wait time in ms, -1 means no limit
+     * @return the maximum wait time for each retry, 0 means no waiting, negative means wait indefinitely
      */
-    virtual int get_max_wait_time_ms() = 0;
+    virtual DefaultTimeUnit_t get_wait_time_for_retry() = 0;
 
     /**
-     * @brief set the maximum wait time in ms
+     * @brief set the maximum wait time for each retry
      *
-     * @param max_wait_time_ms the maximum wait time in ms, -1 means no limit
+     * @param wait_time_for_retry the maximum wait time for each retry, 0 means no waiting, negative means wait indefinitely
      */
-    virtual void set_max_wait_time_ms(int max_wait_time_ms) = 0;
+    virtual void set_wait_time_for_retry(DefaultTimeUnit_t wait_time_for_retry) = 0;
 };
 
 /**
@@ -106,7 +124,7 @@ class DefaultRetryStrategy : public IRetryStrategy
     // this class is ment to be as simple as a struct, so the members are public
   public:
     int max_number_of_retries = DefaultMaxNumberOfRetries;
-    int max_wait_time_ms = DefaultTimeoutMs;
+    DefaultTimeUnit_t max_wait_time_ms = std::chrono::milliseconds((int64_t)DefaultTimeoutMs);
 
   public:
     int get_max_number_of_retries() override
@@ -119,14 +137,14 @@ class DefaultRetryStrategy : public IRetryStrategy
         max_number_of_retries = max_retries;
     }
 
-    int get_max_wait_time_ms() override
+    DefaultTimeUnit_t get_wait_time_for_retry() override
     {
         return max_wait_time_ms;
     }
 
-    void set_max_wait_time_ms(int max_wait_time_ms) override
+    void set_wait_time_for_retry(DefaultTimeUnit_t wait_time_for_retry) override
     {
-        this->max_wait_time_ms = max_wait_time_ms;
+        this->max_wait_time_ms = wait_time_for_retry;
     }
 };
 
