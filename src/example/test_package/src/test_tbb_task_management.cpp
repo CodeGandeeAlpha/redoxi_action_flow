@@ -11,13 +11,74 @@ int do_works_with_arena(int num_worker_threads, int num_tasks, bool no_main_thre
 int do_works_avoid_main_thread(int num_worker_threads, int num_tasks);
 int do_works_originated_from_custom_thread(int num_worker_threads, int num_tasks);
 int do_works_compare_strategy(int num_worker_threads, int num_tasks);
+int will_arena_isolate_block_calling_thread();
 
 int main()
 {
     // do_works_originated_from_custom_thread(2, 100);
-    do_works_compare_strategy(3, 100);
+    // do_works_compare_strategy(3, 100);
+    will_arena_isolate_block_calling_thread();
     return 0;
 }
+
+//! Test if tbb::this_task_arena::isolate() will block the calling thread
+int will_arena_isolate_block_calling_thread()
+{
+    spdlog::info("Testing if tbb::this_task_arena::isolate() will block the calling thread");
+    //! Print main thread id
+    uint64_t main_thread_id = static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id()));
+    spdlog::info("Main thread ID: {}", main_thread_id);
+
+    std::atomic<bool> task_started(false);
+    std::atomic<bool> task_finished(false);
+
+    //! Test tbb::this_task_arena::isolate()
+    spdlog::info("Testing tbb::this_task_arena::isolate()");
+    tbb::this_task_arena::isolate([&]() {
+        uint64_t thread_id = static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id()));
+        spdlog::info("Starting long-running task on thread {}", thread_id);
+        task_started = true;
+
+        //! Simulate a long-running task
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+
+        task_finished = true;
+        spdlog::info("Long-running task finished on thread {}", thread_id);
+    });
+
+    if (task_finished) {
+        spdlog::info("Task finished, the main thread is blocked by tbb::this_task_arena::isolate()");
+    } else {
+        spdlog::info("Task is not finished, the main thread is not blocked by tbb::this_task_arena::isolate()");
+    }
+
+    //! Test custom task_arena's execute()
+    spdlog::info("Testing custom task_arena's execute()");
+    task_started = false;
+    task_finished = false;
+
+    tbb::task_arena arena(2);
+    arena.execute([&]() {
+        uint64_t thread_id = static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id()));
+        spdlog::info("Starting long-running task on thread {}", thread_id);
+        task_started = true;
+
+        //! Simulate a long-running task
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+
+        task_finished = true;
+        spdlog::info("Long-running task finished on thread {}", thread_id);
+    });
+
+    if (task_finished) {
+        spdlog::info("Task finished, the main thread is blocked by custom task_arena's execute()");
+    } else {
+        spdlog::info("Task is not finished, the main thread is not blocked by custom task_arena's execute()");
+    }
+
+    return 0;
+}
+
 
 int do_works_compare_strategy(int num_worker_threads, int num_tasks)
 {
