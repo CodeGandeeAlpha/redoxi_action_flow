@@ -8,7 +8,7 @@
 #include <opencv2/opencv.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
-
+#include <boost/uuid/uuid_io.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 
@@ -53,10 +53,10 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC DownstreamSpec
     std::shared_ptr<IRetryStrategy> retry_strategy;
 };
 
-class REDOXI_VIDEO_READER_BASE_PUBLIC FrameDeliveryQoS
+class REDOXI_VIDEO_READER_BASE_PUBLIC FrameDeliveryOptions
 {
   public:
-    virtual ~FrameDeliveryQoS() = default;
+    virtual ~FrameDeliveryOptions() = default;
 
     //! If the buffer is full, how to drop frames?
     enum class DropFrameStrategy {
@@ -64,6 +64,17 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC FrameDeliveryQoS
         NoDrop = 0,
         //! Drop frames as needed, only drop frames that cannot be delivered to downstream
         DropAsNeeded = 1
+    };
+
+    //! The type of the frame payload
+    //! Enum class representing different types of frame payload
+    enum class FramePayloadType {
+        Uncompressed = 0,               //!< Uncompressed frame data
+        JpegEncoded = 1,                //!< JPEG encoded frame data, quality is jpeg_quality
+        PngEncoded = 2,                 //!< PNG encoded frame data
+        UncompressedBySharedMemory = 3, //!< Uncompressed frame data stored in shared memory
+        JpegEncodedBySharedMemory = 4,  //!< JPEG encoded frame data stored in shared memory, quality is jpeg_quality
+        PngEncodedBySharedMemory = 5,   //!< PNG encoded frame data stored in shared memory
     };
 
     //! The number of frames to buffer waiting for delivery
@@ -75,6 +86,12 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC FrameDeliveryQoS
     //! The interval between each delivery attempt
     //! This is the interval for the highest level, which does not account for downstream retry interval
     DefaultTimeUnit_t deliver_retry_interval = DefaultParams::SlowRetryInterval;
+
+    //! The type of the frame payload
+    FramePayloadType frame_payload_type = FramePayloadType::Uncompressed;
+
+    //! The jpeg quality, only used when frame_payload_type is JpegEncoded
+    int jpeg_quality = 90;
 };
 
 
@@ -100,7 +117,7 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC RuntimeConfig
     virtual ~RuntimeConfig() = default;
     RuntimeConfig()
     {
-        frame_delivery_qos = std::make_shared<FrameDeliveryQoS>();
+        frame_delivery_options = std::make_shared<FrameDeliveryOptions>();
     }
 
     //! The step interval in ms
@@ -114,7 +131,7 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC RuntimeConfig
     cv::Size output_image_size = cv::Size(-1, -1);
 
     //! The frame delivery quality of service
-    std::shared_ptr<FrameDeliveryQoS> frame_delivery_qos;
+    std::shared_ptr<FrameDeliveryOptions> frame_delivery_options;
 
     virtual void from_parameters(RedoxiVideoReaderBase *)
     {
@@ -179,18 +196,13 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC FrameDeliveryTask
 
     //! The frame to deliver
     cv::Mat frame;
-    size_t frame_number = 0;
+    int64_t frame_number = 0;
     double timestamp_sec = 0;
 
-    //! delivery quality request
-    // int num_retry_attempts = 1;
-
-    //! The timeout for each delivery attempt
-    // std::optional<DefaultTimeUnit_t> timeout = std::nullopt;
-
-    //! The shared memory id of the frame, in v6d
-    // uint64_t shared_memory_id = 0;
-    // bool is_shared_memory_allocated = false;
+    std::string get_uid_as_string() const
+    {
+        return boost::uuids::to_string(uid);
+    }
 };
 
 }; // namespace RedoxiVideoReaderBaseTypes

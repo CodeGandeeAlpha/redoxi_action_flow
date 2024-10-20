@@ -35,7 +35,7 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     using FrameMessage_t = RedoxiVideoReaderBaseTypes::InternalTypes::MSG_Frame;
     using Downstream_t = RedoxiVideoReaderBaseTypes::Downstream;
     using FrameDeliveryTask_t = RedoxiVideoReaderBaseTypes::FrameDeliveryTask;
-    using FrameDeliveryQoS_t = RedoxiVideoReaderBaseTypes::FrameDeliveryQoS;
+    using FrameDeliveryOptions_t = RedoxiVideoReaderBaseTypes::FrameDeliveryOptions;
     using SendFrameResult_t = SyncActionSender<Downstream_t::ActionType_t>::_SendResult;
 
   public:
@@ -55,7 +55,7 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     //! debug topic for visualization
     virtual int get_publish_image_queue_size() const
     {
-        return 10;
+        return 1;
     }
 
     //! enable or disable image publishing
@@ -287,19 +287,19 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     std::shared_ptr<InitConfig_t> m_init_config;
     std::shared_ptr<RuntimeConfig_t> m_runtime_config;
 
-    // impl data
-    std::shared_ptr<RedoxiVideoReaderImpl> m_impl;
-
     // status code
-    int m_status_code = NodeStatusCode::BEFORE_INIT;
+    std::atomic<int> m_status_code{NodeStatusCode::BEFORE_INIT};
 
     // publish info for visualization
-    bool m_publish_image = false;
+    std::atomic<bool> m_publish_image{false};
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_topic_image;
 
     // current frame number read by this reader
     // -1 means not read any frame, starting from 0 regardless of the absolute frame number in cv::VideoCapture
-    int64_t m_frame_number = -1;
+    std::atomic<int64_t> m_frame_number{-1};
+
+    // hidden implementation data
+    std::shared_ptr<RedoxiVideoReaderImpl> m_impl;
 };
 
 } // namespace redoxi_works
