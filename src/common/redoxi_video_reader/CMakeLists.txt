@@ -26,6 +26,7 @@ set(source_files
   src/VideoReaderBase.cpp
   src/VideoReaderBaseTypes.cpp
   src/RandomFrameVideoGenerator.cpp
+  src/FrameRelayPublisher.cpp
 )
 
 add_library(redoxi_video_reader ${source_files})
