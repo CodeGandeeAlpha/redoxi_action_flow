@@ -5,22 +5,22 @@
 namespace redoxi_works
 {
 
-class RandomFrameVideoReaderRuntimeConfig : public RedoxiVideoReaderBaseTypes::RuntimeConfig
+class RandomFrameVideoGeneratorRuntimeConfig : public RedoxiVideoReaderBaseTypes::RuntimeConfig
 {
   public:
     inline static const cv::Size DEFAULT_FRAME_SIZE{640, 480};
 
-    RandomFrameVideoReaderRuntimeConfig()
+    RandomFrameVideoGeneratorRuntimeConfig()
     {
         output_image_size = DEFAULT_FRAME_SIZE;
     }
 };
 
-class RandomFrameVideoReader : public RedoxiVideoReaderBase
+class RandomFrameVideoGenerator : public RedoxiVideoReaderBase
 {
   public:
-    RandomFrameVideoReader(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
-    using RuntimeConfig_t = RandomFrameVideoReaderRuntimeConfig;
+    RandomFrameVideoGenerator(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+    using RuntimeConfig_t = RandomFrameVideoGeneratorRuntimeConfig;
 
   public:
     //! Override to update runtime configuration

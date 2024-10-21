@@ -1,14 +1,14 @@
-#include <redoxi_video_reader/generators/RandomFrameVideoReader.hpp>
+#include <redoxi_video_reader/generators/RandomFrameVideoGenerator.hpp>
 #include <redoxi_video_reader/base/VideoReaderBaseImpl.hpp>
 
 namespace redoxi_works
 {
-RandomFrameVideoReader::RandomFrameVideoReader(const std::string &name, const rclcpp::NodeOptions &options)
+RandomFrameVideoGenerator::RandomFrameVideoGenerator(const std::string &name, const rclcpp::NodeOptions &options)
     : RedoxiVideoReaderBase(name, options)
 {
 }
 
-int RandomFrameVideoReader::update_runtime_config(const std::shared_ptr<RedoxiVideoReaderBase::RuntimeConfig_t> &config)
+int RandomFrameVideoGenerator::update_runtime_config(const std::shared_ptr<RedoxiVideoReaderBase::RuntimeConfig_t> &config)
 {
     // ensure the output image size is valid, otherwise uses default size
     if (config->output_image_size.width <= 0 || config->output_image_size.height <= 0) {
@@ -26,7 +26,7 @@ int RandomFrameVideoReader::update_runtime_config(const std::shared_ptr<RedoxiVi
     return 0;
 }
 
-int RandomFrameVideoReader::_read_frame(cv::Mat &frame, std::atomic<int64_t> &frame_number)
+int RandomFrameVideoGenerator::_read_frame(cv::Mat &frame, std::atomic<int64_t> &frame_number)
 {
     auto frame_size = m_runtime_config->output_image_size;
     if (frame_size.empty()) {
