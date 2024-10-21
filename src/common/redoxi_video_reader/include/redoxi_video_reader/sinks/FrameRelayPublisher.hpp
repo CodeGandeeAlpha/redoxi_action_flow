@@ -1,17 +1,24 @@
 #pragma once
 
+#include <thread>
+
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <redoxi_video_reader/base/VideoReaderBase.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
 
+
 namespace redoxi_works
 {
+
+struct FrameRelayPublisherImpl;
 
 //! A sink that publishes the frames received by action/publish/service to a ROS 2 topic
 class FrameRelayPublisher : public rclcpp::Node
 {
+    friend FrameRelayPublisherImpl;
+
   public:
     //! name of the frame receive action
     inline static std::string DefaultFrameReceiveActionName = "in_action";
@@ -22,40 +29,55 @@ class FrameRelayPublisher : public rclcpp::Node
     using FrameReceiveAction_t = redoxi_public_msgs::action::ProcessFrame;
     using FrameReceiveGoalHandle_t = rclcpp_action::ServerGoalHandle<FrameReceiveAction_t>;
 
+    struct InitConfig_t {
+        virtual ~InitConfig_t() = default;
+        std::string frame_receive_action_name = DefaultFrameReceiveActionName;
+        std::string image_topic_name = DefaultImageTopicName;
+
+        //! If true, the node will use async processing, otherwise it will use sync processing
+        bool use_async = false;
+    };
+
+    struct FrameDeliveryPayload_t {
+        cv::Mat frame;
+        int64_t frame_number;
+        std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle;
+    };
+
+    //! The task type for delivering frames
+    struct FrameDeliveryTask_t {
+        virtual ~FrameDeliveryTask_t() = default;
+        boost::uuids::uuid goal_uuid;
+        cv::Mat frame;
+        int64_t frame_number;
+    };
+
   public:
     FrameRelayPublisher(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
-    virtual ~FrameRelayPublisher() = default;
+    virtual ~FrameRelayPublisher();
 
     //! Initializes the node, creating the publishers and action servers
-    virtual void init();
+    virtual void init(std::shared_ptr<InitConfig_t> config);
 
-    //! Sets the name of the frame receive action
-    //! @param name The new name for the frame receive action
-    void set_frame_receive_action_name(const std::string &name)
+    //! Gets the initialization configuration
+    const auto &get_init_config() const
     {
-        m_frame_receive_action_name = name;
-    }
-
-    //! Gets the current name of the frame receive action
-    //! @return The current name of the frame receive action
-    std::string get_frame_receive_action_name() const
-    {
-        return m_frame_receive_action_name;
+        return m_config;
     }
 
   protected:
-    //! The callback function for the frame received event
-    virtual void _on_frame(const cv::Mat &frame, const int64_t frame_number);
-
     //! The callback function for the goal request
     virtual rclcpp_action::GoalResponse
-        _handle_frame_receive_goal(const rclcpp_action::GoalUUID &uuid,
-                                   std::shared_ptr<const FrameReceiveAction_t::Goal> goal);
+        _on_goal_received(const rclcpp_action::GoalUUID &uuid,
+                          std::shared_ptr<const FrameReceiveAction_t::Goal> goal);
 
     //! The callback function for the accepted goal
     virtual rclcpp_action::GoalResponse
-        _handle_frame_receive_accepted(
-            const std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle);
+        _on_goal_accepted(std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle);
+
+    //! The callback function for the goal cancel request
+    virtual rclcpp_action::CancelResponse
+        _on_goal_canceled(std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle);
 
   protected:
     //! The publisher for the image topic
@@ -64,8 +86,11 @@ class FrameRelayPublisher : public rclcpp::Node
     //! action server for frame receiving
     rclcpp_action::Server<FrameReceiveAction_t>::SharedPtr m_frame_receive_action_server;
 
-    //! name of the action server
-    std::string m_frame_receive_action_name = DefaultFrameReceiveActionName;
+    //! The initialization configuration
+    std::shared_ptr<InitConfig_t> m_config;
+
+    //! The implementation of the node
+    std::unique_ptr<FrameRelayPublisherImpl> m_impl;
 };
 
 } // namespace redoxi_works

@@ -146,11 +146,25 @@ class SingleBufferExecNode : public tbb::flow::composite_node<
         std::tuple<OutputWithDataToken_t>>;
 
   public:
-    //! Put data into the node, will overwrite the previous data, return true if success
-    virtual bool put_data(const InputDataType &data)
+    /**
+     * @brief Put data into the node
+     * @param data The input data to be put into the node
+     * @param bypass_limit If true, bypasses the input buffer limit, directly put data into the internal buffer.
+     * This will very likely succeed, but may cause memory issue if not managed properly.
+     * In order to clean up the buffer, you can use graph.wait_for_all() to wait for all the data to be processed.
+     * @return true if the data was successfully put into the node, false otherwise
+     *
+     * This function will overwrite the previous data if successful.
+     */
+    virtual bool put_data(const InputDataType &data, bool bypass_limit = false)
     {
-        if (m_input_data_node)
-            return m_input_data_node->try_put(data);
+        if (m_input_data_node) {
+            if (bypass_limit)
+                return m_input_buffer_node->try_put(data);
+            else
+                return m_input_data_node->try_put(data);
+        }
+
         return false;
     }
 
