@@ -1,7 +1,7 @@
 #pragma once
 
-#include <redoxi_video_reader_base/redoxi_video_reader_base.hpp>
-#include <redoxi_video_reader_base/redoxi_video_reader_types.hpp>
+#include <redoxi_video_reader_base/VideoReaderBase.hpp>
+#include <redoxi_video_reader_base/VideoReaderBaseTypes.hpp>
 #include <redoxi_common_cpp/async_processor/SingleBufferExecNode.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <redoxi_public_msgs/msg/frame.hpp>

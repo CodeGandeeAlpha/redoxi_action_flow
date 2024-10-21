@@ -5,9 +5,11 @@
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <redoxi_public_msgs/msg/frame.hpp>
 
-#include <redoxi_video_reader_base/redoxi_video_reader_base.hpp>
-#include <redoxi_video_reader_base/redoxi_video_reader_types.hpp>
-#include <redoxi_video_reader_base/redoxi_video_reader_base_impl.hpp>
+#include <redoxi_video_reader_base/VideoReaderBase.hpp>
+#include <redoxi_video_reader_base/VideoReaderBaseTypes.hpp>
+#include <redoxi_video_reader_base/VideoReaderBaseImpl.hpp>
+
+#include <cv_bridge/cv_bridge.hpp>
 
 namespace redoxi_works
 {
@@ -22,14 +24,17 @@ RedoxiVideoReaderBase::RedoxiVideoReaderBase(const std::string &name, const rclc
 {
     // declare parameters, should be called in constructor before everything else
     _declare_all_parameters();
-
-    // in subclass, you should declare your own parameters
-    m_impl = std::make_shared<RedoxiVideoReaderImpl>(this);
 }
 
 void RedoxiVideoReaderBase::_set_status_code(int status_code)
 {
     m_status_code = status_code;
+}
+
+std::shared_ptr<RedoxiVideoReaderImpl> RedoxiVideoReaderBase::_create_impl(const std::shared_ptr<InitConfig_t> &,
+                                                                           const std::shared_ptr<RuntimeConfig_t> &)
+{
+    return std::make_shared<RedoxiVideoReaderImpl>(this);
 }
 
 int RedoxiVideoReaderBase::init(const std::shared_ptr<InitConfig_t> &config,
@@ -45,6 +50,9 @@ int RedoxiVideoReaderBase::init(const std::shared_ptr<InitConfig_t> &config,
                           "[{}][init()] Init config is not set", this->get_name());
     RDX_ASSERT_CHECK_TRUE(runtime_config != nullptr,
                           "[{}][init()] Runtime config is not set", this->get_name());
+
+    // create the implementation
+    m_impl = _create_impl(config, runtime_config);
 
     // init shared memory storage if it is supported
     if (m_impl->is_shared_memory_supported()) {
@@ -443,38 +451,65 @@ int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &ta
     }
 
     // add frame to shared memory
-    uint64_t shared_memory_id = 0;
-    auto ret = _add_frame_to_shared_memory(task_input.frame, shared_memory_id);
-    if (ret != 0) {
-        RCLCPP_ERROR(this->get_logger(), "[%s][_do_frame_delivery_main()] Failed to add frame to shared memory", this->get_name());
-        return -1;
-    }
+    auto payload_type = m_runtime_config->frame_delivery_options->frame_payload_type;
 
     // create a frame message
-    FrameMessage_t frame_msg = _create_frame_message(task_input, shared_memory_id);
-
-    // send frame to downstreams
-    bool sent = false; // true if at least one downstream accepted the frame
-    for (auto &it : m_downstreams) {
-        auto ds = it.second;
-        auto ret = _deliver_frame(frame_msg, ds);
-        if (ret != 0) {
-            RCLCPP_ERROR(this->get_logger(),
-                         "[%s][_do_frame_delivery_main()] Failed to deliver frame to downstream %s",
-                         this->get_name(), ds->spec->accept_frame_action.c_str());
-        } else {
-            sent = true;
+    FrameMessage_t frame_msg;
+    auto func_deliver_frame = [this](const FrameMessage_t &frame_msg) -> int {
+        int ret = 0;
+        bool sent = false;
+        for (auto &it : m_downstreams) {
+            auto ds = it.second;
+            auto ret = _deliver_frame(frame_msg, ds);
+            if (ret != 0) {
+                RCLCPP_ERROR(this->get_logger(),
+                             "[%s][_do_frame_delivery_main()] Failed to deliver frame to downstream %s",
+                             this->get_name(), ds->spec->accept_frame_action.c_str());
+            } else {
+                sent = true;
+            }
         }
-    }
+        if (!sent) {
+            ret = -1;
+        }
+        return ret;
+    };
 
-    // clean up resources
-    if (!sent) {
-        // if not sent, remove the frame from shared memory
-        RCLCPP_ERROR(this->get_logger(), "[%s][_do_frame_delivery_main()] Failed to send frame to downstreams", this->get_name());
-        _remove_frame_from_shared_memory(shared_memory_id);
-    }
+    if (payload_type == FrameDeliveryOptions_t::FramePayloadType::UncompressedBySharedMemory) {
 
-    return 0;
+        //! Add frame to shared memory
+        uint64_t shared_memory_id = 0;
+        auto ret = m_impl->add_to_shared_memory(task_input.frame, shared_memory_id);
+        if (ret != 0) {
+            RCLCPP_ERROR(this->get_logger(), "[%s][_do_frame_delivery_main()] Failed to add frame to shared memory", this->get_name());
+            return -1;
+        }
+
+        //! Create frame message with shared memory ID
+        frame_msg = _create_frame_message(task_input, payload_type, shared_memory_id);
+
+        //! Deliver frame
+        auto ret_deliver_frame = func_deliver_frame(frame_msg);
+
+        //! Remove frame from shared memory if failed to deliver
+        if (ret_deliver_frame != 0) {
+            RCLCPP_ERROR(this->get_logger(), "[%s][_do_frame_delivery_main()] Failed to deliver frame, removing frame from shared memory", this->get_name());
+            m_impl->remove_from_shared_memory(shared_memory_id);
+        }
+
+        return ret_deliver_frame;
+    } else {
+        // create frame message using image content
+        frame_msg = _create_frame_message(task_input, payload_type, std::nullopt);
+
+        //! Deliver frame
+        auto ret_deliver_frame = func_deliver_frame(frame_msg);
+        if (ret_deliver_frame != 0) {
+            RCLCPP_ERROR(this->get_logger(), "[%s][_do_frame_delivery_main()] Failed to deliver frame", this->get_name());
+        }
+
+        return ret_deliver_frame;
+    }
 }
 
 int RedoxiVideoReaderBase::_deliver_frame(
@@ -540,14 +575,68 @@ int RedoxiVideoReaderBase::_deliver_frame(
 
 RedoxiVideoReaderBase::FrameMessage_t RedoxiVideoReaderBase::_create_frame_message(
     const FrameDeliveryTask_t &task_input,
+    FrameDeliveryOptions_t::FramePayloadType payload_type,
     std::optional<uint64_t> shared_memory_id)
 {
     FrameMessage_t frame_msg;
     frame_msg.frame_num = task_input.frame_number;
-    if (shared_memory_id) {
-        frame_msg.cache.id_int = shared_memory_id.value();
-        frame_msg.cache.has_int_id = true;
-        frame_msg.cache.id_string = vineyard::ObjectIDToString(shared_memory_id.value());
+    auto source_image_encoding = m_runtime_config->output_image_encoding;
+    if (payload_type == FrameDeliveryOptions_t::FramePayloadType::UncompressedBySharedMemory) {
+        if (shared_memory_id) {
+            frame_msg.cache.id_int = shared_memory_id.value();
+            frame_msg.cache.has_int_id = true;
+            frame_msg.cache.id_string = vineyard::ObjectIDToString(shared_memory_id.value());
+        }
+    } else if (payload_type == FrameDeliveryOptions_t::FramePayloadType::Uncompressed) {
+        //! Convert cv::Mat to sensor_msgs::msg::Image using cv_bridge
+        cv_bridge::CvImage(std_msgs::msg::Header(), source_image_encoding, task_input.frame)
+            .toImageMsg(frame_msg.raw_image);
+    } else if (payload_type == FrameDeliveryOptions_t::FramePayloadType::JpegEncoded ||
+               payload_type == FrameDeliveryOptions_t::FramePayloadType::PngEncoded) {
+        //! Lambda function to convert cv::Mat before encoding
+        auto convert_frame = [&]() -> cv::Mat {
+            if (source_image_encoding == "bgr8" || source_image_encoding == "bgra8" || source_image_encoding == "mono8" || source_image_encoding == "mono16") {
+                return task_input.frame;
+            } else if (source_image_encoding == "rgb8") {
+                cv::Mat converted;
+                cv::cvtColor(task_input.frame, converted, cv::COLOR_RGB2BGR);
+                return converted;
+            } else if (source_image_encoding == "rgba8") {
+                cv::Mat converted;
+                cv::cvtColor(task_input.frame, converted, cv::COLOR_RGBA2BGR);
+                return converted;
+            } else {
+                RDX_RAISE_ERROR("[{}][_create_frame_message()] Unsupported image encoding {} for compression", this->get_name(), source_image_encoding);
+                return cv::Mat(); // Return empty Mat on error
+            }
+        };
+
+        if (payload_type == FrameDeliveryOptions_t::FramePayloadType::JpegEncoded) {
+            auto quality = m_runtime_config->frame_delivery_options->jpeg_quality;
+            cv::Mat frame_to_encode = convert_frame();
+
+            //! Encode the image as JPEG without using cv_bridge
+            std::vector<uchar> buffer;
+            std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, quality};
+            cv::imencode(".jpg", frame_to_encode, buffer, params);
+
+            //! Save the encoded image to frame_msg.encoded_image
+            frame_msg.encoded_image.format = "jpeg";
+            frame_msg.encoded_image.data = buffer;
+        } else { // PngEncoded
+            cv::Mat frame_to_encode = convert_frame();
+
+            //! Encode the image as PNG without using cv_bridge
+            std::vector<uchar> buffer;
+            std::vector<int> params = {cv::IMWRITE_PNG_COMPRESSION, 9}; // PNG compression level 0-9
+            cv::imencode(".png", frame_to_encode, buffer, params);
+
+            //! Save the encoded image to frame_msg.encoded_image
+            frame_msg.encoded_image.format = "png";
+            frame_msg.encoded_image.data = buffer;
+        }
+    } else {
+        RDX_RAISE_ERROR("[{}][_create_frame_message()] Unsupported frame payload type: {}", this->get_name(), (int)payload_type);
     }
     return frame_msg;
 }
@@ -619,35 +708,14 @@ void RedoxiVideoReaderBase::_publish_frame(const cv::Mat &frame)
         return;
     }
 
-    //! Create a sensor_msgs::msg::Image message
-    auto image_msg = std::make_unique<sensor_msgs::msg::Image>();
+    //! Create and publish the image message using cv_bridge
+    std_msgs::msg::Header header;
+    header.stamp = this->now();
+    header.frame_id = "source_frame";
 
-    //! Set the image encoding based on the number of channels
-    std::string encoding;
-    switch (frame.channels()) {
-        case 1:
-            encoding = "mono8";
-            break;
-        case 3:
-            encoding = "bgr8";
-            break;
-        default:
-            RCLCPP_ERROR(this->get_logger(), "Unsupported number of channels: %d", frame.channels());
-            return;
-    }
-
-    //! Fill in the image message
-    image_msg->header.stamp = this->now();
-    image_msg->header.frame_id = "camera_frame";
-    image_msg->height = frame.rows;
-    image_msg->width = frame.cols;
-    image_msg->encoding = encoding;
-    image_msg->is_bigendian = false;
-    image_msg->step = static_cast<sensor_msgs::msg::Image::_step_type>(frame.step);
-    image_msg->data.assign(frame.datastart, frame.dataend);
-
-    //! Publish the image message
-    m_topic_image->publish(std::move(image_msg));
+    auto encoding = m_runtime_config->output_image_encoding;
+    auto image_msg = cv_bridge::CvImage(header, encoding, frame).toImageMsg();
+    m_topic_image->publish(*image_msg);
 }
 
 

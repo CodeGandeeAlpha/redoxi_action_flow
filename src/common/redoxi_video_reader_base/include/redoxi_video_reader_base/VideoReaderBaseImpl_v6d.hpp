@@ -1,6 +1,6 @@
 #pragma once
 
-#include <redoxi_video_reader_base/redoxi_video_reader_base_impl.hpp>
+#include <redoxi_video_reader_base/VideoReaderBaseImpl.hpp>
 #include <redoxi_common_cpp/redoxi_v6d.hpp>
 
 namespace redoxi_works

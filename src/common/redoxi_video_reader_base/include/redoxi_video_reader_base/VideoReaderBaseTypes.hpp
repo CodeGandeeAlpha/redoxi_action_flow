@@ -73,8 +73,8 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC FrameDeliveryOptions
         JpegEncoded = 1,                //!< JPEG encoded frame data, quality is jpeg_quality
         PngEncoded = 2,                 //!< PNG encoded frame data
         UncompressedBySharedMemory = 3, //!< Uncompressed frame data stored in shared memory
-        JpegEncodedBySharedMemory = 4,  //!< JPEG encoded frame data stored in shared memory, quality is jpeg_quality
-        PngEncodedBySharedMemory = 5,   //!< PNG encoded frame data stored in shared memory
+        // JpegEncodedBySharedMemory = 4,  //!< JPEG encoded frame data stored in shared memory, quality is jpeg_quality
+        // PngEncodedBySharedMemory = 5,   //!< PNG encoded frame data stored in shared memory
     };
 
     //! The number of frames to buffer waiting for delivery
@@ -129,6 +129,9 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC RuntimeConfig
     //! The output image size. If input is different, resize to output_image_size.
     //! If output_image_size.width=-1 or output_image_size.height=-1, keep aspect ratio.
     cv::Size output_image_size = cv::Size(-1, -1);
+
+    //! The encoding of the output image, see sensor_msgs::image_encodings for more details
+    std::string output_image_encoding = "bgr8";
 
     //! The frame delivery quality of service
     std::shared_ptr<FrameDeliveryOptions> frame_delivery_options;

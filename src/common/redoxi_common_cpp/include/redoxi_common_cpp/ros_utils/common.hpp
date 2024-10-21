@@ -46,6 +46,14 @@ void RDX_ASSERT_TRUE(bool condition, const std::string &format, Args &&...args)
     rcpputils::assert_true(condition, fmt::format(format, std::forward<Args>(args)...));
 }
 
+//! Raise an error by calling RDX_ASSERT_CHECK_TRUE with a false condition
+template <typename... Args>
+void RDX_RAISE_ERROR(const std::string &format, Args &&...args)
+{
+    RDX_ASSERT_CHECK_TRUE(false, format, std::forward<Args>(args)...);
+}
+
+
 enum class ActionDownstreamResponse {
     ACCEPTED = 0,
     REJECTED = 1,

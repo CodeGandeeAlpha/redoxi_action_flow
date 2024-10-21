@@ -7,7 +7,7 @@
 #include <fmt/format.h>
 #include <fmt/color.h>
 
-int do_works_with_arena(int num_worker_threads, int num_tasks, bool no_main_thread_in_arena = false);
+int do_works_with_arena(int num_worker_threads, int num_tasks);
 int do_works_avoid_main_thread(int num_worker_threads, int num_tasks);
 int do_works_originated_from_custom_thread(int num_worker_threads, int num_tasks);
 int do_works_compare_strategy(int num_worker_threads, int num_tasks);
@@ -91,8 +91,6 @@ int do_works_compare_strategy(int num_worker_threads, int num_tasks)
             throw std::runtime_error("Task is running on the main thread");
         }
 
-        int task_id = ++task_counter;
-        uint64_t thread_id = static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id()));
         std::random_device rd;
         std::mt19937 gen(rd());
         std::uniform_int_distribution<> dis(20, 50);
@@ -385,24 +383,12 @@ int do_works_avoid_main_thread(int num_worker_threads, int num_tasks)
  * @details This function creates 10 jobs in the arena and waits for them to complete.
  *          It also demonstrates how to wait for all jobs to complete using sleep.
  */
-int do_works_with_arena(int num_worker_threads, int num_tasks, bool no_main_thread_in_arena)
+int do_works_with_arena(int num_worker_threads, int num_tasks)
 {
     std::shared_ptr<tbb::task_arena> arena;
     std::shared_ptr<tbb::task_group> group;
     std::atomic<int> counter(0);
     bool wait_in_arena = true;
-    // if (no_main_thread_in_arena) {
-    //     tbb::this_task_arena::isolate([&]() {
-    //         arena = std::make_shared<tbb::task_arena>(num_worker_threads, 0);
-
-    //         // execute a dummy task to initialize the arena
-    //         arena->execute([&]() {
-    //             spdlog::info("[thread_id={}] Hello, TBB!", static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())));
-    //         });
-    //     });
-    // } else {
-    //     arena = std::make_shared<tbb::task_arena>(num_worker_threads);
-    // }
     arena = std::make_shared<tbb::task_arena>(num_worker_threads);
 
     //! Fire num_tasks jobs into the arena

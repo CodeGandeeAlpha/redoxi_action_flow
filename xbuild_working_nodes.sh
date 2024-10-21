@@ -19,7 +19,8 @@ PackagesToBuild="psg_private_msgs \
                  redoxi_public_msgs \
                  redoxi_common_cpp \
                  redoxi_video_reader_base \
-                 test_package"
+                 test_package \
+                 cv_bridge"
 
 # Check if --help flag is provided
 if [[ "$*" == *"--help"* ]]; then
@@ -34,11 +35,11 @@ if [[ "$*" == *"--verbose"* ]]; then
 fi
 
 # Check if --debug or --release flag is provided, default to release
-BUILD_TYPE="Release"
+BUILD_TYPE="RelWithDebInfo"
 if [[ "$*" == *"--debug"* ]]; then
     BUILD_TYPE="Debug"
 elif [[ "$*" == *"--release"* ]]; then
-    BUILD_TYPE="Release"
+    BUILD_TYPE="RelWithDebInfo"
 fi
 
 # PackagesToBuild="stream_worker psg_common psg_private_msgs psg_public_msgs video_reader"

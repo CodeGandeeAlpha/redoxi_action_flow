@@ -6,9 +6,10 @@
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <redoxi_video_reader_base/visibility_control.h>
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
-#include <redoxi_video_reader_base/redoxi_video_reader_types.hpp>
 #include <redoxi_common_cpp/ros_utils/SyncActionSender.hpp>
 #include <sensor_msgs/msg/image.hpp>
+
+#include <redoxi_video_reader_base/VideoReaderBaseTypes.hpp>
 namespace redoxi_works
 {
 class RedoxiVideoReaderImpl;
@@ -204,11 +205,13 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     /**
      * @brief Create a frame message from delivery task
      * @param task_input the input task
-     * @param shared_memory_id the object id of the frame
+     * @param payload_type the payload type of the frame
+     * @param shared_memory_id the id of the allocated shared memory, if any, depends on payload type
      * @return the frame message
      */
     virtual FrameMessage_t _create_frame_message(
         const FrameDeliveryTask_t &task_input,
+        FrameDeliveryOptions_t::FramePayloadType payload_type,
         std::optional<uint64_t> shared_memory_id = std::nullopt);
 
     //! create publisher for visualization
@@ -269,6 +272,10 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
 
     //! do periodic step operation
     virtual void _step();
+
+    //! create the implementation based on configs, will be called in init()
+    virtual std::shared_ptr<RedoxiVideoReaderImpl> _create_impl(const std::shared_ptr<InitConfig_t> &init_config,
+                                                                const std::shared_ptr<RuntimeConfig_t> &runtime_config);
 
   protected:
     // publish frame msg for visualization, by default assumes bgr8 or mono8format

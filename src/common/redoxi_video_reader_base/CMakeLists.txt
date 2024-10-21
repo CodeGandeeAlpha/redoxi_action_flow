@@ -14,6 +14,7 @@ find_package(redoxi_public_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(rcutils REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(cv_bridge REQUIRED)
 find_package(fmt REQUIRED)
 find_package(TBB REQUIRED)
 
@@ -22,8 +23,8 @@ find_package(Boost REQUIRED)
 
 
 set(source_files
-  src/redoxi_video_reader_base.cpp
-  src/redoxi_video_reader_types.cpp
+  src/VideoReaderBase.cpp
+  src/VideoReaderBaseTypes.cpp
 )
 
 add_library(redoxi_video_reader_base ${source_files})
@@ -42,6 +43,7 @@ ament_target_dependencies(
   "redoxi_public_msgs"
   "sensor_msgs"
   "rcutils"
+  "cv_bridge"
 )
 
 # Causes the visibility macros to use dllexport rather than dllimport,
