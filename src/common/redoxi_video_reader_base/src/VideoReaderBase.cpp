@@ -188,6 +188,9 @@ int RedoxiVideoReaderBase::open()
         return ret;
     }
 
+    // reset frame number
+    m_frame_number = -1;
+
     //! Set status code to opened
     _set_status_code(NodeStatusCode::OPENED);
 
@@ -428,7 +431,7 @@ void RedoxiVideoReaderBase::_create_frame_delivery_task(
     task_output.frame = frame;
 
     //! Set the frame number
-    task_output.frame_number = ++m_frame_number;
+    task_output.frame_number = m_frame_number;
 
     //! Set the timestamp
     task_output.timestamp_sec = this->now().seconds();
@@ -735,7 +738,7 @@ void RedoxiVideoReaderBase::_step()
     if (m_impl->read_frame_token->try_pop_token(token)) {
         // time to read a new frame
         cv::Mat frame;
-        int ret = _read_frame(frame);
+        int ret = _read_frame(frame, m_frame_number);
         if (ret == 0) {
             // create a frame delivery task and deliver
             FrameDeliveryTask_t delivery_task;

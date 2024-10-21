@@ -152,9 +152,12 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     /**
      * @brief Read next frame, intended to be overridden by subclass
      * @param frame the frame to be filled with the read frame
+     * @param frame_number the frame number of this frame, you are responsible for updating this.
+     *        The input value is the previous frame number, and the output value will be the current frame number.
      * @return 0 if success, otherwise error code
      */
-    virtual int _read_frame(cv::Mat &frame) = 0;
+    virtual int _read_frame(cv::Mat &frame,
+                            std::atomic<int64_t> &frame_number) = 0;
 
     /**
      * @brief Initialize frame delivery tasks processor
@@ -302,7 +305,8 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_topic_image;
 
     // current frame number read by this reader
-    // -1 means not read any frame, starting from 0 regardless of the absolute frame number in cv::VideoCapture
+    // -1 means not read any frame, increment by each _read_frame()
+    // will be reset to -1 when open()
     std::atomic<int64_t> m_frame_number{-1};
 
     // hidden implementation data
