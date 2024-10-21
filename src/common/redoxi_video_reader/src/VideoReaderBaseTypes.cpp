@@ -1,4 +1,4 @@
-#include <redoxi_video_reader_base/VideoReaderBaseTypes.hpp>
+#include <redoxi_video_reader/base/VideoReaderBaseTypes.hpp>
 
 namespace redoxi_works
 {

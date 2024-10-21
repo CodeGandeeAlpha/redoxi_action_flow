@@ -4,12 +4,12 @@
 #include <optional>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
-#include <redoxi_video_reader/visibility_control.h>
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
 #include <redoxi_common_cpp/ros_utils/SyncActionSender.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
-#include <redoxi_video_reader/VideoReaderBaseTypes.hpp>
+#include <redoxi_video_reader/visibility_control.h>
+#include <redoxi_video_reader/base/VideoReaderBaseTypes.hpp>
 namespace redoxi_works
 {
 class RedoxiVideoReaderImpl;

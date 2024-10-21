@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(redoxi_video_reader_base)
+project(redoxi_video_reader)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -25,18 +25,19 @@ find_package(Boost REQUIRED)
 set(source_files
   src/VideoReaderBase.cpp
   src/VideoReaderBaseTypes.cpp
+  src/RandomFrameVideoReader.cpp
 )
 
-add_library(redoxi_video_reader_base ${source_files})
-add_library(redoxi_video_reader_base::redoxi_video_reader_base ALIAS redoxi_video_reader_base)
-target_compile_features(redoxi_video_reader_base PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-target_include_directories(redoxi_video_reader_base PUBLIC
+add_library(redoxi_video_reader ${source_files})
+add_library(redoxi_video_reader::redoxi_video_reader ALIAS redoxi_video_reader)
+target_compile_features(redoxi_video_reader PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_include_directories(redoxi_video_reader PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_link_libraries(redoxi_video_reader_base PUBLIC TBB::tbb Boost::boost fmt::fmt)  # Link TBB to your target
+target_link_libraries(redoxi_video_reader PUBLIC TBB::tbb Boost::boost fmt::fmt)  # Link TBB to your target
 
 ament_target_dependencies(
-  redoxi_video_reader_base PUBLIC
+  redoxi_video_reader PUBLIC
   "rclcpp"
   "rclcpp_action"
   "redoxi_common_cpp"
@@ -48,7 +49,7 @@ ament_target_dependencies(
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
-target_compile_definitions(redoxi_video_reader_base PRIVATE "REDOXI_VIDEO_READER_BASE_BUILDING_LIBRARY")
+target_compile_definitions(redoxi_video_reader PRIVATE "REDOXI_VIDEO_READER_BUILDING_LIBRARY")
 
 install(
   DIRECTORY include/
@@ -56,7 +57,7 @@ install(
 )
 
 install(
-  TARGETS redoxi_video_reader_base
+  TARGETS redoxi_video_reader
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -79,10 +80,23 @@ ament_export_include_directories(
   include
 )
 ament_export_libraries(
-  redoxi_video_reader_base
+  redoxi_video_reader
 )
 ament_export_targets(
   export_${PROJECT_NAME}
 )
+
+# use these so that downstream packages can find the dependencies without explicitly listing them
+ament_export_dependencies(
+  rclcpp
+  rclcpp_action
+  redoxi_common_cpp
+  redoxi_public_msgs
+  sensor_msgs
+  rcutils
+  cv_bridge
+  Boost
+)
+
 
 ament_package()

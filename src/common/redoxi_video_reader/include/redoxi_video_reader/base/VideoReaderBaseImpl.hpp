@@ -1,7 +1,7 @@
 #pragma once
 
-#include <redoxi_video_reader_base/VideoReaderBase.hpp>
-#include <redoxi_video_reader_base/VideoReaderBaseTypes.hpp>
+#include <redoxi_video_reader/base/VideoReaderBase.hpp>
+#include <redoxi_video_reader/base/VideoReaderBaseTypes.hpp>
 #include <redoxi_common_cpp/async_processor/SingleBufferExecNode.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <redoxi_public_msgs/msg/frame.hpp>
@@ -21,6 +21,7 @@ class RedoxiVideoReaderImpl
     RedoxiVideoReaderImpl(RedoxiVideoReaderBase *node)
     {
         this->ros_node = node;
+        this->time_node_initialized = ros_node->now();
     }
 
     /**
@@ -85,6 +86,12 @@ class RedoxiVideoReaderImpl
     std::shared_ptr<FrameDeliveryNode_t> frame_delivery_node;
     std::shared_ptr<tbb::flow::graph> frame_delivery_graph;
     tbb::task_group frame_delivery_tg;
+
+    // the time when this node is initialized (when impl is created)
+    rclcpp::Time time_node_initialized;
+
+    // the time when this node is last started (when start() is called)
+    rclcpp::Time time_node_last_started;
 };
 
 } // namespace redoxi_works

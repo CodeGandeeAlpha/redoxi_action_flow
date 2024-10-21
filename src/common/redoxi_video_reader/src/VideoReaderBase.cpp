@@ -5,9 +5,9 @@
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <redoxi_public_msgs/msg/frame.hpp>
 
-#include <redoxi_video_reader/VideoReaderBase.hpp>
-#include <redoxi_video_reader/VideoReaderBaseTypes.hpp>
-#include <redoxi_video_reader/VideoReaderBaseImpl.hpp>
+#include <redoxi_video_reader/base/VideoReaderBase.hpp>
+#include <redoxi_video_reader/base/VideoReaderBaseTypes.hpp>
+#include <redoxi_video_reader/base/VideoReaderBaseImpl.hpp>
 
 #include <cv_bridge/cv_bridge.hpp>
 

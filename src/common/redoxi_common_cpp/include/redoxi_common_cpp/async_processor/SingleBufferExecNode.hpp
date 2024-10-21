@@ -352,6 +352,7 @@ class SingleBufferExecNode : public tbb::flow::composite_node<
     //! Check if the node is async
     virtual bool is_async() const
     {
+        assert(!is_built());
         return m_is_async;
     }
 

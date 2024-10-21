@@ -15,7 +15,7 @@
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
 #include <redoxi_public_msgs/msg/frame.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
-#include <redoxi_video_reader_base/visibility_control.h>
+#include <redoxi_video_reader/visibility_control.h>
 
 
 namespace redoxi_works
@@ -37,7 +37,7 @@ const std::string ReadFrameMode = "read_frame_mode";
 } // namespace RosParams
 
 //! The downstream node for RedoxiVideoReaderBase
-class REDOXI_VIDEO_READER_BASE_PUBLIC DownstreamSpec
+class REDOXI_VIDEO_READER_PUBLIC DownstreamSpec
 {
   public:
     virtual ~DownstreamSpec() = default;
@@ -53,7 +53,7 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC DownstreamSpec
     std::shared_ptr<IRetryStrategy> retry_strategy;
 };
 
-class REDOXI_VIDEO_READER_BASE_PUBLIC FrameDeliveryOptions
+class REDOXI_VIDEO_READER_PUBLIC FrameDeliveryOptions
 {
   public:
     virtual ~FrameDeliveryOptions() = default;
@@ -96,7 +96,7 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC FrameDeliveryOptions
 
 
 //! The init config for RedoxiVideoReaderBase or its subclass
-class REDOXI_VIDEO_READER_BASE_PUBLIC InitConfig
+class REDOXI_VIDEO_READER_PUBLIC InitConfig
 {
   public:
     virtual ~InitConfig() = default;
@@ -111,9 +111,11 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC InitConfig
 };
 
 //! The runtime config for RedoxiVideoReaderBase or its subclass
-class REDOXI_VIDEO_READER_BASE_PUBLIC RuntimeConfig
+class REDOXI_VIDEO_READER_PUBLIC RuntimeConfig
 {
   public:
+    inline static const std::string DEFAULT_OUTPUT_IMAGE_ENCODING = "bgr8";
+
     virtual ~RuntimeConfig() = default;
     RuntimeConfig()
     {
@@ -131,7 +133,8 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC RuntimeConfig
     cv::Size output_image_size = cv::Size(-1, -1);
 
     //! The encoding of the output image, see sensor_msgs::image_encodings for more details
-    std::string output_image_encoding = "bgr8";
+    //! accepts rgb8, bgr8, mono8, mono16
+    std::string output_image_encoding = DEFAULT_OUTPUT_IMAGE_ENCODING;
 
     //! The frame delivery quality of service
     std::shared_ptr<FrameDeliveryOptions> frame_delivery_options;
@@ -165,7 +168,7 @@ using MSG_Frame = redoxi_public_msgs::msg::Frame;
 } // namespace InternalTypes
 
 //! The downstream node for RedoxiVideoReaderBase
-class REDOXI_VIDEO_READER_BASE_PUBLIC Downstream
+class REDOXI_VIDEO_READER_PUBLIC Downstream
 {
   public:
     virtual ~Downstream() = default;
@@ -183,7 +186,7 @@ class REDOXI_VIDEO_READER_BASE_PUBLIC Downstream
 };
 
 //! The frame delivery task
-class REDOXI_VIDEO_READER_BASE_PUBLIC FrameDeliveryTask
+class REDOXI_VIDEO_READER_PUBLIC FrameDeliveryTask
 {
   public:
     virtual ~FrameDeliveryTask() = default;

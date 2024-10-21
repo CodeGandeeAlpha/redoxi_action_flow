@@ -18,7 +18,7 @@ display_help() {
 PackagesToBuild="psg_private_msgs \
                  redoxi_public_msgs \
                  redoxi_common_cpp \
-                 redoxi_video_reader_base \
+                 redoxi_video_reader \
                  test_package \
                  cv_bridge"
 

@@ -23,6 +23,7 @@ set(DEPENDENCIES
     psg_private_msgs
     unique_identifier_msgs
     redoxi_common_cpp
+    redoxi_video_reader
     rclcpp_action)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb)
@@ -44,7 +45,9 @@ option(BUILD_TEST_ASYNC_SINGLE_OVERWRITE
        "Build test_async_single_overwrite target" OFF)
 option(BUILD_TEST_ASYNC_SINGLE_BUFFER "Build test_async_single_buffer target"
        OFF)
-option(BUILD_TEST_TBB_TASK_MANAGEMENT "Build test_tbb_task_management target" ON)
+option(BUILD_TEST_TBB_TASK_MANAGEMENT "Build test_tbb_task_management target" OFF)
+option(BUILD_TEST_VIDEO_READER_RANDOM "Build test_video_reader_random target" ON)
+
 # Function to configure a target
 function(configure_target target_name)
   add_executable(${target_name} src/${target_name}.cpp)
@@ -59,6 +62,10 @@ function(configure_target target_name)
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_TEST_VIDEO_READER_RANDOM)
+  configure_target(test_video_reader_random)
+endif()
 
 # Configure targets based on options
 if(BUILD_TEST_NODE)
