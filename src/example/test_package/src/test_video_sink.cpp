@@ -11,6 +11,7 @@ int main(int argc, char **argv)
     spdlog::info("[SINK] Creating FrameRelayPublisher");
     // create and initialize the node
     auto init_config = std::make_shared<rdx::FrameRelayPublisher::InitConfig_t>();
+    init_config->use_async = true;
     node->init(init_config);
 
     spdlog::info("[SINK] Spinning FrameRelayPublisher");

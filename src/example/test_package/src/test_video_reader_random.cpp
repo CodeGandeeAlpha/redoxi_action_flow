@@ -18,9 +18,14 @@ int main(int argc, char **argv)
 
     spdlog::info("[MAIN] Initializing RandomFrameVideoGenerator");
     init_config->from_parameters(video_reader.get());
+    for (auto &ds : init_config->downstreams) {
+        spdlog::info("[MAIN] Downstream: {}", ds.first);
+        ds.second->retry_strategy->set_max_number_of_retries(0);
+    }
 
     runtime_config->frame_interval_ms = video_reader->get_parameter("frame_interval_ms").as_double();
     runtime_config->step_interval_ms = video_reader->get_parameter("step_interval_ms").as_double();
+
     video_reader->init(init_config, runtime_config);
     spdlog::info("[MAIN] Opening RandomFrameVideoGenerator");
     video_reader->open();

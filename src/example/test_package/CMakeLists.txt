@@ -45,8 +45,10 @@ option(BUILD_TEST_ASYNC_SINGLE_OVERWRITE
        "Build test_async_single_overwrite target" OFF)
 option(BUILD_TEST_ASYNC_SINGLE_BUFFER "Build test_async_single_buffer target"
        OFF)
-option(BUILD_TEST_TBB_TASK_MANAGEMENT "Build test_tbb_task_management target" OFF)
-option(BUILD_TEST_VIDEO_READER_RANDOM "Build test_video_reader_random target" ON)
+option(BUILD_TEST_TBB_TASK_MANAGEMENT "Build test_tbb_task_management target"
+       OFF)
+option(BUILD_TEST_VIDEO_READER_RANDOM "Build test_video_reader_random target"
+       ON)
 option(BUILD_TEST_VIDEO_SINK "Build test_video_sink target" ON)
 
 # Function to configure a target

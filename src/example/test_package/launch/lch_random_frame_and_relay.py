@@ -8,7 +8,7 @@ def generate_launch_description():
 
     json_params = {
         "declare_params": {
-            "frame_interval_ms": 50000.0,
+            "frame_interval_ms": 100.0,
             "step_interval_ms": 10.0,
         },
         "downstreams": {

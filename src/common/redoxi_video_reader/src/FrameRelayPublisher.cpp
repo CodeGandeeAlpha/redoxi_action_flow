@@ -115,35 +115,35 @@ int FrameRelayPublisher::_deliver_frame(FrameDeliveryTask_t &task)
 
     sensor_msgs::msg::Image msg_raw;
     sensor_msgs::msg::CompressedImage msg_compressed;
-    if (m_config->publish_raw_image) {
-        if (!incoming_frame.raw_image.data.empty()) {
-            msg_raw = incoming_frame.raw_image;
-        }
-        RCLCPP_DEBUG(this->get_logger(), "[_deliver_frame()][msg_uuid=%s] Publishing raw image", boost::uuids::to_string(msg_uuid).c_str());
-        m_image_publisher->publish(msg_raw);
-    }
+    // if (m_config->publish_raw_image) {
+    //     if (!incoming_frame.raw_image.data.empty()) {
+    //         msg_raw = incoming_frame.raw_image;
+    //     }
+    //     RCLCPP_DEBUG(this->get_logger(), "[_deliver_frame()][msg_uuid=%s] Publishing raw image", boost::uuids::to_string(msg_uuid).c_str());
+    //     m_image_publisher->publish(msg_raw);
+    // }
 
-    if (m_config->publish_compressed_image) {
-        if (!incoming_frame.encoded_image.data.empty()) {
-            msg_compressed = incoming_frame.encoded_image;
-        } else {
-            const auto &_raw = incoming_frame.raw_image;
-            if (!_raw.data.empty()) {
-                //! Convert raw image to OpenCV format
-                auto cv_ptr = cv_bridge::toCvCopy(_raw, sensor_msgs::image_encodings::BGR8);
+    // if (m_config->publish_compressed_image) {
+    //     if (!incoming_frame.encoded_image.data.empty()) {
+    //         msg_compressed = incoming_frame.encoded_image;
+    //     } else {
+    //         const auto &_raw = incoming_frame.raw_image;
+    //         if (!_raw.data.empty()) {
+    //             //! Convert raw image to OpenCV format
+    //             auto cv_ptr = cv_bridge::toCvCopy(_raw, sensor_msgs::image_encodings::BGR8);
 
-                //! Encode the image as JPEG
-                std::vector<uchar> jpeg_buffer;
-                cv::imencode(".jpg", cv_ptr->image, jpeg_buffer);
+    //             //! Encode the image as JPEG
+    //             std::vector<uchar> jpeg_buffer;
+    //             cv::imencode(".jpg", cv_ptr->image, jpeg_buffer);
 
-                //! Fill the compressed image message
-                msg_compressed.format = "jpeg";
-                msg_compressed.data = jpeg_buffer;
-            }
-        }
-        RCLCPP_DEBUG(this->get_logger(), "[_deliver_frame()][msg_uuid=%s] Publishing compressed image", boost::uuids::to_string(msg_uuid).c_str());
-        m_compressed_image_publisher->publish(msg_compressed);
-    }
+    //             //! Fill the compressed image message
+    //             msg_compressed.format = "jpeg";
+    //             msg_compressed.data = jpeg_buffer;
+    //         }
+    //     }
+    //     RCLCPP_DEBUG(this->get_logger(), "[_deliver_frame()][msg_uuid=%s] Publishing compressed image", boost::uuids::to_string(msg_uuid).c_str());
+    //     m_compressed_image_publisher->publish(msg_compressed);
+    // }
 
     // signal the goal as success
     auto result = std::make_shared<FrameReceiveAction_t::Result>();
@@ -213,7 +213,14 @@ rclcpp_action::GoalResponse
     //! Create boost uuid from the message UUID
     auto msg_uuid = to_boost_uuid(goal->x_uid);
 
-    RCLCPP_DEBUG(this->get_logger(), "[_on_goal_received()][msg_uuid=%s] Received goal", boost::uuids::to_string(msg_uuid).c_str());
+    //! Is this goal just a ping request?
+    bool is_ping_request = goal->x_control.code == goal->x_control.PING;
+    RCLCPP_DEBUG(this->get_logger(), "[_on_goal_received()][msg_uuid=%s] Received goal, is_ping_request=%s",
+                 boost::uuids::to_string(msg_uuid).c_str(), is_ping_request ? "true" : "false");
+
+    if (is_ping_request) {
+        return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+    }
 
     // for async mode, try to enqueue the goal
     auto ret = _try_enqueue_goal(uuid, *goal);
@@ -230,9 +237,17 @@ rclcpp_action::GoalResponse
 
 int FrameRelayPublisher::_resolve_goal(std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle)
 {
+    auto goal_uuid = to_boost_uuid(goal_handle->get_goal_id());
+    bool is_ping_request = goal_handle->get_goal()->x_control.code == goal_handle->get_goal()->x_control.PING;
+    RCLCPP_DEBUG(this->get_logger(), "[_resolve_goal()][msg_uuid=%s] Resolving goal, is_ping_request=%s",
+                 boost::uuids::to_string(goal_uuid).c_str(), is_ping_request ? "true" : "false");
+    if (is_ping_request) {
+        // ping request does not need to resolve, not in the map either
+        return 0;
+    }
+
     //! Get the promise from the concurrent hash map
     decltype(m_impl->m_goal2payload)::accessor acc;
-    auto goal_uuid = to_boost_uuid(goal_handle->get_goal_id());
     if (m_impl->m_goal2payload.find(acc, goal_uuid)) {
         //! Create the payload
 
@@ -258,8 +273,23 @@ void FrameRelayPublisher::_on_goal_accepted(std::shared_ptr<FrameReceiveGoalHand
     auto goal_uuid = to_boost_uuid(goal_handle->get_goal_id());
     auto msg_uuid = to_boost_uuid(goal_handle->get_goal()->x_uid);
 
-    RCLCPP_DEBUG(this->get_logger(), "[_on_goal_accepted()][msg_uuid=%s] Goal execution started",
-                 boost::uuids::to_string(msg_uuid).c_str());
+    //! Is this goal just a ping request?
+    bool is_ping_request = goal_handle->get_goal()->x_control.code == goal_handle->get_goal()->x_control.PING;
+    RCLCPP_DEBUG(this->get_logger(), "[_on_goal_accepted()][msg_uuid=%s] Goal execution started, is_ping_request=%s",
+                 boost::uuids::to_string(msg_uuid).c_str(), is_ping_request ? "true" : "false");
+    if (is_ping_request) {
+        RCLCPP_DEBUG(this->get_logger(), "[_on_goal_accepted()][msg_uuid=%s] Signaling goal as success (ping request)",
+                     boost::uuids::to_string(msg_uuid).c_str());
+
+        auto result = std::make_shared<FrameReceiveAction_t::Result>();
+        result->return_code = 0;
+        goal_handle->succeed(result);
+        // goal_handle->canceled(result);
+
+        RCLCPP_DEBUG(this->get_logger(), "[_on_goal_accepted()][msg_uuid=%s] Signaled goal as success (ping request)",
+                     boost::uuids::to_string(msg_uuid).c_str());
+        return;
+    }
 
     auto ret = _resolve_goal(goal_handle);
     if (ret != 0) {

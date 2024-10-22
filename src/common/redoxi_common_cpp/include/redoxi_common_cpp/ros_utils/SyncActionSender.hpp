@@ -95,6 +95,12 @@ class SyncActionSender
          * @details Can be resolved to get the goal handle
          */
         std::shared_future<typename GoalHandle_t::SharedPtr> goal_handle_future;
+
+        /**
+         * @brief The goal handle, obtained from the ROS action, if goal is accepted
+         * @details Non null if goal is accepted, otherwise nullptr
+         */
+        typename GoalHandle_t::SharedPtr goal_handle;
     };
 
     // just for consistency
@@ -139,25 +145,45 @@ class SyncActionSender
         std::mutex mutex;
         std::condition_variable cv;
         bool goal_response_received = false;
+        auto msg_uuid = to_boost_uuid(goal.x_uid);
 
         //! Configure goal send options with a callback
         typename rclcpp_action::Client<ActionType_t>::SendGoalOptions opt;
+        auto node = m_node;
         opt.goal_response_callback =
-            [&](const auto &goal_handle) {
-                std::lock_guard<std::mutex> lock(mutex);
+            [&, msg_uuid](const auto &goal_handle) {
+                RCLCPP_DEBUG(m_node->get_logger(), "[msg_uuid=%s] trying to call goal response callback",
+                             boost::uuids::to_string(msg_uuid).c_str());
+                std::unique_lock<std::mutex> lock(mutex);
+
+                RCLCPP_DEBUG(m_node->get_logger(), "[msg_uuid=%s] get passed lock, executing goal response callback",
+                             boost::uuids::to_string(msg_uuid).c_str());
                 if (goal_handle) {
                     result.response_code = ActionDownstreamResponse::ACCEPTED;
+                    result.goal_handle = goal_handle;
                 } else {
                     result.response_code = ActionDownstreamResponse::REJECTED;
                 }
                 goal_response_received = true;
+                lock.unlock();
                 cv.notify_one(); //! Notify waiting thread
+                RCLCPP_DEBUG(m_node->get_logger(), "[msg_uuid=%s] goal response callback done, notify one",
+                             boost::uuids::to_string(msg_uuid).c_str());
+            };
+        opt.feedback_callback =
+            [msg_uuid, node](auto, const auto) {
+                RCLCPP_DEBUG(node->get_logger(), "[msg_uuid=%s] feedback callback",
+                             boost::uuids::to_string(msg_uuid).c_str());
+            };
+        opt.result_callback =
+            [msg_uuid, node](const auto &) {
+                RCLCPP_DEBUG(node->get_logger(), "[msg_uuid=%s] result callback",
+                             boost::uuids::to_string(msg_uuid).c_str());
             };
 
         //! Send goal asynchronously and store the future
         // TODO: seems like this thread should not be blocked, otherwise it cannot receive the goal response callback
         auto goal_handle_future = client.async_send_goal(goal, opt);
-        auto msg_uuid = to_boost_uuid(goal.x_uid);
         {
             // for debugging
             if (m_node) {
@@ -169,12 +195,11 @@ class SyncActionSender
         result.goal_handle_future = goal_handle_future;
 
         //! Handle waiting behavior
-        std::unique_lock<std::mutex> lock(mutex);
         if (timeout > DurationType::zero()) {
             //! Wait for the specified duration or until goal response is received
             RCLCPP_DEBUG(m_node->get_logger(), "[msg_uuid=%s] start waiting for goal response for %ld ms",
                          boost::uuids::to_string(msg_uuid).c_str(), timeout.count());
-
+            std::unique_lock<std::mutex> lock(mutex);
             if (!cv.wait_for(lock, timeout, [&] { return goal_response_received; })) {
                 //! Timeout occurred
                 RCLCPP_DEBUG(m_node->get_logger(), "[msg_uuid=%s] wait for goal response timeout",
@@ -183,6 +208,7 @@ class SyncActionSender
             }
             //! No action needed if goal response received within timeout, as result is set in callback
         } else {
+            std::unique_lock<std::mutex> lock(mutex);
             //! Negative timeout specified, wait indefinitely until goal response is received
             RCLCPP_DEBUG(m_node->get_logger(), "[msg_uuid=%s] start indefinite waiting for goal response",
                          boost::uuids::to_string(msg_uuid).c_str());
@@ -192,6 +218,8 @@ class SyncActionSender
         }
         //! Result is set in callback for non-timeout cases
 
+        RCLCPP_DEBUG(m_node->get_logger(), "[msg_uuid=%s] async sender done, returning result",
+                     boost::uuids::to_string(msg_uuid).c_str());
         return result;
     }
 
