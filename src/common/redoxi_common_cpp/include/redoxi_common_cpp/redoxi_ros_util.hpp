@@ -1,3 +1,5 @@
 #pragma once
 #include <redoxi_common_cpp/ros_utils/common.hpp>
+#include <redoxi_common_cpp/ros_utils/message_conversion.hpp>
 #include <redoxi_common_cpp/ros_utils/RosTimeToken.hpp>
+#include <redoxi_common_cpp/ros_utils/SyncActionSender.hpp>

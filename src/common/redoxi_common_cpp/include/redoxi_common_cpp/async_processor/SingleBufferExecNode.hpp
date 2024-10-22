@@ -171,14 +171,14 @@ class SingleBufferExecNode : public tbb::flow::composite_node<
   public:
     SingleBufferExecNode(tbb::flow::graph &g,
                          size_t input_data_buffer_size = 1,
-                         bool is_async = false,
+                         bool use_async_callback = false,
                          bool preserve_order = true,
                          bool is_serial = false,
                          size_t execute_token_size = DEFAULT_EXECUTE_TOKEN_SIZE)
         : CompositeNode_t(g)
     {
         m_is_serial = is_serial;
-        m_is_async = is_async;
+        m_use_async_callback = use_async_callback;
         m_preserve_order = preserve_order;
         m_execute_token_size = execute_token_size;
         m_next_sequence_number = std::make_shared<std::atomic<std::size_t>>(0);
@@ -237,7 +237,7 @@ class SingleBufferExecNode : public tbb::flow::composite_node<
         // work node
         m_work_node = nullptr;
         m_async_work_node = nullptr;
-        if (m_is_async)
+        if (m_use_async_callback)
             m_async_work_node = std::make_shared<AsyncWorkNode_t>(
                 g, concurrency_type, [this](const InputWithTokens_t &input_data, typename AsyncWorkNode_t::gateway_type &gateway) {
                     this->_nodefunc_work_async(input_data, gateway);
@@ -257,7 +257,7 @@ class SingleBufferExecNode : public tbb::flow::composite_node<
         // output node, call user callback
         m_output_callback_node = nullptr;
         m_async_output_callback_node = nullptr;
-        if (m_is_async)
+        if (m_use_async_callback)
             m_async_output_callback_node = std::make_shared<AsyncOutputCallbackNode_t>(
                 g, output_pipeline_concurrency_type,
                 [this](const OutputWithTokens_t &output_data, typename AsyncOutputCallbackNode_t::gateway_type &gateway) {
@@ -300,7 +300,7 @@ class SingleBufferExecNode : public tbb::flow::composite_node<
         tbb::flow::make_edge(*m_input_join_node, *m_input_stamp_node);
 
         // stamp_node.port[0] -> work_node or async_work_node
-        if (m_is_async)
+        if (m_use_async_callback)
             tbb::flow::make_edge(tbb::flow::output_port<0>(*m_input_stamp_node), *m_async_work_node);
         else
             tbb::flow::make_edge(tbb::flow::output_port<0>(*m_input_stamp_node), *m_work_node);
@@ -312,7 +312,7 @@ class SingleBufferExecNode : public tbb::flow::composite_node<
         if (m_preserve_order) {
             // if preserve order is requested, work_node -> sequencer_node -> output_callback_node -> finalize_node
             assert(m_output_sequencer_node != nullptr);
-            if (m_is_async) {
+            if (m_use_async_callback) {
                 tbb::flow::make_edge(*m_async_work_node, *m_output_sequencer_node);
                 tbb::flow::make_edge(*m_output_sequencer_node, *m_async_output_callback_node);
                 tbb::flow::make_edge(*m_async_output_callback_node, *m_finalize_node);
@@ -323,7 +323,7 @@ class SingleBufferExecNode : public tbb::flow::composite_node<
             }
         } else {
             // if preserve order is not requested, work_node -> output_callback_node -> finalize_node
-            if (m_is_async) {
+            if (m_use_async_callback) {
                 tbb::flow::make_edge(*m_async_work_node, *m_async_output_callback_node);
                 tbb::flow::make_edge(*m_async_output_callback_node, *m_finalize_node);
             } else {
@@ -357,17 +357,17 @@ class SingleBufferExecNode : public tbb::flow::composite_node<
     }
 
     //! Set if the node is async, only callable before build()
-    virtual void set_is_async(bool is_async)
+    virtual void set_use_async_callback(bool use_async_callback)
     {
         assert(!is_built());
-        m_is_async = is_async;
+        m_use_async_callback = use_async_callback;
     }
 
     //! Check if the node is async
-    virtual bool is_async() const
+    virtual bool is_callback_async() const
     {
         assert(!is_built());
-        return m_is_async;
+        return m_use_async_callback;
     }
 
     virtual bool is_built() const
@@ -588,7 +588,7 @@ class SingleBufferExecNode : public tbb::flow::composite_node<
 
     size_t m_input_data_buffer_size = 1;
     size_t m_execute_token_size = 1;
-    bool m_is_async = false;
+    bool m_use_async_callback = false;
     //! if true, the output callback will be called in the order of the input data
     //! @note this requires the user to set the sequence number of the input gate token properly
     //! and reset the graph in order to restart the sequencing

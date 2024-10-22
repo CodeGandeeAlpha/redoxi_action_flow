@@ -381,7 +381,7 @@ int RedoxiVideoReaderBase::_init_frame_delivery_tasks()
 
     // sync mode, all functions are executed in the graph
     RCLCPP_DEBUG(this->get_logger(), "[_init_frame_delivery_tasks()] Setting node to sync mode ...");
-    node.set_is_async(false);
+    node.set_use_async_callback(false);
     using FrameDeliveryNode_t = ap::SingleBufferExecNode<mytypes::FrameDeliveryTask, mytypes::FrameDeliveryTask>;
     using WorkInput_t = FrameDeliveryNode_t::InputWithTokens_t;
     using WorkOutput_t = FrameDeliveryNode_t::OutputWithTokens_t;

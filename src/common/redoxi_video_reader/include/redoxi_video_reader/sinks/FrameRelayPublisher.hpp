@@ -7,6 +7,7 @@
 #include <sensor_msgs/msg/image.hpp>
 #include <redoxi_video_reader/base/VideoReaderBase.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
+#include <future>
 
 
 namespace redoxi_works
@@ -21,9 +22,15 @@ class FrameRelayPublisher : public rclcpp::Node
 
   public:
     //! name of the frame receive action
-    inline static std::string DefaultFrameReceiveActionName = "in_action";
+    inline static std::string DefaultFrameReceiveActionName = "in/action";
     //! name of the image topic
-    inline static std::string DefaultImageTopicName = "out_image";
+    inline static std::string DefaultImageTopicName = "out/image_raw";
+    //! name of the compressed image topic
+    inline static std::string DefaultCompressedImageTopicName = "out/image_compressed";
+    //! default buffer size for the async processing
+    inline static constexpr int DefaultAsyncBufferSize = 1;
+    //! default publish queue size
+    inline static constexpr int DefaultPublishQueueSize = 20;
 
     //! rename the action type to FrameReceiveAction_t
     using FrameReceiveAction_t = redoxi_public_msgs::action::ProcessFrame;
@@ -33,23 +40,29 @@ class FrameRelayPublisher : public rclcpp::Node
         virtual ~InitConfig_t() = default;
         std::string frame_receive_action_name = DefaultFrameReceiveActionName;
         std::string image_topic_name = DefaultImageTopicName;
+        std::string compressed_image_topic_name = DefaultCompressedImageTopicName;
+        int publish_queue_size = DefaultPublishQueueSize;
+
+        bool publish_raw_image = true;
+        bool publish_compressed_image = true;
 
         //! If true, the node will use async processing, otherwise it will use sync processing
         bool use_async = false;
+
+        //! The buffer size for the async processing
+        int async_buffer_size = DefaultAsyncBufferSize;
     };
 
     struct FrameDeliveryPayload_t {
-        cv::Mat frame;
-        int64_t frame_number;
         std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle;
+        int64_t sent_frame_number;
     };
 
     //! The task type for delivering frames
     struct FrameDeliveryTask_t {
         virtual ~FrameDeliveryTask_t() = default;
         boost::uuids::uuid goal_uuid;
-        cv::Mat frame;
-        int64_t frame_number;
+        std::shared_future<FrameDeliveryPayload_t> payload;
     };
 
   public:
@@ -79,9 +92,12 @@ class FrameRelayPublisher : public rclcpp::Node
     virtual rclcpp_action::CancelResponse
         _on_goal_canceled(std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle);
 
+    virtual int _deliver_frame(FrameDeliveryTask_t &task);
+
   protected:
     //! The publisher for the image topic
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_image_publisher;
+    rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr m_compressed_image_publisher;
 
     //! action server for frame receiving
     rclcpp_action::Server<FrameReceiveAction_t>::SharedPtr m_frame_receive_action_server;

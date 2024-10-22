@@ -35,7 +35,7 @@ int main()
     using Node_t = redoxi_works::async_processor::SingleOverwriteExecNode<InputType, OutputType, InputGateToken>;
     Node_t node(g);
     node.set_preserve_order(false);
-    node.set_is_async(is_async);
+    node.set_use_async_callback(is_async);
     node.set_execute_token_size(10);
     node.set_is_serial(false);
     tbb::flow::limiter_node<int> limiter(g, 1);
