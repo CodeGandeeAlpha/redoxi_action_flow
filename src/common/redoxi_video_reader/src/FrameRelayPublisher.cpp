@@ -58,6 +58,13 @@ struct FrameRelayPublisherImpl {
 FrameRelayPublisher::FrameRelayPublisher(const std::string &name, const rclcpp::NodeOptions &options)
     : rclcpp::Node(name, options)
 {
+    this->get_logger().set_level(rclcpp::Logger::Level::Debug);
+
+    // declare parameters
+    auto ret = declare_default_parameters_for_node(this);
+    if (ret != 0) {
+        RDX_RAISE_ERROR("[%s] Failed to declare default parameters", this->get_name());
+    }
     m_impl = std::make_unique<FrameRelayPublisherImpl>();
 }
 

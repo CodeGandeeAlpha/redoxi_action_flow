@@ -27,6 +27,7 @@ class REDOXI_VIDEO_READER_PUBLIC
                             public IOpenCloseProtocol
 {
     friend class RedoxiVideoReaderImpl;
+    friend class RedoxiVideoReaderBaseTypes::InitConfig;
 
   public:
     //! Import all names from RedoxiVideoReaderInternalTypes
@@ -303,9 +304,12 @@ class REDOXI_VIDEO_READER_PUBLIC
     virtual void _publish_frame(const cv::Mat &frame);
 
   private:
-    //! Declare all parameters (non-overridable)
-    //! should be called in subclass constructor
-    void _declare_all_parameters();
+    /**
+     * @brief Declare all parameters (non-overridable)
+     * @details Should be called in subclass constructor
+     * @return 0 if success, otherwise return error code
+     */
+    int _declare_all_parameters();
 
   protected:
     // member of downstreams

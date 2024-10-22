@@ -41,10 +41,11 @@ class _RosTimeToken
 
     //! start the timer, which creates tokens at the specified interval
     //! @param interval the interval of the timer, if not specified, the interval is the same as the one in constructor
+    //! @param start_with_token if true, the token is created at start
     //! @note if interval is 0, the token is always available
     //! @return true if the timer is successfully started
     //! @return false if the timer is already started
-    virtual bool start(std::optional<IntervalType> interval = std::nullopt)
+    virtual bool start(std::optional<IntervalType> interval = std::nullopt, bool start_with_token = true)
     {
         if (m_is_started) {
             return false;
@@ -52,6 +53,11 @@ class _RosTimeToken
 
         if (interval) {
             m_interval = interval.value();
+        }
+
+        // at start, we have one token available
+        if (start_with_token) {
+            _create_token();
         }
 
         if (m_interval > IntervalType(0)) {

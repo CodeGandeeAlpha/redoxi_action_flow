@@ -34,6 +34,9 @@ if [[ "$*" == *"--verbose"* ]]; then
     VERBOSE="--event-handlers console_direct+"
 fi
 
+# number of parallel jobs, equal to the number of cores-1
+NUM_JOBS=$(($(nproc) - 1))
+
 # Check if --debug or --release flag is provided, default to release
 BUILD_TYPE="RelWithDebInfo"
 if [[ "$*" == *"--debug"* ]]; then
@@ -48,6 +51,7 @@ echo "Building with BUILD_TYPE=$BUILD_TYPE"
 
 colcon build --packages-select $PackagesToBuild \
     $VERBOSE \
+    --parallel-workers $NUM_JOBS \
     --symlink-install \
     --cmake-args \
     -DCMAKE_BUILD_TYPE=$BUILD_TYPE \

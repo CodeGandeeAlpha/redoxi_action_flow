@@ -17,6 +17,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(fmt REQUIRED)
 find_package(TBB REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
 # Find Boost (header-only)
 find_package(Boost REQUIRED)
@@ -35,7 +36,12 @@ target_compile_features(redoxi_video_reader PUBLIC c_std_99 cxx_std_17)  # Requi
 target_include_directories(redoxi_video_reader PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_link_libraries(redoxi_video_reader PUBLIC TBB::tbb Boost::boost fmt::fmt)  # Link TBB to your target
+target_link_libraries(redoxi_video_reader PUBLIC 
+  TBB::tbb 
+  Boost::boost 
+  fmt::fmt
+  nlohmann_json::nlohmann_json
+)  # Link TBB to your target
 
 ament_target_dependencies(
   redoxi_video_reader PUBLIC
@@ -96,6 +102,7 @@ ament_export_dependencies(
   sensor_msgs
   rcutils
   cv_bridge
+  nlohmann_json
   Boost
 )
 

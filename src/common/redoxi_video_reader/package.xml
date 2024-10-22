@@ -20,6 +20,12 @@
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
+  <!-- cpp libraries -->
+  <depend>nlohmann-json3-dev</depend>
+  <depend>libtbb-dev</depend>
+  <depend>libfmt-dev</depend>
+  <depend>libboost-dev</depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>

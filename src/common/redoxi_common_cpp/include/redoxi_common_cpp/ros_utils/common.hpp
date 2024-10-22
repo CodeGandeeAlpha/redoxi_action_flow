@@ -53,11 +53,14 @@ void RDX_RAISE_ERROR(const std::string &format, Args &&...args)
     RDX_ASSERT_CHECK_TRUE(false, format, std::forward<Args>(args)...);
 }
 
-
 enum class ActionDownstreamResponse {
     ACCEPTED = 0,
     REJECTED = 1,
     TIMEOUT = 2,
 };
+
+//! declare some default parameters for the node, some are looked up by json string
+//! return 0 if success, otherwise return error code
+int declare_default_parameters_for_node(rclcpp::Node *node);
 
 } // namespace redoxi_works

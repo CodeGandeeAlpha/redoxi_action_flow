@@ -43,7 +43,27 @@ namespace RosParams
 namespace Keys
 {
 const std::string v6d_socket_name = "v6d_socket_name";
+
 } // namespace Keys
+
+namespace ParamAsJsonString
+{
+
+/**
+ * @brief In each node, you can look for a parameter named "param_as_json_string"
+ *
+ * The value of this parameter should be a JSON string, and it will be parsed into a JSON object,
+ * which contains the parameters for the node.
+ */
+const std::string MainKey = "param_as_json_string";
+
+/**
+ * @brief json[DeclareParams]={"param_name_1": "param_value_1", "param_name_2": "param_value_2", ...}, which
+ *        defines the parameters to be declared in the ros node
+ */
+const std::string DeclareParams = "declare_params";
+
+} // namespace ParamAsJsonString
 
 } // namespace RosParams
 

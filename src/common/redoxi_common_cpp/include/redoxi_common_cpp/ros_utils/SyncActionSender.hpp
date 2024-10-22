@@ -1,7 +1,6 @@
 #pragma once
 #include <optional>
 #include <future>
-#include <chrono>
 #include <mutex>
 #include <condition_variable>
 
@@ -10,6 +9,7 @@
 
 // just for example
 #include <redoxi_common_cpp/ros_utils/common.hpp>
+#include <redoxi_common_cpp/ros_utils/message_conversion.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
 #include <redoxi_public_msgs/msg/frame.hpp>
 
@@ -63,6 +63,10 @@ template <typename ActionType,
 class SyncActionSender
 {
   public:
+    SyncActionSender(rclcpp::Node *node)
+        : m_node(node)
+    {
+    }
     using ActionType_t = ActionType;
     using ActionClient_t = rclcpp_action::Client<ActionType_t>;
     using GoalHandle_t = rclcpp_action::ClientGoalHandle<ActionType_t>;
@@ -151,26 +155,48 @@ class SyncActionSender
             };
 
         //! Send goal asynchronously and store the future
+        // TODO: seems like this thread should not be blocked, otherwise it cannot receive the goal response callback
         auto goal_handle_future = client.async_send_goal(goal, opt);
+        auto msg_uuid = to_boost_uuid(goal.x_uid);
+        {
+            // for debugging
+            if (m_node) {
+                RCLCPP_DEBUG(m_node->get_logger(), "[msg_uuid=%s] async_send_goal() done",
+                             boost::uuids::to_string(msg_uuid).c_str());
+            }
+        }
+
         result.goal_handle_future = goal_handle_future;
 
         //! Handle waiting behavior
         std::unique_lock<std::mutex> lock(mutex);
         if (timeout > DurationType::zero()) {
             //! Wait for the specified duration or until goal response is received
+            RCLCPP_DEBUG(m_node->get_logger(), "[msg_uuid=%s] start waiting for goal response for %ld ms",
+                         boost::uuids::to_string(msg_uuid).c_str(), timeout.count());
+
             if (!cv.wait_for(lock, timeout, [&] { return goal_response_received; })) {
                 //! Timeout occurred
+                RCLCPP_DEBUG(m_node->get_logger(), "[msg_uuid=%s] wait for goal response timeout",
+                             boost::uuids::to_string(msg_uuid).c_str());
                 result.response_code = ActionDownstreamResponse::TIMEOUT;
             }
             //! No action needed if goal response received within timeout, as result is set in callback
         } else {
             //! Negative timeout specified, wait indefinitely until goal response is received
+            RCLCPP_DEBUG(m_node->get_logger(), "[msg_uuid=%s] start indefinite waiting for goal response",
+                         boost::uuids::to_string(msg_uuid).c_str());
             cv.wait(lock, [&] { return goal_response_received; });
+            RCLCPP_DEBUG(m_node->get_logger(), "[msg_uuid=%s] goal response received",
+                         boost::uuids::to_string(msg_uuid).c_str());
         }
         //! Result is set in callback for non-timeout cases
 
         return result;
     }
+
+  private:
+    rclcpp::Node *m_node = nullptr;
 };
 
 } // namespace redoxi_works

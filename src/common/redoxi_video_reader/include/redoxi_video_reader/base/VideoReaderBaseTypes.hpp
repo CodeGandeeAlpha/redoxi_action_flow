@@ -104,10 +104,8 @@ class REDOXI_VIDEO_READER_PUBLIC InitConfig
     //! The downstream nodes, indexed by node name
     std::map<std::string, std::shared_ptr<DownstreamSpec>> downstreams;
 
-    //! Load parameters from node
-    virtual void from_parameters(RedoxiVideoReaderBase *)
-    {
-    }
+    //! Load parameters from node, this will override empty existing parameters
+    virtual void from_parameters(RedoxiVideoReaderBase *node);
 };
 
 //! The runtime config for RedoxiVideoReaderBase or its subclass
@@ -139,9 +137,8 @@ class REDOXI_VIDEO_READER_PUBLIC RuntimeConfig
     //! The frame delivery quality of service
     std::shared_ptr<FrameDeliveryOptions> frame_delivery_options;
 
-    virtual void from_parameters(RedoxiVideoReaderBase *)
-    {
-    }
+    //! Load parameters from node, this will override empty existing parameters
+    virtual void from_parameters(RedoxiVideoReaderBase *node);
 
     //! Get the frame interval as std::chrono::duration
     template <typename TimeUnit_t = DefaultTimeUnit_t>

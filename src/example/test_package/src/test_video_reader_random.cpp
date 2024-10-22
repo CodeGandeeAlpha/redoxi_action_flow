@@ -17,6 +17,10 @@ int main(int argc, char **argv)
     video_reader->get_logger().set_level(rclcpp::Logger::Level::Debug);
 
     spdlog::info("[MAIN] Initializing RandomFrameVideoGenerator");
+    init_config->from_parameters(video_reader.get());
+
+    runtime_config->frame_interval_ms = video_reader->get_parameter("frame_interval_ms").as_double();
+    runtime_config->step_interval_ms = video_reader->get_parameter("step_interval_ms").as_double();
     video_reader->init(init_config, runtime_config);
     spdlog::info("[MAIN] Opening RandomFrameVideoGenerator");
     video_reader->open();

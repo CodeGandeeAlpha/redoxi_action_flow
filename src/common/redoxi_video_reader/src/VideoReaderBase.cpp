@@ -430,19 +430,21 @@ RedoxiVideoReaderBase::~RedoxiVideoReaderBase()
     }
 }
 
-void RedoxiVideoReaderBase::_declare_all_parameters()
+int RedoxiVideoReaderBase::_declare_all_parameters()
 {
+    auto ret = declare_default_parameters_for_node(this);
+    return ret;
     // parameters
-    this->declare_parameter<std::string>("source_file", "");
-    this->declare_parameter<int>("source_camera_index", -1);
-    this->declare_parameter<int>("start_frame_number", -1);
-    this->declare_parameter<int>("end_frame_number", -1);
-    this->declare_parameter<int>("image_width", -1);
-    this->declare_parameter<int>("image_height", -1);
-    this->declare_parameter<std::string>("orbbec_net_device_ip", "");
+    // this->declare_parameter<std::string>("source_file", "");
+    // this->declare_parameter<int>("source_camera_index", -1);
+    // this->declare_parameter<int>("start_frame_number", -1);
+    // this->declare_parameter<int>("end_frame_number", -1);
+    // this->declare_parameter<int>("image_width", -1);
+    // this->declare_parameter<int>("image_height", -1);
+    // this->declare_parameter<std::string>("orbbec_net_device_ip", "");
 
-    this->declare_parameter<double>("frame_interval_ms", -1.0);
-    this->declare_parameter<bool>("send_goal_retry", false);
+    // this->declare_parameter<double>("frame_interval_ms", -1.0);
+    // this->declare_parameter<bool>("send_goal_retry", false);
 }
 
 int RedoxiVideoReaderBase::_do_frame_delivery_preprocess(
@@ -561,8 +563,8 @@ int RedoxiVideoReaderBase::_deliver_frame(
     const std::shared_ptr<Downstream_t> &ds)
 {
     //! Prepare the goal
-    auto goal = Downstream_t::Goal_t();
-    goal.frame = frame_msg;
+    // auto goal = Downstream_t::Goal_t();
+    // goal.frame = frame_msg;
 
     //! Set up retry strategy
     int attempts = 0;
@@ -623,6 +625,7 @@ RedoxiVideoReaderBase::FrameMessage_t RedoxiVideoReaderBase::_create_frame_messa
     std::optional<uint64_t> shared_memory_id)
 {
     FrameMessage_t frame_msg;
+    frame_msg.uuid = to_ros_uuid_msg(task_input.uid);
     frame_msg.frame_num = task_input.frame_number;
     auto source_image_encoding = m_runtime_config->output_image_encoding;
     if (payload_type == FrameDeliveryOptions_t::FramePayloadType::UncompressedBySharedMemory) {
@@ -710,9 +713,10 @@ RedoxiVideoReaderBase::SendFrameResult_t
     auto goal = Downstream_t::Goal_t();
     goal.frame = frame_msg;
     goal.x_control = frame_msg.x_control;
+    goal.x_uid = frame_msg.uuid;
 
     //! Use SyncActionSender to send the goal and wait for the response
-    SyncActionSender<Downstream_t::ActionType_t> sender;
+    SyncActionSender<Downstream_t::ActionType_t> sender(this);
     auto result = sender.send(goal, *client, timeout);
 
     return result;
@@ -723,6 +727,7 @@ bool RedoxiVideoReaderBase::_ping(const std::shared_ptr<Downstream_t> &ds,
 {
     //! Create an empty frame message for pinging
     FrameMessage_t ping_msg;
+    ping_msg.uuid = to_ros_uuid_msg(boost::uuids::random_generator()());
     ping_msg.x_control.code = ping_msg.x_control.PING;
 
     //! Send the ping message to the downstream
