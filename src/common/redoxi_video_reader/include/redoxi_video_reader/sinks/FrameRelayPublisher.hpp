@@ -1,14 +1,11 @@
 #pragma once
 
-#include <thread>
-
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <redoxi_video_reader/base/VideoReaderBase.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
 #include <future>
-
 
 namespace redoxi_works
 {
@@ -55,7 +52,8 @@ class FrameRelayPublisher : public rclcpp::Node
 
     struct FrameDeliveryPayload_t {
         std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle;
-        int64_t sent_frame_number;
+        int64_t ith_received_frame = -1;
+        int64_t ith_sent_frame = -1;
     };
 
     //! The task type for delivering frames
@@ -85,14 +83,21 @@ class FrameRelayPublisher : public rclcpp::Node
                           std::shared_ptr<const FrameReceiveAction_t::Goal> goal);
 
     //! The callback function for the accepted goal
-    virtual rclcpp_action::GoalResponse
-        _on_goal_accepted(std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle);
+    virtual void _on_goal_accepted(std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle);
 
     //! The callback function for the goal cancel request
     virtual rclcpp_action::CancelResponse
         _on_goal_canceled(std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle);
 
+    //! publish the frame to the topic
     virtual int _deliver_frame(FrameDeliveryTask_t &task);
+
+    //! try to enqueue the goal, return 0 if success, otherwise return -1
+    virtual int _try_enqueue_goal(const rclcpp_action::GoalUUID &uuid,
+                                  const FrameReceiveAction_t::Goal &goal);
+
+    //! resolve the goal, return 0 if success, otherwise return -1
+    virtual int _resolve_goal(std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle);
 
   protected:
     //! The publisher for the image topic

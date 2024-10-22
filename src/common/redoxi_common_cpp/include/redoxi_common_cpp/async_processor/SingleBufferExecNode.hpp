@@ -99,7 +99,7 @@ namespace async_processor
 //! This example demonstrates how to create, configure, and use a SingleBufferExecNode
 //! for both synchronous and asynchronous processing of input data.
 template <typename InputDataType,
-          typename OutputDataType = DummyOutputData,
+          typename OutputDataType = InputDataType,
           typename InputDataTokenType = DefaultInputDataToken,
           typename ExecuteTokenType = DefaultExecToken,
           typename = std::enable_if_t<std::is_base_of_v<DefaultInputDataToken, InputDataTokenType>>,
@@ -147,12 +147,12 @@ class SingleBufferExecNode : public tbb::flow::composite_node<
 
   public:
     /**
-     * @brief Put data into the node
+     * @brief Put (a copy of) data into the node
      * @param data The input data to be put into the node
      * @param bypass_limit If true, bypasses the input buffer limit, directly put data into the internal buffer.
      * This will very likely succeed, but may cause memory issue if not managed properly.
      * In order to clean up the buffer, you can use graph.wait_for_all() to wait for all the data to be processed.
-     * @return true if the data was successfully put into the node, false otherwise
+     * @return whether the data was successfully put into the node, true if success, false otherwise
      *
      * This function will overwrite the previous data if successful.
      */
