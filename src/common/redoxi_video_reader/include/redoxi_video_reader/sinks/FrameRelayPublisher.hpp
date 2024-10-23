@@ -38,16 +38,24 @@ class FrameRelayPublisher : public rclcpp::Node
         std::string frame_receive_action_name = DefaultFrameReceiveActionName;
         std::string image_topic_name = DefaultImageTopicName;
         std::string compressed_image_topic_name = DefaultCompressedImageTopicName;
+
+        //! The queue size for the image publisher
         int publish_queue_size = DefaultPublishQueueSize;
 
+        //! If true, the node will publish the raw image
         bool publish_raw_image = true;
+
+        //! If true, the node will publish the compressed image
         bool publish_compressed_image = true;
 
         //! If true, the node will use async processing, otherwise it will use sync processing
         bool use_async = false;
 
         //! The buffer size for the async processing
-        int async_buffer_size = DefaultAsyncBufferSize;
+        int goal_buffer_size = DefaultAsyncBufferSize;
+
+        //! Load the parameters from the node
+        virtual void from_parameters(const rclcpp::Node *node);
     };
 
     struct FrameDeliveryPayload_t {

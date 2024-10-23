@@ -114,7 +114,7 @@ void RDX_RAISE_ERROR(const std::string &format, Args &&...args)
 
 //! Log an info message using RCLCPP_INFO without thread ID
 template <typename... Args>
-void RDX_LOG_INFO(rclcpp::Node *node, const std::string &func_name,
+void RDX_LOG_INFO(const rclcpp::Node *node, const std::string &func_name,
                   const std::string &format, Args &&...args)
 {
     if constexpr (sizeof...(args) == 0) {
@@ -127,7 +127,7 @@ void RDX_LOG_INFO(rclcpp::Node *node, const std::string &func_name,
 
 //! Log an info message using RCLCPP_INFO with or without thread ID
 template <typename... Args>
-void RDX_LOG_INFO(rclcpp::Node *node, const std::string &func_name, _StrictBool with_thread_id,
+void RDX_LOG_INFO(const rclcpp::Node *node, const std::string &func_name, _StrictBool with_thread_id,
                   const std::string &format, Args &&...args)
 {
     if (with_thread_id) {
@@ -148,7 +148,7 @@ void RDX_LOG_INFO(rclcpp::Node *node, const std::string &func_name, _StrictBool 
 
 //! Log a debug message using RCLCPP_DEBUG without thread ID
 template <typename... Args>
-void RDX_LOG_DEBUG(rclcpp::Node *node, const std::string &func_name,
+void RDX_LOG_DEBUG(const rclcpp::Node *node, const std::string &func_name,
                    const std::string &format, Args &&...args)
 {
     if constexpr (sizeof...(args) == 0) {
@@ -161,7 +161,7 @@ void RDX_LOG_DEBUG(rclcpp::Node *node, const std::string &func_name,
 
 //! Log a debug message using RCLCPP_DEBUG with or without thread ID
 template <typename... Args>
-void RDX_LOG_DEBUG(rclcpp::Node *node, const std::string &func_name, _StrictBool with_thread_id,
+void RDX_LOG_DEBUG(const rclcpp::Node *node, const std::string &func_name, _StrictBool with_thread_id,
                    const std::string &format, Args &&...args)
 {
     if (with_thread_id) {
@@ -181,7 +181,7 @@ void RDX_LOG_DEBUG(rclcpp::Node *node, const std::string &func_name, _StrictBool
 
 //! Log an error message using RCLCPP_ERROR without thread ID
 template <typename... Args>
-void RDX_LOG_ERROR(rclcpp::Node *node, const std::string &func_name,
+void RDX_LOG_ERROR(const rclcpp::Node *node, const std::string &func_name,
                    const std::string &format, Args &&...args)
 {
     if constexpr (sizeof...(args) == 0) {
@@ -194,7 +194,7 @@ void RDX_LOG_ERROR(rclcpp::Node *node, const std::string &func_name,
 
 //! Log an error message using RCLCPP_ERROR with or without thread ID
 template <typename... Args>
-void RDX_LOG_ERROR(rclcpp::Node *node, const std::string &func_name, _StrictBool with_thread_id,
+void RDX_LOG_ERROR(const rclcpp::Node *node, const std::string &func_name, _StrictBool with_thread_id,
                    const std::string &format, Args &&...args)
 {
     if (with_thread_id) {
@@ -214,7 +214,7 @@ void RDX_LOG_ERROR(rclcpp::Node *node, const std::string &func_name, _StrictBool
 
 //! Log a warning message using RCLCPP_WARN without thread ID
 template <typename... Args>
-void RDX_LOG_WARN(rclcpp::Node *node, const std::string &func_name,
+void RDX_LOG_WARN(const rclcpp::Node *node, const std::string &func_name,
                   const std::string &format, Args &&...args)
 {
     if constexpr (sizeof...(args) == 0) {
@@ -227,7 +227,7 @@ void RDX_LOG_WARN(rclcpp::Node *node, const std::string &func_name,
 
 //! Log a warning message using RCLCPP_WARN with or without thread ID
 template <typename... Args>
-void RDX_LOG_WARN(rclcpp::Node *node, const std::string &func_name, _StrictBool with_thread_id,
+void RDX_LOG_WARN(const rclcpp::Node *node, const std::string &func_name, _StrictBool with_thread_id,
                   const std::string &format, Args &&...args)
 {
     if (with_thread_id) {
@@ -248,7 +248,7 @@ void RDX_LOG_WARN(rclcpp::Node *node, const std::string &func_name, _StrictBool 
 //! Macro to get JSON parameter from node, defined as macro to avoid include nlohmann/json.hpp in this file
 //! you must include nlohmann/json.hpp in the file where you use this macro
 #define RDX_GET_JSON_PARAM_FROM_NODE(node)                                \
-    ([](rclcpp::Node *node) -> nlohmann::json {                           \
+    ([](const rclcpp::Node *node) -> nlohmann::json {                     \
         rclcpp::Parameter _json_params;                                   \
         auto pkey = redoxi_works::RosParams::ParamAsJsonString::MainKey;  \
         if (!node->get_parameter(pkey, _json_params))                     \

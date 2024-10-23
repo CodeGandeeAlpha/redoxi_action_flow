@@ -3,14 +3,14 @@ from launch_ros.actions import Node
 from launch.actions import SetEnvironmentVariable
 import json
 
-json_params = {
+source_node_json_params = {
     "declare_params": {
         "custom_var_1": 100.0,
         "custom_var_2": 10.0,
     },
     "runtime_config": {
         "frame_interval_ms": 10000.0,
-        "step_interval_ms": 1,
+        "step_interval_ms": 1000,
     },
     "init_config": {
         "downstreams": {
@@ -27,6 +27,20 @@ json_params = {
     },
 }
 
+relay_node_json_params = {
+    "declare_params": {},
+    "init_config": {
+        "frame_receive_action_name": "in/action",
+        "image_topic_name": "out/image",
+        "compressed_image_topic_name": "out/compressed_image",
+        "publish_queue_size": 10,
+        "publish_raw_image": True,
+        "publish_compressed_image": True,
+        "use_async": True,
+        "goal_buffer_size": 1,
+    },
+}
+
 # common_prefix = ["valgrind --tool=callgrind --dump-instr=yes -v --instr-atstart=no"]
 common_prefix = None
 
@@ -37,7 +51,9 @@ simple_action_generator = Node(
     namespace="simple_action_generator",
     parameters=[
         {
-            "param_as_json_string": json.dumps(json_params, separators=(",", ":")),
+            "param_as_json_string": json.dumps(
+                source_node_json_params, separators=(",", ":")
+            ),
         },
     ],
     prefix=common_prefix,
@@ -50,7 +66,9 @@ video_source_node = Node(
     namespace="video_source",
     parameters=[
         {
-            "param_as_json_string": json.dumps(json_params, separators=(",", ":")),
+            "param_as_json_string": json.dumps(
+                source_node_json_params, separators=(",", ":")
+            ),
         },
     ],
     prefix=common_prefix,
@@ -62,6 +80,13 @@ video_sink_node = Node(
     name="video_sink",
     namespace="video_sink",
     prefix=common_prefix,
+    parameters=[
+        {
+            "param_as_json_string": json.dumps(
+                relay_node_json_params, separators=(",", ":")
+            ),
+        },
+    ],
 )
 
 

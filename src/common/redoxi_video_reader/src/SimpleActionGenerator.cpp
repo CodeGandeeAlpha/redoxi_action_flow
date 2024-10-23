@@ -51,6 +51,8 @@ void SimpleActionGenerator::_step()
 
 void SimpleActionGenerator::_step_send_by_tbb_graph()
 {
+    bool AlwaysUsePing = false;
+
     // read a frame
     cv::Mat frame;
     {
@@ -63,7 +65,7 @@ void SimpleActionGenerator::_step_send_by_tbb_graph()
 
     FrameDeliveryTask_t frame_delivery_task;
     _create_frame_delivery_task(frame, frame_delivery_task);
-    {
+    if (AlwaysUsePing) {
         // just use ping anyway
         redoxi_public_msgs::msg::Control control;
         control.code = control.PING;

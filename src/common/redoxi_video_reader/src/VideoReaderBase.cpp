@@ -571,7 +571,9 @@ int RedoxiVideoReaderBase::_deliver_frame(
 
     //! Set up retry strategy
     int attempts = 0;
-    const int max_attempts = ds->spec->retry_strategy->get_max_number_of_retries();
+
+    //! +1 for the first attempt
+    const int max_attempts = ds->spec->retry_strategy->get_max_number_of_retries() + 1;
     auto timeout_each_attempt = ds->spec->retry_strategy->get_wait_time_for_retry();
     auto msg_uuid = to_boost_uuid(frame_msg.uuid);
 
