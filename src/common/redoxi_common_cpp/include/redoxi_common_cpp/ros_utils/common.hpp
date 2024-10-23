@@ -1,5 +1,7 @@
 #pragma once
 
+#include <thread>
+
 #include <rclcpp/rclcpp.hpp>
 #include <rcpputils/asserts.hpp>
 #include <fmt/format.h>
@@ -52,6 +54,70 @@ void RDX_RAISE_ERROR(const std::string &format, Args &&...args)
 {
     RDX_ASSERT_CHECK_TRUE(false, format, std::forward<Args>(args)...);
 }
+
+//! Log an info message using RCLCPP_INFO
+template <typename... Args>
+void RDX_LOG_INFO(rclcpp::Node *node, const std::string &func_name, bool with_thread_id,
+                  const std::string &format, Args &&...args)
+{
+    if (with_thread_id) {
+        if constexpr (sizeof...(args) == 0) {
+            RCLCPP_INFO(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
+                        static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                        format.c_str());
+        } else {
+            RCLCPP_INFO(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
+                        static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                        fmt::format(format, std::forward<Args>(args)...).c_str());
+        }
+    } else {
+        if constexpr (sizeof...(args) == 0) {
+            RCLCPP_INFO(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format.c_str());
+        } else {
+            RCLCPP_INFO(node->get_logger(), "[f=%s()] %s", func_name.c_str(),
+                        fmt::format(format, std::forward<Args>(args)...).c_str());
+        }
+    }
+}
+
+
+//! Log a debug message using RCLCPP_DEBUG
+template <typename... Args>
+void RDX_LOG_DEBUG(rclcpp::Node *node, const char *format, Args &&...args)
+{
+    RCLCPP_DEBUG(node->get_logger(), "[%s][%lu] %s", node->get_name(), static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())), fmt::format(format, std::forward<Args>(args)...).c_str());
+}
+
+//! Log an error message using RCLCPP_ERROR
+template <typename... Args>
+void RDX_LOG_ERROR(rclcpp::Node *node, const char *format, Args &&...args)
+{
+    RCLCPP_ERROR(node->get_logger(), "[%s][%lu] %s", node->get_name(), static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())), fmt::format(format, std::forward<Args>(args)...).c_str());
+}
+
+//! Log a warning message using RCLCPP_WARN
+template <typename... Args>
+void RDX_LOG_WARN(rclcpp::Node *node, const char *format, Args &&...args)
+{
+    RCLCPP_WARN(node->get_logger(), "[%s][%lu] %s", node->get_name(), static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())), fmt::format(format, std::forward<Args>(args)...).c_str());
+}
+
+//! Macro to get JSON parameter from node, defined as macro to avoid include nlohmann/json.hpp in this file
+//! you must include nlohmann/json.hpp in the file where you use this macro
+#define RDX_GET_JSON_PARAM_FROM_NODE(node)                                \
+    ([](rclcpp::Node *node) -> nlohmann::json {                           \
+        rclcpp::Parameter _json_params;                                   \
+        auto pkey = redoxi_works::RosParams::ParamAsJsonString::MainKey;  \
+        if (!node->get_parameter(pkey, _json_params))                     \
+            return nlohmann::json();                                      \
+        try {                                                             \
+            return nlohmann::json::parse(_json_params.as_string());       \
+        } catch (const nlohmann::json::parse_error &e) {                  \
+            RDX_RAISE_ERROR("Failed to parse json string: {}", e.what()); \
+            return nlohmann::json();                                      \
+        }                                                                 \
+    })(node)
+
 
 enum class ActionDownstreamResponse {
     ACCEPTED = 0,
