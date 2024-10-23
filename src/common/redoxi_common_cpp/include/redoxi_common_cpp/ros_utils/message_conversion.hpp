@@ -36,6 +36,11 @@ inline boost::uuids::uuid to_boost_uuid(const rclcpp_action::GoalUUID &goal_uuid
     return uuid;
 }
 
+inline std::string to_boost_uuid_string(const rclcpp_action::GoalUUID &goal_uuid)
+{
+    return boost::uuids::to_string(to_boost_uuid(goal_uuid));
+}
+
 //! Convert a boost UUID to a ROS 2 action goal UUID
 inline rclcpp_action::GoalUUID to_ros_goal_uuid(const boost::uuids::uuid &uuid)
 {

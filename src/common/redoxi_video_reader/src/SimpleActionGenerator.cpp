@@ -54,18 +54,33 @@ void SimpleActionGenerator::_step()
     tbb::task_group unordered_tasks;
 
     // just print a heartbeat
-    RDX_LOG_INFO(this, __func__, true, "heartbeat");
+    // RDX_LOG_INFO(this, __func__, true, "heartbeat");
 
     // ping all downstreams
     for (const auto &downstream : m_downstreams) {
-        RDX_LOG_INFO(this, __func__, "pinging downstream: {}", downstream.first);
+        RDX_LOG_INFO(this, __func__, true, "pinging downstream: {}", downstream.first);
         auto client = downstream.second->accept_frame;
 
         Downstream_t::Goal_t goal;
+        Downstream_t::SendGoalOptions_t opt;
+        opt.goal_response_callback = [this, downstream](const auto &goal_handle) {
+            bool downstream_accepted = goal_handle != nullptr;
+            RDX_LOG_INFO(this, __func__, true, "received goal response from downstream: {} (accepted: {})",
+                         downstream.first, downstream_accepted);
+        };
+        opt.result_callback = [this, downstream](const auto &result) {
+            RDX_LOG_INFO(this, __func__, true, "received result from downstream: {} (status: {}, goal_id: {})",
+                         downstream.first, (int)result.code, to_boost_uuid_string(result.goal_id));
+        };
+
         goal.x_control.code = goal.x_control.PING;
         goal.x_uid = to_ros_uuid_msg(boost::uuids::random_generator()());
-        client->async_send_goal(goal);
-        RDX_LOG_INFO(this, __func__, "sent ping to downstream: {}", downstream.first);
+        client->async_send_goal(goal, opt);
+        RDX_LOG_INFO(this, __func__, true, "sent ping to downstream: {}", downstream.first);
+
+        // block myself
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        RDX_LOG_INFO(this, __func__, true, "unblocked myself");
     }
 
     return;
