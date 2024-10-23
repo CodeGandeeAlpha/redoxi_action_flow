@@ -59,16 +59,33 @@ class FrameRelayPublisher : public rclcpp::Node
     };
 
     struct FrameDeliveryPayload_t {
+        using Ptr = std::shared_ptr<FrameDeliveryPayload_t>;
         std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle;
-        int64_t ith_received_frame = -1;
-        int64_t ith_sent_frame = -1;
+
+        bool is_valid() const
+        {
+            return goal_handle != nullptr;
+        }
     };
 
     //! The task type for delivering frames
     struct FrameDeliveryTask_t {
         virtual ~FrameDeliveryTask_t() = default;
+
+        //! The UUID of the goal
         boost::uuids::uuid goal_uuid;
-        std::shared_future<FrameDeliveryPayload_t> payload;
+
+        //! The index of the received frame
+        int64_t ith_received_frame = -1;
+
+        //! The index of the sent frame
+        int64_t ith_sent_frame = -1;
+
+        // this can only be computed when goal handle is created
+        std::shared_future<FrameDeliveryPayload_t::Ptr> payload;
+
+        //! The promise for the payload, use to signal the payload is ready
+        std::shared_ptr<std::promise<FrameDeliveryPayload_t::Ptr>> _payload_promise;
     };
 
   public:
@@ -104,8 +121,15 @@ class FrameRelayPublisher : public rclcpp::Node
     virtual int _try_enqueue_goal(const rclcpp_action::GoalUUID &uuid,
                                   const FrameReceiveAction_t::Goal &goal);
 
-    //! resolve the goal, return 0 if success, otherwise return -1
-    virtual int _resolve_goal(std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle);
+    //! create a delivery task
+    //! @return 0 if success, otherwise return -1
+    virtual int _create_delivery_task(FrameDeliveryTask_t &output_task,
+                                      const rclcpp_action::GoalUUID &uuid,
+                                      const FrameReceiveAction_t::Goal &goal,
+                                      const FrameDeliveryPayload_t *preset = nullptr);
+
+    //! resolve the goal payload, return 0 if success, otherwise return -1
+    virtual int _resolve_goal_payload(std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle);
 
   protected:
     //! The publisher for the image topic
