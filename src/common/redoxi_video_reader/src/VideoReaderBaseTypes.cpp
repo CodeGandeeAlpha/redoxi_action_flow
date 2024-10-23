@@ -12,23 +12,25 @@
         "custom_var_1": 100.0,
         "custom_var_2": 10.0,
     },
-    "runtime_config":{
-        "frame_interval_ms": 100.0,
-        "step_interval_ms": 10.0,
+    "runtime_config": {
+        "frame_interval_ms": 10000.0,
+        "step_interval_ms": 1000,
     },
-    "init_config":{
+    "init_config": {
         "downstreams": {
-            "actions": {
-                "/video_sink/in/action":{
-                    "retry_strategy":{
-                        "max_retries": 3,
-                        "retry_interval_ms": 50.0,
+            "actions": [
+                    {
+                        "name": "/video_sink/in/action",
+                        "retry_strategy": {
+                            "max_retries": 3,
+                            "retry_interval_ms": 50.0,
+                        }
                     }
-                }
-            },
+                ]
         },
     },
 }
+
 */
 
 
@@ -53,25 +55,30 @@ void InitConfig::from_parameters(RedoxiVideoReaderBase *node)
     json_pointer init_config_ptr("/init_config");
     json_pointer downstreams_ptr("/init_config/downstreams/actions");
 
-    if (json_params.contains(init_config_ptr) && json_params.contains(downstreams_ptr) && json_params[downstreams_ptr].is_object()) {
-        for (const auto &[action_name, action_config] : json_params[downstreams_ptr].items()) {
+    if (json_params.contains(init_config_ptr) && json_params.contains(downstreams_ptr) && json_params[downstreams_ptr].is_array()) {
+        for (const auto &action_config : json_params[downstreams_ptr]) {
+            if (!action_config.contains("name")) {
+                RDX_LOG_WARN(node, __func__, true, "Skipping downstream action without a name");
+                continue;
+            }
+
+            std::string action_name = action_config["name"].get<std::string>();
             auto spec = std::make_shared<DownstreamSpec>();
             spec->accept_frame_action = action_name;
             RDX_LOG_INFO(node, __func__, true, "Configuring downstream action: {}", action_name);
 
             //! Configure retry strategy if present
-            json_pointer retry_strategy_ptr(fmt::format("/init_config/downstreams/actions/{}/retry_strategy", action_name));
-            if (json_params.contains(retry_strategy_ptr)) {
-                json_pointer max_retries_ptr(fmt::format("{}/max_retries", retry_strategy_ptr.to_string()));
-                json_pointer retry_interval_ptr(fmt::format("{}/retry_interval_ms", retry_strategy_ptr.to_string()));
+            if (action_config.contains("retry_strategy")) {
+                const auto &retry_strategy = action_config["retry_strategy"];
 
-                if (json_params.contains(max_retries_ptr)) {
-                    int max_retries = json_params[max_retries_ptr].get<int>();
+                if (retry_strategy.contains("max_retries")) {
+                    int max_retries = retry_strategy["max_retries"].get<int>();
                     spec->retry_strategy->set_max_number_of_retries(max_retries);
                     RDX_LOG_INFO(node, __func__, true, "Set max retries for {}: {}", action_name, max_retries);
                 }
-                if (json_params.contains(retry_interval_ptr)) {
-                    int64_t retry_interval = json_params[retry_interval_ptr].get<int64_t>();
+
+                if (retry_strategy.contains("retry_interval_ms")) {
+                    int64_t retry_interval = retry_strategy["retry_interval_ms"].get<int64_t>();
                     spec->retry_strategy->set_wait_time_for_retry(std::chrono::milliseconds(retry_interval));
                     RDX_LOG_INFO(node, __func__, true, "Set retry interval for {}: {} ms", action_name, retry_interval);
                 }

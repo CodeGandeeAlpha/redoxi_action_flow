@@ -1,5 +1,14 @@
 [] implement the frame payload type
 
+## Debugging
+| Has Frame Payload | Is Ping | Always Accept | Passed | Detail |
+|-------------------|---------|---------------|--------|--------|
+| Yes (640x480)     | Yes     | Yes           | Yes     | Goal expiration is not a problem, it has a 10s timeout set by ros2 (when creating the server) |
+| Yes (640x480)     | Yes     | No            | ?      | Ping requests with random rejection |
+| Yes (640x480)     | No      | Yes           | ?      | Normal frame delivery scenario |
+| No                | Yes     | Yes           | ?      | Ping without frame payload |
+
+
 ## Assumptions
 [] action messages arrive in order
 

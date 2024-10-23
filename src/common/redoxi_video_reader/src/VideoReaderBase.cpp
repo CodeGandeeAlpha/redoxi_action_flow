@@ -14,6 +14,9 @@
 namespace redoxi_works
 {
 
+//! Global switch to control whether thread ID will be printed
+static const bool PRINT_THREAD_ID = true;
+
 void RedoxiVideoReaderBase::set_publish_image(bool enable)
 {
     m_publish_image = enable;
@@ -52,43 +55,43 @@ int RedoxiVideoReaderBase::init(const std::shared_ptr<InitConfig_t> &config,
                           "[init()] Runtime config is not set");
 
     // create the implementation
-    RCLCPP_DEBUG(this->get_logger(), "[init()] Creating implementation ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Creating implementation ...");
     m_impl = _create_impl(config, runtime_config);
 
     // init shared memory storage if it is supported
-    RCLCPP_DEBUG(this->get_logger(), "[init()] Initializing shared memory storage ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Initializing shared memory storage ...");
     if (m_impl->is_shared_memory_supported()) {
         int ret = m_impl->init_shared_memory_storage();
         if (ret != 0) {
-            RCLCPP_WARN(this->get_logger(), "[init()] Failed to initialize shared memory storage, continue without shared memory");
+            RDX_LOG_WARN(this, __func__, PRINT_THREAD_ID, "Failed to initialize shared memory storage, continue without shared memory");
         }
     }
 
     // create debug topics
-    RCLCPP_DEBUG(this->get_logger(), "[init()] Creating debug topics ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Creating debug topics ...");
     _create_debug_topics();
 
     // set init_config
     {
-        RCLCPP_DEBUG(this->get_logger(), "[init()] Updating init config ...");
+        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Updating init config ...");
         auto ret = update_init_config(config);
         if (ret != 0) {
-            RCLCPP_ERROR(this->get_logger(), "[init()] Failed to update init config");
+            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to update init config");
             return ret;
         }
     }
 
     // set runtime_config
     {
-        RCLCPP_DEBUG(this->get_logger(), "[init()] Updating runtime config ...");
+        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Updating runtime config ...");
         auto ret = update_runtime_config(runtime_config);
         if (ret != 0) {
-            RCLCPP_ERROR(this->get_logger(), "[init()] Failed to update runtime config");
+            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to update runtime config");
             return ret;
         }
     }
 
-    RCLCPP_INFO(this->get_logger(), "[init()] Initialization completed successfully");
+    RDX_LOG_INFO(this, __func__, PRINT_THREAD_ID, "Initialization completed successfully");
     return 0;
 }
 
@@ -110,7 +113,7 @@ int RedoxiVideoReaderBase::update_init_config(const std::shared_ptr<InitConfig_t
     //! Reconnect to downstreams with the new config
     auto ret = _connect_to_downstreams();
     if (ret != 0) {
-        RCLCPP_ERROR(this->get_logger(), "[update_init_config()] Failed to connect to downstreams, error code: %d", ret);
+        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to connect to downstreams, error code: {}", ret);
         return ret;
     }
 
@@ -143,10 +146,10 @@ int RedoxiVideoReaderBase::update_runtime_config(const std::shared_ptr<RuntimeCo
 
     //! create frame delivery tasks
     {
-        RCLCPP_DEBUG(this->get_logger(), "[update_runtime_config()] Initializing frame delivery tasks ...");
+        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Initializing frame delivery tasks ...");
         int ret = _init_frame_delivery_tasks();
         if (ret != 0) {
-            RCLCPP_ERROR(this->get_logger(), "[update_init_config()] Failed to initialize frame delivery tasks");
+            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to initialize frame delivery tasks");
             return ret;
         }
     }
@@ -154,7 +157,7 @@ int RedoxiVideoReaderBase::update_runtime_config(const std::shared_ptr<RuntimeCo
     //! Apply any necessary changes based on the new runtime config
     //! This might involve updating internal parameters or reconfiguring components
 
-    RCLCPP_INFO(this->get_logger(), "[update_runtime_config()] Runtime config updated successfully");
+    RDX_LOG_INFO(this, __func__, PRINT_THREAD_ID, "Runtime config updated successfully");
 
     return 0;
 }
@@ -170,9 +173,9 @@ void RedoxiVideoReaderBase::_create_debug_topics()
         topic_name,
         rclcpp::QoS(rclcpp::KeepLast(queue_size)).reliable());
 
-    RCLCPP_DEBUG(this->get_logger(),
-                 "[_create_debug_topics()] Created debug image topic: %s",
-                 topic_name.c_str());
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID,
+                  "Created debug image topic: {}",
+                  topic_name);
 }
 
 int RedoxiVideoReaderBase::open()
@@ -189,7 +192,7 @@ int RedoxiVideoReaderBase::open()
     // do subclass work first, to avoid side effect on failure
     auto ret = _open();
     if (ret != 0) {
-        RCLCPP_ERROR(this->get_logger(), "[open()] Failed to open node");
+        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to open node");
         return ret;
     }
 
@@ -217,7 +220,7 @@ int RedoxiVideoReaderBase::start()
     // do subclass work first, to avoid side effect on failure
     auto ret = _start();
     if (ret != 0) {
-        RCLCPP_ERROR(this->get_logger(), "[start()] Failed to start node");
+        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to start node");
         return ret;
     }
 
@@ -263,7 +266,7 @@ int RedoxiVideoReaderBase::stop()
     // do subclass work first, to avoid side effect on failure
     auto ret = _stop();
     if (ret != 0) {
-        RCLCPP_ERROR(this->get_logger(), "[stop()] Failed to stop node");
+        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to stop node");
         return ret;
     }
 
@@ -301,7 +304,7 @@ int RedoxiVideoReaderBase::close()
     if (m_status_code == NodeStatusCode::STARTED) {
         auto ret = stop();
         if (ret != 0) {
-            RCLCPP_ERROR(this->get_logger(), "[close()] Failed to stop node");
+            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to stop node");
             return ret;
         }
     }
@@ -309,7 +312,7 @@ int RedoxiVideoReaderBase::close()
     // do subclass work first, to avoid side effect on failure
     auto ret = _close();
     if (ret != 0) {
-        RCLCPP_ERROR(this->get_logger(), "[close()] Failed to close node");
+        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to close node");
         return ret;
     }
 
@@ -344,9 +347,9 @@ int RedoxiVideoReaderBase::_connect_to_downstreams()
             ds->spec = it.second;
 
             // wait until the action server becomes online
-            RCLCPP_DEBUG(this->get_logger(), "[_connect_to_downstreams()] Waiting for action server %s to be online", name.c_str());
+            RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Waiting for action server {} to be online", name);
             client->wait_for_action_server();
-            RCLCPP_DEBUG(this->get_logger(), "[_connect_to_downstreams()] Action server %s connected", name.c_str());
+            RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Action server {} connected", name);
         }
 
         m_downstreams[it.first] = ds;
@@ -358,11 +361,11 @@ int RedoxiVideoReaderBase::_connect_to_downstreams()
 int RedoxiVideoReaderBase::_init_frame_delivery_tasks()
 {
     // create graph and node
-    RCLCPP_DEBUG(this->get_logger(), "[_init_frame_delivery_tasks()] Creating graph ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Creating graph ...");
     m_impl->frame_delivery_graph = std::make_shared<tbb::flow::graph>();
     auto &g = *m_impl->frame_delivery_graph;
 
-    RCLCPP_DEBUG(this->get_logger(), "[_init_frame_delivery_tasks()] Creating frame delivery node ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Creating frame delivery node ...");
     m_impl->frame_delivery_node = std::make_shared<
         ap::SingleBufferExecNode<
             mytypes::FrameDeliveryTask,
@@ -370,17 +373,17 @@ int RedoxiVideoReaderBase::_init_frame_delivery_tasks()
     auto &node = *m_impl->frame_delivery_node;
     {
         auto is_built = node.is_built();
-        RCLCPP_DEBUG(this->get_logger(), "[_init_frame_delivery_tasks()] Frame delivery node is built: %s", is_built ? "true" : "false");
+        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Frame delivery node is built: {}", is_built ? "true" : "false");
     }
 
     // set node params
-    RCLCPP_DEBUG(this->get_logger(), "[_init_frame_delivery_tasks()] Setting node params ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Setting node params ...");
     auto buffer_size = m_runtime_config->frame_delivery_options->num_buffer_frames;
     node.set_input_data_buffer_size(buffer_size);
     node.set_preserve_order(true);
 
     // sync mode, all functions are executed in the graph
-    RCLCPP_DEBUG(this->get_logger(), "[_init_frame_delivery_tasks()] Setting node to sync mode ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Setting node to sync mode ...");
     node.set_use_async_callback(false);
     using FrameDeliveryNode_t = ap::SingleBufferExecNode<mytypes::FrameDeliveryTask, mytypes::FrameDeliveryTask>;
     using WorkInput_t = FrameDeliveryNode_t::InputWithTokens_t;
@@ -388,7 +391,7 @@ int RedoxiVideoReaderBase::_init_frame_delivery_tasks()
 
     // setup work function, nothing to do because during work function
     // frames are out of order
-    RCLCPP_DEBUG(this->get_logger(), "[_init_frame_delivery_tasks()] Setting work function ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Setting work function ...");
     node.set_work_function(
         [this](const WorkInput_t &input, WorkOutput_t &output) -> int {
             // copy input to output
@@ -396,7 +399,7 @@ int RedoxiVideoReaderBase::_init_frame_delivery_tasks()
             const auto &in_payload = std::get<0>(input);
             auto ret = this->_do_frame_delivery_preprocess(in_payload, out_payload);
             if (ret != 0) {
-                RCLCPP_ERROR(this->get_logger(), "[WorkFunc] Failed to preprocess frame, error code: %d", ret);
+                RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "[WorkFunc] Failed to preprocess frame, error code: {}", ret);
             }
 
             return ret;
@@ -404,19 +407,19 @@ int RedoxiVideoReaderBase::_init_frame_delivery_tasks()
 
     // output callback
     // send frame to downstreams
-    RCLCPP_DEBUG(this->get_logger(), "[_init_frame_delivery_tasks()] Setting output callback ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Setting output callback ...");
     node.set_output_callback(
         [this](const WorkOutput_t &output) -> int {
             auto &out_payload = std::get<0>(output);
             auto ret = this->_do_frame_delivery_main(out_payload);
             if (ret != 0) {
-                RCLCPP_ERROR(this->get_logger(), "[WorkFunc] Failed to deliver frame, error code: %d", ret);
+                RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "[WorkFunc] Failed to deliver frame, error code: {}", ret);
             }
             return ret;
         });
 
     // build the node
-    RCLCPP_DEBUG(this->get_logger(), "[_init_frame_delivery_tasks()] Building frame delivery node ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Building frame delivery node ...");
     node.build();
 
     return 0;
@@ -492,7 +495,7 @@ int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &ta
         }
     }
     if (!downstream_ready) {
-        RCLCPP_WARN(this->get_logger(), "[_do_frame_delivery_main()] No downstream is ready to accept new frame");
+        RDX_LOG_WARN(this, __func__, PRINT_THREAD_ID, "No downstream is ready to accept new frame");
         return 0;
     }
 
@@ -508,9 +511,9 @@ int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &ta
             auto ds = it.second;
             auto ret = _deliver_frame(frame_msg, ds);
             if (ret != 0) {
-                RCLCPP_ERROR(this->get_logger(),
-                             "[_do_frame_delivery_main()] Failed to deliver frame to downstream %s",
-                             ds->spec->accept_frame_action.c_str());
+                RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID,
+                              "Failed to deliver frame to downstream {}",
+                              ds->spec->accept_frame_action);
             } else {
                 sent = true;
             }
@@ -527,7 +530,7 @@ int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &ta
         uint64_t shared_memory_id = 0;
         auto ret = m_impl->add_to_shared_memory(task_input.frame, shared_memory_id);
         if (ret != 0) {
-            RCLCPP_ERROR(this->get_logger(), "[_do_frame_delivery_main()] Failed to add frame to shared memory");
+            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to add frame to shared memory");
             return -1;
         }
 
@@ -539,7 +542,7 @@ int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &ta
 
         //! Remove frame from shared memory if failed to deliver
         if (ret_deliver_frame != 0) {
-            RCLCPP_ERROR(this->get_logger(), "[_do_frame_delivery_main()] Failed to deliver frame, removing frame from shared memory");
+            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to deliver frame, removing frame from shared memory");
             m_impl->remove_from_shared_memory(shared_memory_id);
         }
 
@@ -551,7 +554,7 @@ int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &ta
         //! Deliver frame
         auto ret_deliver_frame = func_deliver_frame(frame_msg);
         if (ret_deliver_frame != 0) {
-            RCLCPP_ERROR(this->get_logger(), "[_do_frame_delivery_main()] Failed to deliver frame");
+            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to deliver frame");
         }
 
         return ret_deliver_frame;
@@ -570,51 +573,59 @@ int RedoxiVideoReaderBase::_deliver_frame(
     int attempts = 0;
     const int max_attempts = ds->spec->retry_strategy->get_max_number_of_retries();
     auto timeout_each_attempt = ds->spec->retry_strategy->get_wait_time_for_retry();
+    auto msg_uuid = to_boost_uuid(frame_msg.uuid);
 
     while (attempts < max_attempts) {
         //! Send the frame to the downstream
         auto result = _send_frame_to_downstream(frame_msg, ds, timeout_each_attempt);
-        bool wait_indefinitely = timeout_each_attempt < DefaultTimeUnit_t::zero();
-
-        if (result.response_code) {
-            // it has a response code, check it
-            switch (*result.response_code) {
-                case ActionDownstreamResponse::ACCEPTED:
-                    return 0; // Success
-                case ActionDownstreamResponse::REJECTED:
-                    RCLCPP_WARN(this->get_logger(), "[_deliver_frame()] Frame rejected by downstream %s",
-                                ds->spec->accept_frame_action.c_str());
-                    break;
-                case ActionDownstreamResponse::TIMEOUT:
-                    RCLCPP_WARN(this->get_logger(), "[_deliver_frame()] Timeout while sending frame to downstream %s",
-                                ds->spec->accept_frame_action.c_str());
-                    break;
-            }
+        if (!result.goal_handle_future.valid()) {
+            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Not sending frame to downstream {}, goal handle future is invalid",
+                          boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
         } else {
-            // may or maynot have a response code, check the goal handle future
-            if (wait_indefinitely) {
-                //! Wait indefinitely for the goal handle future
-                result.goal_handle_future.wait();
-                auto goal_handle = result.goal_handle_future.get();
-                if (goal_handle) {
-                    return 0; // Success
+            bool wait_indefinitely = timeout_each_attempt < DefaultTimeUnit_t::zero();
+
+            if (result.response_code) {
+                // it has a response code, check it
+                switch (*result.response_code) {
+                    case ActionDownstreamResponse::ACCEPTED:
+                        RDX_LOG_INFO(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame accepted by downstream {}",
+                                     boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+                        return 0; // Success
+                    case ActionDownstreamResponse::REJECTED:
+                        RDX_LOG_WARN(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame rejected by downstream {}",
+                                     boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+                        break;
+                    case ActionDownstreamResponse::TIMEOUT:
+                        RDX_LOG_WARN(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while sending frame to downstream {}",
+                                     boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+                        break;
                 }
             } else {
-                //! Regard as failure without additional waiting
-                RCLCPP_WARN(this->get_logger(), "[_deliver_frame()] Timeout while waiting for goal handle from downstream %s",
-                            ds->spec->accept_frame_action.c_str());
+                // may or maynot have a response code, check the goal handle future
+                if (wait_indefinitely) {
+                    //! Wait indefinitely for the goal handle future
+                    result.goal_handle_future.wait();
+                    auto goal_handle = result.goal_handle_future.get();
+                    if (goal_handle) {
+                        return 0; // Success
+                    }
+                } else {
+                    //! Regard as failure without additional waiting
+                    RDX_LOG_WARN(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while waiting for goal handle from downstream {}",
+                                 boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+                }
             }
         }
 
         attempts++;
         if (attempts < max_attempts) {
-            RCLCPP_INFO(this->get_logger(), "[_deliver_frame()] Retrying frame delivery to downstream %s (attempt %d/%d)",
-                        ds->spec->accept_frame_action.c_str(), attempts + 1, max_attempts);
+            RDX_LOG_INFO(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Retrying frame delivery to downstream {} (attempt {}/{})",
+                         boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action, attempts + 1, max_attempts);
         }
     }
 
-    RCLCPP_ERROR(this->get_logger(), "[_deliver_frame()] Failed to deliver frame to downstream %s after %d attempts",
-                 ds->spec->accept_frame_action.c_str(), max_attempts);
+    RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Failed to deliver frame to downstream {} after {} attempts",
+                  boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action, max_attempts);
     return -1;
 }
 
@@ -627,6 +638,9 @@ RedoxiVideoReaderBase::FrameMessage_t RedoxiVideoReaderBase::_create_frame_messa
     FrameMessage_t frame_msg;
     frame_msg.uuid = to_ros_uuid_msg(task_input.uid);
     frame_msg.frame_num = task_input.frame_number;
+    if (task_input.control_signal) {
+        frame_msg.x_control = *task_input.control_signal;
+    }
     auto source_image_encoding = m_runtime_config->output_image_encoding;
     if (payload_type == FrameDeliveryOptions_t::FramePayloadType::UncompressedBySharedMemory) {
         if (shared_memory_id) {
@@ -770,33 +784,33 @@ void RedoxiVideoReaderBase::_publish_frame(const cv::Mat &frame)
 
 void RedoxiVideoReaderBase::_step()
 {
-    // if not started yet, do nothing
+    //! If not started yet, do nothing
     if (m_status_code != NodeStatusCode::STARTED) {
         return;
     }
 
-    // create a local task group
-    // accumulate tasks and execute them in one go
+    //! Create a local task group
+    //! Accumulate tasks and execute them in one go
     tbb::task_group unordered_tasks;
 
-    // read next frame, if token is ready
+    //! Read next frame, if token is ready
     DummyTimeToken token;
     if (m_impl->read_frame_token->try_pop_token(token)) {
-        // time to read a new frame
+        //! Time to read a new frame
         cv::Mat frame;
         int ret = _read_frame(frame, m_frame_number);
         if (ret == 0) {
-            // create a frame delivery task and deliver
+            //! Create a frame delivery task and deliver
             FrameDeliveryTask_t delivery_task;
             _create_frame_delivery_task(frame, delivery_task);
 
             auto task_func = [this, delivery_task]() {
                 const auto &qos = m_runtime_config->frame_delivery_options;
 
-                // at least try once
+                //! At least try once
                 bool task_sent = m_impl->frame_delivery_node->put_data(delivery_task);
 
-                // if qos says you should retry until success, do so
+                //! If qos says you should retry until success, do so
                 if (qos->drop_frame_strategy == FrameDeliveryOptions_t::DropFrameStrategy::NoDrop) {
                     auto max_attempts = DefaultParams::MaxNumberOfRetries;
                     int attempts = 0;
@@ -806,25 +820,25 @@ void RedoxiVideoReaderBase::_step()
                         task_sent = m_impl->frame_delivery_node->put_data(delivery_task);
                     }
 
-                    // flush the graph, make sure the frame is delivered
+                    //! Flush the graph, make sure the frame is delivered
                     m_impl->frame_delivery_graph->wait_for_all();
                 }
 
                 if (task_sent) {
-                    RCLCPP_DEBUG(this->get_logger(), "[%s][_step()] Frame %d (UID: %s) sent",
-                                 this->get_name(), (int)delivery_task.frame_number,
-                                 delivery_task.get_uid_as_string().c_str());
+                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Frame {} (UID: {}) sent",
+                                  (int)delivery_task.frame_number,
+                                  delivery_task.get_uid_as_string());
                 } else {
-                    RCLCPP_DEBUG(this->get_logger(), "[%s][_step()] Frame %d (UID: %s) dropped",
-                                 this->get_name(), (int)delivery_task.frame_number,
-                                 delivery_task.get_uid_as_string().c_str());
+                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Frame {} (UID: {}) dropped",
+                                  (int)delivery_task.frame_number,
+                                  delivery_task.get_uid_as_string());
                 }
             };
 
-            // execute the task in isolation
+            //! Execute the task in isolation
             unordered_tasks.run(task_func);
 
-            // requested publish frame?
+            //! Requested publish frame?
             if (m_publish_image) {
                 unordered_tasks.run([this, frame]() {
                     _publish_frame(frame);
@@ -833,8 +847,8 @@ void RedoxiVideoReaderBase::_step()
         }
     }
 
-    // wait for all tasks to complete
+    //! Wait for all tasks to complete
     unordered_tasks.wait();
-} // end of _step() function
+} //! End of _step() function
 
 } // namespace redoxi_works

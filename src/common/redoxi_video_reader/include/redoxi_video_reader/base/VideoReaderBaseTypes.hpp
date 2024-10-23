@@ -202,6 +202,9 @@ class REDOXI_VIDEO_READER_PUBLIC FrameDeliveryTask
     int64_t frame_number = 0;
     double timestamp_sec = 0;
 
+    //! control signal, if provided, will override the frame control signal
+    std::optional<redoxi_public_msgs::msg::Control> control_signal;
+
     std::string get_uid_as_string() const
     {
         return boost::uuids::to_string(uid);

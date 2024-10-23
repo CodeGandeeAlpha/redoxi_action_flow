@@ -12,6 +12,63 @@
 namespace redoxi_works
 {
 
+//! A lightweight class that can only be converted to and from bool or int
+class _StrictBool
+{
+  private:
+    bool value;
+
+  public:
+    //! Default constructor
+    _StrictBool()
+        : value(false)
+    {
+    }
+
+    //! Constructor from bool
+    _StrictBool(bool b)
+        : value(b)
+    {
+    }
+
+    //! Constructor from int
+    _StrictBool(int i)
+        : value(i != 0)
+    {
+    }
+
+    //! Conversion to bool
+    operator bool() const
+    {
+        return value;
+    }
+
+    //! Conversion to int
+    operator int() const
+    {
+        return value ? 1 : 0;
+    }
+
+    //! Assignment from bool
+    _StrictBool &operator=(bool b)
+    {
+        value = b;
+        return *this;
+    }
+
+    //! Assignment from int
+    _StrictBool &operator=(int i)
+    {
+        value = (i != 0);
+        return *this;
+    }
+
+    //! Deleted conversion operators to prevent implicit conversions to other types
+    template <typename T>
+    operator T() const = delete;
+};
+
+
 /**
  * @brief Assert that a condition is true, if not, throw an exception and terminate the program
  * @param condition the condition to assert
@@ -55,9 +112,22 @@ void RDX_RAISE_ERROR(const std::string &format, Args &&...args)
     RDX_ASSERT_CHECK_TRUE(false, format, std::forward<Args>(args)...);
 }
 
-//! Log an info message using RCLCPP_INFO
+//! Log an info message using RCLCPP_INFO without thread ID
 template <typename... Args>
-void RDX_LOG_INFO(rclcpp::Node *node, const std::string &func_name, bool with_thread_id,
+void RDX_LOG_INFO(rclcpp::Node *node, const std::string &func_name,
+                  const std::string &format, Args &&...args)
+{
+    if constexpr (sizeof...(args) == 0) {
+        RCLCPP_INFO(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format.c_str());
+    } else {
+        RCLCPP_INFO(node->get_logger(), "[f=%s()] %s", func_name.c_str(),
+                    fmt::format(format, std::forward<Args>(args)...).c_str());
+    }
+}
+
+//! Log an info message using RCLCPP_INFO with or without thread ID
+template <typename... Args>
+void RDX_LOG_INFO(rclcpp::Node *node, const std::string &func_name, _StrictBool with_thread_id,
                   const std::string &format, Args &&...args)
 {
     if (with_thread_id) {
@@ -71,35 +141,108 @@ void RDX_LOG_INFO(rclcpp::Node *node, const std::string &func_name, bool with_th
                         fmt::format(format, std::forward<Args>(args)...).c_str());
         }
     } else {
-        if constexpr (sizeof...(args) == 0) {
-            RCLCPP_INFO(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format.c_str());
-        } else {
-            RCLCPP_INFO(node->get_logger(), "[f=%s()] %s", func_name.c_str(),
-                        fmt::format(format, std::forward<Args>(args)...).c_str());
-        }
+        RDX_LOG_INFO(node, func_name, format, std::forward<Args>(args)...);
     }
 }
 
 
-//! Log a debug message using RCLCPP_DEBUG
+//! Log a debug message using RCLCPP_DEBUG without thread ID
 template <typename... Args>
-void RDX_LOG_DEBUG(rclcpp::Node *node, const char *format, Args &&...args)
+void RDX_LOG_DEBUG(rclcpp::Node *node, const std::string &func_name,
+                   const std::string &format, Args &&...args)
 {
-    RCLCPP_DEBUG(node->get_logger(), "[%s][%lu] %s", node->get_name(), static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())), fmt::format(format, std::forward<Args>(args)...).c_str());
+    if constexpr (sizeof...(args) == 0) {
+        RCLCPP_DEBUG(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format.c_str());
+    } else {
+        RCLCPP_DEBUG(node->get_logger(), "[f=%s()] %s", func_name.c_str(),
+                     fmt::format(format, std::forward<Args>(args)...).c_str());
+    }
 }
 
-//! Log an error message using RCLCPP_ERROR
+//! Log a debug message using RCLCPP_DEBUG with or without thread ID
 template <typename... Args>
-void RDX_LOG_ERROR(rclcpp::Node *node, const char *format, Args &&...args)
+void RDX_LOG_DEBUG(rclcpp::Node *node, const std::string &func_name, _StrictBool with_thread_id,
+                   const std::string &format, Args &&...args)
 {
-    RCLCPP_ERROR(node->get_logger(), "[%s][%lu] %s", node->get_name(), static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())), fmt::format(format, std::forward<Args>(args)...).c_str());
+    if (with_thread_id) {
+        if constexpr (sizeof...(args) == 0) {
+            RCLCPP_DEBUG(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
+                         static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                         format.c_str());
+        } else {
+            RCLCPP_DEBUG(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
+                         static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                         fmt::format(format, std::forward<Args>(args)...).c_str());
+        }
+    } else {
+        RDX_LOG_DEBUG(node, func_name, format, std::forward<Args>(args)...);
+    }
 }
 
-//! Log a warning message using RCLCPP_WARN
+//! Log an error message using RCLCPP_ERROR without thread ID
 template <typename... Args>
-void RDX_LOG_WARN(rclcpp::Node *node, const char *format, Args &&...args)
+void RDX_LOG_ERROR(rclcpp::Node *node, const std::string &func_name,
+                   const std::string &format, Args &&...args)
 {
-    RCLCPP_WARN(node->get_logger(), "[%s][%lu] %s", node->get_name(), static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())), fmt::format(format, std::forward<Args>(args)...).c_str());
+    if constexpr (sizeof...(args) == 0) {
+        RCLCPP_ERROR(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format.c_str());
+    } else {
+        RCLCPP_ERROR(node->get_logger(), "[f=%s()] %s", func_name.c_str(),
+                     fmt::format(format, std::forward<Args>(args)...).c_str());
+    }
+}
+
+//! Log an error message using RCLCPP_ERROR with or without thread ID
+template <typename... Args>
+void RDX_LOG_ERROR(rclcpp::Node *node, const std::string &func_name, _StrictBool with_thread_id,
+                   const std::string &format, Args &&...args)
+{
+    if (with_thread_id) {
+        if constexpr (sizeof...(args) == 0) {
+            RCLCPP_ERROR(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
+                         static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                         format.c_str());
+        } else {
+            RCLCPP_ERROR(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
+                         static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                         fmt::format(format, std::forward<Args>(args)...).c_str());
+        }
+    } else {
+        RDX_LOG_ERROR(node, func_name, format, std::forward<Args>(args)...);
+    }
+}
+
+//! Log a warning message using RCLCPP_WARN without thread ID
+template <typename... Args>
+void RDX_LOG_WARN(rclcpp::Node *node, const std::string &func_name,
+                  const std::string &format, Args &&...args)
+{
+    if constexpr (sizeof...(args) == 0) {
+        RCLCPP_WARN(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format.c_str());
+    } else {
+        RCLCPP_WARN(node->get_logger(), "[f=%s()] %s", func_name.c_str(),
+                    fmt::format(format, std::forward<Args>(args)...).c_str());
+    }
+}
+
+//! Log a warning message using RCLCPP_WARN with or without thread ID
+template <typename... Args>
+void RDX_LOG_WARN(rclcpp::Node *node, const std::string &func_name, _StrictBool with_thread_id,
+                  const std::string &format, Args &&...args)
+{
+    if (with_thread_id) {
+        if constexpr (sizeof...(args) == 0) {
+            RCLCPP_WARN(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
+                        static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                        format.c_str());
+        } else {
+            RCLCPP_WARN(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
+                        static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                        fmt::format(format, std::forward<Args>(args)...).c_str());
+        }
+    } else {
+        RDX_LOG_WARN(node, func_name, format, std::forward<Args>(args)...);
+    }
 }
 
 //! Macro to get JSON parameter from node, defined as macro to avoid include nlohmann/json.hpp in this file

@@ -1,5 +1,7 @@
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <redoxi_video_reader/generators/SimpleActionGenerator.hpp>
+#include <redoxi_common_cpp/ros_utils/SyncActionSender.hpp>
+#include <redoxi_video_reader/base/VideoReaderBaseImpl.hpp>
 
 namespace redoxi_works
 {
@@ -44,18 +46,80 @@ int SimpleActionGenerator::_read_frame(cv::Mat &frame, std::atomic<int64_t> &fra
 
 void SimpleActionGenerator::_step()
 {
+    _step_send_by_tbb_graph();
+}
+
+void SimpleActionGenerator::_step_send_by_tbb_graph()
+{
+    // read a frame
+    cv::Mat frame;
+    {
+        auto ret = _read_frame(frame, m_frame_number);
+        if (ret != 0) {
+            RDX_LOG_ERROR(this, __func__, true, "Failed to read frame");
+            return;
+        }
+    }
+
+    FrameDeliveryTask_t frame_delivery_task;
+    _create_frame_delivery_task(frame, frame_delivery_task);
+    {
+        // just use ping anyway
+        redoxi_public_msgs::msg::Control control;
+        control.code = control.PING;
+        frame_delivery_task.control_signal = control;
+    }
+
+    //! Put the ping task into the frame delivery node
+    auto msg_uuid = frame_delivery_task.uid;
+    {
+        auto ok = m_impl->frame_delivery_node->put_data(frame_delivery_task);
+        if (!ok) {
+            RDX_LOG_ERROR(this, __func__, true, "[msg_uuid={}] put data FAILED", boost::uuids::to_string(msg_uuid));
+        } else {
+            RDX_LOG_INFO(this, __func__, true, "[msg_uuid={}] put data SUCCESS", boost::uuids::to_string(msg_uuid));
+        }
+    }
+
+    //! Wait for the frame delivery graph to finish
+    // RDX_LOG_INFO(this, __func__, true, "waiting for frame delivery graph to finish");
+    // m_impl->frame_delivery_graph->wait_for_all();
+    // RDX_LOG_INFO(this, __func__, true, "frame delivery graph finished");
+}
+
+void SimpleActionGenerator::_step_send_by_sync_action_sender()
+{
+    std::chrono::milliseconds send_wait_time(100);
+    for (const auto &downstream : m_downstreams) {
+        //! Send a ping signal to the downstream using SyncActionSender
+        SyncActionSender<Downstream_t::ActionType_t> sender(this);
+
+        Downstream_t::Goal_t goal;
+        goal.x_control.code = goal.x_control.PING;
+        goal.x_uid = to_ros_uuid_msg(boost::uuids::random_generator()());
+
+        auto result = sender.send(goal, *downstream.second->accept_frame, send_wait_time);
+
+        if (result.response_code) {
+            if (result.response_code.value() == ActionDownstreamResponse::ACCEPTED) {
+                RDX_LOG_INFO(this, __func__, true, "Ping accepted by downstream: {}", downstream.first);
+            } else if (result.response_code.value() == ActionDownstreamResponse::REJECTED) {
+                RDX_LOG_INFO(this, __func__, true, "Ping rejected by downstream: {}", downstream.first);
+            } else if (result.response_code.value() == ActionDownstreamResponse::TIMEOUT) {
+                RDX_LOG_INFO(this, __func__, true, "Ping timed out for downstream: {}", downstream.first);
+            }
+        } else {
+            RDX_LOG_INFO(this, __func__, true, "Unknown response from downstream: {}", downstream.first);
+        }
+    }
+}
+
+void SimpleActionGenerator::_step_send_and_block()
+{
     // if not started yet, do nothing
     if (m_status_code != NodeStatusCode::STARTED) {
         return;
     }
-
-    // create a local task group
-    // accumulate tasks and execute them in one go
-    tbb::task_group unordered_tasks;
-
-    // just print a heartbeat
-    // RDX_LOG_INFO(this, __func__, true, "heartbeat");
-
     // ping all downstreams
     for (const auto &downstream : m_downstreams) {
         RDX_LOG_INFO(this, __func__, true, "pinging downstream: {}", downstream.first);
@@ -84,62 +148,6 @@ void SimpleActionGenerator::_step()
     }
 
     return;
-
-    // read next frame, if token is ready
-    DummyTimeToken token;
-    if (m_impl->read_frame_token->try_pop_token(token)) {
-        // time to read a new frame
-        cv::Mat frame;
-        int ret = _read_frame(frame, m_frame_number);
-        if (ret == 0) {
-            // create a frame delivery task and deliver
-            FrameDeliveryTask_t delivery_task;
-            _create_frame_delivery_task(frame, delivery_task);
-
-            auto task_func = [this, delivery_task]() {
-                const auto &qos = m_runtime_config->frame_delivery_options;
-
-                // at least try once
-                bool task_sent = m_impl->frame_delivery_node->put_data(delivery_task);
-
-                // if qos says you should retry until success, do so
-                if (qos->drop_frame_strategy == FrameDeliveryOptions_t::DropFrameStrategy::NoDrop) {
-                    auto max_attempts = DefaultParams::MaxNumberOfRetries;
-                    int attempts = 0;
-                    while (!task_sent && attempts < max_attempts) {
-                        attempts++;
-                        std::this_thread::sleep_for(qos->deliver_retry_interval);
-                        task_sent = m_impl->frame_delivery_node->put_data(delivery_task);
-                    }
-
-                    // flush the graph, make sure the frame is delivered
-                    m_impl->frame_delivery_graph->wait_for_all();
-                }
-
-                if (task_sent) {
-                    RCLCPP_DEBUG(this->get_logger(), "[%s][_step()] Frame %d (UID: %s) sent",
-                                 this->get_name(), (int)delivery_task.frame_number,
-                                 delivery_task.get_uid_as_string().c_str());
-                } else {
-                    RCLCPP_DEBUG(this->get_logger(), "[%s][_step()] Frame %d (UID: %s) dropped",
-                                 this->get_name(), (int)delivery_task.frame_number,
-                                 delivery_task.get_uid_as_string().c_str());
-                }
-            };
-
-            // execute the task in isolation
-            unordered_tasks.run(task_func);
-
-            // requested publish frame?
-            if (m_publish_image) {
-                unordered_tasks.run([this, frame]() {
-                    _publish_frame(frame);
-                });
-            }
-        }
-    }
-
-    // wait for all tasks to complete
-    unordered_tasks.wait();
 }
+
 } // namespace redoxi_works

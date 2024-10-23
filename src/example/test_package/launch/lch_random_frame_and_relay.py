@@ -10,21 +10,25 @@ json_params = {
     },
     "runtime_config": {
         "frame_interval_ms": 10000.0,
-        "step_interval_ms": 1.0,
+        "step_interval_ms": 1,
     },
     "init_config": {
         "downstreams": {
-            "actions": {
-                "/video_sink/in/action": {
+            "actions": [
+                {
+                    "name": "/video_sink/in/action",
                     "retry_strategy": {
-                        "max_retries": 3,
+                        "max_retries": 5,
                         "retry_interval_ms": 50.0,
-                    }
+                    },
                 }
-            },
+            ]
         },
     },
 }
+
+# common_prefix = ["valgrind --tool=callgrind --dump-instr=yes -v --instr-atstart=no"]
+common_prefix = None
 
 simple_action_generator = Node(
     package="test_package",
@@ -36,6 +40,7 @@ simple_action_generator = Node(
             "param_as_json_string": json.dumps(json_params, separators=(",", ":")),
         },
     ],
+    prefix=common_prefix,
 )
 
 video_source_node = Node(
@@ -48,6 +53,7 @@ video_source_node = Node(
             "param_as_json_string": json.dumps(json_params, separators=(",", ":")),
         },
     ],
+    prefix=common_prefix,
 )
 
 video_sink_node = Node(
@@ -55,6 +61,7 @@ video_sink_node = Node(
     executable="test_video_sink",
     name="video_sink",
     namespace="video_sink",
+    prefix=common_prefix,
 )
 
 
@@ -63,6 +70,9 @@ def generate_launch_description():
     env_var_settings = [
         SetEnvironmentVariable(
             "RCUTILS_CONSOLE_OUTPUT_FORMAT", "[{severity}][{time}]: {message}"
+        ),
+        SetEnvironmentVariable(
+            "ROS_LOG_DIR", "/soft/workspace/code/psf_ros2_ws/tmp/roslog"
         ),
     ]
 

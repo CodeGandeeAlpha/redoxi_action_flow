@@ -8,11 +8,15 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_hash.hpp>
 #include <future>
+#include <random>
 
 using namespace std::placeholders;
 
 namespace redoxi_works
 {
+
+//! Global static variable to control thread ID printing
+static const bool print_thread_id = true;
 
 struct TbbBoostUuidHash {
     //! Hash function for boost::uuids::uuid to be used with tbb::concurrent_hash_map
@@ -63,7 +67,7 @@ FrameRelayPublisher::FrameRelayPublisher(const std::string &name, const rclcpp::
     // declare parameters
     auto ret = declare_default_parameters_for_node(this);
     if (ret != 0) {
-        RDX_RAISE_ERROR("[%s] Failed to declare default parameters", this->get_name());
+        RDX_RAISE_ERROR("[{}] Failed to declare default parameters", this->get_name());
     }
     m_impl = std::make_unique<FrameRelayPublisherImpl>();
 }
@@ -92,6 +96,9 @@ void FrameRelayPublisher::init(std::shared_ptr<InitConfig_t> config)
     m_impl->m_async_node->build();
 
     // create the action server
+    auto server_opt = rcl_action_server_get_default_options();
+
+
     m_frame_receive_action_server =
         rclcpp_action::create_server<FrameReceiveAction_t>(
             this,
@@ -119,7 +126,7 @@ int FrameRelayPublisher::_deliver_frame(FrameDeliveryTask_t &task)
     //     if (!incoming_frame.raw_image.data.empty()) {
     //         msg_raw = incoming_frame.raw_image;
     //     }
-    //     RCLCPP_DEBUG(this->get_logger(), "[_deliver_frame()][msg_uuid=%s] Publishing raw image", boost::uuids::to_string(msg_uuid).c_str());
+    //     RDX_LOG_INFO(this, __func__, print_thread_id, "[msg_uuid={}] Publishing raw image", boost::uuids::to_string(msg_uuid));
     //     m_image_publisher->publish(msg_raw);
     // }
 
@@ -141,7 +148,7 @@ int FrameRelayPublisher::_deliver_frame(FrameDeliveryTask_t &task)
     //             msg_compressed.data = jpeg_buffer;
     //         }
     //     }
-    //     RCLCPP_DEBUG(this->get_logger(), "[_deliver_frame()][msg_uuid=%s] Publishing compressed image", boost::uuids::to_string(msg_uuid).c_str());
+    //     RDX_LOG_INFO(this, __func__, print_thread_id, "[msg_uuid={}] Publishing compressed image", boost::uuids::to_string(msg_uuid));
     //     m_compressed_image_publisher->publish(msg_compressed);
     // }
 
@@ -179,8 +186,8 @@ int FrameRelayPublisher::_try_enqueue_goal(
     if (m_config->use_async) {
         // for async case, try push the task to the async node
         if (async_node.put_data(d_task)) {
-            RCLCPP_DEBUG(this->get_logger(), "[_try_enqueue_goal()][msg_uuid=%s] Goal enqueued (async mode)",
-                         boost::uuids::to_string(msg_uuid).c_str());
+            RDX_LOG_INFO(this, __func__, print_thread_id, "[msg_uuid={}] Goal enqueued (async mode)",
+                         boost::uuids::to_string(msg_uuid));
             // ok, save the promise to the map
             decltype(m_impl->m_goal2payload)::accessor acc;
             m_impl->m_goal2payload.insert(acc, goal_uuid);
@@ -188,14 +195,14 @@ int FrameRelayPublisher::_try_enqueue_goal(
             return 0;
         } else {
             // failed to push the task to the async node
-            RCLCPP_ERROR(this->get_logger(), "[_try_enqueue_goal()][msg_uuid=%s] Failed to queue goal",
-                         boost::uuids::to_string(msg_uuid).c_str());
+            RDX_LOG_ERROR(this, __func__, "[msg_uuid={}] Failed to queue goal",
+                          boost::uuids::to_string(msg_uuid));
             return -1;
         }
     } else {
         // for sync case, always accept the goal
-        RCLCPP_DEBUG(this->get_logger(), "[_try_enqueue_goal()][msg_uuid=%s] Goal enqueued (sync mode)",
-                     boost::uuids::to_string(msg_uuid).c_str());
+        RDX_LOG_INFO(this, __func__, print_thread_id, "[msg_uuid={}] Goal enqueued (sync mode)",
+                     boost::uuids::to_string(msg_uuid));
         decltype(m_impl->m_goal2payload)::accessor acc;
         m_impl->m_goal2payload.insert(acc, goal_uuid);
         acc->second = FrameRelayPublisherImpl::RegisteredGoal_t{std::move(d_task), std::move(payload_producer)};
@@ -215,22 +222,31 @@ rclcpp_action::GoalResponse
 
     //! Is this goal just a ping request?
     bool is_ping_request = goal->x_control.code == goal->x_control.PING;
-    RCLCPP_DEBUG(this->get_logger(), "[_on_goal_received()][msg_uuid=%s] Received goal, is_ping_request=%s",
-                 boost::uuids::to_string(msg_uuid).c_str(), is_ping_request ? "true" : "false");
+    RDX_LOG_INFO(this, __func__, print_thread_id, "[msg_uuid={}] Received goal, is_ping_request={}",
+                 boost::uuids::to_string(msg_uuid), is_ping_request ? "true" : "false");
 
     if (is_ping_request) {
+        //! Randomly reject ping requests with a probability of 0.3
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_real_distribution<> dis(0.0, 1.0);
+        if (dis(gen) < 0.3) {
+            RDX_LOG_INFO(this, __func__, print_thread_id, "[msg_uuid={}] Randomly rejecting ping request",
+                         boost::uuids::to_string(msg_uuid));
+            return rclcpp_action::GoalResponse::REJECT;
+        }
         return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
     }
 
     // for async mode, try to enqueue the goal
     auto ret = _try_enqueue_goal(uuid, *goal);
     if (ret == 0) {
-        RCLCPP_DEBUG(this->get_logger(), "[_on_goal_received()][msg_uuid=%s] Goal accepted",
-                     boost::uuids::to_string(msg_uuid).c_str());
+        RDX_LOG_INFO(this, __func__, print_thread_id, "[msg_uuid={}] Goal accepted",
+                     boost::uuids::to_string(msg_uuid));
         return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
     } else {
-        RCLCPP_ERROR(this->get_logger(), "[_on_goal_received()][msg_uuid=%s] Goal rejected",
-                     boost::uuids::to_string(msg_uuid).c_str());
+        RDX_LOG_ERROR(this, __func__, "[msg_uuid={}] Goal rejected",
+                      boost::uuids::to_string(msg_uuid));
         return rclcpp_action::GoalResponse::REJECT;
     }
 }
@@ -239,8 +255,8 @@ int FrameRelayPublisher::_resolve_goal(std::shared_ptr<FrameReceiveGoalHandle_t>
 {
     auto goal_uuid = to_boost_uuid(goal_handle->get_goal_id());
     bool is_ping_request = goal_handle->get_goal()->x_control.code == goal_handle->get_goal()->x_control.PING;
-    RCLCPP_DEBUG(this->get_logger(), "[_resolve_goal()][msg_uuid=%s] Resolving goal, is_ping_request=%s",
-                 boost::uuids::to_string(goal_uuid).c_str(), is_ping_request ? "true" : "false");
+    RDX_LOG_INFO(this, __func__, print_thread_id, "[msg_uuid={}] Resolving goal, is_ping_request={}",
+                 boost::uuids::to_string(goal_uuid), is_ping_request ? "true" : "false");
     if (is_ping_request) {
         // ping request does not need to resolve, not in the map either
         return 0;
@@ -255,13 +271,13 @@ int FrameRelayPublisher::_resolve_goal(std::shared_ptr<FrameReceiveGoalHandle_t>
         auto &resolver = acc->second.second;
         resolver(goal_handle);
 
-        RCLCPP_DEBUG(this->get_logger(), "[_resolve_goal()][msg_uuid=%s] Goal resolved successfully",
-                     boost::uuids::to_string(goal_uuid).c_str());
+        RDX_LOG_INFO(this, __func__, print_thread_id, "[msg_uuid={}] Goal resolved successfully",
+                     boost::uuids::to_string(goal_uuid));
         return 0;
     } else {
         // this should never happen
-        RDX_RAISE_ERROR("[_resolve_goal()][msg_uuid=%s] Failed to find goal in map",
-                        boost::uuids::to_string(goal_uuid).c_str());
+        RDX_RAISE_ERROR("[msg_uuid={}] Failed to find goal in map",
+                        boost::uuids::to_string(goal_uuid));
         return -1;
     }
     return 0;
@@ -275,29 +291,29 @@ void FrameRelayPublisher::_on_goal_accepted(std::shared_ptr<FrameReceiveGoalHand
 
     //! Is this goal just a ping request?
     bool is_ping_request = goal_handle->get_goal()->x_control.code == goal_handle->get_goal()->x_control.PING;
-    RCLCPP_DEBUG(this->get_logger(), "[_on_goal_accepted()][msg_uuid=%s] Goal execution started, is_ping_request=%s",
-                 boost::uuids::to_string(msg_uuid).c_str(), is_ping_request ? "true" : "false");
+    RDX_LOG_INFO(this, __func__, print_thread_id, "[msg_uuid={}] Goal execution started, is_ping_request={}",
+                 boost::uuids::to_string(msg_uuid), is_ping_request ? "true" : "false");
     if (is_ping_request) {
-        RCLCPP_DEBUG(this->get_logger(), "[_on_goal_accepted()][msg_uuid=%s] Signaling goal as success (ping request)",
-                     boost::uuids::to_string(msg_uuid).c_str());
+        RDX_LOG_INFO(this, __func__, print_thread_id, "[msg_uuid={}] Signaling goal as success (ping request)",
+                     boost::uuids::to_string(msg_uuid));
 
         auto result = std::make_shared<FrameReceiveAction_t::Result>();
         result->return_code = 0;
         goal_handle->succeed(result);
         // goal_handle->canceled(result);
 
-        RCLCPP_DEBUG(this->get_logger(), "[_on_goal_accepted()][msg_uuid=%s] Signaled goal as success (ping request)",
-                     boost::uuids::to_string(msg_uuid).c_str());
+        RDX_LOG_INFO(this, __func__, print_thread_id, "[msg_uuid={}] Signaled goal as success (ping request)",
+                     boost::uuids::to_string(msg_uuid));
         return;
     }
 
     auto ret = _resolve_goal(goal_handle);
     if (ret != 0) {
-        RCLCPP_ERROR(this->get_logger(), "[_on_goal_accepted()][msg_uuid=%s] Failed to resolve goal",
-                     boost::uuids::to_string(msg_uuid).c_str());
+        RDX_LOG_ERROR(this, __func__, "[msg_uuid={}] Failed to resolve goal",
+                      boost::uuids::to_string(msg_uuid));
     } else {
-        RCLCPP_DEBUG(this->get_logger(), "[_on_goal_accepted()][msg_uuid=%s] Goal resolved successfully",
-                     boost::uuids::to_string(msg_uuid).c_str());
+        RDX_LOG_INFO(this, __func__, print_thread_id, "[msg_uuid={}] Goal resolved successfully",
+                     boost::uuids::to_string(msg_uuid));
     }
 
     // deliver the frame in sync mode
@@ -322,8 +338,8 @@ rclcpp_action::CancelResponse
     auto goal_uuid = to_boost_uuid(goal_handle->get_goal_id());
     auto msg_uuid = to_boost_uuid(goal_handle->get_goal()->x_uid);
 
-    RCLCPP_DEBUG(this->get_logger(), "[_on_goal_canceled()][msg_uuid=%s] Goal cancellation requested",
-                 boost::uuids::to_string(msg_uuid).c_str());
+    RDX_LOG_INFO(this, __func__, print_thread_id, "[msg_uuid={}] Goal cancellation requested",
+                 boost::uuids::to_string(msg_uuid));
 
     //! Remove the goal from the hash map
     decltype(m_impl->m_goal2payload)::accessor acc;
@@ -335,8 +351,8 @@ rclcpp_action::CancelResponse
 
         // done, remove the goal from the map
         m_impl->m_goal2payload.erase(acc);
-        RCLCPP_DEBUG(this->get_logger(), "[_on_goal_canceled()][msg_uuid=%s] Goal resolved and removed from map",
-                     boost::uuids::to_string(msg_uuid).c_str());
+        RDX_LOG_INFO(this, __func__, print_thread_id, "[msg_uuid={}] Goal resolved and removed from map",
+                     boost::uuids::to_string(msg_uuid));
     }
 
     //! Return accept
