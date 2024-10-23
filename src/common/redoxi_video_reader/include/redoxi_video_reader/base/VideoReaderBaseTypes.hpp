@@ -134,6 +134,9 @@ class REDOXI_VIDEO_READER_PUBLIC RuntimeConfig
     //! accepts rgb8, bgr8, mono8, mono16
     std::string output_image_encoding = DEFAULT_OUTPUT_IMAGE_ENCODING;
 
+    //! publish in debug topic?
+    bool publish_to_debug_topic = false;
+
     //! The frame delivery quality of service
     std::shared_ptr<FrameDeliveryOptions> frame_delivery_options;
 

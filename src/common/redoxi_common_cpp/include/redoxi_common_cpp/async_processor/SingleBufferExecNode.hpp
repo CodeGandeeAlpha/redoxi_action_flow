@@ -23,7 +23,11 @@ namespace async_processor
 //!
 //! This class provides a flexible way to process input data, with options for synchronous or asynchronous execution,
 //! preserving order, and controlling concurrency. It is designed to be used with TBB's flow graph.
+//! To add your own work function, you need to set the work function and output callback,
+//! the pipeline will be like this: input -> (input, tokens) -> work function -> (output, tokens) -> output callback -> output
+//! if work function is not set, the data is copied through when input and output types are the same, otherwise only the token passes through.
 //!
+//! @note If input and output types are the same and work function is not set, the data is copied through, otherwise only the token passes through.
 //! @tparam InputDataType The type of input data to be processed.
 //! @tparam OutputDataType The type of output data produced after processing.
 //! @tparam InputDataTokenType The type of token associated with input data (default: DefaultInputDataToken).
@@ -498,6 +502,16 @@ class SingleBufferExecNode : public tbb::flow::composite_node<
         auto &exec_token = std::get<2>(output_data);
         if (m_work_function)
             exec_token.error_code = m_work_function(input_data, output_data);
+        else {
+            const auto &input = std::get<0>(input_data);
+            auto &output = std::get<0>(output_data);
+            //! If input and output types are the same, pass through by copying
+            if constexpr (std::is_same_v<std::decay_t<decltype(input)>, std::decay_t<decltype(output)>>) {
+                output = input;
+            } else {
+                // only the token passes through, the data is not copied
+            }
+        }
 
         // done
         return output_data;

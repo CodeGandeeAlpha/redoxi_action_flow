@@ -154,6 +154,9 @@ int RedoxiVideoReaderBase::update_runtime_config(const std::shared_ptr<RuntimeCo
         }
     }
 
+    //! set publish to debug topic
+    set_publish_image(m_runtime_config->publish_to_debug_topic);
+
     //! Apply any necessary changes based on the new runtime config
     //! This might involve updating internal parameters or reconfiguring components
 

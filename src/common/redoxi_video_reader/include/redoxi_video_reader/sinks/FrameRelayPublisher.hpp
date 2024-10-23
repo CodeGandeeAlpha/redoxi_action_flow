@@ -126,7 +126,7 @@ class FrameRelayPublisher : public rclcpp::Node
     virtual int _create_delivery_task(FrameDeliveryTask_t &output_task,
                                       const rclcpp_action::GoalUUID &uuid,
                                       const FrameReceiveAction_t::Goal &goal,
-                                      const FrameDeliveryPayload_t *preset = nullptr);
+                                      const FrameDeliveryTask_t *preset = nullptr);
 
     //! resolve the goal payload, return 0 if success, otherwise return -1
     virtual int _resolve_goal_payload(std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle);

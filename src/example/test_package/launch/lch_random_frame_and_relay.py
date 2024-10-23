@@ -10,7 +10,8 @@ source_node_json_params = {
     },
     "runtime_config": {
         "frame_interval_ms": 10000.0,
-        "step_interval_ms": 1000,
+        "step_interval_ms": 1,
+        "publish_to_debug_topic": True,
     },
     "init_config": {
         "downstreams": {
@@ -35,7 +36,7 @@ relay_node_json_params = {
         "compressed_image_topic_name": "out/compressed_image",
         "publish_queue_size": 10,
         "publish_raw_image": True,
-        "publish_compressed_image": True,
+        "publish_compressed_image": False,
         "use_async": True,
         "goal_buffer_size": 1,
     },

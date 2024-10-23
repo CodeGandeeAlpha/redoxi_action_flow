@@ -83,6 +83,10 @@ void SimpleActionGenerator::_step_send_by_tbb_graph()
         }
     }
 
+    if (m_publish_image) {
+        _publish_frame(frame);
+    }
+
     //! Wait for the frame delivery graph to finish
     // RDX_LOG_INFO(this, __func__, true, "waiting for frame delivery graph to finish");
     // m_impl->frame_delivery_graph->wait_for_all();

@@ -30,7 +30,7 @@ int main(int argc, char **argv)
     video_reader->init(init_config, runtime_config);
     spdlog::info("[MAIN] Opening RandomFrameVideoGenerator");
     video_reader->open();
-    video_reader->set_publish_image(true);
+
     spdlog::info("[MAIN] Starting RandomFrameVideoGenerator");
     video_reader->start();
 
