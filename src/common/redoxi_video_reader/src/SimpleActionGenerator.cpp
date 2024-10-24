@@ -77,9 +77,9 @@ void SimpleActionGenerator::_step_send_by_tbb_graph()
     {
         auto ok = m_impl->frame_delivery_node->put_data(frame_delivery_task);
         if (!ok) {
-            RDX_LOG_INFO(this, __func__, true, "[msg_uuid={}] put data FAILED", boost::uuids::to_string(msg_uuid));
+            RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] put data FAILED", boost::uuids::to_string(msg_uuid));
         } else {
-            RDX_LOG_INFO(this, __func__, true, "[msg_uuid={}] put data SUCCESS", boost::uuids::to_string(msg_uuid));
+            RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] put data SUCCESS", boost::uuids::to_string(msg_uuid));
         }
     }
 
@@ -88,9 +88,9 @@ void SimpleActionGenerator::_step_send_by_tbb_graph()
     }
 
     //! Wait for the frame delivery graph to finish
-    // RDX_LOG_INFO(this, __func__, true, "waiting for frame delivery graph to finish");
+    // RDX_INFO_DEV(this, __func__, true, "waiting for frame delivery graph to finish");
     // m_impl->frame_delivery_graph->wait_for_all();
-    // RDX_LOG_INFO(this, __func__, true, "frame delivery graph finished");
+    // RDX_INFO_DEV(this, __func__, true, "frame delivery graph finished");
 }
 
 void SimpleActionGenerator::_step_send_by_sync_action_sender()
@@ -108,14 +108,14 @@ void SimpleActionGenerator::_step_send_by_sync_action_sender()
 
         if (result.response_code) {
             if (result.response_code.value() == ActionDownstreamResponse::ACCEPTED) {
-                RDX_LOG_INFO(this, __func__, true, "Ping accepted by downstream: {}", downstream.first);
+                RDX_INFO_DEV(this, __func__, true, "Ping accepted by downstream: {}", downstream.first);
             } else if (result.response_code.value() == ActionDownstreamResponse::REJECTED) {
-                RDX_LOG_INFO(this, __func__, true, "Ping rejected by downstream: {}", downstream.first);
+                RDX_INFO_DEV(this, __func__, true, "Ping rejected by downstream: {}", downstream.first);
             } else if (result.response_code.value() == ActionDownstreamResponse::TIMEOUT) {
-                RDX_LOG_INFO(this, __func__, true, "Ping timed out for downstream: {}", downstream.first);
+                RDX_INFO_DEV(this, __func__, true, "Ping timed out for downstream: {}", downstream.first);
             }
         } else {
-            RDX_LOG_INFO(this, __func__, true, "Unknown response from downstream: {}", downstream.first);
+            RDX_INFO_DEV(this, __func__, true, "Unknown response from downstream: {}", downstream.first);
         }
     }
 }
@@ -128,29 +128,29 @@ void SimpleActionGenerator::_step_send_and_block()
     }
     // ping all downstreams
     for (const auto &downstream : m_downstreams) {
-        RDX_LOG_INFO(this, __func__, true, "pinging downstream: {}", downstream.first);
+        RDX_INFO_DEV(this, __func__, true, "pinging downstream: {}", downstream.first);
         auto client = downstream.second->accept_frame;
 
         Downstream_t::Goal_t goal;
         Downstream_t::SendGoalOptions_t opt;
         opt.goal_response_callback = [this, downstream](const auto &goal_handle) {
             bool downstream_accepted = goal_handle != nullptr;
-            RDX_LOG_INFO(this, __func__, true, "received goal response from downstream: {} (accepted: {})",
+            RDX_INFO_DEV(this, __func__, true, "received goal response from downstream: {} (accepted: {})",
                          downstream.first, downstream_accepted);
         };
         opt.result_callback = [this, downstream](const auto &result) {
-            RDX_LOG_INFO(this, __func__, true, "received result from downstream: {} (status: {}, goal_id: {})",
+            RDX_INFO_DEV(this, __func__, true, "received result from downstream: {} (status: {}, goal_id: {})",
                          downstream.first, (int)result.code, to_boost_uuid_string(result.goal_id));
         };
 
         goal.x_control.code = goal.x_control.PING;
         goal.x_uid = to_ros_uuid_msg(boost::uuids::random_generator()());
         client->async_send_goal(goal, opt);
-        RDX_LOG_INFO(this, __func__, true, "sent ping to downstream: {}", downstream.first);
+        RDX_INFO_DEV(this, __func__, true, "sent ping to downstream: {}", downstream.first);
 
         // block myself
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        RDX_LOG_INFO(this, __func__, true, "unblocked myself");
+        RDX_INFO_DEV(this, __func__, true, "unblocked myself");
     }
 
     return;

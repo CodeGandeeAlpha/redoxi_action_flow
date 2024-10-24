@@ -17,7 +17,7 @@ source_node_json_params = {
     },
     "runtime_config": {
         "frame_interval_ms": 10000.0,
-        "step_interval_ms": 1,
+        "step_interval_ms": 100.0,
         "publish_to_debug_topic": True,
     },
     "init_config": {
@@ -107,6 +107,11 @@ def generate_launch_description():
         SetEnvironmentVariable(
             "ROS_LOG_DIR", "/soft/workspace/code/psf_ros2_ws/tmp/roslog"
         ),
+        # SetEnvironmentVariable(
+        #     "FASTRTPS_DEFAULT_PROFILES_FILE",
+        #     "/soft/workspace/code/psf_ros2_ws/scripts/dds-profile.xml",
+        # ),
+        SetEnvironmentVariable("ROS_DOMAIN_ID", "0"),
     ]
 
     return LaunchDescription(
