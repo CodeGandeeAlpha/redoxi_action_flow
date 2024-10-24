@@ -6,10 +6,11 @@
             <AllowMulticast>default</AllowMulticast>
             <MaxMessageSize>65500B</MaxMessageSize>
             <FragmentSize>4000B</FragmentSize>
+            <ExternalNetworkAddress>172.18.0.2</ExternalNetworkAddress>
         </General>
         <Discovery>
             <Peers>
-                <Peer address="host.docker.internal"/>
+                <Peer address="172.17.80.1"/>
             </Peers>
             <ParticipantIndex>auto</ParticipantIndex>
             <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
