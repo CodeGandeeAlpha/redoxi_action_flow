@@ -2,12 +2,14 @@
 [] set goal handle expiration time to 1s or less
 
 ## Debugging
-| Has Frame Payload | Is Ping | Always Accept | Passed | Detail |
-|-------------------|---------|---------------|--------|--------|
-| Yes (640x480)     | Yes     | Yes           | Yes     | Goal expiration is not a problem, it has a 10s timeout set by ros2 (when creating the server) |
-| Yes (640x480)     | Yes     | No            | Yes      | Ping requests with random rejection |
-| Yes (640x480)     | No      | Yes           | ?      | Normal frame delivery scenario |
-| No                | Yes     | Yes           | ?      | Ping without frame payload |
+
+| Has Frame Payload | Is Ping | Always Accept | Passed | Detail                                                                                       |
+|-------------------|---------|---------------|--------|----------------------------------------------------------------------------------------------|
+| Yes (640x480)     | Yes     | Yes           | Yes    | Goal expiration is not a problem, it has a 10s timeout set by ros2 (when creating the server) |
+| Yes (640x480)     | Yes     | No            | Yes    | Ping requests with random rejection                                                           |
+| Yes (640x480)     | No      | No (best effort) | Yes (Simple Node)    | Normal frame delivery scenario                                                                |
+| Yes (640x480)     | No      | No (best effort) | ? (Complex Node)    | Normal frame delivery scenario                                                |
+| No                | Yes     | Yes           | ?      | Ping without frame payload                                                                    |
 
 
 ## Assumptions

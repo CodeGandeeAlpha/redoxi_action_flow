@@ -62,7 +62,7 @@ struct FrameRelayPublisherImpl {
 FrameRelayPublisher::FrameRelayPublisher(const std::string &name, const rclcpp::NodeOptions &options)
     : rclcpp::Node(name, options)
 {
-    this->get_logger().set_level(rclcpp::Logger::Level::Debug);
+    // this->get_logger().set_level(rclcpp::Logger::Level::Debug);
 
     // declare parameters
     auto ret = declare_default_parameters_for_node(this);
@@ -113,7 +113,7 @@ void FrameRelayPublisher::init(std::shared_ptr<InitConfig_t> config)
     // create the action server
     auto server_opt = rcl_action_server_get_default_options();
     {
-        std::chrono::nanoseconds timeout = std::chrono::milliseconds(300);
+        std::chrono::nanoseconds timeout = DefaultParams::GoalHandleTimeout;
         server_opt.result_timeout.nanoseconds = timeout.count();
     }
 

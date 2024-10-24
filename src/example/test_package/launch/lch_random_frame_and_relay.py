@@ -1,7 +1,14 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument
 import json
+
+log_level_arg = DeclareLaunchArgument(
+    "log_level",
+    default_value=["info"],
+    description="Logging level",
+)
 
 source_node_json_params = {
     "declare_params": {
@@ -105,6 +112,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             *env_var_settings,
+            log_level_arg,
             simple_action_generator,
             video_sink_node,
         ]

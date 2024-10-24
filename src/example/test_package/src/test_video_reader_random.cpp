@@ -14,7 +14,7 @@ int main(int argc, char **argv)
 
     //! Create the RandomFrameVideoGenerator
     auto video_reader = std::make_shared<rdx::RandomFrameVideoGenerator>("random_frames");
-    video_reader->get_logger().set_level(rclcpp::Logger::Level::Debug);
+    // video_reader->get_logger().set_level(rclcpp::Logger::Level::Debug);
 
     spdlog::info("[MAIN] Initializing RandomFrameVideoGenerator");
     init_config->from_parameters(video_reader.get());

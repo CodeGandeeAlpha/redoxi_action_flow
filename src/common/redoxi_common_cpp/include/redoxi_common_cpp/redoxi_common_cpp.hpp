@@ -34,6 +34,9 @@ const DefaultTimeUnit_t SlowRetryInterval = std::chrono::milliseconds(1);
 //! wait time for ping action
 const DefaultTimeUnit_t PingActionWaitTime = std::chrono::milliseconds(10);
 
+//! goal handle timeout
+const DefaultTimeUnit_t GoalHandleTimeout = std::chrono::milliseconds(2000);
+
 } // namespace DefaultParams
 
 // globally accessible parameters in ROS related to this application

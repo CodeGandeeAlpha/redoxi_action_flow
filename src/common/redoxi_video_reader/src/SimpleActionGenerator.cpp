@@ -77,7 +77,7 @@ void SimpleActionGenerator::_step_send_by_tbb_graph()
     {
         auto ok = m_impl->frame_delivery_node->put_data(frame_delivery_task);
         if (!ok) {
-            RDX_LOG_ERROR(this, __func__, true, "[msg_uuid={}] put data FAILED", boost::uuids::to_string(msg_uuid));
+            RDX_LOG_INFO(this, __func__, true, "[msg_uuid={}] put data FAILED", boost::uuids::to_string(msg_uuid));
         } else {
             RDX_LOG_INFO(this, __func__, true, "[msg_uuid={}] put data SUCCESS", boost::uuids::to_string(msg_uuid));
         }

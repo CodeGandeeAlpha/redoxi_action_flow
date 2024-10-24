@@ -76,7 +76,7 @@ int RedoxiVideoReaderBase::init(const std::shared_ptr<InitConfig_t> &config,
         RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Updating init config ...");
         auto ret = update_init_config(config);
         if (ret != 0) {
-            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to update init config");
+            RDX_RAISE_ERROR("[init()] Failed to update init config");
             return ret;
         }
     }
@@ -86,7 +86,7 @@ int RedoxiVideoReaderBase::init(const std::shared_ptr<InitConfig_t> &config,
         RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Updating runtime config ...");
         auto ret = update_runtime_config(runtime_config);
         if (ret != 0) {
-            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to update runtime config");
+            RDX_RAISE_ERROR("[init()] Failed to update runtime config");
             return ret;
         }
     }
@@ -113,7 +113,7 @@ int RedoxiVideoReaderBase::update_init_config(const std::shared_ptr<InitConfig_t
     //! Reconnect to downstreams with the new config
     auto ret = _connect_to_downstreams();
     if (ret != 0) {
-        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to connect to downstreams, error code: {}", ret);
+        RDX_LOG_INFO(this, __func__, PRINT_THREAD_ID, "Failed to connect to downstreams, error code: {}", ret);
         return ret;
     }
 
@@ -128,12 +128,12 @@ int RedoxiVideoReaderBase::update_runtime_config(const std::shared_ptr<RuntimeCo
     //! Ensure the node is in CLOSED or STOPPED
     RDX_ASSERT_CHECK_TRUE(m_status_code == NodeStatusCode::CLOSED ||
                               m_status_code == NodeStatusCode::STOPPED,
-                          "[update_runtime_config()] Invalid node status for updating runtime config: {}",
-                          m_status_code);
+                          "[{}()] Invalid node status for updating runtime config: {}",
+                          __func__, m_status_code);
 
     //! Ensure the new config is not null
     RDX_ASSERT_CHECK_TRUE(config != nullptr,
-                          "[update_runtime_config()] New runtime config is null");
+                          "[{}()] New runtime config is null", __func__);
 
     //! Update the runtime config
     m_runtime_config = config;
@@ -149,7 +149,7 @@ int RedoxiVideoReaderBase::update_runtime_config(const std::shared_ptr<RuntimeCo
         RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Initializing frame delivery tasks ...");
         int ret = _init_frame_delivery_tasks();
         if (ret != 0) {
-            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to initialize frame delivery tasks");
+            RDX_RAISE_ERROR("[{}()] Failed to initialize frame delivery tasks", __func__);
             return ret;
         }
     }
@@ -402,7 +402,7 @@ int RedoxiVideoReaderBase::_init_frame_delivery_tasks()
             const auto &in_payload = std::get<0>(input);
             auto ret = this->_do_frame_delivery_preprocess(in_payload, out_payload);
             if (ret != 0) {
-                RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "[WorkFunc] Failed to preprocess frame, error code: {}", ret);
+                RDX_LOG_INFO(this, __func__, PRINT_THREAD_ID, "Failed to preprocess frame, error code: {}", ret);
             }
 
             return ret;
@@ -416,7 +416,7 @@ int RedoxiVideoReaderBase::_init_frame_delivery_tasks()
             auto &out_payload = std::get<0>(output);
             auto ret = this->_do_frame_delivery_main(out_payload);
             if (ret != 0) {
-                RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "[WorkFunc] Failed to deliver frame, error code: {}", ret);
+                RDX_LOG_INFO(this, __func__, PRINT_THREAD_ID, "Failed to deliver frame, error code: {}", ret);
             }
             return ret;
         });
@@ -514,9 +514,9 @@ int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &ta
             auto ds = it.second;
             auto ret = _deliver_frame(frame_msg, ds);
             if (ret != 0) {
-                RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID,
-                              "Failed to deliver frame to downstream {}",
-                              ds->spec->accept_frame_action);
+                RDX_LOG_INFO(this, __func__, PRINT_THREAD_ID,
+                             "Failed to deliver frame to downstream {}",
+                             ds->spec->accept_frame_action);
             } else {
                 sent = true;
             }
@@ -533,8 +533,8 @@ int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &ta
         uint64_t shared_memory_id = 0;
         auto ret = m_impl->add_to_shared_memory(task_input.frame, shared_memory_id);
         if (ret != 0) {
-            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to add frame to shared memory");
-            return -1;
+            RDX_RAISE_ERROR("[{}()] Failed to add frame to shared memory", __func__);
+            return ret;
         }
 
         //! Create frame message with shared memory ID
@@ -545,7 +545,8 @@ int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &ta
 
         //! Remove frame from shared memory if failed to deliver
         if (ret_deliver_frame != 0) {
-            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to deliver frame, removing frame from shared memory");
+            //! Failed to deliver frame, removing frame from shared memory
+            RDX_LOG_INFO(this, __func__, PRINT_THREAD_ID, "Failed to deliver frame, removing frame from shared memory");
             m_impl->remove_from_shared_memory(shared_memory_id);
         }
 
@@ -557,7 +558,7 @@ int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &ta
         //! Deliver frame
         auto ret_deliver_frame = func_deliver_frame(frame_msg);
         if (ret_deliver_frame != 0) {
-            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to deliver frame");
+            RDX_LOG_INFO(this, __func__, PRINT_THREAD_ID, "Failed to deliver frame");
         }
 
         return ret_deliver_frame;
@@ -584,8 +585,8 @@ int RedoxiVideoReaderBase::_deliver_frame(
         //! Send the frame to the downstream
         auto result = _send_frame_to_downstream(frame_msg, ds, timeout_each_attempt);
         if (!result.goal_handle_future.valid()) {
-            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Not sending frame to downstream {}, goal handle future is invalid",
-                          boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+            RDX_LOG_INFO(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Not sending frame to downstream {}, goal handle future is invalid",
+                         boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
         } else {
             bool wait_indefinitely = timeout_each_attempt < DefaultTimeUnit_t::zero();
 
@@ -597,11 +598,11 @@ int RedoxiVideoReaderBase::_deliver_frame(
                                      boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
                         return 0; // Success
                     case ActionDownstreamResponse::REJECTED:
-                        RDX_LOG_WARN(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame rejected by downstream {}",
+                        RDX_LOG_INFO(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame rejected by downstream {}",
                                      boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
                         break;
                     case ActionDownstreamResponse::TIMEOUT:
-                        RDX_LOG_WARN(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while sending frame to downstream {}",
+                        RDX_LOG_INFO(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while sending frame to downstream {}",
                                      boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
                         break;
                 }
@@ -616,7 +617,7 @@ int RedoxiVideoReaderBase::_deliver_frame(
                     }
                 } else {
                     //! Regard as failure without additional waiting
-                    RDX_LOG_WARN(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while waiting for goal handle from downstream {}",
+                    RDX_LOG_INFO(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while waiting for goal handle from downstream {}",
                                  boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
                 }
             }
@@ -629,8 +630,8 @@ int RedoxiVideoReaderBase::_deliver_frame(
         }
     }
 
-    RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Failed to deliver frame to downstream {} after {} attempts",
-                  boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action, max_attempts);
+    RDX_LOG_INFO(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Failed to deliver frame to downstream {} after {} attempts",
+                 boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action, max_attempts);
     return -1;
 }
 
