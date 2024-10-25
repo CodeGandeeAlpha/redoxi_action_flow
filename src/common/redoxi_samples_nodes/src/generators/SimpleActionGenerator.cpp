@@ -2,6 +2,7 @@
 #include <redoxi_samples_nodes/generators/SimpleActionGenerator.hpp>
 #include <redoxi_common_cpp/ros_utils/SyncActionSender.hpp>
 #include <redoxi_video_reader/base/VideoReaderBaseImpl.hpp>
+#include <redoxi_samples_lib/random_image.hpp>
 
 namespace redoxi_works
 {
@@ -13,32 +14,13 @@ SimpleActionGenerator::SimpleActionGenerator(const std::string &name, const rclc
 
 int SimpleActionGenerator::_read_frame(cv::Mat &frame, std::atomic<int64_t> &frame_number)
 {
-    //! Randomize the frame
-    cv::RNG rng(cv::getTickCount());
-    cv::Scalar randomColor(rng.uniform(0, 256), rng.uniform(0, 256), rng.uniform(0, 256));
-    frame = cv::Mat(480, 640, CV_8UC3, randomColor);
+    //! Generate a random UUID and convert it to a string
+    boost::uuids::random_generator gen;
+    boost::uuids::uuid uuid = gen();
+    std::string random_string = boost::uuids::to_string(uuid);
 
-    //! Add some random shapes
-    int numShapes = rng.uniform(1, 5);
-    for (int i = 0; i < numShapes; ++i) {
-        int shapeType = rng.uniform(0, 3);
-        cv::Point pt1(rng.uniform(0, frame.cols), rng.uniform(0, frame.rows));
-        cv::Point pt2(rng.uniform(0, frame.cols), rng.uniform(0, frame.rows));
-        cv::Scalar color(rng.uniform(0, 256), rng.uniform(0, 256), rng.uniform(0, 256));
-
-        if (shapeType == 0) {
-            cv::rectangle(frame, pt1, pt2, color, -1);
-        } else if (shapeType == 1) {
-            cv::circle(frame, pt1, rng.uniform(10, 50), color, -1);
-        } else {
-            std::vector<cv::Point> pts;
-            for (int j = 0; j < 3; ++j) {
-                pts.push_back(cv::Point(rng.uniform(0, frame.cols), rng.uniform(0, frame.rows)));
-            }
-            cv::fillPoly(frame, std::vector<std::vector<cv::Point>>{pts}, color);
-        }
-    }
-
+    //! Use the random string to generate the frame content
+    random_image_with_text(frame, cv::Size(640, 480), random_string);
     frame_number++;
 
     return 0;
@@ -83,8 +65,11 @@ void SimpleActionGenerator::_step_send_by_tbb_graph()
         }
     }
 
-    if (m_publish_image) {
-        _publish_frame(frame);
+    bool publish_to_debug_topic = get_publish_to_debug_topic();
+    for (const auto &downstream : m_downstreams) {
+        if (downstream.second->debug_pub_sent.valid() && publish_to_debug_topic) {
+            downstream.second->debug_pub_sent.publish(frame, fmt::format("[SENT] frame_num={}", m_frame_number), cv::Scalar(0, 255, 0));
+        }
     }
 
     //! Wait for the frame delivery graph to finish

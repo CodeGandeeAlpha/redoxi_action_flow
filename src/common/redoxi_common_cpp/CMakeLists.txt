@@ -21,9 +21,11 @@ find_package(rclcpp REQUIRED)
 find_package(rcpputils REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(redoxi_public_msgs REQUIRED)
-
+find_package(cv_bridge REQUIRED)
 set(source_files src/redoxi_common_cpp.cpp src/redoxi_v6d.cpp
-                 src/redoxi_ros_util.cpp)
+                 src/redoxi_ros_util.cpp src/image_proc/ImageStamper.cpp
+                 src/ros_utils/StampedImagePub.cpp)
+                 
 set(required_dependencies ${VINEYARD_LIBRARIES} ${OpenCV_LIBS} fmt::fmt
                           nlohmann_json::nlohmann_json TBB::tbb)
 set(required_includes ${OpenCV_INCLUDE_DIRS} ${VINEYARD_INCLUDE_DIRS})
@@ -42,7 +44,7 @@ target_include_directories(
 target_link_libraries(redoxi_common_cpp PUBLIC ${required_dependencies})
 
 ament_target_dependencies(redoxi_common_cpp PUBLIC rclcpp rcpputils
-                          redoxi_public_msgs rclcpp_action)
+                          redoxi_public_msgs rclcpp_action cv_bridge)
 
 # Causes the visibility macros to use dllexport rather than dllimport, which is
 # appropriate when building the dll but not consuming it.
@@ -78,6 +80,7 @@ ament_export_dependencies(
   rcpputils
   redoxi_public_msgs
   rclcpp_action
+  cv_bridge
   TBB
   nlohmann_json
   fmt

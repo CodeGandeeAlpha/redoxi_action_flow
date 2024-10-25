@@ -48,20 +48,9 @@ class REDOXI_VIDEO_READER_PUBLIC
     virtual ~RedoxiVideoReaderBase();
 
   public:
-    //! debug topic for visualization
-    virtual std::string get_publish_image_topic_name() const
-    {
-        return "debug_port/image";
-    }
-
-    //! debug topic for visualization
-    virtual int get_publish_image_queue_size() const
-    {
-        return 1;
-    }
-
     //! enable or disable image publishing
-    virtual void set_publish_image(bool enable);
+    virtual void set_publish_to_debug_topic(bool enable);
+    virtual bool get_publish_to_debug_topic() const;
 
   public:
     //! Initialize with configurations, must be called once before open()
@@ -236,9 +225,6 @@ class REDOXI_VIDEO_READER_PUBLIC
         FrameDeliveryOptions_t::FramePayloadType payload_type,
         std::optional<uint64_t> shared_memory_id = std::nullopt);
 
-    //! create publisher for visualization
-    virtual void _create_debug_topics();
-
     //! find and connect to downstreams, return 0 if success, otherwise error code
     virtual int _connect_to_downstreams();
 
@@ -299,10 +285,6 @@ class REDOXI_VIDEO_READER_PUBLIC
     virtual std::shared_ptr<RedoxiVideoReaderImpl> _create_impl(const std::shared_ptr<InitConfig_t> &init_config,
                                                                 const std::shared_ptr<RuntimeConfig_t> &runtime_config);
 
-  protected:
-    // publish frame msg for visualization, by default assumes bgr8 or mono8format
-    virtual void _publish_frame(const cv::Mat &frame);
-
   private:
     /**
      * @brief Declare all parameters (non-overridable)
@@ -321,10 +303,6 @@ class REDOXI_VIDEO_READER_PUBLIC
 
     // status code
     std::atomic<int> m_status_code{NodeStatusCode::BEFORE_INIT};
-
-    // publish info for visualization
-    std::atomic<bool> m_publish_image{false};
-    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_topic_image;
 
     // current frame number read by this reader
     // -1 means not read any frame, increment by each _read_frame()

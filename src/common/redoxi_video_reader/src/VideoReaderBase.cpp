@@ -17,9 +17,23 @@ namespace redoxi_works
 //! Global switch to control whether thread ID will be printed
 static const bool PRINT_THREAD_ID = true;
 
-void RedoxiVideoReaderBase::set_publish_image(bool enable)
+bool RedoxiVideoReaderBase::get_publish_to_debug_topic() const
 {
-    m_publish_image = enable;
+    if (m_runtime_config) {
+        return m_runtime_config->publish_to_debug_topic;
+    }
+    return false;
+}
+
+void RedoxiVideoReaderBase::set_publish_to_debug_topic(bool enable)
+{
+    // Note that it will only publish if the downstreams are also set to use debug pub
+    // otherwise, it will be ignored
+
+    //! Only update the runtime config if it is set
+    if (m_runtime_config) {
+        m_runtime_config->publish_to_debug_topic = enable;
+    }
 }
 
 RedoxiVideoReaderBase::RedoxiVideoReaderBase(const std::string &name, const rclcpp::NodeOptions &options)
@@ -66,10 +80,6 @@ int RedoxiVideoReaderBase::init(const std::shared_ptr<InitConfig_t> &config,
             RDX_LOG_WARN(this, __func__, PRINT_THREAD_ID, "Failed to initialize shared memory storage, continue without shared memory");
         }
     }
-
-    // create debug topics
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Creating debug topics ...");
-    _create_debug_topics();
 
     // set init_config
     {
@@ -154,31 +164,12 @@ int RedoxiVideoReaderBase::update_runtime_config(const std::shared_ptr<RuntimeCo
         }
     }
 
-    //! set publish to debug topic
-    set_publish_image(m_runtime_config->publish_to_debug_topic);
-
     //! Apply any necessary changes based on the new runtime config
     //! This might involve updating internal parameters or reconfiguring components
 
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "Runtime config updated successfully");
 
     return 0;
-}
-
-
-void RedoxiVideoReaderBase::_create_debug_topics()
-{
-    //! Create publisher for debug image topic if enabled
-    std::string topic_name = get_publish_image_topic_name();
-    int queue_size = get_publish_image_queue_size();
-
-    m_topic_image = this->create_publisher<sensor_msgs::msg::Image>(
-        topic_name,
-        rclcpp::QoS(rclcpp::KeepLast(queue_size)).reliable());
-
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID,
-                  "Created debug image topic: {}",
-                  topic_name);
 }
 
 int RedoxiVideoReaderBase::open()
@@ -355,6 +346,13 @@ int RedoxiVideoReaderBase::_connect_to_downstreams()
             RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Action server {} connected", name);
         }
 
+        // create publisher for debug image topic
+        if (ds->spec->use_debug_pub) {
+            ds->debug_pub_sending.init(this, ds->get_debug_pub_sending_name(*it.second));
+            ds->debug_pub_dropped.init(this, ds->get_debug_pub_dropped_name(*it.second));
+            ds->debug_pub_sent.init(this, ds->get_debug_pub_sent_name(*it.second));
+        }
+
         m_downstreams[it.first] = ds;
     }
 
@@ -440,17 +438,6 @@ int RedoxiVideoReaderBase::_declare_all_parameters()
 {
     auto ret = declare_default_parameters_for_node(this);
     return ret;
-    // parameters
-    // this->declare_parameter<std::string>("source_file", "");
-    // this->declare_parameter<int>("source_camera_index", -1);
-    // this->declare_parameter<int>("start_frame_number", -1);
-    // this->declare_parameter<int>("end_frame_number", -1);
-    // this->declare_parameter<int>("image_width", -1);
-    // this->declare_parameter<int>("image_height", -1);
-    // this->declare_parameter<std::string>("orbbec_net_device_ip", "");
-
-    // this->declare_parameter<double>("frame_interval_ms", -1.0);
-    // this->declare_parameter<bool>("send_goal_retry", false);
 }
 
 int RedoxiVideoReaderBase::_do_frame_delivery_preprocess(
@@ -581,7 +568,22 @@ int RedoxiVideoReaderBase::_deliver_frame(
     auto timeout_each_attempt = ds->spec->retry_strategy->get_wait_time_for_retry();
     auto msg_uuid = to_boost_uuid(frame_msg.uuid);
 
+    //! Debug image message
+    const sensor_msgs::msg::Image *debug_image_msg = nullptr;
+    if (frame_msg.raw_image.data.size() > 0) {
+        debug_image_msg = &frame_msg.raw_image;
+    }
+    bool publish_to_debug_topic = get_publish_to_debug_topic();
+
     while (attempts < max_attempts) {
+
+        //! Publish the frame to the debug topic
+        if (publish_to_debug_topic && debug_image_msg && ds->debug_pub_sending.valid()) {
+            ds->debug_pub_sending.publish(*debug_image_msg,
+                                          fmt::format("[SENDING] frame_num={}, attempts={}/{}", frame_msg.frame_num, attempts + 1, max_attempts),
+                                          cv::Scalar(0, 0, 255));
+        }
+
         //! Send the frame to the downstream
         auto result = _send_frame_to_downstream(frame_msg, ds, timeout_each_attempt);
         if (!result.goal_handle_future.valid()) {
@@ -596,6 +598,13 @@ int RedoxiVideoReaderBase::_deliver_frame(
                     case ActionDownstreamResponse::ACCEPTED:
                         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame accepted by downstream {}",
                                      boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+
+                        //! Publish the frame sent message
+                        if (publish_to_debug_topic && ds->debug_pub_sent.valid() && debug_image_msg) {
+                            ds->debug_pub_sent.publish(*debug_image_msg,
+                                                       fmt::format("[SENT] frame_num={}, attempts={}/{}", frame_msg.frame_num, attempts + 1, max_attempts),
+                                                       cv::Scalar(0, 255, 0));
+                        }
                         return 0; // Success
                     case ActionDownstreamResponse::REJECTED:
                         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame rejected by downstream {}",
@@ -628,6 +637,12 @@ int RedoxiVideoReaderBase::_deliver_frame(
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Retrying frame delivery to downstream {} (attempt {}/{})",
                          boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action, attempts + 1, max_attempts);
         }
+    }
+
+    if (publish_to_debug_topic && ds->debug_pub_dropped.valid() && debug_image_msg) {
+        ds->debug_pub_dropped.publish(*debug_image_msg,
+                                      fmt::format("[FAILED] frame_num={}, attempts={}/{}", frame_msg.frame_num, attempts + 1, max_attempts),
+                                      cv::Scalar(255, 0, 0));
     }
 
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Failed to deliver frame to downstream {} after {} attempts",
@@ -770,24 +785,6 @@ bool RedoxiVideoReaderBase::_ping(const std::shared_ptr<Downstream_t> &ds,
     }
 }
 
-void RedoxiVideoReaderBase::_publish_frame(const cv::Mat &frame)
-{
-    //! Check if image publishing is enabled
-    if (!m_publish_image || !m_topic_image) {
-        return;
-    }
-
-    //! Create and publish the image message using cv_bridge
-    std_msgs::msg::Header header;
-    header.stamp = this->now();
-    header.frame_id = "source_frame";
-
-    auto encoding = m_runtime_config->output_image_encoding;
-    auto image_msg = cv_bridge::CvImage(header, encoding, frame).toImageMsg();
-    m_topic_image->publish(*image_msg);
-}
-
-
 void RedoxiVideoReaderBase::_step()
 {
     //! If not started yet, do nothing
@@ -843,13 +840,6 @@ void RedoxiVideoReaderBase::_step()
 
             //! Execute the task in isolation
             unordered_tasks.run(task_func);
-
-            //! Requested publish frame?
-            if (m_publish_image) {
-                unordered_tasks.run([this, frame]() {
-                    _publish_frame(frame);
-                });
-            }
         }
     }
 

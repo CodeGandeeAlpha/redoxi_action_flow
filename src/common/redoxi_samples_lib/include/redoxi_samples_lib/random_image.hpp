@@ -1,7 +1,9 @@
 #pragma once
 
+#include <optional>
 #include <redoxi_samples_lib/redoxi_samples_lib.hpp>
 #include <opencv2/opencv.hpp>
+
 namespace redoxi_works
 {
 
@@ -25,14 +27,14 @@ int random_image_with_shapes(cv::Mat &image, const cv::Size &size);
  *
  * @param[out] image The output cv::Mat where the generated image will be stored.
  * @param[in] size The size of the image to be generated.
- * @param[in] text The text to be added to the image.
- * @param[in] background_color The background color of the image (default is black).
- * @param[in] text_color The color of the text (default is white).
+ * @param[in] text The text to be added to the image, if not specified, a random UUID and time code will be used.
+ * @param[in] background_color The background color of the image, if not specified, a random color will be used.
+ * @param[in] text_color The color of the text, if not specified, a random color will be used.
  * @return Returns 0 on success.
  */
 int random_image_with_text(cv::Mat &image, const cv::Size &size,
-                           const std::string &text,
-                           const cv::Scalar &background_color = cv::Scalar(),
-                           const cv::Scalar &text_color = cv::Scalar());
+                           std::optional<std::string> text = std::nullopt,
+                           std::optional<cv::Scalar> text_color = std::nullopt,
+                           std::optional<cv::Scalar> background_color = std::nullopt);
 
 } // namespace redoxi_works

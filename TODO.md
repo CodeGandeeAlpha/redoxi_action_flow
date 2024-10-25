@@ -1,4 +1,6 @@
 [] implement the frame payload type
+[] make use of vineyard to deliver the frame payload
+[] test random blocking from the receiver side
 [x] set goal handle expiration time to 1s or less
 
 ## Debugging

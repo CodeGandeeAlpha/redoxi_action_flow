@@ -16,8 +16,8 @@ source_node_json_params = {
         "custom_var_2": 10.0,
     },
     "runtime_config": {
-        "frame_interval_ms": 1000.0,
-        "step_interval_ms": 10.0,
+        "frame_interval_ms": 10.0,
+        "step_interval_ms": 1.0,
         "publish_to_debug_topic": True,
     },
     "init_config": {
@@ -27,7 +27,7 @@ source_node_json_params = {
                     "name": "/video_sink/in/action",
                     "retry_strategy": {
                         "max_retries": 5,
-                        "retry_interval_ms": 50.0,
+                        "retry_interval_ms": 10.0,
                     },
                 }
             ]
@@ -44,7 +44,7 @@ relay_node_json_params = {
         "publish_queue_size": 10,
         "publish_raw_image": True,
         "publish_compressed_image": False,
-        "use_async": True,
+        "use_async": False,
         "goal_buffer_size": 1,
     },
 }

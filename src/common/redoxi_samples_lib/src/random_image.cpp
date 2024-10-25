@@ -1,4 +1,10 @@
 #include <redoxi_samples_lib/random_image.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
 
 namespace redoxi_works
 {
@@ -32,11 +38,14 @@ int random_image_with_shapes(cv::Mat &image, const cv::Size &size)
     return 0;
 }
 
-int random_image_with_text(cv::Mat &image, const cv::Size &size, const std::string &text,
-                           const cv::Scalar &background_color, const cv::Scalar &text_color)
+int random_image_with_text(cv::Mat &image, const cv::Size &size, std::optional<std::string> text,
+                           std::optional<cv::Scalar> text_color, std::optional<cv::Scalar> background_color)
 {
-    //! Create the image with the specified background color
-    image = cv::Mat(size, CV_8UC3, background_color);
+    //! Create the image with the specified background color or a random color if not provided
+    cv::RNG rng(cv::getTickCount());
+    cv::Scalar actualBackgroundColor = background_color.value_or(
+        cv::Scalar(rng.uniform(0, 256), rng.uniform(0, 256), rng.uniform(0, 256)));
+    image = cv::Mat(size, CV_8UC3, actualBackgroundColor);
 
     //! Set up text parameters
     int fontFace = cv::FONT_HERSHEY_SIMPLEX;
@@ -48,12 +57,28 @@ int random_image_with_text(cv::Mat &image, const cv::Size &size, const std::stri
     int borderPadding = std::min(size.width, size.height) / 10;
     cv::Rect safeArea(borderPadding, borderPadding, size.width - 2 * borderPadding, size.height - 2 * borderPadding);
 
-    //! Split text into lines
+    //! Generate text if not provided
     std::vector<std::string> lines;
-    std::istringstream iss(text);
-    std::string line;
-    while (std::getline(iss, line)) {
-        lines.push_back(line);
+    if (!text.has_value()) {
+        //! Generate UUID
+        boost::uuids::random_generator gen;
+        boost::uuids::uuid uuid = gen();
+        lines.push_back(boost::uuids::to_string(uuid));
+
+        //! Generate current time
+        auto now = std::chrono::system_clock::now();
+        auto now_c = std::chrono::system_clock::to_time_t(now);
+        auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&now_c), "%Y-%m-%d %H:%M:%S") << ":" << std::setfill('0') << std::setw(3) << now_ms.count();
+        lines.push_back(ss.str());
+    } else {
+        //! Split provided text into lines
+        std::istringstream iss(text.value());
+        std::string line;
+        while (std::getline(iss, line)) {
+            lines.push_back(line);
+        }
     }
 
     //! Calculate text size and position
@@ -82,10 +107,18 @@ int random_image_with_text(cv::Mat &image, const cv::Size &size, const std::stri
     //! Calculate total text height
     int totalTextHeight = wrappedLines.size() * (cv::getTextSize("Tg", fontFace, fontScale, thickness, &baseline).height + baseline);
 
+    //! Set text color or use inverted background color if not provided
+    cv::Scalar actualTextColor;
+    if (text_color.has_value()) {
+        actualTextColor = text_color.value();
+    } else {
+        actualTextColor = cv::Scalar(255, 255, 255) - actualBackgroundColor;
+    }
+
     //! Draw text
     cv::Point textOrg(safeArea.x, safeArea.y + (safeArea.height - totalTextHeight) / 2);
     for (const auto &line : wrappedLines) {
-        cv::putText(image, line, textOrg, fontFace, fontScale, text_color, thickness, cv::LINE_AA);
+        cv::putText(image, line, textOrg, fontFace, fontScale, actualTextColor, thickness, cv::LINE_AA);
         textOrg.y += cv::getTextSize(line, fontFace, fontScale, thickness, &baseline).height + baseline;
     }
 

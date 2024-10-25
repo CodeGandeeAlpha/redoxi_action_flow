@@ -4,7 +4,7 @@
 #include <map>
 #include <memory>
 #include <optional>
-
+#include <algorithm>
 #include <opencv2/opencv.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -16,6 +16,7 @@
 #include <redoxi_public_msgs/msg/frame.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
 #include <redoxi_video_reader/visibility_control.h>
+#include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 
 
 namespace redoxi_works
@@ -48,6 +49,9 @@ class REDOXI_VIDEO_READER_PUBLIC DownstreamSpec
 
     //! The action to accept the frame for this downstream node
     std::string accept_frame_action;
+
+    //! If use debug pub for this downstream node
+    bool use_debug_pub = true;
 
     //! The retry strategy for this downstream node
     std::shared_ptr<IRetryStrategy> retry_strategy;
@@ -183,6 +187,53 @@ class REDOXI_VIDEO_READER_PUBLIC Downstream
     std::shared_ptr<DownstreamSpec> spec;
     ActionClient_t::SharedPtr accept_frame;
     SendGoalOptions_t accept_frame_options;
+
+    // publisher for debug image
+    StampedImagePub debug_pub_sending; //!< The publisher for sending frame
+    StampedImagePub debug_pub_dropped; //!< The publisher for dropped frame
+    StampedImagePub debug_pub_sent;    //!< The publisher for sent frame successfully
+
+    //! Get the debug pub sending name
+    //! @return The debug pub sending name, empty string if spec is not set
+    virtual std::string get_debug_pub_sending_name(const DownstreamSpec &spec) const
+    {
+        std::string topic_name = "debug_port/" + spec.accept_frame_action + "/frame_sending";
+
+        //! Remove duplicate consecutive slashes from topic name
+        topic_name.erase(std::unique(topic_name.begin(), topic_name.end(),
+                                     [](char a, char b) { return a == '/' && b == '/'; }),
+                         topic_name.end());
+
+        return topic_name;
+    }
+
+    //! Get the debug pub dropped name
+    //! @return The debug pub dropped name, empty string if spec is not set
+    virtual std::string get_debug_pub_dropped_name(const DownstreamSpec &spec) const
+    {
+        std::string topic_name = "debug_port/" + spec.accept_frame_action + "/frame_dropped";
+
+        //! Remove duplicate consecutive slashes from topic name
+        topic_name.erase(std::unique(topic_name.begin(), topic_name.end(),
+                                     [](char a, char b) { return a == '/' && b == '/'; }),
+                         topic_name.end());
+
+        return topic_name;
+    }
+
+    //! Get the debug pub sent name
+    //! @return The debug pub sent name, empty string if spec is not set
+    virtual std::string get_debug_pub_sent_name(const DownstreamSpec &spec) const
+    {
+        std::string topic_name = "debug_port/" + spec.accept_frame_action + "/frame_sent";
+
+        //! Remove duplicate consecutive slashes from topic name
+        topic_name.erase(std::unique(topic_name.begin(), topic_name.end(),
+                                     [](char a, char b) { return a == '/' && b == '/'; }),
+                         topic_name.end());
+
+        return topic_name;
+    }
 };
 
 //! The frame delivery task

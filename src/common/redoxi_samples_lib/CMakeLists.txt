@@ -13,7 +13,9 @@ find_package(redoxi_common_cpp REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_library(redoxi_samples_lib src/redoxi_samples_lib.cpp)
+set(srcfiles src/redoxi_samples_lib.cpp src/random_image.cpp)
+
+add_library(redoxi_samples_lib ${srcfiles})
 add_library(redoxi_samples_lib::redoxi_samples_lib ALIAS redoxi_samples_lib)
 target_compile_features(redoxi_samples_lib PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 target_include_directories(redoxi_samples_lib PUBLIC

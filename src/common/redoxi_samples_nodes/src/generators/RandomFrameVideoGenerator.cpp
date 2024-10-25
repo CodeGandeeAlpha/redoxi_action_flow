@@ -1,6 +1,7 @@
 #include <redoxi_samples_nodes/generators/RandomFrameVideoGenerator.hpp>
 #include <redoxi_video_reader/base/VideoReaderBaseImpl.hpp>
 #include <redoxi_samples_lib/random_image.hpp>
+#include <redoxi_common_cpp/image_proc/ImageStamper.hpp>
 
 namespace redoxi_works
 {
@@ -34,30 +35,10 @@ int RandomFrameVideoGenerator::_read_frame(cv::Mat &frame, std::atomic<int64_t> 
         RDX_RAISE_ERROR("[%s][_read_frame()] output_image_size is not set", this->get_name());
     }
 
-    //! Get current ROS time as seconds from start
-    auto current_time = this->now();
-    auto dt_ns = (current_time - m_impl->time_node_last_started).nanoseconds();
-    auto dt_ms = dt_ns / 1e6;
-    RCLCPP_DEBUG(this->get_logger(), "Current time: %.2f ms from start", dt_ms);
-
-    // generate a random frame
-    auto encoding = m_runtime_config->output_image_encoding;
+    //! Generate a random frame with the UUID text
     cv::Mat random_frame;
-    if (encoding == "mono8") {
-        random_frame = cv::Mat(frame_size, CV_8UC1);
-        cv::randu(random_frame, cv::Scalar(0), cv::Scalar(255));
-    } else if (encoding == "mono16") {
-        random_frame = cv::Mat(frame_size, CV_16UC1);
-        cv::randu(random_frame, cv::Scalar(0), cv::Scalar(65535));
-    } else if (encoding == "bgr8" || encoding == "rgb8") {
-        random_frame = cv::Mat(frame_size, CV_8UC3);
-        cv::randu(random_frame, cv::Scalar(0, 0, 0), cv::Scalar(255, 255, 255));
-    } else {
-        //! Unsupported encoding, fallback to bgr8
-        RCLCPP_WARN(this->get_logger(), "Unsupported encoding: %s. Falling back to bgr8.", encoding.c_str());
-        random_frame = cv::Mat(frame_size, CV_8UC3);
-        cv::randu(random_frame, cv::Scalar(0, 0, 0), cv::Scalar(255, 255, 255));
-    }
+    random_image_with_text(random_frame, frame_size);
+
     frame = random_frame;
     frame_number++;
     return 0;
