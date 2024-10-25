@@ -14,6 +14,7 @@ find_package(vineyard REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(fmt REQUIRED)
+find_package(TBB REQUIRED)
 
 # ros libraries
 find_package(rclcpp REQUIRED)
@@ -24,7 +25,7 @@ find_package(redoxi_public_msgs REQUIRED)
 set(source_files src/redoxi_common_cpp.cpp src/redoxi_v6d.cpp
                  src/redoxi_ros_util.cpp)
 set(required_dependencies ${VINEYARD_LIBRARIES} ${OpenCV_LIBS} fmt::fmt
-                          nlohmann_json::nlohmann_json)
+                          nlohmann_json::nlohmann_json TBB::tbb)
 set(required_includes ${OpenCV_INCLUDE_DIRS} ${VINEYARD_INCLUDE_DIRS})
 
 add_library(redoxi_common_cpp ${source_files})
@@ -71,5 +72,18 @@ endif()
 ament_export_include_directories(include)
 ament_export_libraries(redoxi_common_cpp)
 ament_export_targets(export_${PROJECT_NAME})
+
+ament_export_dependencies(
+  rclcpp
+  rcpputils
+  redoxi_public_msgs
+  rclcpp_action
+  TBB
+  nlohmann_json
+  fmt
+  vineyard
+  OpenCV
+)
+
 
 ament_package()

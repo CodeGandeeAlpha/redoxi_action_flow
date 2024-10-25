@@ -16,8 +16,8 @@ source_node_json_params = {
         "custom_var_2": 10.0,
     },
     "runtime_config": {
-        "frame_interval_ms": 10000.0,
-        "step_interval_ms": 100.0,
+        "frame_interval_ms": 1000.0,
+        "step_interval_ms": 10.0,
         "publish_to_debug_topic": True,
     },
     "init_config": {
@@ -118,7 +118,8 @@ def generate_launch_description():
         [
             *env_var_settings,
             log_level_arg,
-            simple_action_generator,
+            # simple_action_generator,
+            video_source_node,
             video_sink_node,
         ]
     )

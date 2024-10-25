@@ -1,4 +1,4 @@
-#include <redoxi_video_reader/generators/RandomFrameVideoGenerator.hpp>
+#include <redoxi_samples_nodes/generators/RandomFrameVideoGenerator.hpp>
 #include <spdlog/spdlog.h>
 
 namespace rdx = redoxi_works;

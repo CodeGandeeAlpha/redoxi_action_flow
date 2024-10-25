@@ -1,5 +1,5 @@
 #include <redoxi_common_cpp/ros_utils/common.hpp>
-#include <redoxi_video_reader/generators/SimpleActionGenerator.hpp>
+#include <redoxi_samples_nodes/generators/SimpleActionGenerator.hpp>
 #include <redoxi_common_cpp/ros_utils/SyncActionSender.hpp>
 #include <redoxi_video_reader/base/VideoReaderBaseImpl.hpp>
 

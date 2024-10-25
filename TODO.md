@@ -1,5 +1,5 @@
 [] implement the frame payload type
-[] set goal handle expiration time to 1s or less
+[x] set goal handle expiration time to 1s or less
 
 ## Debugging
 
@@ -10,6 +10,9 @@
 | Yes (640x480)     | No      | No (best effort) | Yes (Simple Node)    | Normal frame delivery scenario                                                                |
 | Yes (640x480)     | No      | No (best effort) | ? (Complex Node)    | Normal frame delivery scenario                                                |
 | No                | Yes     | Yes           | ?      | Ping without frame payload                                                                    |
+
+## Test cases
+### Run random frame generator with full videobase implementation
 
 
 ## Assumptions

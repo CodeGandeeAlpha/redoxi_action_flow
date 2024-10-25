@@ -1,5 +1,6 @@
-#include <redoxi_video_reader/generators/RandomFrameVideoGenerator.hpp>
+#include <redoxi_samples_nodes/generators/RandomFrameVideoGenerator.hpp>
 #include <redoxi_video_reader/base/VideoReaderBaseImpl.hpp>
+#include <redoxi_samples_lib/random_image.hpp>
 
 namespace redoxi_works
 {

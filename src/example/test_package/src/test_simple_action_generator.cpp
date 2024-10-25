@@ -1,4 +1,4 @@
-#include <redoxi_video_reader/generators/SimpleActionGenerator.hpp>
+#include <redoxi_samples_nodes/generators/SimpleActionGenerator.hpp>
 
 namespace rdx = redoxi_works;
 using Node_t = rdx::SimpleActionGenerator;

@@ -16,15 +16,10 @@ find_package(TBB REQUIRED)
 
 # Set dependencies
 set(DEPENDENCIES
-    rclcpp
-    std_msgs
-    geometry_msgs
-    redoxi_public_msgs
     psg_private_msgs
-    unique_identifier_msgs
-    redoxi_common_cpp
     redoxi_video_reader
-    rclcpp_action)
+    redoxi_samples_lib
+    redoxi_samples_nodes)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb)
 
@@ -116,7 +111,7 @@ endif()
 install(TARGETS ${ALL_TEST_TARGETS} DESTINATION lib/${PROJECT_NAME})
 
 # Install launch files
-install(DIRECTORY launch DESTINATION share/${PROJECT_NAME}/)
+install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/)
 
 # Finalize ament package
 ament_package()

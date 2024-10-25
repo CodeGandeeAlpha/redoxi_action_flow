@@ -19,6 +19,8 @@ PackagesToBuild="psg_private_msgs \
                  redoxi_public_msgs \
                  redoxi_common_cpp \
                  redoxi_video_reader \
+                 redoxi_samples_lib \
+                 redoxi_samples_nodes \
                  test_package \
                  cv_bridge"
 

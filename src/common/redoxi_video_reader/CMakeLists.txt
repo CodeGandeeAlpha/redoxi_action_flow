@@ -26,9 +26,7 @@ find_package(Boost REQUIRED)
 set(source_files
   src/VideoReaderBase.cpp
   src/VideoReaderBaseTypes.cpp
-  src/RandomFrameVideoGenerator.cpp
   src/FrameRelayPublisher.cpp
-  src/SimpleActionGenerator.cpp
 )
 
 add_library(redoxi_video_reader ${source_files})
