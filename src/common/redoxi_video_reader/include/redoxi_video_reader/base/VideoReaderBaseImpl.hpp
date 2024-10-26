@@ -4,6 +4,7 @@
 #include <redoxi_video_reader/base/VideoReaderBaseTypes.hpp>
 #include <redoxi_common_cpp/async_processor/SingleBufferExecNode.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
+#include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 #include <redoxi_public_msgs/msg/frame.hpp>
 
 #include <tbb/tbb.h>
@@ -92,6 +93,14 @@ class RedoxiVideoReaderImpl
 
     // the time when this node is last started (when start() is called)
     rclcpp::Time time_node_last_started;
+
+    // debug publisher
+
+    //! Debug publisher for frame delivery task enqueued
+    std::shared_ptr<StampedImagePub> debug_pub_task_enqueued;
+
+    //! Debug publisher for frame delivery task dropped
+    std::shared_ptr<StampedImagePub> debug_pub_task_dropped;
 };
 
 } // namespace redoxi_works

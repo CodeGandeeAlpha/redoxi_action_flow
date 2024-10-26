@@ -14,13 +14,12 @@ class StampedImagePub
 {
   public:
     using Publisher_t = rclcpp::Publisher<sensor_msgs::msg::Image>;
-    inline static constexpr int DEFAULT_QUEUE_SIZE = 10;
 
     //! Constructor
     StampedImagePub() = default;
 
     //! Constructor that creates publisher during construction
-    StampedImagePub(rclcpp::Node *node, const std::string &topic_name, int queue_size = DEFAULT_QUEUE_SIZE);
+    StampedImagePub(rclcpp::Node *node, const std::string &topic_name, std::optional<rclcpp::QoS> qos = std::nullopt);
 
     //! Check if the publisher is valid
     bool valid() const
@@ -31,7 +30,7 @@ class StampedImagePub
     //! Initialize the publisher
     int init(rclcpp::Node *node,
              const std::string &topic_name,
-             int queue_size = DEFAULT_QUEUE_SIZE);
+             std::optional<rclcpp::QoS> qos = std::nullopt);
 
     //! Get the publisher
     Publisher_t::SharedPtr get_publisher() const;

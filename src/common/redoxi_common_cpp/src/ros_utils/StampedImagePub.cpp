@@ -5,21 +5,25 @@
 namespace redoxi_works
 {
 
-StampedImagePub::StampedImagePub(rclcpp::Node *node, const std::string &topic_name, int queue_size)
+StampedImagePub::StampedImagePub(rclcpp::Node *node, const std::string &topic_name, std::optional<rclcpp::QoS> qos)
     : m_node(node)
 {
-    init(node, topic_name, queue_size);
+    init(node, topic_name, qos);
 }
 
 int StampedImagePub::init(rclcpp::Node *node,
                           const std::string &topic_name,
-                          int queue_size)
+                          std::optional<rclcpp::QoS> qos)
 {
     RDX_ASSERT_CHECK_TRUE(node, "Node should not be nullptr in {}", __func__);
     RDX_ASSERT_CHECK_TRUE(!m_pub, "Publisher should not be initialized in {}", __func__);
 
     m_node = node;
-    m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, queue_size);
+    if (qos) {
+        m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, *qos);
+    } else {
+        m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, DefaultParams::DebugPublisherQoS);
+    }
     return m_pub != nullptr ? 0 : -1;
 }
 

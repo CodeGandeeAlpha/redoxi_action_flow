@@ -17,8 +17,9 @@ using namespace std::placeholders;
 #ifdef _DEBUG_ENABLE_RANDOM_BLOCKING
 namespace _random_block_params
 {
-//! The interval to block
-constexpr static std::chrono::milliseconds BlockThisLong = std::chrono::milliseconds(1000);
+//! The interval to block, random between BlockThisLongMin and BlockThisLongMax
+constexpr static std::chrono::milliseconds BlockThisLongMin = std::chrono::milliseconds(100);
+constexpr static std::chrono::milliseconds BlockThisLongMax = std::chrono::milliseconds(1000);
 
 //! The probability to block
 constexpr static double BlockThisLikely = 0.2;
@@ -51,8 +52,10 @@ struct FrameRelayPublisherImpl {
         : m_node(node)
     {
 #ifdef _DEBUG_ENABLE_RANDOM_BLOCKING
-        m_random_block_signal = std::make_shared<RosTimeUnsetToken>(node, _random_block_params::BlockThisLong);
-        m_random_block_signal->start();
+        {
+            //! Set the blocking interval
+            m_random_block_signal = std::make_shared<RosTimeUnsetToken>(node, _random_block_params::BlockThisLongMin);
+        }
 #endif
         m_ping_response = std::make_shared<FrameReceiveAction_t::Result>();
         m_ping_response->return_code = 0;
@@ -160,12 +163,15 @@ void FrameRelayPublisher::init(std::shared_ptr<InitConfig_t> config)
             std::bind(&FrameRelayPublisher::_on_goal_canceled, this, _1),
             std::bind(&FrameRelayPublisher::_on_goal_accepted, this, _1),
             server_opt);
-    m_pub_relayed_frame.init(this, config->relayed_frame_topic_name, config->publish_queue_size);
+    m_pub_relayed_frame = std::make_shared<StampedImagePub>();
+    m_pub_relayed_frame->init(this, config->relayed_frame_topic_name, config->publish_queue_size);
 
     // create publisher, regardless of whether debug pub is enabled
     RDX_INFO_DEV(this, __func__, print_thread_id, "Creating image publisher");
-    m_debug_pub_accepted_goal.init(this, "debug_port/accepted_goal");
-    m_debug_pub_rejected_goal.init(this, "debug_port/rejected_goal");
+    m_debug_pub_accepted_goal = std::make_shared<StampedImagePub>();
+    m_debug_pub_accepted_goal->init(this, "debug_port/accepted_goal", DefaultParams::DebugPublisherQoS);
+    m_debug_pub_rejected_goal = std::make_shared<StampedImagePub>();
+    m_debug_pub_rejected_goal->init(this, "debug_port/rejected_goal", DefaultParams::DebugPublisherQoS);
 
     RDX_INFO_DEV(this, __func__, print_thread_id, "Initialization completed");
 }
@@ -346,6 +352,19 @@ rclcpp_action::GoalResponse
         if (dis(gen) < _random_block_params::BlockThisLikely) {
             RDX_INFO_DEV(this, __func__, print_thread_id, "[msg_uuid={}] Generated a blocking signal",
                          boost::uuids::to_string(msg_uuid));
+
+            //! Generate a random blocking interval
+            std::uniform_int_distribution<> block_duration_dist(
+                _random_block_params::BlockThisLongMin.count(),
+                _random_block_params::BlockThisLongMax.count());
+            auto block_duration = std::chrono::milliseconds(block_duration_dist(gen));
+
+            RDX_INFO_DEV(this, __func__, print_thread_id,
+                         "[msg_uuid={}] Generated blocking interval of {} ms",
+                         boost::uuids::to_string(msg_uuid), block_duration.count());
+
+            m_impl->m_random_block_signal->stop();
+            m_impl->m_random_block_signal->start(block_duration);
             m_impl->m_random_block_signal->try_push_token();
         }
     }
@@ -537,11 +556,11 @@ int FrameRelayPublisher::_debug_publish_accepted_goal(const FrameReceiveAction_t
         return -1;
     }
 
-    if (!m_debug_pub_accepted_goal.valid()) {
+    if (!m_debug_pub_accepted_goal->valid()) {
         return -1;
     }
 
-    m_debug_pub_accepted_goal.publish(raw_image, "accepted", cv::Scalar(0, 255, 0));
+    m_debug_pub_accepted_goal->publish(raw_image, fmt::format("accepted frame {}", goal.frame.frame_num), cv::Scalar(0, 255, 0));
     return 0;
 }
 
@@ -555,18 +574,18 @@ int FrameRelayPublisher::_debug_publish_rejected_goal(const FrameReceiveAction_t
         return -1;
     }
 
-    if (!m_debug_pub_rejected_goal.valid()) {
+    if (!m_debug_pub_rejected_goal->valid()) {
         return -1;
     }
 
-    m_debug_pub_rejected_goal.publish(raw_image, "rejected", cv::Scalar(0, 0, 255));
+    m_debug_pub_rejected_goal->publish(raw_image, fmt::format("rejected frame {}", goal.frame.frame_num), cv::Scalar(0, 0, 255));
     return 0;
 }
 
 int FrameRelayPublisher::_publish_relayed_frame(const FrameReceiveAction_t::Goal &goal)
 {
     auto msg_uuid = to_boost_uuid(goal.x_uid);
-    if (!m_pub_relayed_frame.valid()) {
+    if (!m_pub_relayed_frame->valid()) {
         RDX_INFO_DEV(this, __func__, "[msg_uuid={}] Relay frame publish channel is not valid",
                      boost::uuids::to_string(msg_uuid));
         return -1;
@@ -579,7 +598,7 @@ int FrameRelayPublisher::_publish_relayed_frame(const FrameReceiveAction_t::Goal
         return -1;
     }
 
-    m_pub_relayed_frame.publish(raw_image);
+    m_pub_relayed_frame->publish(raw_image);
     return 0;
 }
 

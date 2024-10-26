@@ -285,6 +285,61 @@ class REDOXI_VIDEO_READER_PUBLIC
     virtual std::shared_ptr<RedoxiVideoReaderImpl> _create_impl(const std::shared_ptr<InitConfig_t> &init_config,
                                                                 const std::shared_ptr<RuntimeConfig_t> &runtime_config);
 
+    // publishing for debug
+  protected:
+    /**
+     * @brief Publish debug image when a frame is being sent to downstream
+     * @param frame_msg The frame message being sent
+     * @param ds The downstream the frame is being sent to
+     * @param ith_attempt The current attempt number
+     * @param max_attempts The maximum number of attempts
+     * @return 0 if successful, otherwise an error code
+     */
+    virtual int _debug_publish_sending_to_downstream(const FrameMessage_t &frame_msg,
+                                                     std::shared_ptr<Downstream_t> ds,
+                                                     int64_t ith_attempt,
+                                                     int64_t max_attempts);
+
+    /**
+     * @brief Publish debug image when a frame is successfully sent to downstream
+     * @param frame_msg The frame message that was sent
+     * @param ds The downstream the frame was sent to
+     * @param ith_attempt The attempt number on which the frame was successfully sent
+     * @param max_attempts The maximum number of attempts
+     * @return 0 if successful, otherwise an error code
+     */
+    virtual int _debug_publish_sent_to_downstream(const FrameMessage_t &frame_msg,
+                                                  std::shared_ptr<Downstream_t> ds,
+                                                  int64_t ith_attempt,
+                                                  int64_t max_attempts);
+
+    /**
+     * @brief Publish debug image when failed to send a frame to downstream
+     * @param frame_msg The frame message that failed to send
+     * @param ds The downstream to which the send attempt failed
+     * @param ith_attempt The attempt number on which the send failed
+     * @param max_attempts The maximum number of attempts
+     * @return 0 if successful, otherwise an error code
+     */
+    virtual int _debug_publish_failed_to_send_to_downstream(const FrameMessage_t &frame_msg,
+                                                            std::shared_ptr<Downstream_t> ds,
+                                                            int64_t ith_attempt,
+                                                            int64_t max_attempts);
+
+    /**
+     * @brief Publish debug image when a delivery task is enqueued
+     * @param task The delivery task that was enqueued
+     * @return 0 if successful, otherwise an error code
+     */
+    virtual int _debug_publish_delivery_task_enqueued(const FrameDeliveryTask_t &task);
+
+    /**
+     * @brief Publish debug image when a delivery task is dropped
+     * @param task The delivery task that was dropped
+     * @return 0 if successful, otherwise an error code
+     */
+    virtual int _debug_publish_delivery_task_dropped(const FrameDeliveryTask_t &task);
+
   private:
     /**
      * @brief Declare all parameters (non-overridable)

@@ -127,6 +127,19 @@ int RedoxiVideoReaderBase::update_init_config(const std::shared_ptr<InitConfig_t
         return ret;
     }
 
+    //! Create debug publishers if requested
+    if (m_init_config->create_debug_pub) {
+        //! Debug publisher for frame delivery task enqueued
+        m_impl->debug_pub_task_enqueued = std::make_shared<StampedImagePub>(
+            this, m_init_config->debug_pub_task_enqueue_name, DefaultParams::DebugPublisherQoS);
+
+        //! Debug publisher for frame delivery task dropped
+        m_impl->debug_pub_task_dropped = std::make_shared<StampedImagePub>(
+            this, m_init_config->debug_pub_task_drop_name, DefaultParams::DebugPublisherQoS);
+
+        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Debug publishers created");
+    }
+
     //! Set status code to closed
     _set_status_code(NodeStatusCode::CLOSED);
 
@@ -162,6 +175,13 @@ int RedoxiVideoReaderBase::update_runtime_config(const std::shared_ptr<RuntimeCo
             RDX_RAISE_ERROR("[{}()] Failed to initialize frame delivery tasks", __func__);
             return ret;
         }
+    }
+
+    // resolve the delivery policy
+    for (auto &it : m_downstreams) {
+        auto &ds = it.second;
+        ds->delivery_policy = ds->spec->retry_strategy->clone();
+        ds->delivery_policy->resolve_to_definite({m_runtime_config->delivery_policy_fallback.get()});
     }
 
     //! Apply any necessary changes based on the new runtime config
@@ -340,6 +360,10 @@ int RedoxiVideoReaderBase::_connect_to_downstreams()
             ds->accept_frame = client;
             ds->spec = it.second;
 
+            // resolve the delivery policy
+            ds->delivery_policy = ds->spec->retry_strategy->clone();
+            ds->delivery_policy->resolve_to_definite();
+
             // wait until the action server becomes online
             RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Waiting for action server {} to be online", name);
             client->wait_for_action_server();
@@ -348,9 +372,12 @@ int RedoxiVideoReaderBase::_connect_to_downstreams()
 
         // create publisher for debug image topic
         if (ds->spec->use_debug_pub) {
-            ds->debug_pub_sending.init(this, ds->get_debug_pub_sending_name(*it.second));
-            ds->debug_pub_dropped.init(this, ds->get_debug_pub_dropped_name(*it.second));
-            ds->debug_pub_sent.init(this, ds->get_debug_pub_sent_name(*it.second));
+            ds->debug_pub_sending = std::make_shared<StampedImagePub>(
+                this, ds->get_debug_pub_sending_name(*ds->spec), DefaultParams::DebugPublisherQoS);
+            ds->debug_pub_dropped = std::make_shared<StampedImagePub>(
+                this, ds->get_debug_pub_dropped_name(*ds->spec), DefaultParams::DebugPublisherQoS);
+            ds->debug_pub_sent = std::make_shared<StampedImagePub>(
+                this, ds->get_debug_pub_sent_name(*ds->spec), DefaultParams::DebugPublisherQoS);
         }
 
         m_downstreams[it.first] = ds;
@@ -556,34 +583,26 @@ int RedoxiVideoReaderBase::_deliver_frame(
     const FrameMessage_t &frame_msg,
     const std::shared_ptr<Downstream_t> &ds)
 {
-    //! Prepare the goal
-    // auto goal = Downstream_t::Goal_t();
-    // goal.frame = frame_msg;
-
     //! Set up retry strategy
     int attempts = 0;
 
     //! +1 for the first attempt
-    const int max_attempts = ds->spec->retry_strategy->get_number_of_delivery_retry() + 1;
-    auto timeout_each_attempt = ds->spec->retry_strategy->get_wait_time_for_delivery_response();
-    auto interval_between_attempts = ds->spec->retry_strategy->get_wait_time_between_delivery_retry();
+    bool no_drop = m_runtime_config->frame_delivery_options->drop_frame_strategy == FrameDeliveryOptions_t::DropFrameStrategy::NoDrop;
+    auto max_attempts = ds->delivery_policy->get_number_of_delivery_retry().value_or(0) + 1;
+    auto timeout_each_attempt = ds->delivery_policy->get_wait_time_for_delivery_response().value_or(DefaultTimeUnit_t::zero());
+    auto interval_between_attempts = ds->delivery_policy->get_wait_time_between_delivery_retry().value_or(DefaultTimeUnit_t::zero());
     auto msg_uuid = to_boost_uuid(frame_msg.uuid);
 
-    //! Debug image message
-    const sensor_msgs::msg::Image *debug_image_msg = nullptr;
-    if (frame_msg.raw_image.data.size() > 0) {
-        debug_image_msg = &frame_msg.raw_image;
-    }
-    bool publish_to_debug_topic = get_publish_to_debug_topic();
-
-    while (attempts < max_attempts) {
+    while (attempts < max_attempts || no_drop) {
+        if (!rclcpp::ok()) {
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] ROS context is not OK, stopping frame delivery",
+                         boost::uuids::to_string(msg_uuid));
+            return -1;
+        }
+        // for no_drop, we need to keep trying until the frame is delivered (return in the loop)
 
         //! Publish the frame to the debug topic
-        if (publish_to_debug_topic && debug_image_msg && ds->debug_pub_sending.valid()) {
-            ds->debug_pub_sending.publish(*debug_image_msg,
-                                          fmt::format("[SENDING] frame_num={}, attempts={}/{}", frame_msg.frame_num, attempts + 1, max_attempts),
-                                          cv::Scalar(0, 0, 255));
-        }
+        _debug_publish_sending_to_downstream(frame_msg, ds, attempts + 1, max_attempts);
 
         //! Send the frame to the downstream
         auto result = _send_frame_to_downstream(frame_msg, ds, timeout_each_attempt);
@@ -601,11 +620,8 @@ int RedoxiVideoReaderBase::_deliver_frame(
                                      boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
 
                         //! Publish the frame sent message
-                        if (publish_to_debug_topic && ds->debug_pub_sent.valid() && debug_image_msg) {
-                            ds->debug_pub_sent.publish(*debug_image_msg,
-                                                       fmt::format("[SENT] frame_num={}, attempts={}/{}", frame_msg.frame_num, attempts + 1, max_attempts),
-                                                       cv::Scalar(0, 255, 0));
-                        }
+                        _debug_publish_sent_to_downstream(frame_msg, ds, attempts + 1, max_attempts);
+
                         return 0; // Success
                     case ActionDownstreamResponse::REJECTED:
                         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame rejected by downstream {}",
@@ -643,11 +659,7 @@ int RedoxiVideoReaderBase::_deliver_frame(
         std::this_thread::sleep_for(interval_between_attempts);
     }
 
-    if (publish_to_debug_topic && ds->debug_pub_dropped.valid() && debug_image_msg) {
-        ds->debug_pub_dropped.publish(*debug_image_msg,
-                                      fmt::format("[FAILED] frame_num={}, attempts={}/{}", frame_msg.frame_num, attempts + 1, max_attempts),
-                                      cv::Scalar(255, 0, 0));
-    }
+    _debug_publish_failed_to_send_to_downstream(frame_msg, ds, attempts, max_attempts);
 
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Failed to deliver frame to downstream {} after {} attempts",
                  boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action, max_attempts);
@@ -789,6 +801,108 @@ bool RedoxiVideoReaderBase::_ping(const std::shared_ptr<Downstream_t> &ds,
     }
 }
 
+int RedoxiVideoReaderBase::_debug_publish_sending_to_downstream(const FrameMessage_t &frame_msg,
+                                                                std::shared_ptr<Downstream_t> ds,
+                                                                int64_t ith_attempt,
+                                                                int64_t max_attempts)
+{
+    auto &debug_pub = ds->debug_pub_sending;
+    if (!get_publish_to_debug_topic() || !debug_pub->valid()) {
+        return 0;
+    }
+
+    const sensor_msgs::msg::Image *debug_image_msg = nullptr;
+    if (frame_msg.raw_image.data.size() > 0) {
+        debug_image_msg = &frame_msg.raw_image;
+    }
+
+    if (debug_image_msg) {
+        debug_pub->publish(*debug_image_msg,
+                           fmt::format("[SENDING] frame_num={}, attempts={}/{}",
+                                       frame_msg.frame_num, ith_attempt, max_attempts),
+                           cv::Scalar(0, 0, 255));
+    }
+    return 0;
+}
+
+int RedoxiVideoReaderBase::_debug_publish_sent_to_downstream(const FrameMessage_t &frame_msg,
+                                                             std::shared_ptr<Downstream_t> ds,
+                                                             int64_t ith_attempt,
+                                                             int64_t max_attempts)
+{
+    auto &debug_pub = ds->debug_pub_sent;
+    if (!get_publish_to_debug_topic() || !debug_pub->valid()) {
+        return 0;
+    }
+
+    const sensor_msgs::msg::Image *debug_image_msg = nullptr;
+    if (frame_msg.raw_image.data.size() > 0) {
+        debug_image_msg = &frame_msg.raw_image;
+    }
+
+    if (debug_image_msg) {
+        debug_pub->publish(*debug_image_msg,
+                           fmt::format("[SENT] frame_num={}, attempts={}/{}",
+                                       frame_msg.frame_num, ith_attempt, max_attempts),
+                           cv::Scalar(0, 255, 0));
+    }
+    return 0;
+}
+
+int RedoxiVideoReaderBase::_debug_publish_failed_to_send_to_downstream(const FrameMessage_t &frame_msg,
+                                                                       std::shared_ptr<Downstream_t> ds,
+                                                                       int64_t ith_attempt,
+                                                                       int64_t max_attempts)
+{
+    auto &debug_pub = ds->debug_pub_dropped;
+    if (!get_publish_to_debug_topic() || !debug_pub->valid()) {
+        return 0;
+    }
+
+    const sensor_msgs::msg::Image *debug_image_msg = nullptr;
+    if (frame_msg.raw_image.data.size() > 0) {
+        debug_image_msg = &frame_msg.raw_image;
+    }
+
+    if (debug_image_msg) {
+        debug_pub->publish(*debug_image_msg,
+                           fmt::format("[FAILED] frame_num={}, attempts={}/{}",
+                                       frame_msg.frame_num, ith_attempt, max_attempts),
+                           cv::Scalar(255, 0, 0));
+    }
+    return 0;
+}
+
+int RedoxiVideoReaderBase::_debug_publish_delivery_task_enqueued(const FrameDeliveryTask_t &task)
+{
+    auto &debug_pub = m_impl->debug_pub_task_enqueued;
+    if (!get_publish_to_debug_topic() || !debug_pub->valid()) {
+        return 0;
+    }
+
+    if (!task.frame.empty()) {
+        debug_pub->publish(task.frame,
+                           fmt::format("[ENQUEUED] frame_num={}", task.frame_number),
+                           cv::Scalar(255, 255, 0));
+    }
+    return 0;
+}
+
+int RedoxiVideoReaderBase::_debug_publish_delivery_task_dropped(const FrameDeliveryTask_t &task)
+{
+    auto &debug_pub = m_impl->debug_pub_task_dropped;
+    if (!get_publish_to_debug_topic() || !debug_pub->valid()) {
+        return 0;
+    }
+
+    if (!task.frame.empty()) {
+        debug_pub->publish(task.frame,
+                           fmt::format("[DROPPED] frame_num={}", task.frame_number),
+                           cv::Scalar(255, 0, 0));
+    }
+    return 0;
+}
+
 void RedoxiVideoReaderBase::_step()
 {
     //! If not started yet, do nothing
@@ -810,34 +924,51 @@ void RedoxiVideoReaderBase::_step()
             FrameDeliveryTask_t delivery_task;
             _create_frame_delivery_task(frame, delivery_task);
 
-            auto task_func = [this, delivery_task]() {
-                const auto &qos = m_runtime_config->frame_delivery_options;
+            auto qos_policy = m_runtime_config->delivery_policy_fallback;
 
+            //! Get delivery retry parameters from QoS policy, it already has all parameters resolved
+            auto max_attempts = qos_policy->get_number_of_delivery_retry().value() + 1;
+            auto interval_between_attempts = qos_policy->get_wait_time_between_delivery_retry().value();
+            auto drop_frame_strategy = m_runtime_config->frame_delivery_options->drop_frame_strategy;
+
+            auto task_func = [this, delivery_task,
+                              max_attempts, interval_between_attempts,
+                              drop_frame_strategy]() {
                 //! At least try once
                 bool task_sent = m_impl->frame_delivery_node->put_data(delivery_task);
 
+                //! Start from 1 as we already tried once
+                int attempts = 1;
+
                 //! If qos says you should retry until success, do so
-                if (qos->drop_frame_strategy == FrameDeliveryOptions_t::DropFrameStrategy::NoDrop) {
-                    auto max_attempts = qos->get_number_of_enqueue_retry();
-                    int attempts = 0;
-                    while (!task_sent && attempts < max_attempts) {
+                if (drop_frame_strategy == FrameDeliveryOptions_t::DropFrameStrategy::NoDrop) {
+                    while (!task_sent) {
                         attempts++;
-                        std::this_thread::sleep_for(qos->deliver_enqueue_interval);
+                        std::this_thread::sleep_for(interval_between_attempts);
                         task_sent = m_impl->frame_delivery_node->put_data(delivery_task);
                     }
 
                     //! Flush the graph, make sure the frame is delivered
                     m_impl->frame_delivery_graph->wait_for_all();
+                } else {
+                    //! If qos says you should drop frames as needed, do so when attempts are exhausted
+                    while (!task_sent && attempts < max_attempts) {
+                        attempts++;
+                        std::this_thread::sleep_for(interval_between_attempts);
+                        task_sent = m_impl->frame_delivery_node->put_data(delivery_task);
+                    }
                 }
 
                 if (task_sent) {
                     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Frame {} (UID: {}) sent",
                                   (int)delivery_task.frame_number,
                                   delivery_task.get_uid_as_string());
+                    _debug_publish_delivery_task_enqueued(delivery_task);
                 } else {
                     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Frame {} (UID: {}) dropped",
                                   (int)delivery_task.frame_number,
                                   delivery_task.get_uid_as_string());
+                    _debug_publish_delivery_task_dropped(delivery_task);
                 }
             };
 

@@ -65,11 +65,9 @@ void SimpleActionGenerator::_step_send_by_tbb_graph()
         }
     }
 
-    bool publish_to_debug_topic = get_publish_to_debug_topic();
     for (const auto &downstream : m_downstreams) {
-        if (downstream.second->debug_pub_sent.valid() && publish_to_debug_topic) {
-            downstream.second->debug_pub_sent.publish(frame, fmt::format("[SENT] frame_num={}", m_frame_number), cv::Scalar(0, 255, 0));
-        }
+        auto frame_msg = this->_create_frame_message(frame_delivery_task, FrameDeliveryOptions_t::FramePayloadType::Uncompressed);
+        _debug_publish_sent_to_downstream(frame_msg, downstream.second, 1, 1);
     }
 
     //! Wait for the frame delivery graph to finish

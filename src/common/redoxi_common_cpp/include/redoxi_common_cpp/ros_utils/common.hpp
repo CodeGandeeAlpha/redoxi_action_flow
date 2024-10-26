@@ -35,6 +35,18 @@
 namespace redoxi_works
 {
 
+namespace DefaultParams
+{
+
+//! publisher queue size when the topic is intended to be used for debugging
+constexpr int DebugPublisherQueueSize = 10;
+
+//! QoS for the debug publisher
+const rclcpp::QoS DebugPublisherQoS = rclcpp::QoS(DebugPublisherQueueSize).best_effort();
+// const rclcpp::QoS DebugPublisherQoS = rclcpp::QoS(DebugPublisherQueueSize).reliable();
+
+} // namespace DefaultParams
+
 //! A dummy token that can be used as a placeholder for time token
 struct DummyTimeToken {
 };

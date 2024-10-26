@@ -65,6 +65,8 @@ class REDOXI_VIDEO_READER_PUBLIC FrameDeliveryOptions
 
     //! If the buffer is full, how to drop frames?
     enum class DropFrameStrategy {
+        // FIXME: currently NoDrop only makes sure the task will be enqueued, but it may still be dropped if
+        // number of per-downstream delivery retry is exhausted
         //! No dropping, just block the frame reading until the buffer has space
         NoDrop = 0,
         //! Drop frames as needed, only drop frames that cannot be delivered to downstream
@@ -105,6 +107,12 @@ class REDOXI_VIDEO_READER_PUBLIC InitConfig
     //! The downstream nodes, indexed by node name
     std::map<std::string, std::shared_ptr<DownstreamSpec>> downstreams;
 
+    //! create the debug publish topic for this video reader?
+    bool create_debug_pub = true;
+    int debug_pub_queue_size = 10;
+    std::string debug_pub_task_enqueue_name = "debug_port/task_enqueue";
+    std::string debug_pub_task_drop_name = "debug_port/task_drop";
+
     //! Load parameters from node, this will override empty existing parameters
     virtual void from_parameters(RedoxiVideoReaderBase *node);
 };
@@ -119,7 +127,10 @@ class REDOXI_VIDEO_READER_PUBLIC RuntimeConfig
     RuntimeConfig()
     {
         frame_delivery_options = std::make_shared<FrameDeliveryOptions>();
+
+        // resolve the delivery policy, this will be used as the fallback policy
         delivery_policy_fallback = std::make_shared<DefaultDeliveryRetryPolicy>();
+        delivery_policy_fallback->resolve_to_definite();
     }
 
     //! The step interval in ms
@@ -142,8 +153,14 @@ class REDOXI_VIDEO_READER_PUBLIC RuntimeConfig
     //! The frame delivery quality of service
     std::shared_ptr<FrameDeliveryOptions> frame_delivery_options;
 
-    //! The fallback delivery policy, if the downstream node does not specify a delivery policy
-    //! or a particular parameter in the delivery policy
+    /**
+     * @brief The fallback delivery policy with all parameters resolved.
+     *
+     * This policy is used in the following scenarios:
+     * - If a downstream node does not specify a delivery policy
+     * - If a downstream node's delivery policy is missing a particular parameter
+     * - For actions that require parameters independent of the downstream node
+     */
     std::shared_ptr<IDeliveryRetryPolicy> delivery_policy_fallback;
 
     //! Load parameters from node, this will override empty existing parameters
@@ -187,13 +204,18 @@ class REDOXI_VIDEO_READER_PUBLIC Downstream
 
     // client to call query service
     std::shared_ptr<DownstreamSpec> spec;
+
+    // the resolved delivery policy for this downstream node
+    // which will have all the parameters resolved (not optional)
+    std::shared_ptr<IDeliveryRetryPolicy> delivery_policy;
+
     ActionClient_t::SharedPtr accept_frame;
     SendGoalOptions_t accept_frame_options;
 
     // publisher for debug image
-    StampedImagePub debug_pub_sending; //!< The publisher for sending frame
-    StampedImagePub debug_pub_dropped; //!< The publisher for dropped frame
-    StampedImagePub debug_pub_sent;    //!< The publisher for sent frame successfully
+    std::shared_ptr<StampedImagePub> debug_pub_sending; //!< The publisher for sending frame
+    std::shared_ptr<StampedImagePub> debug_pub_dropped; //!< The publisher for dropped frame
+    std::shared_ptr<StampedImagePub> debug_pub_sent;    //!< The publisher for sent frame successfully
 
     //! Get the debug pub sending name
     //! @return The debug pub sending name, empty string if spec is not set

@@ -146,9 +146,9 @@ class FrameRelayPublisher : public rclcpp::Node
     }
 
     //! The publisher for the image topic
-    StampedImagePub m_debug_pub_accepted_goal;
-    StampedImagePub m_debug_pub_rejected_goal;
-    StampedImagePub m_pub_relayed_frame; // when the frame is delivered
+    std::shared_ptr<StampedImagePub> m_debug_pub_accepted_goal;
+    std::shared_ptr<StampedImagePub> m_debug_pub_rejected_goal;
+    std::shared_ptr<StampedImagePub> m_pub_relayed_frame; // when the frame is delivered
 
     //! action server for frame receiving
     rclcpp_action::Server<FrameReceiveAction_t>::SharedPtr m_frame_receive_action_server;
