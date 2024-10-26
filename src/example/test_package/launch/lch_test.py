@@ -22,14 +22,14 @@ source_node_json_params = {
         "publish_to_debug_topic": True,  # Whether to publish to debug topic
         "delivery_policy_fallback": {
             "number_of_enqueue_retry": 0,  # Number of times to retry enqueueing
-            "wait_time_between_enqueue_retry": 10.0,  # Wait time between enqueue retries in ms
+            "wait_time_between_enqueue_retry": 5.0,  # Wait time between enqueue retries in ms
             "number_of_delivery_retry": 10,  # Number of times to retry delivery
-            "wait_time_between_delivery_retry": 20.0,  # Wait time between delivery retries in ms
+            "wait_time_between_delivery_retry": 10.0,  # Wait time between delivery retries in ms
             "wait_time_for_delivery_response": 100.0,  # Wait time for delivery response in ms
         },
         "delivery_options": {
             "frame_payload_type": "uncompressed",  # can be "uncompressed", "uncompressed_by_shared_memory", "jpeg_encoded", "png_encoded"
-            "drop_frame_strategy": "no_drop",  # can be "no_drop" or "drop_as_needed"
+            "drop_frame_strategy": "drop_as_needed",  # can be "no_drop" or "drop_as_needed"
             "jpeg_quality": 90,  # only valid when frame_payload_type is "jpeg_encoded"
             "num_buffer_frames": 1,  # number of frames to buffer waiting for delivery
         },
