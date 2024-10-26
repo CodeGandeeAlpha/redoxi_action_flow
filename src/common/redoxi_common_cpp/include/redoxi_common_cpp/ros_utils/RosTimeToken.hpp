@@ -12,14 +12,11 @@
 namespace redoxi_works
 {
 
-struct DummyTimeToken {
-};
-
 //! a token generator that generates a token with a ROS time interval
 //! @note the token is generated at the specified interval, if interval is 0, the token is always available
 //! @tparam TokenType the type of the token
 //! @tparam IntervalType the type of the interval, should be a std::chrono::duration
-template <typename TokenType, typename IntervalType = std::chrono::milliseconds>
+template <typename TokenType = DummyTimeToken, typename IntervalType = DefaultTimeUnit_t>
 class _RosTimeToken
 {
     static_assert(std::is_base_of<std::chrono::duration<typename IntervalType::rep, typename IntervalType::period>, IntervalType>::value,
@@ -60,14 +57,10 @@ class _RosTimeToken
             _create_token();
         }
 
+        // when interval is positive, create tokens at the specified interval
+        // when 0 or negative, the queue pretends to be always full, but tokens are created when popping
         if (m_interval > IntervalType(0)) {
-            // positive interval, create tokens at the specified interval
             m_timer = m_node->create_wall_timer(m_interval, [this]() { _create_token(); });
-        } else {
-            // interval is 0, token always available
-            // fill the queue with tokens
-            while (_create_token()) {
-            }
         }
 
         m_is_started = true;
@@ -90,11 +83,6 @@ class _RosTimeToken
             m_timer.reset();
         }
 
-        // clear the queue and create a new one
-        // m_queue->abort();
-        m_queue = std::make_shared<tbb::concurrent_bounded_queue<TokenType>>();
-        m_queue->set_capacity(m_token_capacity);
-
         // reset the started flag
         m_is_started = false;
         return true;
@@ -106,28 +94,59 @@ class _RosTimeToken
         return m_token_capacity;
     }
 
-    //! pop a token from the queue, does not wait until the token is available if not present
-    virtual bool try_pop_token(TokenType &token)
+    //! reset the token queue, which removes all tokens in the queue
+    virtual void reset()
     {
-        bool ok = m_queue->try_pop(token);
-        if (ok && m_is_started && m_interval == IntervalType(0)) {
+        // clean up the queue
+        TokenType token;
+        while (m_queue->try_pop(token)) {
+        }
+    }
+
+    //! pop a token from the queue, does not wait until the token is available if not present
+    virtual bool try_pop_token(TokenType *token = nullptr)
+    {
+        bool ok = false;
+        if (m_is_started && m_interval == IntervalType(0)) {
             // if the interval is 0, the token is always available
-            // so we need to create a new token
-            _create_token();
+            if (token) {
+                *token = _generate_token();
+            } // else do nothing
+        } else {
+            if (token) {
+                ok = m_queue->try_pop(*token);
+            } else {
+                TokenType _token;
+                ok = m_queue->try_pop(_token);
+            }
         }
         return ok;
     }
 
     //! pop a token from the queue, wait until the token is available if necessary
-    virtual bool pop_token(TokenType &token)
+    virtual bool pop_token(TokenType *token = nullptr)
     {
-        bool ok = m_queue->pop(token);
-        if (ok && m_is_started && m_interval == IntervalType(0)) {
+        bool ok = false;
+        if (m_is_started && m_interval == IntervalType(0)) {
             // if the interval is 0, the token is always available
-            // so we need to create a new token
-            _create_token();
+            if (token) {
+                *token = _generate_token();
+            } // else do nothing
+        } else {
+            if (token) {
+                ok = m_queue->pop(*token);
+            } else {
+                TokenType _token;
+                ok = m_queue->pop(_token);
+            }
         }
         return ok;
+    }
+
+    //! Get the number of tokens in the queue
+    virtual size_t get_num_tokens() const
+    {
+        return m_queue->size();
     }
 
     /**

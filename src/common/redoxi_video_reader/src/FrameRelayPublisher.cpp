@@ -12,6 +12,20 @@
 
 using namespace std::placeholders;
 
+#define _DEBUG_ENABLE_RANDOM_BLOCKING
+
+#ifdef _DEBUG_ENABLE_RANDOM_BLOCKING
+namespace _random_block_params
+{
+//! The interval to block
+constexpr static std::chrono::milliseconds BlockThisLong = std::chrono::milliseconds(1000);
+
+//! The probability to block
+constexpr static double BlockThisLikely = 0.2;
+} // namespace _random_block_params
+
+#endif
+
 namespace redoxi_works
 {
 
@@ -33,6 +47,16 @@ struct TbbBoostUuidHash {
 };
 
 struct FrameRelayPublisherImpl {
+    FrameRelayPublisherImpl(FrameRelayPublisher *node)
+        : m_node(node)
+    {
+#ifdef _DEBUG_ENABLE_RANDOM_BLOCKING
+        m_random_block_signal = std::make_shared<RosTimeUnsetToken>(node, _random_block_params::BlockThisLong);
+        m_random_block_signal->start();
+#endif
+        m_ping_response = std::make_shared<FrameReceiveAction_t::Result>();
+        m_ping_response->return_code = 0;
+    }
     inline constexpr static size_t DefaultPayloadMapSize = 10000;
     using FrameReceiveAction_t = FrameRelayPublisher::FrameReceiveAction_t;
     using FrameReceiveGoalHandle_t = FrameRelayPublisher::FrameReceiveGoalHandle_t;
@@ -42,6 +66,9 @@ struct FrameRelayPublisherImpl {
 
     //! The type for the registered goal, which is cached in the hash map
     using RegisteredGoal_t = std::pair<FrameDeliveryTask_t, FramePayloadProducer_t>;
+
+    //! The parent node
+    FrameRelayPublisher *m_node = nullptr;
 
     //! The graph for the node
     std::shared_ptr<tbb::flow::graph> m_async_graph;
@@ -57,19 +84,25 @@ struct FrameRelayPublisherImpl {
     //! frame count bookkeeping
     std::atomic<size_t> m_num_sent_frame{0};
     std::atomic<size_t> m_num_received_frame{0};
+
+    //! The response to ping requests
+    std::shared_ptr<FrameReceiveAction_t::Result> m_ping_response;
+
+#ifdef _DEBUG_ENABLE_RANDOM_BLOCKING
+    //! token generator
+    std::shared_ptr<RosTimeUnsetToken> m_random_block_signal;
+#endif
 };
 
 FrameRelayPublisher::FrameRelayPublisher(const std::string &name, const rclcpp::NodeOptions &options)
     : rclcpp::Node(name, options)
 {
-    // this->get_logger().set_level(rclcpp::Logger::Level::Debug);
-
     // declare parameters
     auto ret = declare_default_parameters_for_node(this);
     if (ret != 0) {
         RDX_RAISE_ERROR("[{}] Failed to declare default parameters", this->get_name());
     }
-    m_impl = std::make_unique<FrameRelayPublisherImpl>();
+    m_impl = std::make_unique<FrameRelayPublisherImpl>(this);
 }
 
 FrameRelayPublisher::~FrameRelayPublisher()
@@ -127,13 +160,12 @@ void FrameRelayPublisher::init(std::shared_ptr<InitConfig_t> config)
             std::bind(&FrameRelayPublisher::_on_goal_canceled, this, _1),
             std::bind(&FrameRelayPublisher::_on_goal_accepted, this, _1),
             server_opt);
+    m_pub_relayed_frame.init(this, config->relayed_frame_topic_name, config->publish_queue_size);
 
-    // create publisher
+    // create publisher, regardless of whether debug pub is enabled
     RDX_INFO_DEV(this, __func__, print_thread_id, "Creating image publisher");
-    m_image_publisher = this->create_publisher<sensor_msgs::msg::Image>(
-        config->image_topic_name, config->publish_queue_size);
-    m_compressed_image_publisher = this->create_publisher<sensor_msgs::msg::CompressedImage>(
-        config->compressed_image_topic_name, config->publish_queue_size);
+    m_debug_pub_accepted_goal.init(this, "debug_port/accepted_goal");
+    m_debug_pub_rejected_goal.init(this, "debug_port/rejected_goal");
 
     RDX_INFO_DEV(this, __func__, print_thread_id, "Initialization completed");
 }
@@ -145,45 +177,12 @@ int FrameRelayPublisher::_deliver_frame(FrameDeliveryTask_t &task)
 
     if (payload->is_valid()) {
         RDX_INFO_DEV(this, __func__, print_thread_id, "Got payload");
-        const auto &incoming_frame = payload->goal_handle->get_goal()->frame;
         auto msg_uuid = to_boost_uuid(payload->goal_handle->get_goal()->x_uid);
 
         RDX_INFO_DEV(this, __func__, print_thread_id, "[msg_uuid={}][goal_uuid={}] Delivering frame",
                      boost::uuids::to_string(msg_uuid), boost::uuids::to_string(task.goal_uuid));
 
-        sensor_msgs::msg::Image msg_raw;
-        sensor_msgs::msg::CompressedImage msg_compressed;
-        if (m_config->publish_raw_image) {
-            if (!incoming_frame.raw_image.data.empty()) {
-                msg_raw = incoming_frame.raw_image;
-            }
-            RDX_INFO_DEV(this, __func__, print_thread_id, "[msg_uuid={}][goal_uuid={}] Publishing raw image",
-                         boost::uuids::to_string(msg_uuid), boost::uuids::to_string(task.goal_uuid));
-            m_image_publisher->publish(msg_raw);
-        }
-
-        if (m_config->publish_compressed_image) {
-            if (!incoming_frame.encoded_image.data.empty()) {
-                msg_compressed = incoming_frame.encoded_image;
-            } else {
-                const auto &_raw = incoming_frame.raw_image;
-                if (!_raw.data.empty()) {
-                    //! Convert raw image to OpenCV format
-                    auto cv_ptr = cv_bridge::toCvCopy(_raw, sensor_msgs::image_encodings::BGR8);
-
-                    //! Encode the image as JPEG
-                    std::vector<uchar> jpeg_buffer;
-                    cv::imencode(".jpg", cv_ptr->image, jpeg_buffer);
-
-                    //! Fill the compressed image message
-                    msg_compressed.format = "jpeg";
-                    msg_compressed.data = jpeg_buffer;
-                }
-            }
-            RDX_INFO_DEV(this, __func__, print_thread_id, "[msg_uuid={}][goal_uuid={}] Publishing compressed image",
-                         boost::uuids::to_string(msg_uuid), boost::uuids::to_string(task.goal_uuid));
-            m_compressed_image_publisher->publish(msg_compressed);
-        }
+        _publish_relayed_frame(*payload->goal_handle->get_goal());
 
         // signal the goal as success
         RDX_INFO_DEV(this, __func__, print_thread_id, "[msg_uuid={}][goal_uuid={}] Signaling goal as success",
@@ -331,17 +330,40 @@ rclcpp_action::GoalResponse
                  boost::uuids::to_string(msg_uuid), is_ping_request ? "true" : "false");
 
     if (is_ping_request) {
-        //! Randomly reject ping requests with a probability of 0.3
-        // std::random_device rd;
-        // std::mt19937 gen(rd());
-        // std::uniform_real_distribution<> dis(0.0, 1.0);
-        // if (dis(gen) < 0.3) {
-        //     RDX_INFO_DEV(this, __func__, print_thread_id, "[msg_uuid={}] Randomly rejecting ping request",
-        //                  boost::uuids::to_string(msg_uuid));
-        //     return rclcpp_action::GoalResponse::REJECT;
-        // }
+        //! Always accept ping requests
         return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
     }
+
+    // return rclcpp_action::GoalResponse::REJECT;
+
+#ifdef _DEBUG_ENABLE_RANDOM_BLOCKING
+    // do we already have a blocking signal? if no, generate one using probability
+    if (m_impl->m_random_block_signal->get_num_tokens() == 0) {
+        // generate a random number between 0 and 1
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_real_distribution<> dis(0.0, 1.0);
+        if (dis(gen) < _random_block_params::BlockThisLikely) {
+            RDX_INFO_DEV(this, __func__, print_thread_id, "[msg_uuid={}] Generated a blocking signal",
+                         boost::uuids::to_string(msg_uuid));
+            m_impl->m_random_block_signal->try_push_token();
+        }
+    }
+
+    // we have a block signal, do not accept the goal
+    RDX_INFO_DEV(this, __func__, print_thread_id, "[msg_uuid={}] Already have a blocking signal, rejecting goal",
+                 boost::uuids::to_string(msg_uuid));
+
+    if (m_impl->m_random_block_signal->get_num_tokens() > 0) {
+        // publish the rejected goal if debug publishing is enabled
+        if (get_debug_pub_enabled()) {
+            _debug_publish_rejected_goal(*goal);
+        }
+
+        // we have a blocking signal, reject the goal
+        return rclcpp_action::GoalResponse::REJECT;
+    }
+#endif
 
     // queue the goal, whether async or sync
     auto ret = _try_enqueue_goal(uuid, *goal);
@@ -371,13 +393,18 @@ void FrameRelayPublisher::_on_goal_accepted(std::shared_ptr<FrameReceiveGoalHand
         RDX_INFO_DEV(this, __func__, print_thread_id, "[msg_uuid={}][goal_uuid={}] Signaling goal as success (ping request)",
                      boost::uuids::to_string(msg_uuid), boost::uuids::to_string(goal_uuid));
 
-        auto result = std::make_shared<FrameReceiveAction_t::Result>();
-        result->return_code = 0;
-        goal_handle->succeed(result);
+        goal_handle->succeed(m_impl->m_ping_response);
 
         RDX_INFO_DEV(this, __func__, print_thread_id, "[msg_uuid={}][goal_uuid={}] Signaled goal as success (ping request)",
                      boost::uuids::to_string(msg_uuid), boost::uuids::to_string(goal_uuid));
     } else {
+
+#ifdef _DEBUG_ENABLE_RANDOM_BLOCKING
+        // publish the accepted goal
+        if (get_debug_pub_enabled()) {
+            _debug_publish_accepted_goal(*goal_handle->get_goal());
+        }
+#endif
 
         // resolve the goal payload
         auto ret = _resolve_goal_payload(goal_handle);
@@ -439,17 +466,17 @@ void FrameRelayPublisher::InitConfig_t::from_parameters(const rclcpp::Node *node
     {
         "declare_params": {},
         "init_config": {
-            "frame_receive_action_name": "/video_source/out/action",
-            "image_topic_name": "/video_source/out/image",
-            "compressed_image_topic_name": "/video_source/out/compressed_image",
+            "frame_receive_action_name": "in/action",
+            "relayed_frame_topic_name": "out/image",
             "publish_queue_size": 10,
-            "publish_raw_image": True,
-            "publish_compressed_image": True,
-            "use_async": True,
-            "goal_buffer_size": 10,
+            "publish_raw_image": true,
+            "use_async": false,
+            "goal_buffer_size": 1,
+            "debug_pub_enabled": true,
         },
     }
     */
+
     //! Load parameters from the node
     using JsonPointer_t = nlohmann::json::json_pointer;
     auto json_params = RDX_GET_JSON_PARAM_FROM_NODE(node);
@@ -468,18 +495,13 @@ void FrameRelayPublisher::InitConfig_t::from_parameters(const rclcpp::Node *node
             RDX_LOG_DEBUG(node, __func__, "frame_receive_action_name: {}", frame_receive_action_name);
         }
 
-        if (init_config.contains(JsonPointer_t("/image_topic_name"))) {
-            image_topic_name = init_config[JsonPointer_t("/image_topic_name")].get<std::string>();
-            RDX_LOG_DEBUG(node, __func__, "image_topic_name: {}", image_topic_name);
-        }
-
-        if (init_config.contains(JsonPointer_t("/compressed_image_topic_name"))) {
-            compressed_image_topic_name = init_config[JsonPointer_t("/compressed_image_topic_name")].get<std::string>();
-            RDX_LOG_DEBUG(node, __func__, "compressed_image_topic_name: {}", compressed_image_topic_name);
+        if (init_config.contains(JsonPointer_t("/relayed_frame_topic_name"))) {
+            relayed_frame_topic_name = init_config[JsonPointer_t("/relayed_frame_topic_name")].get<std::string>();
+            RDX_LOG_DEBUG(node, __func__, "relayed_frame_topic_name: {}", relayed_frame_topic_name);
         }
 
         if (init_config.contains(JsonPointer_t("/publish_queue_size"))) {
-            publish_queue_size = init_config[JsonPointer_t("/publish_queue_size")].get<size_t>();
+            publish_queue_size = init_config[JsonPointer_t("/publish_queue_size")].get<int>();
             RDX_LOG_DEBUG(node, __func__, "publish_queue_size: {}", publish_queue_size);
         }
 
@@ -488,22 +510,77 @@ void FrameRelayPublisher::InitConfig_t::from_parameters(const rclcpp::Node *node
             RDX_LOG_DEBUG(node, __func__, "publish_raw_image: {}", publish_raw_image);
         }
 
-        if (init_config.contains(JsonPointer_t("/publish_compressed_image"))) {
-            publish_compressed_image = init_config[JsonPointer_t("/publish_compressed_image")].get<bool>();
-            RDX_LOG_DEBUG(node, __func__, "publish_compressed_image: {}", publish_compressed_image);
-        }
-
         if (init_config.contains(JsonPointer_t("/use_async"))) {
             use_async = init_config[JsonPointer_t("/use_async")].get<bool>();
             RDX_LOG_DEBUG(node, __func__, "use_async: {}", use_async);
         }
 
         if (init_config.contains(JsonPointer_t("/goal_buffer_size"))) {
-            goal_buffer_size = init_config[JsonPointer_t("/goal_buffer_size")].get<size_t>();
+            goal_buffer_size = init_config[JsonPointer_t("/goal_buffer_size")].get<int>();
             RDX_LOG_DEBUG(node, __func__, "goal_buffer_size: {}", goal_buffer_size);
+        }
+
+        if (init_config.contains(JsonPointer_t("/debug_pub_enabled"))) {
+            debug_pub_enabled = init_config[JsonPointer_t("/debug_pub_enabled")].get<bool>();
+            RDX_LOG_DEBUG(node, __func__, "debug_pub_enabled: {}", debug_pub_enabled);
         }
     }
 }
 
+int FrameRelayPublisher::_debug_publish_accepted_goal(const FrameReceiveAction_t::Goal &goal)
+{
+    const auto &raw_image = goal.frame.raw_image;
+    auto msg_uuid = to_boost_uuid(goal.x_uid);
+    if (raw_image.data.empty()) {
+        RDX_INFO_DEV(this, __func__, "[msg_uuid={}] Accepted goal has no raw image data",
+                     boost::uuids::to_string(msg_uuid));
+        return -1;
+    }
+
+    if (!m_debug_pub_accepted_goal.valid()) {
+        return -1;
+    }
+
+    m_debug_pub_accepted_goal.publish(raw_image, "accepted", cv::Scalar(0, 255, 0));
+    return 0;
+}
+
+int FrameRelayPublisher::_debug_publish_rejected_goal(const FrameReceiveAction_t::Goal &goal)
+{
+    const auto &raw_image = goal.frame.raw_image;
+    auto msg_uuid = to_boost_uuid(goal.x_uid);
+    if (raw_image.data.empty()) {
+        RDX_INFO_DEV(this, __func__, "[msg_uuid={}] Rejected goal has no raw image data",
+                     boost::uuids::to_string(msg_uuid));
+        return -1;
+    }
+
+    if (!m_debug_pub_rejected_goal.valid()) {
+        return -1;
+    }
+
+    m_debug_pub_rejected_goal.publish(raw_image, "rejected", cv::Scalar(0, 0, 255));
+    return 0;
+}
+
+int FrameRelayPublisher::_publish_relayed_frame(const FrameReceiveAction_t::Goal &goal)
+{
+    auto msg_uuid = to_boost_uuid(goal.x_uid);
+    if (!m_pub_relayed_frame.valid()) {
+        RDX_INFO_DEV(this, __func__, "[msg_uuid={}] Relay frame publish channel is not valid",
+                     boost::uuids::to_string(msg_uuid));
+        return -1;
+    }
+
+    const auto &raw_image = goal.frame.raw_image;
+    if (raw_image.data.empty()) {
+        RDX_INFO_DEV(this, __func__, "[msg_uuid={}] Relay frame has no raw image data",
+                     boost::uuids::to_string(msg_uuid));
+        return -1;
+    }
+
+    m_pub_relayed_frame.publish(raw_image);
+    return 0;
+}
 
 } // namespace redoxi_works

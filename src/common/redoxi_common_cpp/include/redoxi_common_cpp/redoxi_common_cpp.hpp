@@ -5,6 +5,7 @@
 #include <string>
 #include <chrono>
 #include <type_traits>
+#include <numeric>
 
 namespace redoxi_works
 {
@@ -22,20 +23,13 @@ namespace DefaultParams
 {
 
 //! maximum timeout for any operation that may block
-const DefaultTimeUnit_t MaxTimeout = std::chrono::seconds(30);
-
-//! maximum number of retries for any operation that may fail
-const int MaxNumberOfRetries = 100;
+constexpr DefaultTimeUnit_t MaxTimeout = std::chrono::seconds(30);
 
 //! interval between each retry for any operation that may fail
-const DefaultTimeUnit_t FastRetryInterval = std::chrono::microseconds(100);
-const DefaultTimeUnit_t SlowRetryInterval = std::chrono::milliseconds(1);
-
-//! wait time for ping action
-const DefaultTimeUnit_t PingActionWaitTime = std::chrono::milliseconds(10);
+constexpr DefaultTimeUnit_t PingActionRetryInterval = std::chrono::milliseconds(5);
 
 //! goal handle timeout
-const DefaultTimeUnit_t GoalHandleTimeout = std::chrono::milliseconds(2000);
+constexpr DefaultTimeUnit_t GoalHandleTimeout = std::chrono::milliseconds(2000);
 
 } // namespace DefaultParams
 
@@ -94,81 +88,6 @@ class IStartStopProtocol
     // return 0 if success, otherwise return error code
     virtual int start() = 0;
     virtual int stop() = 0;
-};
-
-/**
- * @brief Interface for retry strategy
- *
- * @details This interface is used to define the retry strategy for a task.
- *
- * @note This interface is designed to be as simple as a struct, so the members are mostly public.
- */
-class IRetryStrategy
-{
-  public:
-    virtual ~IRetryStrategy() = default;
-
-    /**
-     * @brief get the maximum number of retries
-     *
-     * @return the maximum number of retries, negative means no limit
-     */
-    virtual int get_max_number_of_retries() = 0;
-
-    /**
-     * @brief set the maximum number of retries
-     *
-     * @param max_retries the maximum number of retries, negative means no limit
-     */
-    virtual void set_max_number_of_retries(int max_retries) = 0;
-
-    /**
-     * @brief get the maximum wait time for each retry
-     *
-     * @return the maximum wait time for each retry, 0 means no waiting, negative means wait indefinitely
-     */
-    virtual DefaultTimeUnit_t get_wait_time_for_retry() = 0;
-
-    /**
-     * @brief set the maximum wait time for each retry
-     *
-     * @param wait_time_for_retry the maximum wait time for each retry, 0 means no waiting, negative means wait indefinitely
-     */
-    virtual void set_wait_time_for_retry(DefaultTimeUnit_t wait_time_for_retry) = 0;
-};
-
-/**
- * @brief Default retry strategy
- *
- * @details This is the default retry strategy, which is a simple struct.
- */
-class DefaultRetryStrategy : public IRetryStrategy
-{
-    // this class is ment to be as simple as a struct, so the members are public
-  public:
-    int max_number_of_retries = DefaultMaxNumberOfRetries;
-    DefaultTimeUnit_t max_wait_time_ms = std::chrono::milliseconds((int64_t)DefaultTimeoutMs);
-
-  public:
-    int get_max_number_of_retries() override
-    {
-        return max_number_of_retries;
-    }
-
-    void set_max_number_of_retries(int max_retries) override
-    {
-        max_number_of_retries = max_retries;
-    }
-
-    DefaultTimeUnit_t get_wait_time_for_retry() override
-    {
-        return max_wait_time_ms;
-    }
-
-    void set_wait_time_for_retry(DefaultTimeUnit_t wait_time_for_retry) override
-    {
-        this->max_wait_time_ms = wait_time_for_retry;
-    }
 };
 
 namespace ReturnCode

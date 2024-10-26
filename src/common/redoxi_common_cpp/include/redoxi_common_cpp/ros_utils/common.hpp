@@ -35,6 +35,10 @@
 namespace redoxi_works
 {
 
+//! A dummy token that can be used as a placeholder for time token
+struct DummyTimeToken {
+};
+
 //! A lightweight class that can only be converted to and from bool or int
 class _StrictBool
 {

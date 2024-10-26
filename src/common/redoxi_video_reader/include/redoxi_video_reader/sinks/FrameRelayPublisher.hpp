@@ -4,8 +4,10 @@
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <redoxi_video_reader/base/VideoReaderBase.hpp>
+#include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
 #include <future>
+#include <atomic>
 
 namespace redoxi_works
 {
@@ -22,8 +24,6 @@ class FrameRelayPublisher : public rclcpp::Node
     inline static std::string DefaultFrameReceiveActionName = "in/action";
     //! name of the image topic
     inline static std::string DefaultImageTopicName = "out/image_raw";
-    //! name of the compressed image topic
-    inline static std::string DefaultCompressedImageTopicName = "out/image_compressed";
     //! default buffer size for the async processing
     inline static constexpr int DefaultAsyncBufferSize = 1;
     //! default publish queue size
@@ -36,8 +36,7 @@ class FrameRelayPublisher : public rclcpp::Node
     struct InitConfig_t {
         virtual ~InitConfig_t() = default;
         std::string frame_receive_action_name = DefaultFrameReceiveActionName;
-        std::string image_topic_name = DefaultImageTopicName;
-        std::string compressed_image_topic_name = DefaultCompressedImageTopicName;
+        std::string relayed_frame_topic_name = DefaultImageTopicName;
 
         //! The queue size for the image publisher
         int publish_queue_size = DefaultPublishQueueSize;
@@ -45,14 +44,14 @@ class FrameRelayPublisher : public rclcpp::Node
         //! If true, the node will publish the raw image
         bool publish_raw_image = true;
 
-        //! If true, the node will publish the compressed image
-        bool publish_compressed_image = true;
-
         //! If true, the node will use async processing, otherwise it will use sync processing
         bool use_async = false;
 
         //! The buffer size for the async processing
         int goal_buffer_size = DefaultAsyncBufferSize;
+
+        //! If true, the node will publish the debug information
+        bool debug_pub_enabled = false;
 
         //! Load the parameters from the node
         virtual void from_parameters(const rclcpp::Node *node);
@@ -131,10 +130,25 @@ class FrameRelayPublisher : public rclcpp::Node
     //! resolve the goal payload, return 0 if success, otherwise return -1
     virtual int _resolve_goal_payload(std::shared_ptr<FrameReceiveGoalHandle_t> goal_handle);
 
+    //! publish the accepted goal, return 0 if success, otherwise return -1
+    virtual int _debug_publish_accepted_goal(const FrameReceiveAction_t::Goal &goal);
+
+    //! publish the rejected goal, return 0 if success, otherwise return -1
+    virtual int _debug_publish_rejected_goal(const FrameReceiveAction_t::Goal &goal);
+
+    //! publish the relayed frame, return 0 if success, otherwise return -1
+    virtual int _publish_relayed_frame(const FrameReceiveAction_t::Goal &goal);
+
   protected:
+    bool get_debug_pub_enabled() const
+    {
+        return m_config->debug_pub_enabled;
+    }
+
     //! The publisher for the image topic
-    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_image_publisher;
-    rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr m_compressed_image_publisher;
+    StampedImagePub m_debug_pub_accepted_goal;
+    StampedImagePub m_debug_pub_rejected_goal;
+    StampedImagePub m_pub_relayed_frame; // when the frame is delivered
 
     //! action server for frame receiving
     rclcpp_action::Server<FrameReceiveAction_t>::SharedPtr m_frame_receive_action_server;

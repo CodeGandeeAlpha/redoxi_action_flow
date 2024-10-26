@@ -22,6 +22,7 @@ PackagesToBuild="psg_private_msgs \
                  redoxi_samples_lib \
                  redoxi_samples_nodes \
                  test_package \
+                 rosboard \
                  cv_bridge"
 
 # Check if --help flag is provided

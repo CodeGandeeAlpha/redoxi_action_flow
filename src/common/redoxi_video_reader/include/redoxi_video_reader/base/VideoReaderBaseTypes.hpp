@@ -13,6 +13,7 @@
 #include <rclcpp_action/rclcpp_action.hpp>
 
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
+#include <redoxi_common_cpp/interfaces/IDeliveryRetryPolicy.hpp>
 #include <redoxi_public_msgs/msg/frame.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
 #include <redoxi_video_reader/visibility_control.h>
@@ -44,7 +45,7 @@ class REDOXI_VIDEO_READER_PUBLIC DownstreamSpec
     virtual ~DownstreamSpec() = default;
     DownstreamSpec()
     {
-        retry_strategy = std::make_shared<DefaultRetryStrategy>();
+        retry_strategy = std::make_shared<DefaultDeliveryRetryPolicy>();
     }
 
     //! The action to accept the frame for this downstream node
@@ -54,7 +55,7 @@ class REDOXI_VIDEO_READER_PUBLIC DownstreamSpec
     bool use_debug_pub = true;
 
     //! The retry strategy for this downstream node
-    std::shared_ptr<IRetryStrategy> retry_strategy;
+    std::shared_ptr<IDeliveryRetryPolicy> retry_strategy;
 };
 
 class REDOXI_VIDEO_READER_PUBLIC FrameDeliveryOptions
@@ -87,14 +88,10 @@ class REDOXI_VIDEO_READER_PUBLIC FrameDeliveryOptions
     //! If the buffer is full, how to drop frames?
     DropFrameStrategy drop_frame_strategy = DropFrameStrategy::NoDrop;
 
-    //! The interval between each delivery attempt
-    //! This is the interval for the highest level, which does not account for downstream retry interval
-    DefaultTimeUnit_t deliver_retry_interval = DefaultParams::SlowRetryInterval;
-
     //! The type of the frame payload
     FramePayloadType frame_payload_type = FramePayloadType::Uncompressed;
 
-    //! The jpeg quality, only used when frame_payload_type is JpegEncoded
+    //! The quality of the jpeg encoded frame
     int jpeg_quality = 90;
 };
 
@@ -122,6 +119,7 @@ class REDOXI_VIDEO_READER_PUBLIC RuntimeConfig
     RuntimeConfig()
     {
         frame_delivery_options = std::make_shared<FrameDeliveryOptions>();
+        delivery_policy_fallback = std::make_shared<DefaultDeliveryRetryPolicy>();
     }
 
     //! The step interval in ms
@@ -143,6 +141,10 @@ class REDOXI_VIDEO_READER_PUBLIC RuntimeConfig
 
     //! The frame delivery quality of service
     std::shared_ptr<FrameDeliveryOptions> frame_delivery_options;
+
+    //! The fallback delivery policy, if the downstream node does not specify a delivery policy
+    //! or a particular parameter in the delivery policy
+    std::shared_ptr<IDeliveryRetryPolicy> delivery_policy_fallback;
 
     //! Load parameters from node, this will override empty existing parameters
     virtual void from_parameters(RedoxiVideoReaderBase *node);

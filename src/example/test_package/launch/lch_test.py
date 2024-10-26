@@ -11,23 +11,34 @@ log_level_arg = DeclareLaunchArgument(
 )
 
 source_node_json_params = {
+    "timeunit": "ms",
     "declare_params": {
         "custom_var_1": 100.0,
         "custom_var_2": 10.0,
     },
     "runtime_config": {
-        "frame_interval_ms": 10.0,
-        "step_interval_ms": 1.0,
+        "frame_interval_ms": 10000.0,
+        "step_interval_ms": 1000,
         "publish_to_debug_topic": True,
+        "delivery_policy_fallback": {
+            "number_of_enqueue_retry": 5,
+            "wait_time_between_enqueue_retry": 10.0,
+            "number_of_delivery_retry": 5,
+            "wait_time_between_delivery_retry": 20.0,
+            "wait_time_for_delivery_response": 100.0,
+        },
     },
     "init_config": {
         "downstreams": {
             "actions": [
                 {
                     "name": "/video_sink/in/action",
-                    "retry_strategy": {
-                        "max_retries": 5,
-                        "retry_interval_ms": 10.0,
+                    "delivery_policy": {
+                        "number_of_enqueue_retry": 10,
+                        "wait_time_between_enqueue_retry": 5.0,
+                        "number_of_delivery_retry": 10,
+                        "wait_time_between_delivery_retry": 10.0,
+                        "wait_time_for_delivery_response": 50.0,
                     },
                 }
             ]
@@ -39,13 +50,12 @@ relay_node_json_params = {
     "declare_params": {},
     "init_config": {
         "frame_receive_action_name": "in/action",
-        "image_topic_name": "out/image",
-        "compressed_image_topic_name": "out/compressed_image",
+        "relayed_frame_topic_name": "out/image",
         "publish_queue_size": 10,
         "publish_raw_image": True,
-        "publish_compressed_image": False,
         "use_async": False,
         "goal_buffer_size": 1,
+        "debug_pub_enabled": True,
     },
 }
 

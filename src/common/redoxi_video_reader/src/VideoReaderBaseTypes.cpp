@@ -7,23 +7,42 @@
 // ROS parameter json format
 /*
 {
+    // default time unit for all parameters, unless otherwise specified. time values can be int or double
+    // if timeunit is not specified, it is ms
+    "timeunit": "ms",
+
+    // declare custom parameters here, these will be set into node->declare_parameter()
     "declare_params": {
         "custom_var_1": 100.0,
         "custom_var_2": 10.0,
     },
+
+    // runtime config
     "runtime_config": {
         "frame_interval_ms": 10000.0,
         "step_interval_ms": 1000,
-        "publish_to_debug_topic": True,
+        "publish_to_debug_topic": true,
+        "delivery_policy_fallback": {
+            "number_of_enqueue_retry": 5,
+            "wait_time_between_enqueue_retry": 10.0,
+            "number_of_delivery_retry": 5,
+            "wait_time_between_delivery_retry": 20.0,
+            "wait_time_for_delivery_response": 100.0
+        }
     },
+
+    // init config
     "init_config": {
         "downstreams": {
             "actions": [
                     {
                         "name": "/video_sink/in/action",
-                        "retry_strategy": {
-                            "max_retries": 3,
-                            "retry_interval_ms": 50.0,
+                        "delivery_policy": {
+                            "number_of_enqueue_retry": 10,
+                            "wait_time_between_enqueue_retry": 5.0,
+                            "number_of_delivery_retry": 10,
+                            "wait_time_between_delivery_retry": 10.0,
+                            "wait_time_for_delivery_response": 50.0
                         }
                     }
                 ]
@@ -52,6 +71,15 @@ void InitConfig::from_parameters(RedoxiVideoReaderBase *node)
         return;
     }
 
+    //! Check if timeunit is specified and if it's "ms"
+    if (json_params.contains("timeunit")) {
+        std::string timeunit = json_params["timeunit"].get<std::string>();
+        if (timeunit != "ms") {
+            RDX_RAISE_ERROR("Invalid timeunit specified. Only 'ms' is supported. Exiting.");
+            return;
+        }
+    }
+
     //! Parse the init_config and downstreams configuration
     using json_pointer = nlohmann::json::json_pointer;
     json_pointer init_config_ptr("/init_config");
@@ -69,20 +97,38 @@ void InitConfig::from_parameters(RedoxiVideoReaderBase *node)
             spec->accept_frame_action = action_name;
             RDX_INFO_DEV(node, __func__, "Configuring downstream action: {}", action_name);
 
-            //! Configure retry strategy if present
-            if (action_config.contains("retry_strategy")) {
-                const auto &retry_strategy = action_config["retry_strategy"];
+            //! Configure delivery policy if present
+            if (action_config.contains("delivery_policy")) {
+                const auto &delivery_policy = action_config["delivery_policy"];
 
-                if (retry_strategy.contains("max_retries")) {
-                    int max_retries = retry_strategy["max_retries"].get<int>();
-                    spec->retry_strategy->set_max_number_of_retries(max_retries);
-                    RDX_INFO_DEV(node, __func__, "Set max retries for {}: {}", action_name, max_retries);
+                if (delivery_policy.contains("number_of_enqueue_retry")) {
+                    int64_t number_of_enqueue_retry = delivery_policy["number_of_enqueue_retry"].get<int64_t>();
+                    spec->retry_strategy->set_number_of_enqueue_retry(number_of_enqueue_retry);
+                    RDX_INFO_DEV(node, __func__, "Set number of enqueue retry for {}: {}", action_name, number_of_enqueue_retry);
                 }
 
-                if (retry_strategy.contains("retry_interval_ms")) {
-                    int64_t retry_interval = retry_strategy["retry_interval_ms"].get<int64_t>();
-                    spec->retry_strategy->set_wait_time_for_retry(std::chrono::milliseconds(retry_interval));
-                    RDX_INFO_DEV(node, __func__, "Set retry interval for {}: {} ms", action_name, retry_interval);
+                if (delivery_policy.contains("wait_time_between_enqueue_retry")) {
+                    double wait_time_between_enqueue_retry = delivery_policy["wait_time_between_enqueue_retry"].get<double>();
+                    spec->retry_strategy->set_wait_time_between_enqueue_retry(std::chrono::duration_cast<DefaultTimeUnit_t>(std::chrono::duration<double, std::milli>(wait_time_between_enqueue_retry)));
+                    RDX_INFO_DEV(node, __func__, "Set wait time between enqueue retry for {}: {} ms", action_name, wait_time_between_enqueue_retry);
+                }
+
+                if (delivery_policy.contains("number_of_delivery_retry")) {
+                    int64_t number_of_delivery_retry = delivery_policy["number_of_delivery_retry"].get<int64_t>();
+                    spec->retry_strategy->set_number_of_delivery_retry(number_of_delivery_retry);
+                    RDX_INFO_DEV(node, __func__, "Set number of delivery retry for {}: {}", action_name, number_of_delivery_retry);
+                }
+
+                if (delivery_policy.contains("wait_time_between_delivery_retry")) {
+                    double wait_time_between_delivery_retry = delivery_policy["wait_time_between_delivery_retry"].get<double>();
+                    spec->retry_strategy->set_wait_time_between_delivery_retry(std::chrono::duration_cast<DefaultTimeUnit_t>(std::chrono::duration<double, std::milli>(wait_time_between_delivery_retry)));
+                    RDX_INFO_DEV(node, __func__, "Set wait time between delivery retry for {}: {} ms", action_name, wait_time_between_delivery_retry);
+                }
+
+                if (delivery_policy.contains("wait_time_for_delivery_response")) {
+                    double wait_time_for_delivery_response = delivery_policy["wait_time_for_delivery_response"].get<double>();
+                    spec->retry_strategy->set_wait_time_for_delivery_response(std::chrono::duration_cast<DefaultTimeUnit_t>(std::chrono::duration<double, std::milli>(wait_time_for_delivery_response)));
+                    RDX_INFO_DEV(node, __func__, "Set wait time for delivery response for {}: {} ms", action_name, wait_time_for_delivery_response);
                 }
             }
 
@@ -107,6 +153,8 @@ void RuntimeConfig::from_parameters(RedoxiVideoReaderBase *node)
     std::string KeyFrameIntervalMs = "frame_interval_ms";
     std::string KeyStepIntervalMs = "step_interval_ms";
     std::string KeyPublishToDebugTopic = "publish_to_debug_topic";
+    std::string KeyDeliveryPolicyFallback = "delivery_policy_fallback";
+
     {
         auto jkey = JsonPointer_t(fmt::format("/{}/{}", KeyRuntimeConfig, KeyFrameIntervalMs));
         if (json_params.contains(jkey)) {
@@ -128,6 +176,43 @@ void RuntimeConfig::from_parameters(RedoxiVideoReaderBase *node)
         if (json_params.contains(jkey)) {
             this->publish_to_debug_topic = json_params[jkey].get<bool>();
             RDX_INFO_DEV(node, __func__, "Got publish_to_debug_topic from JSON: {}", this->publish_to_debug_topic);
+        }
+    }
+
+    {
+        auto jkey = JsonPointer_t(fmt::format("/{}/{}", KeyRuntimeConfig, KeyDeliveryPolicyFallback));
+        if (json_params.contains(jkey)) {
+            const auto &fallback_policy = json_params[jkey];
+
+            if (fallback_policy.contains("number_of_enqueue_retry")) {
+                int64_t value = fallback_policy["number_of_enqueue_retry"].get<int64_t>();
+                this->delivery_policy_fallback->set_number_of_enqueue_retry(value);
+                RDX_INFO_DEV(node, __func__, "Set fallback number of enqueue retry: {}", value);
+            }
+
+            if (fallback_policy.contains("wait_time_between_enqueue_retry")) {
+                double value = fallback_policy["wait_time_between_enqueue_retry"].get<double>();
+                this->delivery_policy_fallback->set_wait_time_between_enqueue_retry(std::chrono::duration_cast<DefaultTimeUnit_t>(std::chrono::duration<double, std::milli>(value)));
+                RDX_INFO_DEV(node, __func__, "Set fallback wait time between enqueue retry: {} ms", value);
+            }
+
+            if (fallback_policy.contains("number_of_delivery_retry")) {
+                int64_t value = fallback_policy["number_of_delivery_retry"].get<int64_t>();
+                this->delivery_policy_fallback->set_number_of_delivery_retry(value);
+                RDX_INFO_DEV(node, __func__, "Set fallback number of delivery retry: {}", value);
+            }
+
+            if (fallback_policy.contains("wait_time_between_delivery_retry")) {
+                double value = fallback_policy["wait_time_between_delivery_retry"].get<double>();
+                this->delivery_policy_fallback->set_wait_time_between_delivery_retry(std::chrono::duration_cast<DefaultTimeUnit_t>(std::chrono::duration<double, std::milli>(value)));
+                RDX_INFO_DEV(node, __func__, "Set fallback wait time between delivery retry: {} ms", value);
+            }
+
+            if (fallback_policy.contains("wait_time_for_delivery_response")) {
+                double value = fallback_policy["wait_time_for_delivery_response"].get<double>();
+                this->delivery_policy_fallback->set_wait_time_for_delivery_response(std::chrono::duration_cast<DefaultTimeUnit_t>(std::chrono::duration<double, std::milli>(value)));
+                RDX_INFO_DEV(node, __func__, "Set fallback wait time for delivery response: {} ms", value);
+            }
         }
     }
 }

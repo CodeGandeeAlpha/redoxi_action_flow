@@ -276,7 +276,7 @@ class REDOXI_VIDEO_READER_PUBLIC
      * @return true if the downstream is ready to accept new frame, false otherwise (including timeout or when timeout is 0)
      */
     virtual bool _ping(const std::shared_ptr<Downstream_t> &ds,
-                       DefaultTimeUnit_t timeout = DefaultParams::PingActionWaitTime);
+                       DefaultTimeUnit_t timeout = DefaultParams::PingActionRetryInterval);
 
     //! do periodic step operation
     virtual void _step();

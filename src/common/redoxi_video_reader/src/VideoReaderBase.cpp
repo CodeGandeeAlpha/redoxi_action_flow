@@ -479,7 +479,7 @@ int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &ta
     bool downstream_ready = false;
     for (auto &it : m_downstreams) {
         auto ds = it.second;
-        downstream_ready = _ping(ds, DefaultParams::PingActionWaitTime);
+        downstream_ready = _ping(ds, DefaultParams::PingActionRetryInterval);
         if (downstream_ready) {
             break;
         }
@@ -564,8 +564,9 @@ int RedoxiVideoReaderBase::_deliver_frame(
     int attempts = 0;
 
     //! +1 for the first attempt
-    const int max_attempts = ds->spec->retry_strategy->get_max_number_of_retries() + 1;
-    auto timeout_each_attempt = ds->spec->retry_strategy->get_wait_time_for_retry();
+    const int max_attempts = ds->spec->retry_strategy->get_number_of_delivery_retry() + 1;
+    auto timeout_each_attempt = ds->spec->retry_strategy->get_wait_time_for_delivery_response();
+    auto interval_between_attempts = ds->spec->retry_strategy->get_wait_time_between_delivery_retry();
     auto msg_uuid = to_boost_uuid(frame_msg.uuid);
 
     //! Debug image message
@@ -637,6 +638,9 @@ int RedoxiVideoReaderBase::_deliver_frame(
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Retrying frame delivery to downstream {} (attempt {}/{})",
                          boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action, attempts + 1, max_attempts);
         }
+
+        // sleep for the interval between attempts
+        std::this_thread::sleep_for(interval_between_attempts);
     }
 
     if (publish_to_debug_topic && ds->debug_pub_dropped.valid() && debug_image_msg) {
@@ -797,8 +801,7 @@ void RedoxiVideoReaderBase::_step()
     tbb::task_group unordered_tasks;
 
     //! Read next frame, if token is ready
-    DummyTimeToken token;
-    if (m_impl->read_frame_token->try_pop_token(token)) {
+    if (m_impl->read_frame_token->try_pop_token()) {
         //! Time to read a new frame
         cv::Mat frame;
         int ret = _read_frame(frame, m_frame_number);
@@ -815,11 +818,11 @@ void RedoxiVideoReaderBase::_step()
 
                 //! If qos says you should retry until success, do so
                 if (qos->drop_frame_strategy == FrameDeliveryOptions_t::DropFrameStrategy::NoDrop) {
-                    auto max_attempts = DefaultParams::MaxNumberOfRetries;
+                    auto max_attempts = qos->get_number_of_enqueue_retry();
                     int attempts = 0;
                     while (!task_sent && attempts < max_attempts) {
                         attempts++;
-                        std::this_thread::sleep_for(qos->deliver_retry_interval);
+                        std::this_thread::sleep_for(qos->deliver_enqueue_interval);
                         task_sent = m_impl->frame_delivery_node->put_data(delivery_task);
                     }
 
