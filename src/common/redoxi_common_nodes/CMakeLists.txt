@@ -11,10 +11,16 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(redoxi_extern_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
-
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
+
+set(cpp_required_to_find Boost)
+foreach(pkg ${cpp_required_to_find})
+  find_package(${pkg} REQUIRED)
+endforeach()
+
+set(cpp_required_to_link Boost::boost)
 
 add_library(redoxi_common_nodes src/redoxi_common_nodes.cpp)
 add_library(redoxi_common_nodes::redoxi_common_nodes ALIAS redoxi_common_nodes)
@@ -22,6 +28,8 @@ target_compile_features(redoxi_common_nodes PUBLIC c_std_99 cxx_std_17)  # Requi
 target_include_directories(redoxi_common_nodes PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
+
+target_link_libraries(redoxi_common_nodes PUBLIC ${cpp_required_to_link})
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
@@ -57,6 +65,7 @@ ament_export_dependencies(
   rclcpp
   rclcpp_action
   redoxi_extern_cpp
+  ${cpp_required_to_find}
 )
 
 ament_export_include_directories(
