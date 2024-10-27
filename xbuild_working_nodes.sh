@@ -15,15 +15,20 @@ display_help() {
     echo "  $0 --verbose --debug"
 }
 
-PackagesToBuild="psg_private_msgs \
-                 redoxi_public_msgs \
-                 redoxi_common_cpp \
-                 redoxi_video_reader \
-                 redoxi_samples_lib \
-                 redoxi_samples_nodes \
-                 test_package \
-                 rosboard \
-                 cv_bridge"
+# PackagesToBuild="psg_private_msgs \
+#                  redoxi_public_msgs \
+#                  redoxi_common_cpp \
+#                  redoxi_video_reader \
+#                  redoxi_common_nodes \
+#                  redoxi_samples_lib \
+#                  redoxi_samples_nodes \
+#                  test_package \
+#                  json_struct \
+#                  redoxi_extern_cpp \
+#                  rosboard \
+#                  cv_bridge"
+
+PackagesToBuild="redoxi_common_nodes test_package"
 
 # Check if --help flag is provided
 if [[ "$*" == *"--help"* ]]; then
@@ -52,7 +57,17 @@ fi
 
 echo "Building with BUILD_TYPE=$BUILD_TYPE"
 
-colcon build --packages-select $PackagesToBuild \
+# colcon build --packages-select $PackagesToBuild \
+#     $VERBOSE \
+#     --parallel-workers $NUM_JOBS \
+#     --symlink-install \
+#     --cmake-args \
+#     -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+#     -DCMAKE_CXX_STANDARD=17 \
+#     -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+#     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+colcon build --packages-up-to $PackagesToBuild \
     $VERBOSE \
     --parallel-workers $NUM_JOBS \
     --symlink-install \
