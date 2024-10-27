@@ -115,7 +115,7 @@ class _StrictBool
  * @param args the arguments to the format string
  */
 template <typename... Args>
-void RDX_ASSERT_CHECK_TRUE(bool condition, const std::string &format, Args &&...args)
+void RDX_ASSERT_CHECK_TRUE(bool condition, fmt::format_string<Args...> format, Args &&...args)
 {
     rcpputils::check_true(condition, fmt::format(format, std::forward<Args>(args)...));
 }
@@ -127,7 +127,7 @@ void RDX_ASSERT_CHECK_TRUE(bool condition, const std::string &format, Args &&...
  * @param args the arguments to the format string
  */
 template <typename... Args>
-void RDX_ASSERT_REQUIRE_TRUE(bool condition, const std::string &format, Args &&...args)
+void RDX_ASSERT_REQUIRE_TRUE(bool condition, fmt::format_string<Args...> format, Args &&...args)
 {
     rcpputils::require_true(condition, fmt::format(format, std::forward<Args>(args)...));
 }
@@ -139,14 +139,14 @@ void RDX_ASSERT_REQUIRE_TRUE(bool condition, const std::string &format, Args &&.
  * @param args the arguments to the format string
  */
 template <typename... Args>
-void RDX_ASSERT_TRUE(bool condition, const std::string &format, Args &&...args)
+void RDX_ASSERT_TRUE(bool condition, fmt::format_string<Args...> format, Args &&...args)
 {
     rcpputils::assert_true(condition, fmt::format(format, std::forward<Args>(args)...));
 }
 
 //! Raise an error by calling RDX_ASSERT_CHECK_TRUE with a false condition
 template <typename... Args>
-void RDX_RAISE_ERROR(const std::string &format, Args &&...args)
+void RDX_RAISE_ERROR(fmt::format_string<Args...> format, Args &&...args)
 {
     RDX_ASSERT_CHECK_TRUE(false, format, std::forward<Args>(args)...);
 }
@@ -199,7 +199,7 @@ class LogImportanceThreshold
 //! Log a message using RCLCPP macros with or without thread ID
 template <int Severity, int Importance, typename... Args>
 void RDX_LOG_GENERIC_(const rclcpp::Node *node, const std::string &func_name, _StrictBool with_thread_id,
-                      const std::string &format, Args &&...args)
+                      fmt::format_string<Args...> format, Args &&...args)
 {
     if (Importance < LogImportanceThreshold::getInstance()[Severity]) {
         return;
@@ -211,7 +211,7 @@ void RDX_LOG_GENERIC_(const rclcpp::Node *node, const std::string &func_name, _S
                 if constexpr (sizeof...(args) == 0) {
                     RCLCPP_DEBUG(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
                                  static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
-                                 format.c_str());
+                                 format);
                 } else {
                     RCLCPP_DEBUG(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
                                  static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
@@ -219,7 +219,7 @@ void RDX_LOG_GENERIC_(const rclcpp::Node *node, const std::string &func_name, _S
                 }
             } else {
                 if constexpr (sizeof...(args) == 0) {
-                    RCLCPP_DEBUG(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format.c_str());
+                    RCLCPP_DEBUG(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format);
                 } else {
                     RCLCPP_DEBUG(node->get_logger(), "[f=%s()] %s", func_name.c_str(),
                                  fmt::format(format, std::forward<Args>(args)...).c_str());
@@ -231,7 +231,7 @@ void RDX_LOG_GENERIC_(const rclcpp::Node *node, const std::string &func_name, _S
                 if constexpr (sizeof...(args) == 0) {
                     RCLCPP_INFO(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
                                 static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
-                                format.c_str());
+                                format);
                 } else {
                     RCLCPP_INFO(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
                                 static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
@@ -239,7 +239,7 @@ void RDX_LOG_GENERIC_(const rclcpp::Node *node, const std::string &func_name, _S
                 }
             } else {
                 if constexpr (sizeof...(args) == 0) {
-                    RCLCPP_INFO(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format.c_str());
+                    RCLCPP_INFO(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format);
                 } else {
                     RCLCPP_INFO(node->get_logger(), "[f=%s()] %s", func_name.c_str(),
                                 fmt::format(format, std::forward<Args>(args)...).c_str());
@@ -251,7 +251,7 @@ void RDX_LOG_GENERIC_(const rclcpp::Node *node, const std::string &func_name, _S
                 if constexpr (sizeof...(args) == 0) {
                     RCLCPP_WARN(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
                                 static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
-                                format.c_str());
+                                format);
                 } else {
                     RCLCPP_WARN(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
                                 static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
@@ -259,7 +259,7 @@ void RDX_LOG_GENERIC_(const rclcpp::Node *node, const std::string &func_name, _S
                 }
             } else {
                 if constexpr (sizeof...(args) == 0) {
-                    RCLCPP_WARN(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format.c_str());
+                    RCLCPP_WARN(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format);
                 } else {
                     RCLCPP_WARN(node->get_logger(), "[f=%s()] %s", func_name.c_str(),
                                 fmt::format(format, std::forward<Args>(args)...).c_str());
@@ -271,7 +271,7 @@ void RDX_LOG_GENERIC_(const rclcpp::Node *node, const std::string &func_name, _S
                 if constexpr (sizeof...(args) == 0) {
                     RCLCPP_ERROR(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
                                  static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
-                                 format.c_str());
+                                 format);
                 } else {
                     RCLCPP_ERROR(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
                                  static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
@@ -279,7 +279,7 @@ void RDX_LOG_GENERIC_(const rclcpp::Node *node, const std::string &func_name, _S
                 }
             } else {
                 if constexpr (sizeof...(args) == 0) {
-                    RCLCPP_ERROR(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format.c_str());
+                    RCLCPP_ERROR(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format);
                 } else {
                     RCLCPP_ERROR(node->get_logger(), "[f=%s()] %s", func_name.c_str(),
                                  fmt::format(format, std::forward<Args>(args)...).c_str());
@@ -291,7 +291,7 @@ void RDX_LOG_GENERIC_(const rclcpp::Node *node, const std::string &func_name, _S
                 if constexpr (sizeof...(args) == 0) {
                     RCLCPP_FATAL(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
                                  static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
-                                 format.c_str());
+                                 format);
                 } else {
                     RCLCPP_FATAL(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
                                  static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
@@ -299,7 +299,7 @@ void RDX_LOG_GENERIC_(const rclcpp::Node *node, const std::string &func_name, _S
                 }
             } else {
                 if constexpr (sizeof...(args) == 0) {
-                    RCLCPP_FATAL(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format.c_str());
+                    RCLCPP_FATAL(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format);
                 } else {
                     RCLCPP_FATAL(node->get_logger(), "[f=%s()] %s", func_name.c_str(),
                                  fmt::format(format, std::forward<Args>(args)...).c_str());
@@ -312,7 +312,7 @@ void RDX_LOG_GENERIC_(const rclcpp::Node *node, const std::string &func_name, _S
                 if constexpr (sizeof...(args) == 0) {
                     RCLCPP_INFO(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
                                 static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
-                                format.c_str());
+                                format);
                 } else {
                     RCLCPP_INFO(node->get_logger(), "[f=%s()][tid=%lu] %s", func_name.c_str(),
                                 static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
@@ -320,7 +320,7 @@ void RDX_LOG_GENERIC_(const rclcpp::Node *node, const std::string &func_name, _S
                 }
             } else {
                 if constexpr (sizeof...(args) == 0) {
-                    RCLCPP_INFO(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format.c_str());
+                    RCLCPP_INFO(node->get_logger(), "[f=%s()] %s", func_name.c_str(), format);
                 } else {
                     RCLCPP_INFO(node->get_logger(), "[f=%s()] %s", func_name.c_str(),
                                 fmt::format(format, std::forward<Args>(args)...).c_str());
@@ -333,14 +333,14 @@ void RDX_LOG_GENERIC_(const rclcpp::Node *node, const std::string &func_name, _S
 #define DEFINE_RDX_LOGGING_SEVERITY_WITH_IMPORTANCE(severity, importance)                                                           \
     template <typename... Args>                                                                                                     \
     void RDX_LOG_##severity##_##importance(const rclcpp::Node *node, const std::string &func_name,                                  \
-                                           const std::string &format, Args &&...args)                                               \
+                                           fmt::format_string<Args...> format, Args &&...args)                                      \
     {                                                                                                                               \
         RDX_LOG_GENERIC_<log_severity::severity, importance>(node, func_name, false, format, std::forward<Args>(args)...);          \
     }                                                                                                                               \
                                                                                                                                     \
     template <typename... Args>                                                                                                     \
     void RDX_LOG_##severity##_##importance(const rclcpp::Node *node, const std::string &func_name, _StrictBool with_thread_id,      \
-                                           const std::string &format, Args &&...args)                                               \
+                                           fmt::format_string<Args...> format, Args &&...args)                                      \
     {                                                                                                                               \
         RDX_LOG_GENERIC_<log_severity::severity, importance>(node, func_name, with_thread_id, format, std::forward<Args>(args)...); \
     }
@@ -348,14 +348,14 @@ void RDX_LOG_GENERIC_(const rclcpp::Node *node, const std::string &func_name, _S
 #define DEFINE_RDX_LOGGING_SEVERITY(severity)                                                                              \
     template <typename... Args>                                                                                            \
     void RDX_LOG_##severity(const rclcpp::Node *node, const std::string &func_name,                                        \
-                            const std::string &format, Args &&...args)                                                     \
+                            fmt::format_string<Args...> format, Args &&...args)                                            \
     {                                                                                                                      \
         RDX_LOG_GENERIC_<log_severity::severity, 0>(node, func_name, false, format, std::forward<Args>(args)...);          \
     }                                                                                                                      \
                                                                                                                            \
     template <typename... Args>                                                                                            \
     void RDX_LOG_##severity(const rclcpp::Node *node, const std::string &func_name, _StrictBool with_thread_id,            \
-                            const std::string &format, Args &&...args)                                                     \
+                            fmt::format_string<Args...> format, Args &&...args)                                            \
     {                                                                                                                      \
         RDX_LOG_GENERIC_<log_severity::severity, 0>(node, func_name, with_thread_id, format, std::forward<Args>(args)...); \
     }

@@ -70,7 +70,7 @@ void InitConfig::from_parameters(RedoxiVideoReaderBase *node)
     //! Try to get params from json string
     nlohmann::json json_params = RDX_GET_JSON_PARAM_FROM_NODE(node);
 
-    RDX_INFO_DEV(node, __func__, json_params.dump(4));
+    // RDX_INFO_DEV(node, __func__, json_params.dump(4));
 
     //! Nothing to parse, return
     if (json_params.empty()) {

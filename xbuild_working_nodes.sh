@@ -28,7 +28,7 @@ display_help() {
 #                  rosboard \
 #                  cv_bridge"
 
-PackagesToBuild="redoxi_common_nodes test_package"
+PackagesToBuild="redoxi_common_nodes test_package rosboard"
 
 # Check if --help flag is provided
 if [[ "$*" == *"--help"* ]]; then
@@ -73,7 +73,7 @@ colcon build --packages-up-to $PackagesToBuild \
     --symlink-install \
     --cmake-args \
     -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-    -DCMAKE_CXX_STANDARD=17 \
+    -DCMAKE_CXX_STANDARD=20 \
     -DCMAKE_CXX_STANDARD_REQUIRED=ON \
-    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 
 source install/setup.bash

@@ -8,3 +8,6 @@ fi
 
 # install tbb
 apt-get install -y libtbb-dev
+
+# required by the ros2_web_bridge
+sudo pip3 install simplejpeg
