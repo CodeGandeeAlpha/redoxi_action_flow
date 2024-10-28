@@ -67,9 +67,7 @@ const std::string DeclareParams = "declare_params";
 class IOpenCloseProtocol
 {
   public:
-    virtual ~IOpenCloseProtocol()
-    {
-    }
+    virtual ~IOpenCloseProtocol() = default;
 
     // return 0 if success, otherwise return error code
     virtual int open() = 0;
@@ -81,9 +79,7 @@ class IOpenCloseProtocol
 class IStartStopProtocol
 {
   public:
-    virtual ~IStartStopProtocol()
-    {
-    }
+    virtual ~IStartStopProtocol() = default;
 
     // return 0 if success, otherwise return error code
     virtual int start() = 0;

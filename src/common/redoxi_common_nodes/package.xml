@@ -15,6 +15,7 @@
   <depend>rclcpp</depend>
   <depend>rclcpp_action</depend>
   <depend>redoxi_extern_cpp</depend>
+  <depend>redoxi_common_cpp</depend>
 
   <depend>libboost-dev</depend>
 

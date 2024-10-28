@@ -9,6 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(redoxi_extern_cpp REQUIRED)
+find_package(redoxi_common_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 # uncomment the following section in order to fill in
@@ -35,7 +36,8 @@ target_link_libraries(redoxi_common_nodes PUBLIC ${cpp_required_to_link})
 # which is appropriate when building the dll but not consuming it.
 target_compile_definitions(redoxi_common_nodes PRIVATE "REDOXI_COMMON_NODES_BUILDING_LIBRARY")
 
-ament_target_dependencies(redoxi_common_nodes PUBLIC rclcpp rclcpp_action redoxi_extern_cpp)
+ament_target_dependencies(redoxi_common_nodes PUBLIC
+rclcpp rclcpp_action redoxi_extern_cpp redoxi_common_cpp)
 
 install(
   DIRECTORY include/
@@ -65,6 +67,7 @@ ament_export_dependencies(
   rclcpp
   rclcpp_action
   redoxi_extern_cpp
+  redoxi_common_cpp
   ${cpp_required_to_find}
 )
 
