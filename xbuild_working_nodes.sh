@@ -75,5 +75,6 @@ colcon build --packages-up-to $PackagesToBuild \
     -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
     -DCMAKE_CXX_STANDARD=20 \
     -DCMAKE_CXX_STANDARD_REQUIRED=ON \
-    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+    -DJSON_STRUCT_OPT_INSTALL=ON
 source install/setup.bash

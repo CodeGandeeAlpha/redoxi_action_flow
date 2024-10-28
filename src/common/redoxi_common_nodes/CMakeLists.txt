@@ -12,6 +12,8 @@ find_package(redoxi_extern_cpp REQUIRED)
 find_package(redoxi_common_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(json_struct REQUIRED)
+
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -21,9 +23,11 @@ foreach(pkg ${cpp_required_to_find})
   find_package(${pkg} REQUIRED)
 endforeach()
 
-set(cpp_required_to_link Boost::boost)
+set(cpp_required_to_link Boost::boost json_struct::json_struct)
 
-add_library(redoxi_common_nodes src/redoxi_common_nodes.cpp)
+set(srcfiles src/redoxi_common_nodes.cpp src/AsyncActionOutputPort.cpp)
+
+add_library(redoxi_common_nodes ${srcfiles})
 add_library(redoxi_common_nodes::redoxi_common_nodes ALIAS redoxi_common_nodes)
 target_compile_features(redoxi_common_nodes PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 target_include_directories(redoxi_common_nodes PUBLIC
@@ -68,6 +72,7 @@ ament_export_dependencies(
   rclcpp_action
   redoxi_extern_cpp
   redoxi_common_cpp
+  json_struct
   ${cpp_required_to_find}
 )
 
