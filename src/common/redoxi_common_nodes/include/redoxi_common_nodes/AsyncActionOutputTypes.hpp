@@ -3,7 +3,6 @@
 #include <redoxi_common_nodes/AsyncActionPortInterfaces.hpp>
 #include <optional>
 #include <json_struct/json_struct.h>
-#include <iostream>
 
 // default types for the async action output port
 namespace redoxi_works
