@@ -13,7 +13,6 @@
 #include <rclcpp_action/client.hpp>
 #include <rclcpp/node.hpp>
 #include <boost/uuid/uuid.hpp>
-#include <redoxi_public_msgs/action/process_frame.hpp>
 
 namespace redoxi_works
 {
@@ -329,6 +328,16 @@ concept DownstreamSpecConcept = requires(T t)
     requires RosActionConcept<typename T::ActionType_t>;
     //! Publisher type must satisfy RosPublisherConcept
     requires RosPublisherConcept<typename T::PublisherType_t>;
+
+    //! Must have method to get its own name
+    {
+        std::declval<const T &>().get_name()
+        } -> std::same_as<const std::string &>;
+
+    //! Must have method to set its own name
+    {
+        std::declval<T &>().set_name(std::declval<const std::string &>())
+        } -> std::same_as<void>;
 
     //! Must have method to get action name
     {

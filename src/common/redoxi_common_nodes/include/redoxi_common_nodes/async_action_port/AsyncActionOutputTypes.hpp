@@ -163,6 +163,7 @@ class DefaultTargetData
 struct DefaultStampData {
 };
 
+//! Default implementation of DeliveryRequestConcept
 template <DeliverySourceDataConcept SourceDataType,
           RetryPolicyConcept RetryPolicyType,
           DeliveryStampConcept StampType>
@@ -253,11 +254,22 @@ class DefaultDeliveryRequest
     }
 
   protected:
+    //! Source data for the delivery request
     std::shared_ptr<SourceDataType_t> m_source_data;
+
+    //! Stamp data for getting delivery in-progress status
     std::shared_ptr<StampType_t> m_stamp{std::make_shared<StampType_t>()};
+
+    //! Pointer to the retry policy
     std::shared_ptr<RetryPolicyType_t> m_retry_policy;
+
+    //! Flag indicating if this is a ping request
     bool m_is_ping{false};
+
+    //! The delivery precondition
     DeliveryPrecondition m_precondition{DeliveryPrecondition::NoPrecondition};
+
+    //! The drop strategy
     DropStrategy m_drop_strategy{DropStrategy::NoDrop};
 };
 
@@ -308,10 +320,42 @@ class DefaultDeliveryTask
         return m_retry_policy;
     }
 
+    //! Set the retry policy
+    virtual void set_retry_policy(std::shared_ptr<RetryPolicyType_t> policy)
+    {
+        m_retry_policy = policy;
+    }
+
+    //! Get the precondition
+    virtual DeliveryPrecondition get_precondition() const
+    {
+        return m_precondition;
+    }
+
+    //! Set the precondition
+    virtual void set_precondition(DeliveryPrecondition precondition)
+    {
+        m_precondition = precondition;
+    }
+
+    //! Get the drop strategy
+    virtual DropStrategy get_drop_strategy() const
+    {
+        return m_drop_strategy;
+    }
+
+    //! Set the drop strategy
+    virtual void set_drop_strategy(DropStrategy strategy)
+    {
+        m_drop_strategy = strategy;
+    }
+
   protected:
     std::shared_ptr<RequestType_t> m_request;
     std::shared_ptr<TargetDataType_t> m_target_data;
     std::shared_ptr<RetryPolicyType_t> m_retry_policy;
+    DeliveryPrecondition m_precondition{DeliveryPrecondition::NoPrecondition};
+    DropStrategy m_drop_strategy{DropStrategy::NoDrop};
 };
 
 //! Default implementation of delivery policy
@@ -354,26 +398,54 @@ class DefaultDeliveryPolicy
 //! Default implementation of downstream specification
 template <RosActionConcept ActionType,
           DeliveryPolicyConcept DeliveryPolicyType,
-          RosMessageConcept PublishMessageType>
+          RosPublisherConcept PublisherType>
 class DefaultDownstreamSpec
 {
   public:
     using ActionType_t = ActionType;
     using DeliveryPolicy_t = DeliveryPolicyType;
-    using PublishMessageType_t = PublishMessageType;
+    using PublisherType_t = PublisherType;
+    using PublishMessageType_t = typename PublisherType_t::MessageType_t;
 
     virtual ~DefaultDownstreamSpec() = default;
 
-    DefaultDownstreamSpec(const std::string &action_name)
-        : m_action_name(action_name)
+    DefaultDownstreamSpec()
     {
         static_assert(DownstreamSpecConcept<DefaultDownstreamSpec>, "DefaultDownstreamSpec must satisfy DownstreamSpecConcept");
+    }
+
+    //! Initialize the downstream spec
+    virtual void init(const std::string &name, const std::string &action_name)
+    {
+        m_name = name;
+        m_action_name = action_name;
+        m_debug_topic_sending = "debug/" + name + "/sending";
+        m_debug_topic_succeeded = "debug/" + name + "/succeeded";
+        m_debug_topic_failed = "debug/" + name + "/failed";
+    }
+
+    //! Get the name
+    virtual const std::string &get_name() const
+    {
+        return m_name;
+    }
+
+    //! Set the name
+    virtual void set_name(const std::string &name)
+    {
+        m_name = name;
     }
 
     //! Get the action name
     virtual const std::string &get_action_name() const
     {
         return m_action_name;
+    }
+
+    //! Set the action name
+    virtual void set_action_name(const std::string &action_name)
+    {
+        m_action_name = action_name;
     }
 
     //! Get the delivery policy
@@ -414,15 +486,26 @@ class DefaultDownstreamSpec
     }
 
   protected:
+    //! The name of this output port
+    std::string m_name;
+
+    //! The action name
     std::string m_action_name;
+
+    //! The delivery policy
     std::shared_ptr<DeliveryPolicy_t> m_delivery_policy;
+
+    //! Whether to use debug publish
     bool m_use_debug_publish{false};
+
+    //! The debug topic for sending
     std::string m_debug_topic_sending;
     std::string m_debug_topic_succeeded;
     std::string m_debug_topic_failed;
 
   public:
-    JS_OBJECT(JS_MEMBER_WITH_NAME(m_action_name, "action_name"),
+    JS_OBJECT(JS_MEMBER_WITH_NAME(m_name, "name"),
+              JS_MEMBER_WITH_NAME(m_action_name, "action_name"),
               JS_MEMBER_WITH_NAME(m_use_debug_publish, "use_debug_publish"),
               JS_MEMBER_WITH_NAME(m_debug_topic_sending, "debug_topic_sending"),
               JS_MEMBER_WITH_NAME(m_debug_topic_succeeded, "debug_topic_succeeded"),
@@ -436,6 +519,11 @@ class DefaultInitConfig
   public:
     //! Type aliases
     using DownstreamSpec_t = TDownstreamSpec;
+
+    DefaultInitConfig()
+    {
+        static_assert(InitConfigConcept<DefaultInitConfig>, "DefaultInitConfig must satisfy InitConfigConcept");
+    }
 
     //! Virtual destructor
     virtual ~DefaultInitConfig() = default;
@@ -605,7 +693,7 @@ concept AsyncActionOutputPortSpecConcept = requires(T t)
     typename T::DownstreamSpec_t;
     requires DownstreamSpecConcept<typename T::DownstreamSpec_t>;
     requires std::same_as<typename T::DownstreamSpec_t::ActionType_t, typename T::ActionType_t>;
-    requires std::same_as<typename T::DownstreamSpec_t::DeliveryPolicyType_t, typename T::DeliveryPolicy_t>;
+    requires std::same_as<typename T::DownstreamSpec_t::DeliveryPolicy_t, typename T::DeliveryPolicy_t>;
 
     // for debug publishing in downstream nodes
     typename T::DownstreamDebugPublisher_t;
@@ -615,11 +703,11 @@ concept AsyncActionOutputPortSpecConcept = requires(T t)
 
     typename T::InitConfig_t;
     requires InitConfigConcept<typename T::InitConfig_t>;
-    requires std::same_as<typename T::InitConfig_t::DownstreamSpecType_t, typename T::DownstreamSpec_t>;
+    requires std::same_as<typename T::InitConfig_t::DownstreamSpec_t, typename T::DownstreamSpec_t>;
 
     typename T::Downstream_t;
     requires DownstreamConcept<typename T::Downstream_t>;
-    requires std::same_as<typename T::Downstream_t::DownstreamSpecType_t, typename T::DownstreamSpec_t>;
+    requires std::same_as<typename T::Downstream_t::DownstreamSpec_t, typename T::DownstreamSpec_t>;
 };
 
 

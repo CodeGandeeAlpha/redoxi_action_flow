@@ -13,7 +13,7 @@ find_package(redoxi_common_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(json_struct REQUIRED)
-
+find_package(cv_bridge REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -41,7 +41,7 @@ target_link_libraries(redoxi_common_nodes PUBLIC ${cpp_required_to_link})
 target_compile_definitions(redoxi_common_nodes PRIVATE "REDOXI_COMMON_NODES_BUILDING_LIBRARY")
 
 ament_target_dependencies(redoxi_common_nodes PUBLIC
-rclcpp rclcpp_action redoxi_extern_cpp redoxi_common_cpp)
+rclcpp rclcpp_action redoxi_extern_cpp redoxi_common_cpp cv_bridge)
 
 install(
   DIRECTORY include/
@@ -73,6 +73,7 @@ ament_export_dependencies(
   redoxi_extern_cpp
   redoxi_common_cpp
   json_struct
+  cv_bridge
   ${cpp_required_to_find}
 )
 

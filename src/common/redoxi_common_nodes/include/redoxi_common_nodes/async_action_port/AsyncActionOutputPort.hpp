@@ -3,7 +3,8 @@
 #include <string>
 #include "redoxi_common_nodes/redoxi_common_nodes.hpp"
 #include <redoxi_common_cpp/async_processor/SingleBufferExecNode.hpp>
-#include <redoxi_common_nodes/AsyncActionOutputTypes.hpp>
+#include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
+#include <redoxi_common_nodes/async_action_port/ImageOutputPortSpec.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <atomic>
@@ -11,10 +12,11 @@
 namespace redoxi_works
 {
 
+using TSpec = async_action_image_output_port::ImageOutputPortSpec;
 
 //! Sends action requests to downstream nodes, asynchronously
 //! Thread safe, can be used in multi thread executor
-template <AsyncActionPortTypes::AsyncActionOutputPortSpecConcept TSpec>
+// template <AsyncActionPortTypes::AsyncActionOutputPortSpecConcept TSpec>
 class AsyncActionOutputPort : public IStartStopProtocol
 {
   public:
@@ -178,7 +180,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         // output callback
         // send frame to downstreams
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Setting output callback ...");
+        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "Setting output callback ...");
         node.set_output_callback(
             [this](const WorkOutput_t &output) -> int {
                 auto &out_payload = std::get<0>(output);

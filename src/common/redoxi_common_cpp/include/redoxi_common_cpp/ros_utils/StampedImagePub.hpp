@@ -13,7 +13,8 @@ namespace redoxi_works
 class StampedImagePub
 {
   public:
-    using Publisher_t = rclcpp::Publisher<sensor_msgs::msg::Image>;
+    using MessageType_t = sensor_msgs::msg::Image;
+    using Publisher_t = rclcpp::Publisher<MessageType_t>;
 
     //! Constructor
     StampedImagePub() = default;
