@@ -3,6 +3,7 @@
 
 #include "redoxi_common_nodes/visibility_control.h"
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
+#include <json_struct/json_struct.h>
 
 namespace redoxi_works
 {

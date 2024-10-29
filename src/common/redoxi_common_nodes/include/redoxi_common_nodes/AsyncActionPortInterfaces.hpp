@@ -36,6 +36,14 @@ concept RosActionConcept = requires
     typename T::Impl::GoalStatusMessage;
 };
 
+//! Concept to check if a type is ROS message
+template <typename T>
+concept RosMessageConcept = requires(T t)
+{
+    requires std::copyable<T>;
+    requires std::is_copy_assignable_v<T>;
+};
+
 //! Interface for retry policy, if anything needs to retry, its configuration should be here
 //! Concept for retry policy interface
 template <typename T>
@@ -115,8 +123,25 @@ concept DeliverySourceDataConcept = std::copyable<T>;
 //! data to be sent to the downstream action, in a format that the downstream action can use
 //! for example, a ROS message
 template <typename T>
-concept DeliveryTargetDataConcept = std::copyable<T>;
+concept DeliveryTargetDataConcept = requires(T t)
+{
+    //! Must have ROS message type
+    typename T::RosMessageType_t;
+    requires RosMessageConcept<typename T::RosMessageType_t>;
 
+    //! Must be copyable
+    requires std::copyable<T>;
+
+    //! Must have method to get ROS message
+    {
+        std::declval<const T &>().get_ros_message()
+        } -> std::same_as<const typename T::RosMessageType_t *>;
+
+    //! Must have method to determine if this is a ping signal
+    {
+        std::declval<const T &>().is_ping()
+        } -> std::same_as<bool>;
+};
 //! data collected during the delivery process
 template <typename T>
 concept DeliveryStampConcept = std::copyable<T>;
@@ -254,8 +279,8 @@ concept DownstreamSpecConcept = requires(T t)
     requires DeliveryPolicyConcept<typename T::DeliveryPolicy_t>;
     //! Action type must satisfy RosActionConcept
     requires RosActionConcept<typename T::ActionType_t>;
-    //! Publish data type must satisfy std::copyable
-    requires std::copyable<typename T::PublishDataType_t>;
+    //! Publish data type must satisfy RosMessageConcept
+    requires RosMessageConcept<typename T::PublishDataType_t>;
 
     //! Must have method to get action name
     {
@@ -368,6 +393,16 @@ concept DownstreamConcept = requires(T t)
     //! Must have initialization method
     {
         std::declval<T &>().init_by_spec(std::declval<std::shared_ptr<typename T::DownstreamSpec_t>>(), std::declval<rclcpp::Node *>())
+        } -> std::same_as<int>;
+};
+
+//! Concept for ROS publisher types
+template <typename T>
+concept RosPublisherConcept = requires(T publisher, const RosMessageConcept auto &msg)
+{
+    //! Must have publish method that takes a ROS message and returns int
+    {
+        publisher.publish(msg)
         } -> std::same_as<int>;
 };
 
