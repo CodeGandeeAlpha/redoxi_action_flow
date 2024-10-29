@@ -1,34 +1,34 @@
 #pragma once
 
 #include <string>
-#include <optional>
 #include "redoxi_common_nodes/redoxi_common_nodes.hpp"
 #include <redoxi_common_cpp/async_processor/SingleBufferExecNode.hpp>
-#include <redoxi_common_nodes/AsyncActionPortInterfaces.hpp>
+#include <redoxi_common_nodes/AsyncActionOutputTypes.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <atomic>
-#include <tuple>
-#include <functional>
 
 namespace redoxi_works
 {
 
+
 //! Sends action requests to downstream nodes, asynchronously
 //! Thread safe, can be used in multi thread executor
+template <AsyncActionPortTypes::AsyncActionOutputPortSpecConcept TSpec>
 class AsyncActionOutputPort : public IStartStopProtocol
 {
   public:
     AsyncActionOutputPort();
     ~AsyncActionOutputPort() noexcept = default;
 
-    using InitConfig_t = typename AsyncActionPortTypes::IInitConfig;
-    using SourceData_t = typename AsyncActionPortTypes::IDeliverySourceData;
-    using TargetData_t = typename AsyncActionPortTypes::IDeliveryTargetData;
-    using DeliveryRequest_t = typename AsyncActionPortTypes::IDeliveryRequest;
-    using DeliveryTask_t = typename AsyncActionPortTypes::IDeliveryTask;
-    using Downstream_t = typename AsyncActionPortTypes::IDownstream;
-    using ActionType_t = typename AsyncActionPortTypes::IDownstreamSpec::ActionType_t;
+    using MasterSpec_t = TSpec; // master specification of this port
+    using InitConfig_t = typename TSpec::InitConfig_t;
+    using SourceData_t = typename TSpec::DeliverySourceData_t;
+    using TargetData_t = typename TSpec::DeliveryTargetData_t;
+    using DeliveryRequest_t = typename TSpec::DeliveryRequest_t;
+    using DeliveryTask_t = typename TSpec::DeliveryTask_t;
+    using Downstream_t = typename TSpec::Downstream_t;
+    using ActionType_t = typename TSpec::ActionType_t;
 
   protected:
     using DeliveryTaskNode_t = async_processor::SingleBufferExecNode<DeliveryTask_t>;

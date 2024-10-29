@@ -24,9 +24,12 @@ namespace AsyncActionPortTypes
  * - Set the current value
  * - Get the fallback value (used when current value is not set)
  */
+template <TimeDurationConcept TimeUnitType>
 class DefaultRetryPolicy
 {
   public:
+    using DurationType_t = TimeUnitType;
+
     DefaultRetryPolicy()
     {
         static_assert(RetryPolicyConcept<DefaultRetryPolicy>, "DefaultRetryPolicy must satisfy RetryPolicyConcept");
@@ -52,37 +55,37 @@ class DefaultRetryPolicy
     }
 
     //! Get the current wait time between retries
-    virtual std::optional<DefaultTimeUnit_t> get_wait_time_between_retry() const
+    virtual std::optional<DurationType_t> get_wait_time_between_retry() const
     {
         return m_wait_time_between_retry;
     }
 
     //! Set the current wait time between retries
-    virtual void set_wait_time_between_retry(std::optional<DefaultTimeUnit_t> wait_time)
+    virtual void set_wait_time_between_retry(std::optional<DurationType_t> wait_time)
     {
         m_wait_time_between_retry = wait_time;
     }
 
     //! Get the fallback wait time between retries
-    virtual DefaultTimeUnit_t get_fallback_wait_time_between_retry() const
+    virtual DurationType_t get_fallback_wait_time_between_retry() const
     {
         return m_fallback_wait_time_between_retry;
     }
 
     //! Get the current wait time for retry response
-    virtual std::optional<DefaultTimeUnit_t> get_wait_time_retry_response() const
+    virtual std::optional<DurationType_t> get_wait_time_retry_response() const
     {
         return m_wait_time_retry_response;
     }
 
     //! Set the current wait time for retry response
-    virtual void set_wait_time_retry_response(std::optional<DefaultTimeUnit_t> wait_time)
+    virtual void set_wait_time_retry_response(std::optional<DurationType_t> wait_time)
     {
         m_wait_time_retry_response = wait_time;
     }
 
     //! Get the fallback wait time for retry response
-    virtual DefaultTimeUnit_t get_fallback_wait_time_retry_response() const
+    virtual DurationType_t get_fallback_wait_time_retry_response() const
     {
         return m_fallback_wait_time_retry_response;
     }
@@ -93,13 +96,13 @@ class DefaultRetryPolicy
     //! Fallback number of retry
     int64_t m_fallback_number_of_retry;
     //! Current wait time between retries
-    std::optional<DefaultTimeUnit_t> m_wait_time_between_retry;
+    std::optional<DurationType_t> m_wait_time_between_retry;
     //! Fallback wait time between retries
-    DefaultTimeUnit_t m_fallback_wait_time_between_retry;
+    DurationType_t m_fallback_wait_time_between_retry;
     //! Current wait time for retry response
-    std::optional<DefaultTimeUnit_t> m_wait_time_retry_response;
+    std::optional<DurationType_t> m_wait_time_retry_response;
     //! Fallback wait time for retry response
-    DefaultTimeUnit_t m_fallback_wait_time_retry_response;
+    DurationType_t m_fallback_wait_time_retry_response;
 
   public:
     JS_OBJECT(JS_MEMBER_WITH_NAME(m_number_of_retry, "number_of_retry"),
@@ -111,12 +114,13 @@ class DefaultRetryPolicy
 };
 
 
-template <RosMessageConcept T>
+template <RosActionConcept T>
 class DefaultTargetData
 {
   public:
     //! The ROS message type that this target data wraps
-    using RosMessageType_t = T;
+    using ActionType_t = T;
+    using Goal_t = typename ActionType_t::Goal;
 
     DefaultTargetData()
     {
@@ -128,15 +132,15 @@ class DefaultTargetData
     virtual DefaultTargetData &operator=(const DefaultTargetData &) = default;
 
     //! Get the underlying ROS message
-    virtual const RosMessageType_t *get_ros_message() const
+    virtual const Goal_t *get_goal() const
     {
-        return m_ros_msg.has_value() ? &m_ros_msg.value() : nullptr;
+        return m_goal.has_value() ? &m_goal.value() : nullptr;
     }
 
     //! Set the ROS message
-    virtual void set_ros_message(const RosMessageType_t &msg)
+    virtual void set_goal(const Goal_t &goal)
     {
-        m_ros_msg = msg;
+        m_goal = goal;
     }
 
     //! Check if this is a ping signal
@@ -152,7 +156,7 @@ class DefaultTargetData
     }
 
   protected:
-    std::optional<RosMessageType_t> m_ros_msg;
+    std::optional<Goal_t> m_goal;
     bool m_is_ping{false};
 };
 
@@ -350,13 +354,13 @@ class DefaultDeliveryPolicy
 //! Default implementation of downstream specification
 template <RosActionConcept ActionType,
           DeliveryPolicyConcept DeliveryPolicyType,
-          RosMessageConcept PublishDataType>
+          RosMessageConcept PublishMessageType>
 class DefaultDownstreamSpec
 {
   public:
     using ActionType_t = ActionType;
     using DeliveryPolicy_t = DeliveryPolicyType;
-    using PublishDataType_t = PublishDataType;
+    using PublishMessageType_t = PublishMessageType;
 
     virtual ~DefaultDownstreamSpec() = default;
 
@@ -482,7 +486,8 @@ class DefaultDownstream
     using ActionClient_t = rclcpp_action::Client<ActionType_t>;
     using GoalHandle_t = typename ActionClient_t::GoalHandle;
     using SendGoalOptions_t = typename ActionClient_t::SendGoalOptions;
-    using PublishDataType_t = typename DownstreamSpec_t::PublishDataType_t;
+    using PublishMessageType_t = typename DownstreamSpec_t::PublishMessageType_t;
+    using PublisherType_t = typename DownstreamSpec_t::PublisherType_t;
 
     //! Virtual destructor
     virtual ~DefaultDownstream() = default;
@@ -511,19 +516,19 @@ class DefaultDownstream
     }
 
     //! Debug publish to sending topic
-    virtual int debug_publish_to_sending_topic(const PublishDataType_t &data)
+    virtual int debug_publish_to_sending_topic(const PublishMessageType_t &data)
     {
         return 0; // Default implementation
     }
 
     //! Debug publish to succeeded topic
-    virtual int debug_publish_to_succeeded_topic(const PublishDataType_t &data)
+    virtual int debug_publish_to_succeeded_topic(const PublishMessageType_t &data)
     {
         return 0; // Default implementation
     }
 
     //! Debug publish to failed topic
-    virtual int debug_publish_to_failed_topic(const PublishDataType_t &data)
+    virtual int debug_publish_to_failed_topic(const PublishMessageType_t &data)
     {
         return 0; // Default implementation
     }
@@ -541,6 +546,80 @@ class DefaultDownstream
     std::shared_ptr<DownstreamSpec_t> m_downstream_spec;
     typename ActionClient_t::SharedPtr m_action_client;
     rclcpp::Node *m_node{nullptr};
+};
+
+//! Concept for AsyncActionOutputPortSpec, which is used to define the async action output port
+//! @note this is a concept for downstream spec, not the port itself, but the port has to use it
+template <typename T>
+concept AsyncActionOutputPortSpecConcept = requires(T t)
+{
+    typename T::ActionType_t;
+    requires RosActionConcept<typename T::ActionType_t>;
+
+    typename T::ActionGoal_t;
+    requires std::same_as<typename T::ActionGoal_t, typename T::ActionType_t::Goal>;
+
+    typename T::ActionResult_t;
+    requires std::same_as<typename T::ActionResult_t, typename T::ActionType_t::Result>;
+
+    typename T::ActionFeedback_t;
+    requires std::same_as<typename T::ActionFeedback_t, typename T::ActionType_t::Feedback>;
+
+    typename T::TimeUnit_t;
+    requires TimeDurationConcept<typename T::TimeUnit_t>;
+
+    typename T::RetryPolicy_t;
+    requires RetryPolicyConcept<typename T::RetryPolicy_t>;
+    std::same_as<typename T::RetryPolicy_t::DurationType_t, typename T::TimeUnit_t>;
+
+    typename T::DeliverySourceData_t;
+    requires DeliverySourceDataConcept<typename T::DeliverySourceData_t>;
+
+    typename T::SourceDataPublishMessageType_t;
+    requires std::same_as<typename T::SourceDataPublishMessageType_t, typename T::DeliverySourceData_t::PublishMessageType_t>;
+
+    typename T::DeliveryTargetData_t;
+    requires DeliveryTargetDataConcept<typename T::DeliveryTargetData_t>;
+    requires std::same_as<typename T::DeliveryTargetData_t::ActionType_t, typename T::ActionType_t>;
+    requires std::same_as<typename T::DeliveryTargetData_t::Goal_t, typename T::ActionGoal_t>;
+
+    typename T::DeliveryStamp_t;
+    requires DeliveryStampConcept<typename T::DeliveryStamp_t>;
+
+    typename T::DeliveryRequest_t;
+    requires DeliveryRequestConcept<typename T::DeliveryRequest_t>;
+    requires std::same_as<typename T::DeliveryRequest_t::SourceDataType_t, typename T::DeliverySourceData_t>;
+    requires std::same_as<typename T::DeliveryRequest_t::RetryPolicyType_t, typename T::RetryPolicy_t>;
+    requires std::same_as<typename T::DeliveryRequest_t::StampType_t, typename T::DeliveryStamp_t>;
+
+    typename T::DeliveryTask_t;
+    requires DeliveryTaskConcept<typename T::DeliveryTask_t>;
+    requires std::same_as<typename T::DeliveryTask_t::RequestType_t, typename T::DeliveryRequest_t>;
+    requires std::same_as<typename T::DeliveryTask_t::TargetDataType_t, typename T::DeliveryTargetData_t>;
+    requires std::same_as<typename T::DeliveryTask_t::RetryPolicyType_t, typename T::RetryPolicy_t>;
+
+    typename T::DeliveryPolicy_t;
+    requires DeliveryPolicyConcept<typename T::DeliveryPolicy_t>;
+    requires std::same_as<typename T::DeliveryPolicy_t::RetryPolicyType_t, typename T::RetryPolicy_t>;
+
+    typename T::DownstreamSpec_t;
+    requires DownstreamSpecConcept<typename T::DownstreamSpec_t>;
+    requires std::same_as<typename T::DownstreamSpec_t::ActionType_t, typename T::ActionType_t>;
+    requires std::same_as<typename T::DownstreamSpec_t::DeliveryPolicyType_t, typename T::DeliveryPolicy_t>;
+
+    // for debug publishing in downstream nodes
+    typename T::DownstreamDebugPublisher_t;
+    requires RosPublisherConcept<typename T::DownstreamDebugPublisher_t>;
+    requires std::same_as<typename T::DownstreamDebugPublisher_t, typename T::DownstreamSpec_t::PublisherType_t>;
+    requires std::same_as<typename T::DownstreamDebugPublisher_t::MessageType_t, typename T::SourceDataPublishMessageType_t>;
+
+    typename T::InitConfig_t;
+    requires InitConfigConcept<typename T::InitConfig_t>;
+    requires std::same_as<typename T::InitConfig_t::DownstreamSpecType_t, typename T::DownstreamSpec_t>;
+
+    typename T::Downstream_t;
+    requires DownstreamConcept<typename T::Downstream_t>;
+    requires std::same_as<typename T::Downstream_t::DownstreamSpecType_t, typename T::DownstreamSpec_t>;
 };
 
 

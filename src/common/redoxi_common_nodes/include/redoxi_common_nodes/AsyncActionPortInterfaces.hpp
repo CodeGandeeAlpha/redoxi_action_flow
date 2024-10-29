@@ -5,36 +5,18 @@
 #include <vector>
 #include <concepts>
 #include <utility>
+#include <type_traits>
+#include <chrono>
 
 #include "redoxi_common_nodes/redoxi_common_nodes.hpp"
 #include <redoxi_common_cpp/interfaces/IDeliveryRetryPolicy.hpp>
 #include <rclcpp_action/client.hpp>
 #include <rclcpp/node.hpp>
-#include <opencv2/opencv.hpp>
-#include <redoxi_public_msgs/action/process_frame.hpp>
 #include <boost/uuid/uuid.hpp>
+#include <redoxi_public_msgs/action/process_frame.hpp>
 
 namespace redoxi_works
 {
-
-//! Concept to check if a type is ROS action definition
-template <typename T>
-concept RosActionConcept = requires
-{
-    //! Check Goal type exists and is accessible
-    typename T::Goal;
-    //! Check Result type exists and is accessible
-    typename T::Result;
-    //! Check Feedback type exists and is accessible
-    typename T::Feedback;
-
-    //! Check Impl struct exists and has required service/message types
-    typename T::Impl::SendGoalService;
-    typename T::Impl::GetResultService;
-    typename T::Impl::FeedbackMessage;
-    typename T::Impl::CancelGoalService;
-    typename T::Impl::GoalStatusMessage;
-};
 
 //! Concept to check if a type is ROS message
 template <typename T>
@@ -44,13 +26,59 @@ concept RosMessageConcept = requires(T t)
     requires std::is_copy_assignable_v<T>;
 };
 
+//! Concept to check if a type is ROS action definition
+template <typename T>
+concept RosActionConcept = requires
+{
+    //! Check Goal type exists and is accessible
+    typename T::Goal;
+    requires RosMessageConcept<typename T::Goal>;
+
+    //! Check Result type exists and is accessible
+    typename T::Result;
+    requires RosMessageConcept<typename T::Result>;
+
+    //! Check Feedback type exists and is accessible
+    typename T::Feedback;
+    requires RosMessageConcept<typename T::Feedback>;
+
+    //! Check Impl struct exists and has required service/message types
+    typename T::Impl::SendGoalService;
+    typename T::Impl::GetResultService;
+    typename T::Impl::FeedbackMessage;
+    typename T::Impl::CancelGoalService;
+    typename T::Impl::GoalStatusMessage;
+};
+
+//! Publisher concept
+template <typename T>
+concept RosPublisherConcept = requires(T pub)
+{
+    typename T::MessageType_t;
+    requires RosMessageConcept<typename T::MessageType_t>;
+    {
+        pub.publish(std::declval<const typename T::MessageType_t &>())
+        } -> std::same_as<int>;
+};
+
+//! Concept to check if a type is std::chrono::duration
+template <typename T>
+concept TimeDurationConcept = requires
+{
+    requires std::is_same_v<T, std::chrono::duration<typename T::rep, typename T::period>>;
+};
+
+
 //! Interface for retry policy, if anything needs to retry, its configuration should be here
 //! Concept for retry policy interface
 template <typename T>
 concept RetryPolicyConcept = requires(T t,
                                       std::optional<int64_t> retry_count,
-                                      std::optional<DefaultTimeUnit_t> wait_time)
+                                      std::optional<typename T::DurationType_t> wait_time)
 {
+    typename T::DurationType_t;
+    requires TimeDurationConcept<typename T::DurationType_t>;
+
     //! Must have methods to get/set number of retries
     {
         std::declval<const T &>().get_number_of_retry()
@@ -65,24 +93,24 @@ concept RetryPolicyConcept = requires(T t,
     //! Must have methods to get/set wait time between retries
     {
         std::declval<const T &>().get_wait_time_between_retry()
-        } -> std::same_as<std::optional<DefaultTimeUnit_t>>;
+        } -> std::same_as<std::optional<typename T::DurationType_t>>;
     {
         t.set_wait_time_between_retry(wait_time)
         } -> std::same_as<void>;
     {
         std::declval<const T &>().get_fallback_wait_time_between_retry()
-        } -> std::same_as<DefaultTimeUnit_t>;
+        } -> std::same_as<typename T::DurationType_t>;
 
     //! Must have methods to get/set wait time for retry response
     {
         std::declval<const T &>().get_wait_time_retry_response()
-        } -> std::same_as<std::optional<DefaultTimeUnit_t>>;
+        } -> std::same_as<std::optional<typename T::DurationType_t>>;
     {
         t.set_wait_time_retry_response(wait_time)
         } -> std::same_as<void>;
     {
         std::declval<const T &>().get_fallback_wait_time_retry_response()
-        } -> std::same_as<DefaultTimeUnit_t>;
+        } -> std::same_as<typename T::DurationType_t>;
 };
 
 // //! Concept for retry policy, requires to be derived from IRetryPolicy
@@ -111,14 +139,23 @@ enum class DropStrategy {
 
 namespace AsyncActionPortTypes
 {
-//! The type of the goal for the downstream action
-using DownstreamGoalType = redoxi_public_msgs::action::ProcessFrame;
-using PublishDataType = sensor_msgs::msg::Image;
 
 //! data to be sent to the downstream action, in its original format
 //! for example, a cv::Mat image
 template <typename T>
-concept DeliverySourceDataConcept = std::copyable<T>;
+concept DeliverySourceDataConcept = requires(T t)
+{
+    requires std::copyable<T>;
+
+    //! The source data can be converted to this type for publishing
+    typename T::PublishMessageType_t;
+    requires RosMessageConcept<typename T::PublishMessageType_t>;
+
+    //! Must have method to get ROS message
+    {
+        std::declval<const T &>().to_publish_message(std::declval<typename T::PublishMessageType_t &>())
+        } -> std::same_as<int>;
+};
 
 //! data to be sent to the downstream action, in a format that the downstream action can use
 //! for example, a ROS message
@@ -126,16 +163,19 @@ template <typename T>
 concept DeliveryTargetDataConcept = requires(T t)
 {
     //! Must have ROS message type
-    typename T::RosMessageType_t;
-    requires RosMessageConcept<typename T::RosMessageType_t>;
+    typename T::ActionType_t;
+    requires RosActionConcept<typename T::ActionType_t>;
+
+    typename T::Goal_t;
+    requires std::same_as<typename T::Goal_t, typename T::ActionType_t::Goal>;
 
     //! Must be copyable
     requires std::copyable<T>;
 
     //! Must have method to get ROS message
     {
-        std::declval<const T &>().get_ros_message()
-        } -> std::same_as<const typename T::RosMessageType_t *>;
+        std::declval<const T &>().get_goal()
+        } -> std::same_as<const typename T::Goal_t *>;
 
     //! Must have method to determine if this is a ping signal
     {
@@ -272,15 +312,18 @@ concept DownstreamSpecConcept = requires(T t)
     typename T::ActionType_t;
     //! Must have delivery policy type
     typename T::DeliveryPolicy_t;
-    //! Must have publish data type
-    typename T::PublishDataType_t;
+    //! Must have publisher type
+    typename T::PublisherType_t;
+    //! Must have publish message type
+    typename T::PublishMessageType_t;
+    requires std::same_as<typename T::PublishMessageType_t, typename T::PublisherType_t::MessageType_t>;
 
     //! Delivery policy type must satisfy DeliveryPolicyConcept
     requires DeliveryPolicyConcept<typename T::DeliveryPolicy_t>;
     //! Action type must satisfy RosActionConcept
     requires RosActionConcept<typename T::ActionType_t>;
-    //! Publish data type must satisfy RosMessageConcept
-    requires RosMessageConcept<typename T::PublishDataType_t>;
+    //! Publisher type must satisfy RosPublisherConcept
+    requires RosPublisherConcept<typename T::PublisherType_t>;
 
     //! Must have method to get action name
     {
@@ -360,8 +403,11 @@ concept DownstreamConcept = requires(T t)
     typename T::SendGoalOptions_t;
     requires std::same_as<typename T::SendGoalOptions_t, typename T::ActionClient_t::SendGoalOptions>;
 
-    typename T::PublishDataType_t;
-    requires std::same_as<typename T::PublishDataType_t, typename T::DownstreamSpec_t::PublishDataType_t>;
+    typename T::PublisherType_t;
+    requires std::same_as<typename T::PublisherType_t, typename T::DownstreamSpec_t::PublisherType_t>;
+
+    typename T::PublishMessageType_t;
+    requires std::same_as<typename T::PublishMessageType_t, typename T::DownstreamSpec_t::PublishMessageType_t>;
 
     //! Must have method to get downstream spec
     {
@@ -379,30 +425,20 @@ concept DownstreamConcept = requires(T t)
 
     //! Must have debug publish methods
     {
-        std::declval<T &>().debug_publish_to_sending_topic(std::declval<const typename T::PublishDataType_t &>())
+        std::declval<T &>().debug_publish_to_sending_topic(std::declval<const typename T::PublishMessageType_t &>())
         } -> std::same_as<int>;
 
     {
-        std::declval<T &>().debug_publish_to_succeeded_topic(std::declval<const typename T::PublishDataType_t &>())
+        std::declval<T &>().debug_publish_to_succeeded_topic(std::declval<const typename T::PublishMessageType_t &>())
         } -> std::same_as<int>;
 
     {
-        std::declval<T &>().debug_publish_to_failed_topic(std::declval<const typename T::PublishDataType_t &>())
+        std::declval<T &>().debug_publish_to_failed_topic(std::declval<const typename T::PublishMessageType_t &>())
         } -> std::same_as<int>;
 
     //! Must have initialization method
     {
         std::declval<T &>().init_by_spec(std::declval<std::shared_ptr<typename T::DownstreamSpec_t>>(), std::declval<rclcpp::Node *>())
-        } -> std::same_as<int>;
-};
-
-//! Concept for ROS publisher types
-template <typename T>
-concept RosPublisherConcept = requires(T publisher, const RosMessageConcept auto &msg)
-{
-    //! Must have publish method that takes a ROS message and returns int
-    {
-        publisher.publish(msg)
         } -> std::same_as<int>;
 };
 
