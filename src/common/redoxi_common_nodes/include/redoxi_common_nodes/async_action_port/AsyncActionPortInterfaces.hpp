@@ -155,6 +155,11 @@ concept DeliverySourceDataConcept = requires(T t)
     {
         std::declval<const T &>().to_publish_message(std::declval<typename T::PublishMessageType_t &>())
         } -> std::same_as<int>;
+
+    //! Must have method to get UUID
+    {
+        std::declval<const T &>().get_uuid()
+        } -> std::same_as<boost::uuids::uuid>;
 };
 
 //! data to be sent to the downstream action, in a format that the downstream action can use
