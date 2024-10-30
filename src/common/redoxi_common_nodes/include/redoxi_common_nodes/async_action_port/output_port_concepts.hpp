@@ -7,6 +7,7 @@
 #include <utility>
 #include <type_traits>
 #include <chrono>
+#include <array>
 
 #include "redoxi_common_nodes/redoxi_common_nodes.hpp"
 #include <redoxi_common_cpp/interfaces/IDeliveryRetryPolicy.hpp>
@@ -23,6 +24,11 @@ concept RosMessageConcept = requires(T t)
 {
     requires std::copyable<T>;
     requires std::is_copy_assignable_v<T>;
+
+    //! Default constructor for RosMessageConcept
+    {
+        T()
+        } -> std::same_as<T>;
 };
 
 //! Concept to check if a type is ROS action definition
@@ -53,10 +59,17 @@ concept RosActionConcept = requires
 template <typename T>
 concept RosPublisherConcept = requires(T pub)
 {
+    //! Publish a message, without additional text
     typename T::MessageType_t;
     requires RosMessageConcept<typename T::MessageType_t>;
     {
         pub.publish(std::declval<const typename T::MessageType_t &>())
+        } -> std::same_as<int>;
+
+    //! Publish a message with additional text
+    {
+        pub.publish(std::declval<const typename T::MessageType_t &>(),
+                    std::declval<const std::string &>())
         } -> std::same_as<int>;
 };
 
@@ -136,7 +149,7 @@ enum class DropStrategy {
     DropAsNeeded = 1,
 };
 
-namespace AsyncActionPortTypes
+namespace output_port_types
 {
 
 //! data to be sent to the downstream action, in its original format
@@ -176,6 +189,9 @@ concept DeliveryTargetDataConcept = requires(T t)
     //! Must be copyable
     requires std::copyable<T>;
 
+    //! Must be constructible with no parameters
+    requires std::is_default_constructible_v<T>;
+
     //! Must have method to get ROS message
     {
         std::declval<const T &>().get_goal()
@@ -185,6 +201,16 @@ concept DeliveryTargetDataConcept = requires(T t)
     {
         std::declval<const T &>().is_ping()
         } -> std::same_as<bool>;
+
+    //! Must have method to copy data to another target data object
+    {
+        std::declval<const T &>().copy_to(std::declval<T &>())
+        } -> std::same_as<void>;
+
+    //! Must have method to create a clone of this object
+    {
+        std::declval<const T &>().clone()
+        } -> std::same_as<std::shared_ptr<T>>;
 };
 //! data collected during the delivery process
 template <typename T>
@@ -437,26 +463,26 @@ concept DownstreamConcept = requires(T t)
         std::declval<T &>().set_action_client(std::declval<typename T::ActionClient_t::SharedPtr>())
         } -> std::same_as<void>;
 
-    //! Must have debug publish methods
-    {
-        std::declval<T &>().debug_publish_to_sending_topic(std::declval<const typename T::PublishMessageType_t &>())
-        } -> std::same_as<int>;
-
-    {
-        std::declval<T &>().debug_publish_to_succeeded_topic(std::declval<const typename T::PublishMessageType_t &>())
-        } -> std::same_as<int>;
-
-    {
-        std::declval<T &>().debug_publish_to_failed_topic(std::declval<const typename T::PublishMessageType_t &>())
-        } -> std::same_as<int>;
-
     //! Must have initialization method
     {
         std::declval<T &>().init_by_spec(std::declval<std::shared_ptr<typename T::DownstreamSpec_t>>(), std::declval<rclcpp::Node *>())
         } -> std::same_as<int>;
+
+    //! Get publisher for debug
+    {
+        std::declval<const T &>().get_debug_publisher_sending()
+        } -> std::same_as<std::shared_ptr<typename T::PublisherType_t>>;
+
+    {
+        std::declval<const T &>().get_debug_publisher_succeeded()
+        } -> std::same_as<std::shared_ptr<typename T::PublisherType_t>>;
+
+    {
+        std::declval<const T &>().get_debug_publisher_failed()
+        } -> std::same_as<std::shared_ptr<typename T::PublisherType_t>>;
 };
 
 
-} // namespace AsyncActionPortTypes
+} // namespace output_port_types
 
 } // namespace redoxi_works

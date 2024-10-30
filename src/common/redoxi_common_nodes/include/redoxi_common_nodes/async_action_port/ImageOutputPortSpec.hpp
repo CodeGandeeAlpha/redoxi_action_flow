@@ -13,8 +13,6 @@ namespace redoxi_works
 
 namespace async_action_image_output_port
 {
-
-namespace aapt = AsyncActionPortTypes;
 using TimeUnit = DefaultTimeUnit_t;
 using DeliveryActionType = redoxi_public_msgs::action::ProcessFrame;
 
@@ -26,7 +24,7 @@ static constexpr TimeUnit FallbackWaitTimeRetryResponse = std::chrono::milliseco
 } // namespace Defaults
 
 //! Retry policy type implementing the RetryPolicyConcept
-class RetryPolicy : public aapt::DefaultRetryPolicy<TimeUnit>
+class RetryPolicy : public output_port_types::DefaultRetryPolicy<TimeUnit>
 {
     RetryPolicy()
     {
@@ -46,7 +44,7 @@ class DeliverySourceData
 
     DeliverySourceData()
     {
-        static_assert(aapt::DeliverySourceDataConcept<DeliverySourceData>, "DeliverySourceData must satisfy DeliverySourceDataConcept");
+        static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>, "DeliverySourceData must satisfy DeliverySourceDataConcept");
         m_uuid = boost::uuids::random_generator()();
     }
     virtual ~DeliverySourceData() = default;
@@ -101,19 +99,19 @@ class DeliverySourceData
 
 
 //! Delivery target data type for image output port
-using DeliveryTargetData = aapt::DefaultTargetData<DeliveryActionType>;
+using DeliveryTargetData = output_port_types::DefaultTargetData<DeliveryActionType>;
 
 //! Stamp data type for image output port (nothing to do here, right now)
-using DeliveryStampData = aapt::DefaultStampData;
+using DeliveryStampData = output_port_types::DefaultStampData;
 
 //! Request type for image output port
-using DeliveryRequest = aapt::DefaultDeliveryRequest<DeliverySourceData, RetryPolicy, DeliveryStampData>;
+using DeliveryRequest = output_port_types::DefaultDeliveryRequest<DeliverySourceData, RetryPolicy, DeliveryStampData>;
 
 //! Task type for image output port
-using DeliveryTask = aapt::DefaultDeliveryTask<DeliveryRequest, DeliveryTargetData, RetryPolicy>;
+using DeliveryTask = output_port_types::DefaultDeliveryTask<DeliveryRequest, DeliveryTargetData, RetryPolicy>;
 
 //! Delivery policy type for image output port
-using DeliveryPolicy = aapt::DefaultDeliveryPolicy<RetryPolicy>;
+using DeliveryPolicy = output_port_types::DefaultDeliveryPolicy<RetryPolicy>;
 
 //! Downstream debug publisher type for image output port
 class DownstreamDebugPublisher
@@ -121,6 +119,8 @@ class DownstreamDebugPublisher
   public:
     using MessageType_t = sensor_msgs::msg::Image;
     using Publisher_t = redoxi_works::StampedImagePub;
+    inline static const cv::Scalar DefaultHeaderColor{255, 0, 0};
+    inline static constexpr double DefaultHeaderScale = 1.0;
 
     //! Constructor for DownstreamDebugPublisher with concept assert
     DownstreamDebugPublisher()
@@ -132,14 +132,12 @@ class DownstreamDebugPublisher
 
     //! Initialize the DownstreamDebugPublisher with a shared pointer to a publisher
     virtual void init(std::shared_ptr<Publisher_t> pub,
-                      std::string header_text,
                       std::optional<cv::Scalar> header_color = std::nullopt,
                       std::optional<double> header_scale = std::nullopt)
     {
         m_pub = pub;
-        m_header_text = header_text;
-        m_header_color = header_color.value_or(m_header_color);
-        m_header_scale = header_scale.value_or(m_header_scale);
+        m_header_color = header_color.value_or(DefaultHeaderColor);
+        m_header_scale = header_scale.value_or(DefaultHeaderScale);
     }
 
     //! Set the publisher for the DownstreamDebugPublisher
@@ -157,32 +155,37 @@ class DownstreamDebugPublisher
     //! Publish an image with the DownstreamDebugPublisher
     virtual int publish(const cv::Mat &image)
     {
-        return m_pub->publish(image, m_header_text, m_header_color, m_header_scale);
+        return m_pub->publish(image);
     }
 
     virtual int publish(const MessageType_t &msg)
     {
-        return m_pub->publish(msg, m_header_text, m_header_color, m_header_scale);
+        return m_pub->publish(msg);
+    }
+
+    virtual int publish(const MessageType_t &msg,
+                        const std::string &header_text)
+    {
+        return m_pub->publish(msg, header_text, m_header_color, m_header_scale);
     }
 
   protected:
     std::shared_ptr<Publisher_t> m_pub;
-    std::string m_header_text;
-    cv::Scalar m_header_color{255, 0, 0};
-    double m_header_scale = 1.0;
+    cv::Scalar m_header_color{DefaultHeaderColor};
+    double m_header_scale = DefaultHeaderScale;
 };
 
 //! Downstream spec type for image output port
-using DownstreamSpec = aapt::DefaultDownstreamSpec<
+using DownstreamSpec = output_port_types::DefaultDownstreamSpec<
     DeliveryActionType,
     DeliveryPolicy,
     DownstreamDebugPublisher>;
 
 //! Init config type for image output port
-using InitConfig = aapt::DefaultInitConfig<DownstreamSpec>;
+using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;
 
 //! Downstream type for image output port
-using Downstream = aapt::DefaultDownstream<DownstreamSpec>;
+using Downstream = output_port_types::DefaultDownstream<DownstreamSpec>;
 
 //! Image output port spec
 //! This type must satisfy the AsyncActionOutputPortSpecConcept
@@ -190,7 +193,7 @@ using Downstream = aapt::DefaultDownstream<DownstreamSpec>;
 struct ImageOutputPortSpec {
     ImageOutputPortSpec()
     {
-        static_assert(aapt::AsyncActionOutputPortSpecConcept<ImageOutputPortSpec>,
+        static_assert(output_port_types::AsyncActionOutputPortSpecConcept<ImageOutputPortSpec>,
                       "ImageOutputPortSpec must satisfy AsyncActionOutputPortSpecConcept");
     }
     //! Action type and related types
@@ -212,10 +215,10 @@ struct ImageOutputPortSpec {
     using SourceDataPublishMessageType_t = typename DeliverySourceData_t::PublishMessageType_t;
 
     //! Target data type
-    using DeliveryTargetData_t = aapt::DefaultTargetData<ActionType_t>;
+    using DeliveryTargetData_t = output_port_types::DefaultTargetData<ActionType_t>;
 
     //! Stamp type
-    using DeliveryStamp_t = aapt::DefaultStampData;
+    using DeliveryStamp_t = output_port_types::DefaultStampData;
 
     //! Request type
     using DeliveryRequest_t = DeliveryRequest;

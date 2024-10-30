@@ -1,6 +1,6 @@
 #pragma once
 
-#include <redoxi_common_nodes/async_action_port/AsyncActionPortInterfaces.hpp>
+#include <redoxi_common_nodes/async_action_port/output_port_concepts.hpp>
 #include <optional>
 #include <json_struct/json_struct.h>
 
@@ -8,7 +8,7 @@
 namespace redoxi_works
 {
 
-namespace AsyncActionPortTypes
+namespace output_port_types
 {
 
 /*!
@@ -153,6 +153,19 @@ class DefaultTargetData
     virtual void set_ping(bool is_ping)
     {
         m_is_ping = is_ping;
+    }
+
+    //! Copy data to another target data object
+    virtual void copy_to(DefaultTargetData &other) const
+    {
+        other.m_goal = m_goal;
+        other.m_is_ping = m_is_ping;
+    }
+
+    //! Create a clone of this object
+    virtual std::shared_ptr<DefaultTargetData> clone() const
+    {
+        return std::make_shared<DefaultTargetData>(*this);
     }
 
   protected:
@@ -603,36 +616,33 @@ class DefaultDownstream
         m_action_client = client;
     }
 
-    //! Debug publish to sending topic
-    virtual int debug_publish_to_sending_topic(const PublishMessageType_t &data)
+    //! Get debug publisher for sending
+    virtual std::shared_ptr<PublisherType_t> get_debug_publisher_sending() const
     {
-        return 0; // Default implementation
+        return m_debug_publisher_sending;
     }
 
-    //! Debug publish to succeeded topic
-    virtual int debug_publish_to_succeeded_topic(const PublishMessageType_t &data)
+    //! Get debug publisher for succeeded
+    virtual std::shared_ptr<PublisherType_t> get_debug_publisher_succeeded() const
     {
-        return 0; // Default implementation
+        return m_debug_publisher_succeeded;
     }
 
-    //! Debug publish to failed topic
-    virtual int debug_publish_to_failed_topic(const PublishMessageType_t &data)
+    //! Get debug publisher for failed
+    virtual std::shared_ptr<PublisherType_t> get_debug_publisher_failed() const
     {
-        return 0; // Default implementation
+        return m_debug_publisher_failed;
     }
 
     //! Initialize downstream from spec
-    virtual int init_by_spec(std::shared_ptr<DownstreamSpec_t> spec, rclcpp::Node *node)
-    {
-        m_downstream_spec = spec;
-        m_node = node;
-
-        return 0; // Default implementation
-    }
+    virtual int init_by_spec(std::shared_ptr<DownstreamSpec_t> spec, rclcpp::Node *node) = 0;
 
   protected:
     std::shared_ptr<DownstreamSpec_t> m_downstream_spec;
     typename ActionClient_t::SharedPtr m_action_client;
+    std::shared_ptr<PublisherType_t> m_debug_publisher_sending;
+    std::shared_ptr<PublisherType_t> m_debug_publisher_succeeded;
+    std::shared_ptr<PublisherType_t> m_debug_publisher_failed;
     rclcpp::Node *m_node{nullptr};
 };
 
@@ -711,6 +721,6 @@ concept AsyncActionOutputPortSpecConcept = requires(T t)
 };
 
 
-} // namespace AsyncActionPortTypes
+} // namespace output_port_types
 
 } // namespace redoxi_works
