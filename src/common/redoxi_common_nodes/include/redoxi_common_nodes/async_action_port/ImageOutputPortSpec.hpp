@@ -1,12 +1,12 @@
 #pragma once
 
+#include <redoxi_common_nodes/redoxi_concepts.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
 #include <cv_bridge/cv_bridge.hpp>
+#include <boost/uuid/uuid_generators.hpp>
 
 namespace redoxi_works
 {
@@ -15,6 +15,7 @@ namespace async_action_image_output_port
 {
 using TimeUnit = DefaultTimeUnit_t;
 using DeliveryActionType = redoxi_public_msgs::action::ProcessFrame;
+static_assert(RedoxiActionConcept<DeliveryActionType>, "DeliveryActionType must satisfy RedoxiActionConcept");
 
 namespace Defaults
 {
@@ -101,7 +102,8 @@ class DeliverySourceData
 
 //! Delivery target data type for image output port
 using DeliveryTargetData =
-    output_port_types::DefaultTargetData<DeliveryActionType, DeliverySourceData::PublishMessageType_t>;
+    output_port_types::DefaultTargetData<DeliveryActionType, RedoxiActionDataTrait<DeliveryActionType>, DeliverySourceData::PublishMessageType_t>;
+static_assert(output_port_types::DeliveryTargetDataConcept<DeliveryTargetData>, "DeliveryTargetData must satisfy DeliveryTargetDataConcept");
 
 //! Stamp data type for image output port (nothing to do here, right now)
 using DeliveryStampData = output_port_types::DefaultStampData;
@@ -110,6 +112,8 @@ using DeliveryStampData = output_port_types::DefaultStampData;
 using DeliveryRequest = output_port_types::DefaultDeliveryRequest<DeliverySourceData, RetryPolicy, DeliveryStampData>;
 
 //! Task type for image output port
+static_assert(output_port_types::DeliveryRequestConcept<DeliveryRequest>, "DeliveryRequest must satisfy DeliveryRequestConcept");
+
 using DeliveryTask = output_port_types::DefaultDeliveryTask<DeliveryRequest, DeliveryTargetData, RetryPolicy>;
 
 //! Delivery policy type for image output port
@@ -209,6 +213,9 @@ struct ImageOutputPortSpec {
     using ActionGoal_t = typename ActionType_t::Goal;
     using ActionResult_t = typename ActionType_t::Result;
     using ActionFeedback_t = typename ActionType_t::Feedback;
+
+    // the action type trait
+    using ActionDataTrait_t = RedoxiActionDataTrait<ActionType_t>;
 
     //! Time unit type
     using TimeUnit_t = TimeUnit;

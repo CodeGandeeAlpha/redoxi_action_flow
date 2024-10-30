@@ -130,6 +130,7 @@ class DefaultRetryPolicy
 
 
 template <RosActionConcept ActionType,
+          ActionDataTraitConcept ActionDataTrait,
           RosMessageConcept PublishMessageType>
 class DefaultTargetData
 {
@@ -138,13 +139,18 @@ class DefaultTargetData
     using ActionType_t = ActionType;
     using Goal_t = typename ActionType_t::Goal;
     using PublishMessageType_t = PublishMessageType;
+    using ActionDataTrait_t = ActionDataTrait;
 
     DefaultTargetData()
     {
         static_assert(DeliveryTargetDataConcept<DefaultTargetData>, "DefaultTargetData must satisfy DeliveryTargetDataConcept");
     }
+
     virtual ~DefaultTargetData() = default;
-    DefaultTargetData(const DefaultTargetData &) = default;
+    DefaultTargetData(const Goal_t &goal)
+    {
+        m_goal = goal;
+    }
 
     virtual DefaultTargetData &operator=(const DefaultTargetData &) = default;
 
@@ -809,6 +815,10 @@ concept AsyncActionOutputPortSpecConcept = requires(T t)
 
     typename T::ActionFeedback_t;
     requires std::same_as<typename T::ActionFeedback_t, typename T::ActionType_t::Feedback>;
+
+    typename T::ActionDataTrait_t;
+    requires ActionDataTraitConcept<typename T::ActionDataTrait_t>;
+    requires std::same_as<typename T::ActionDataTrait_t::ActionType_t, typename T::ActionType_t>;
 
     //! Time unit type
     typename T::TimeUnit_t;

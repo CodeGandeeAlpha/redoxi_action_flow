@@ -510,7 +510,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
             } else {
                 bool wait_indefinitely = timeout_each_attempt < DefaultTimeUnit_t::zero();
 
-                if (result.response_code) {
+                if (result.response_code.has_value()) {
                     // it has a response code, check it
                     switch (*result.response_code) {
                         case ActionDownstreamResponse::ACCEPTED:
