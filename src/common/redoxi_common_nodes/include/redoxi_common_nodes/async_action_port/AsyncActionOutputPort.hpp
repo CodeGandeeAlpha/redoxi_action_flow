@@ -345,6 +345,10 @@ class AsyncActionOutputPort : public IStartStopProtocol
                                                             int64_t ith_attempt,
                                                             int64_t max_attempts)
     {
+        if (!get_publish_to_debug_topic()) {
+            return 0;
+        }
+
         if (source_data != nullptr) {
             auto pub = ds->get_debug_pub_source_data_failed();
             if (pub != nullptr) {
@@ -381,6 +385,10 @@ class AsyncActionOutputPort : public IStartStopProtocol
                                                      int64_t ith_attempt,
                                                      int64_t max_attempts)
     {
+        if (!get_publish_to_debug_topic()) {
+            return 0;
+        }
+
         if (source_data != nullptr) {
             auto pub = ds->get_debug_pub_source_data_sending();
             if (pub != nullptr) {
@@ -417,6 +425,10 @@ class AsyncActionOutputPort : public IStartStopProtocol
                                                   int64_t ith_attempt,
                                                   int64_t max_attempts)
     {
+        if (!get_publish_to_debug_topic()) {
+            return 0;
+        }
+
         if (source_data != nullptr) {
             auto pub = ds->get_debug_pub_source_data_succeeded();
             if (pub != nullptr) {
