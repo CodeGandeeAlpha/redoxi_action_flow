@@ -99,7 +99,8 @@ class DeliverySourceData
 
 
 //! Delivery target data type for image output port
-using DeliveryTargetData = output_port_types::DefaultTargetData<DeliveryActionType>;
+using DeliveryTargetData =
+    output_port_types::DefaultTargetData<DeliveryActionType, DeliverySourceData::PublishMessageType_t>;
 
 //! Stamp data type for image output port (nothing to do here, right now)
 using DeliveryStampData = output_port_types::DefaultStampData;
@@ -179,13 +180,19 @@ class DownstreamDebugPublisher
 using DownstreamSpec = output_port_types::DefaultDownstreamSpec<
     DeliveryActionType,
     DeliveryPolicy,
+    DownstreamDebugPublisher,
     DownstreamDebugPublisher>;
+static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
+              "DownstreamSpec must satisfy DefaultDownstreamSpecConcept");
 
 //! Init config type for image output port
 using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;
 
 //! Downstream type for image output port
 using Downstream = output_port_types::DefaultDownstream<DownstreamSpec>;
+
+static_assert(output_port_types::DownstreamConcept<Downstream>,
+              "DownstreamSpec must satisfy DefaultDownstreamSpecConcept");
 
 //! Image output port spec
 //! This type must satisfy the AsyncActionOutputPortSpecConcept
@@ -212,10 +219,19 @@ struct ImageOutputPortSpec {
     using DeliverySourceData_t = DeliverySourceData;
 
     //! Source data publish message type
-    using SourceDataPublishMessageType_t = typename DeliverySourceData_t::PublishMessageType_t;
+    using SourcePublishMessageType_t = typename DeliverySourceData_t::PublishMessageType_t;
+
+    //! Source data publisher type
+    using SourcePublisherType_t = DownstreamDebugPublisher;
 
     //! Target data type
-    using DeliveryTargetData_t = output_port_types::DefaultTargetData<ActionType_t>;
+    using DeliveryTargetData_t = DeliveryTargetData;
+
+    //! Target data publish message type
+    using TargetPublishMessageType_t = typename DeliveryTargetData_t::PublishMessageType_t;
+
+    //! Target data publisher type
+    using TargetPublisherType_t = DownstreamDebugPublisher;
 
     //! Stamp type
     using DeliveryStamp_t = output_port_types::DefaultStampData;
@@ -228,9 +244,6 @@ struct ImageOutputPortSpec {
 
     //! Delivery policy type
     using DeliveryPolicy_t = DeliveryPolicy;
-
-    //! Publisher type for debug publishing
-    using DownstreamDebugPublisher_t = DownstreamDebugPublisher;
 
     //! Downstream spec type
     using DownstreamSpec_t = DownstreamSpec;

@@ -37,8 +37,11 @@ class DefaultRetryPolicy
     virtual ~DefaultRetryPolicy() = default;
 
     //! Get the current number of retry
-    virtual std::optional<int64_t> get_number_of_retry() const
+    virtual std::optional<int64_t> get_number_of_retry(bool use_fallback_if_not_set = false) const
     {
+        if (use_fallback_if_not_set && !m_number_of_retry.has_value()) {
+            return m_fallback_number_of_retry;
+        }
         return m_number_of_retry;
     }
 
@@ -55,8 +58,11 @@ class DefaultRetryPolicy
     }
 
     //! Get the current wait time between retries
-    virtual std::optional<DurationType_t> get_wait_time_between_retry() const
+    virtual std::optional<DurationType_t> get_wait_time_between_retry(bool use_fallback_if_not_set = false) const
     {
+        if (use_fallback_if_not_set && !m_wait_time_between_retry.has_value()) {
+            return m_fallback_wait_time_between_retry;
+        }
         return m_wait_time_between_retry;
     }
 
@@ -73,8 +79,11 @@ class DefaultRetryPolicy
     }
 
     //! Get the current wait time for retry response
-    virtual std::optional<DurationType_t> get_wait_time_retry_response() const
+    virtual std::optional<DurationType_t> get_wait_time_retry_response(bool use_fallback_if_not_set = false) const
     {
+        if (use_fallback_if_not_set && !m_wait_time_retry_response.has_value()) {
+            return m_fallback_wait_time_retry_response;
+        }
         return m_wait_time_retry_response;
     }
 
@@ -114,13 +123,15 @@ class DefaultRetryPolicy
 };
 
 
-template <RosActionConcept T>
+template <RosActionConcept ActionType,
+          RosMessageConcept PublishMessageType>
 class DefaultTargetData
 {
   public:
     //! The ROS message type that this target data wraps
-    using ActionType_t = T;
+    using ActionType_t = ActionType;
     using Goal_t = typename ActionType_t::Goal;
+    using PublishMessageType_t = PublishMessageType;
 
     DefaultTargetData()
     {
@@ -168,8 +179,27 @@ class DefaultTargetData
         return std::make_shared<DefaultTargetData>(*this);
     }
 
+    //! Get the source data UUID
+    virtual boost::uuids::uuid get_source_data_uuid() const
+    {
+        return m_source_data_uuid;
+    }
+
+    //! Set the source data UUID
+    virtual void set_source_data_uuid(boost::uuids::uuid uuid)
+    {
+        m_source_data_uuid = uuid;
+    }
+
+    //! Convert to publish message
+    virtual int to_publish_message(PublishMessageType_t &msg) const
+    {
+        return 0;
+    }
+
   protected:
     std::optional<Goal_t> m_goal;
+    boost::uuids::uuid m_source_data_uuid;
     bool m_is_ping{false};
 };
 
@@ -363,12 +393,25 @@ class DefaultDeliveryTask
         m_drop_strategy = strategy;
     }
 
+    //! Get the delivery result code
+    virtual DeliveryResultCode get_delivery_result_code() const
+    {
+        return m_delivery_result_code;
+    }
+
+    //! Set the delivery result code
+    virtual void set_delivery_result_code(DeliveryResultCode result_code)
+    {
+        m_delivery_result_code = result_code;
+    }
+
   protected:
     std::shared_ptr<RequestType_t> m_request;
     std::shared_ptr<TargetDataType_t> m_target_data;
     std::shared_ptr<RetryPolicyType_t> m_retry_policy;
     DeliveryPrecondition m_precondition{DeliveryPrecondition::NoPrecondition};
     DropStrategy m_drop_strategy{DropStrategy::NoDrop};
+    DeliveryResultCode m_delivery_result_code{DeliveryResultCode::NotTried};
 };
 
 //! Default implementation of delivery policy
@@ -411,14 +454,17 @@ class DefaultDeliveryPolicy
 //! Default implementation of downstream specification
 template <RosActionConcept ActionType,
           DeliveryPolicyConcept DeliveryPolicyType,
-          RosPublisherConcept PublisherType>
+          RosPublisherConcept SourceDataPublisherType,
+          RosPublisherConcept TargetDataPublisherType>
 class DefaultDownstreamSpec
 {
   public:
     using ActionType_t = ActionType;
     using DeliveryPolicy_t = DeliveryPolicyType;
-    using PublisherType_t = PublisherType;
-    using PublishMessageType_t = typename PublisherType_t::MessageType_t;
+    using SourcePublisherType_t = SourceDataPublisherType;
+    using TargetPublisherType_t = TargetDataPublisherType;
+    using SourcePublishMessageType_t = typename SourcePublisherType_t::MessageType_t;
+    using TargetPublishMessageType_t = typename TargetPublisherType_t::MessageType_t;
 
     virtual ~DefaultDownstreamSpec() = default;
 
@@ -432,9 +478,12 @@ class DefaultDownstreamSpec
     {
         m_name = name;
         m_action_name = action_name;
-        m_debug_topic_sending = "debug/" + name + "/sending";
-        m_debug_topic_succeeded = "debug/" + name + "/succeeded";
-        m_debug_topic_failed = "debug/" + name + "/failed";
+        m_debug_topic_source_data_sending = "debug/" + name + "/source_data/sending";
+        m_debug_topic_source_data_succeeded = "debug/" + name + "/source_data/succeeded";
+        m_debug_topic_source_data_failed = "debug/" + name + "/source_data/failed";
+        m_debug_topic_target_data_sending = "debug/" + name + "/target_data/sending";
+        m_debug_topic_target_data_succeeded = "debug/" + name + "/target_data/succeeded";
+        m_debug_topic_target_data_failed = "debug/" + name + "/target_data/failed";
     }
 
     //! Get the name
@@ -480,22 +529,40 @@ class DefaultDownstreamSpec
         return m_use_debug_publish;
     }
 
-    //! Get the debug topic for sending
-    virtual const std::string *get_debug_topic_sending() const
+    //! Get the debug topic for source data sending
+    virtual std::optional<std::string> get_debug_topic_source_data_sending() const
     {
-        return m_use_debug_publish ? &m_debug_topic_sending : nullptr;
+        return m_debug_topic_source_data_sending;
     }
 
-    //! Get the debug topic for succeeded
-    virtual const std::string *get_debug_topic_succeeded() const
+    //! Get the debug topic for source data succeeded
+    virtual std::optional<std::string> get_debug_topic_source_data_succeeded() const
     {
-        return m_use_debug_publish ? &m_debug_topic_succeeded : nullptr;
+        return m_debug_topic_source_data_succeeded;
     }
 
-    //! Get the debug topic for failed
-    virtual const std::string *get_debug_topic_failed() const
+    //! Get the debug topic for source data failed
+    virtual std::optional<std::string> get_debug_topic_source_data_failed() const
     {
-        return m_use_debug_publish ? &m_debug_topic_failed : nullptr;
+        return m_debug_topic_source_data_failed;
+    }
+
+    //! Get the debug topic for target data sending
+    virtual std::optional<std::string> get_debug_topic_target_data_sending() const
+    {
+        return m_debug_topic_target_data_sending;
+    }
+
+    //! Get the debug topic for target data succeeded
+    virtual std::optional<std::string> get_debug_topic_target_data_succeeded() const
+    {
+        return m_debug_topic_target_data_succeeded;
+    }
+
+    //! Get the debug topic for target data failed
+    virtual std::optional<std::string> get_debug_topic_target_data_failed() const
+    {
+        return m_debug_topic_target_data_failed;
     }
 
   protected:
@@ -511,18 +578,26 @@ class DefaultDownstreamSpec
     //! Whether to use debug publish
     bool m_use_debug_publish{false};
 
-    //! The debug topic for sending
-    std::string m_debug_topic_sending;
-    std::string m_debug_topic_succeeded;
-    std::string m_debug_topic_failed;
+    //! Debug topics for publishing source data events
+    std::optional<std::string> m_debug_topic_source_data_sending;
+    std::optional<std::string> m_debug_topic_source_data_succeeded;
+    std::optional<std::string> m_debug_topic_source_data_failed;
+
+    //! Debug topics for publishing target data events
+    std::optional<std::string> m_debug_topic_target_data_sending;
+    std::optional<std::string> m_debug_topic_target_data_succeeded;
+    std::optional<std::string> m_debug_topic_target_data_failed;
 
   public:
     JS_OBJECT(JS_MEMBER_WITH_NAME(m_name, "name"),
               JS_MEMBER_WITH_NAME(m_action_name, "action_name"),
               JS_MEMBER_WITH_NAME(m_use_debug_publish, "use_debug_publish"),
-              JS_MEMBER_WITH_NAME(m_debug_topic_sending, "debug_topic_sending"),
-              JS_MEMBER_WITH_NAME(m_debug_topic_succeeded, "debug_topic_succeeded"),
-              JS_MEMBER_WITH_NAME(m_debug_topic_failed, "debug_topic_failed"));
+              JS_MEMBER_WITH_NAME(m_debug_topic_source_data_sending, "debug_topic_source_data_sending"),
+              JS_MEMBER_WITH_NAME(m_debug_topic_source_data_succeeded, "debug_topic_source_data_succeeded"),
+              JS_MEMBER_WITH_NAME(m_debug_topic_source_data_failed, "debug_topic_source_data_failed"),
+              JS_MEMBER_WITH_NAME(m_debug_topic_target_data_sending, "debug_topic_target_data_sending"),
+              JS_MEMBER_WITH_NAME(m_debug_topic_target_data_succeeded, "debug_topic_target_data_succeeded"),
+              JS_MEMBER_WITH_NAME(m_debug_topic_target_data_failed, "debug_topic_target_data_failed"));
 };
 
 //! Implementation of InitConfigConcept
@@ -587,8 +662,10 @@ class DefaultDownstream
     using ActionClient_t = rclcpp_action::Client<ActionType_t>;
     using GoalHandle_t = typename ActionClient_t::GoalHandle;
     using SendGoalOptions_t = typename ActionClient_t::SendGoalOptions;
-    using PublishMessageType_t = typename DownstreamSpec_t::PublishMessageType_t;
-    using PublisherType_t = typename DownstreamSpec_t::PublisherType_t;
+    using SourcePublishMessageType_t = typename DownstreamSpec_t::SourcePublishMessageType_t;
+    using TargetPublishMessageType_t = typename DownstreamSpec_t::TargetPublishMessageType_t;
+    using SourcePublisherType_t = typename DownstreamSpec_t::SourcePublisherType_t;
+    using TargetPublisherType_t = typename DownstreamSpec_t::TargetPublisherType_t;
 
     //! Virtual destructor
     virtual ~DefaultDownstream() = default;
@@ -616,33 +693,59 @@ class DefaultDownstream
         m_action_client = client;
     }
 
-    //! Get debug publisher for sending
-    virtual std::shared_ptr<PublisherType_t> get_debug_publisher_sending() const
+    //! Get debug publisher for source data sending
+    virtual std::shared_ptr<SourcePublisherType_t> get_debug_pub_source_data_sending() const
     {
-        return m_debug_publisher_sending;
+        return m_debug_pub_source_data_sending;
     }
 
-    //! Get debug publisher for succeeded
-    virtual std::shared_ptr<PublisherType_t> get_debug_publisher_succeeded() const
+    //! Get debug publisher for source data succeeded
+    virtual std::shared_ptr<SourcePublisherType_t> get_debug_pub_source_data_succeeded() const
     {
-        return m_debug_publisher_succeeded;
+        return m_debug_pub_source_data_succeeded;
     }
 
-    //! Get debug publisher for failed
-    virtual std::shared_ptr<PublisherType_t> get_debug_publisher_failed() const
+    //! Get debug publisher for source data failed
+    virtual std::shared_ptr<SourcePublisherType_t> get_debug_pub_source_data_failed() const
     {
-        return m_debug_publisher_failed;
+        return m_debug_pub_source_data_failed;
+    }
+
+    //! Get debug publisher for target data sending
+    virtual std::shared_ptr<TargetPublisherType_t> get_debug_pub_target_data_sending() const
+    {
+        return m_debug_pub_target_data_sending;
+    }
+
+    //! Get debug publisher for target data succeeded
+    virtual std::shared_ptr<TargetPublisherType_t> get_debug_pub_target_data_succeeded() const
+    {
+        return m_debug_pub_target_data_succeeded;
+    }
+
+    //! Get debug publisher for target data failed
+    virtual std::shared_ptr<TargetPublisherType_t> get_debug_pub_target_data_failed() const
+    {
+        return m_debug_pub_target_data_failed;
     }
 
     //! Initialize downstream from spec
-    virtual int init_by_spec(std::shared_ptr<DownstreamSpec_t> spec, rclcpp::Node *node) = 0;
+    virtual int init_by_spec(std::shared_ptr<DownstreamSpec_t> spec, rclcpp::Node *node)
+    {
+        m_downstream_spec = spec;
+        m_node = node;
+        return 0;
+    }
 
   protected:
     std::shared_ptr<DownstreamSpec_t> m_downstream_spec;
     typename ActionClient_t::SharedPtr m_action_client;
-    std::shared_ptr<PublisherType_t> m_debug_publisher_sending;
-    std::shared_ptr<PublisherType_t> m_debug_publisher_succeeded;
-    std::shared_ptr<PublisherType_t> m_debug_publisher_failed;
+    std::shared_ptr<SourcePublisherType_t> m_debug_pub_source_data_sending;
+    std::shared_ptr<SourcePublisherType_t> m_debug_pub_source_data_succeeded;
+    std::shared_ptr<SourcePublisherType_t> m_debug_pub_source_data_failed;
+    std::shared_ptr<TargetPublisherType_t> m_debug_pub_target_data_sending;
+    std::shared_ptr<TargetPublisherType_t> m_debug_pub_target_data_succeeded;
+    std::shared_ptr<TargetPublisherType_t> m_debug_pub_target_data_failed;
     rclcpp::Node *m_node{nullptr};
 };
 
@@ -651,6 +754,7 @@ class DefaultDownstream
 template <typename T>
 concept AsyncActionOutputPortSpecConcept = requires(T t)
 {
+    //! Action type and related types
     typename T::ActionType_t;
     requires RosActionConcept<typename T::ActionType_t>;
 
@@ -663,54 +767,74 @@ concept AsyncActionOutputPortSpecConcept = requires(T t)
     typename T::ActionFeedback_t;
     requires std::same_as<typename T::ActionFeedback_t, typename T::ActionType_t::Feedback>;
 
+    //! Time unit type
     typename T::TimeUnit_t;
     requires TimeDurationConcept<typename T::TimeUnit_t>;
 
+    //! Retry policy type
     typename T::RetryPolicy_t;
     requires RetryPolicyConcept<typename T::RetryPolicy_t>;
-    std::same_as<typename T::RetryPolicy_t::DurationType_t, typename T::TimeUnit_t>;
+    requires std::same_as<typename T::RetryPolicy_t::DurationType_t, typename T::TimeUnit_t>;
 
+    //! Source data type
     typename T::DeliverySourceData_t;
     requires DeliverySourceDataConcept<typename T::DeliverySourceData_t>;
 
-    typename T::SourceDataPublishMessageType_t;
-    requires std::same_as<typename T::SourceDataPublishMessageType_t, typename T::DeliverySourceData_t::PublishMessageType_t>;
+    //! Source data publish message type
+    typename T::SourcePublishMessageType_t;
+    requires std::same_as<typename T::SourcePublishMessageType_t, typename T::DeliverySourceData_t::PublishMessageType_t>;
 
+    //! Publisher types for downstream debug publishing
+    typename T::SourcePublisherType_t;
+    requires RosPublisherConcept<typename T::SourcePublisherType_t>;
+    requires std::same_as<typename T::SourcePublisherType_t::MessageType_t, typename T::SourcePublishMessageType_t>;
+
+    //! Target data type
     typename T::DeliveryTargetData_t;
     requires DeliveryTargetDataConcept<typename T::DeliveryTargetData_t>;
     requires std::same_as<typename T::DeliveryTargetData_t::ActionType_t, typename T::ActionType_t>;
     requires std::same_as<typename T::DeliveryTargetData_t::Goal_t, typename T::ActionGoal_t>;
 
+    //! Target data publish message type
+    typename T::TargetPublishMessageType_t;
+    requires std::same_as<typename T::TargetPublishMessageType_t, typename T::DeliveryTargetData_t::PublishMessageType_t>;
+
+    typename T::TargetPublisherType_t;
+    requires RosPublisherConcept<typename T::TargetPublisherType_t>;
+    requires std::same_as<typename T::TargetPublisherType_t::MessageType_t, typename T::TargetPublishMessageType_t>;
+
+    //! Stamp type
     typename T::DeliveryStamp_t;
     requires DeliveryStampConcept<typename T::DeliveryStamp_t>;
 
+    //! Request type
     typename T::DeliveryRequest_t;
     requires DeliveryRequestConcept<typename T::DeliveryRequest_t>;
     requires std::same_as<typename T::DeliveryRequest_t::SourceDataType_t, typename T::DeliverySourceData_t>;
     requires std::same_as<typename T::DeliveryRequest_t::RetryPolicyType_t, typename T::RetryPolicy_t>;
     requires std::same_as<typename T::DeliveryRequest_t::StampType_t, typename T::DeliveryStamp_t>;
 
+    //! Task type
     typename T::DeliveryTask_t;
     requires DeliveryTaskConcept<typename T::DeliveryTask_t>;
     requires std::same_as<typename T::DeliveryTask_t::RequestType_t, typename T::DeliveryRequest_t>;
     requires std::same_as<typename T::DeliveryTask_t::TargetDataType_t, typename T::DeliveryTargetData_t>;
     requires std::same_as<typename T::DeliveryTask_t::RetryPolicyType_t, typename T::RetryPolicy_t>;
 
+    //! Delivery policy type
     typename T::DeliveryPolicy_t;
     requires DeliveryPolicyConcept<typename T::DeliveryPolicy_t>;
     requires std::same_as<typename T::DeliveryPolicy_t::RetryPolicyType_t, typename T::RetryPolicy_t>;
 
+    //! Downstream spec type
     typename T::DownstreamSpec_t;
     requires DownstreamSpecConcept<typename T::DownstreamSpec_t>;
     requires std::same_as<typename T::DownstreamSpec_t::ActionType_t, typename T::ActionType_t>;
     requires std::same_as<typename T::DownstreamSpec_t::DeliveryPolicy_t, typename T::DeliveryPolicy_t>;
+    requires std::same_as<typename T::DownstreamSpec_t::SourcePublisherType_t, typename T::SourcePublisherType_t>;
+    requires std::same_as<typename T::DownstreamSpec_t::TargetPublisherType_t, typename T::TargetPublisherType_t>;
 
-    // for debug publishing in downstream nodes
-    typename T::DownstreamDebugPublisher_t;
-    requires RosPublisherConcept<typename T::DownstreamDebugPublisher_t>;
-    requires std::same_as<typename T::DownstreamDebugPublisher_t, typename T::DownstreamSpec_t::PublisherType_t>;
-    requires std::same_as<typename T::DownstreamDebugPublisher_t::MessageType_t, typename T::SourceDataPublishMessageType_t>;
-
+    //! Config types
     typename T::InitConfig_t;
     requires InitConfigConcept<typename T::InitConfig_t>;
     requires std::same_as<typename T::InitConfig_t::DownstreamSpec_t, typename T::DownstreamSpec_t>;

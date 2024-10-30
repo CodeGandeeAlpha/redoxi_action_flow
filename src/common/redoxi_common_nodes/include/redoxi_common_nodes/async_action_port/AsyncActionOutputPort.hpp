@@ -1,13 +1,15 @@
 #pragma once
 
 #include <string>
+#include <atomic>
 #include "redoxi_common_nodes/redoxi_common_nodes.hpp"
 #include <redoxi_common_cpp/async_processor/SingleBufferExecNode.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
 #include <redoxi_common_nodes/async_action_port/ImageOutputPortSpec.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
-#include <atomic>
+#include <boost/uuid/uuid_io.hpp>
+
 
 namespace redoxi_works
 {
@@ -195,7 +197,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 // copy input to output
                 auto &out_payload = std::get<0>(output);
                 const auto &in_payload = std::get<0>(input);
-                auto ret = this->_do_frame_delivery_preprocess(in_payload, out_payload);
+                auto ret = this->_do_task_delivery_preprocess(in_payload, out_payload);
                 if (ret != 0) {
                     RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Failed to preprocess frame, error code: {}", ret);
                 }
@@ -209,7 +211,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         node.set_output_callback(
             [this](const WorkOutput_t &output) -> int {
                 auto &out_payload = std::get<0>(output);
-                auto ret = this->_do_frame_delivery_main(out_payload);
+                auto ret = this->_do_task_delivery_main(out_payload);
                 if (ret != 0) {
                     RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Failed to deliver frame, error code: {}", ret);
                 }
@@ -327,29 +329,197 @@ class AsyncActionOutputPort : public IStartStopProtocol
         return 0;
     }
 
+    virtual int _create_target_data(TargetData_t &target_data, std::shared_ptr<const DeliveryRequest_t> request)
+    {
+        target_data.set_source_data_uuid(request->get_source_data()->get_uuid());
+        return 0;
+    }
+
     //! preprocess the delivery task, and transform it to the target data
-    virtual int _do_frame_delivery_preprocess(
+    virtual int _do_task_delivery_preprocess(
         const DeliveryTask_t &task_input,
         DeliveryTask_t &task_output)
     {
+        // nothing to do, just do shallow copy
+        task_output = task_input;
         return 0;
     }
 
     //! main delivery logic
-    virtual int _do_frame_delivery_main(const DeliveryTask_t &task)
+    virtual int _do_task_delivery_main(DeliveryTask_t &task)
     {
-        return 0;
+        // check if any downstream is ready to accept new frame
+        bool downstream_ready = false;
+        for (auto &ds : m_downstreams) {
+            auto delivery_policy = ds->get_downstream_spec()->get_delivery_policy();
+
+            // should we ping at all?
+            auto precondition = delivery_policy->get_precondition();
+            if (precondition == DeliveryPrecondition::NoPrecondition) {
+                // some downstream is assumed to be always ready
+                downstream_ready = true;
+            } else {
+                // check if downstream is ready
+                auto retry_policy = delivery_policy->get_retry_policy();
+                auto fallback_wait_time = retry_policy->get_fallback_wait_time_retry_response();
+                auto ping_wait_time = retry_policy->get_wait_time_retry_response().value_or(fallback_wait_time);
+                downstream_ready |= _ping(ds, ping_wait_time);
+            }
+
+            // if any downstream is ready, break
+            if (downstream_ready) {
+                break;
+            }
+        }
+
+        if (!downstream_ready) {
+            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "No downstream is ready to accept new frame");
+            return 0;
+        }
+
+        // deliver data to downstreams
+        // we define lambda function here because for later use in other cases
+        auto func_deliver_data = [this](std::shared_ptr<TargetData_t> target_data) -> int {
+            int ret = 0;
+            bool sent = false;
+            for (auto &ds : m_downstreams) {
+                auto ret = _deliver_data_with_retry(target_data, ds);
+                if (ret != 0) {
+                    RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
+                                 "Failed to deliver frame to downstream {}",
+                                 ds->get_downstream_spec()->get_name());
+                } else {
+                    sent = true;
+                }
+            }
+            if (!sent) {
+                ret = -1;
+            }
+            return ret;
+        };
+
+        // create target delivery data
+        auto target_data = std::make_shared<TargetData_t>();
+        _create_target_data(*target_data, task.get_request());
+
+        // do whatever preprocessing you need
+        if (m_cb_on_deliver_before) {
+            auto ret = m_cb_on_deliver_before(*target_data, task);
+            if (ret != 0) {
+                RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "on_deliver_before callback failed");
+            }
+        }
+
+        //! Deliver data
+        auto ret_deliver_data = func_deliver_data(target_data);
+        if (ret_deliver_data != 0) {
+            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Failed to deliver frame");
+            task.set_delivery_result_code(DeliveryResultCode::TriedButFailed);
+        } else {
+            task.set_delivery_result_code(DeliveryResultCode::Success);
+        }
+
+        // do whatever postprocessing you need
+        if (m_cb_on_deliver_after) {
+            auto ret = m_cb_on_deliver_after(*target_data, task);
+            if (ret != 0) {
+                RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "on_deliver_after callback failed");
+            }
+        }
+
+        return ret_deliver_data;
     }
 
     //! delivery data to downstream, with retry logic
-    virtual int _deliver_data_with_retry(const TargetData_t &target_data,
+    virtual int _deliver_data_with_retry(std::shared_ptr<TargetData_t> target_data,
                                          std::shared_ptr<Downstream_t> ds)
     {
-        return 0;
+        //! Set up retry strategy
+        int attempts = 0;
+
+        auto delivery_policy = ds->get_downstream_spec()->get_delivery_policy();
+        auto retry_policy = delivery_policy->get_retry_policy();
+
+        //! +1 for the first attempt
+        bool no_drop = delivery_policy->get_drop_strategy() == DropStrategy::NoDrop;
+        auto max_attempts = retry_policy->get_number_of_retry(true).value() + 1;
+        auto timeout_each_attempt = retry_policy->get_wait_time_retry_response(true).value();
+        auto interval_between_attempts = retry_policy->get_wait_time_between_retry(true).value();
+        auto msg_uuid = target_data->get_source_data_uuid();
+
+        while (attempts < max_attempts || no_drop) {
+            if (!rclcpp::ok()) {
+                return -1;
+            }
+            // for no_drop, we need to keep trying until the frame is delivered (return in the loop)
+
+            //! Publish the frame to the debug topic
+            _debug_publish_sending_to_downstream(target_data, ds, attempts + 1, max_attempts);
+
+            //! Send the frame to the downstream
+            auto result = _send_frame_to_downstream(frame_msg, ds, timeout_each_attempt);
+            if (!result.goal_handle_future.valid()) {
+                RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Not sending frame to downstream {}, goal handle future is invalid",
+                             boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+            } else {
+                bool wait_indefinitely = timeout_each_attempt < DefaultTimeUnit_t::zero();
+
+                if (result.response_code) {
+                    // it has a response code, check it
+                    switch (*result.response_code) {
+                        case ActionDownstreamResponse::ACCEPTED:
+                            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame accepted by downstream {}",
+                                         boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+
+                            //! Publish the frame sent message
+                            _debug_publish_sent_to_downstream(frame_msg, ds, attempts + 1, max_attempts);
+
+                            return 0; // Success
+                        case ActionDownstreamResponse::REJECTED:
+                            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame rejected by downstream {}",
+                                         boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+                            break;
+                        case ActionDownstreamResponse::TIMEOUT:
+                            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while sending frame to downstream {}",
+                                         boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+                            break;
+                    }
+                } else {
+                    // may or maynot have a response code, check the goal handle future
+                    if (wait_indefinitely) {
+                        //! Wait indefinitely for the goal handle future
+                        result.goal_handle_future.wait();
+                        auto goal_handle = result.goal_handle_future.get();
+                        if (goal_handle) {
+                            return 0; // Success
+                        }
+                    } else {
+                        //! Regard as failure without additional waiting
+                        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while waiting for goal handle from downstream {}",
+                                     boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+                    }
+                }
+            }
+
+            attempts++;
+            if (attempts < max_attempts) {
+                RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Retrying frame delivery to downstream {} (attempt {}/{})",
+                             boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action, attempts + 1, max_attempts);
+            }
+
+            // sleep for the interval between attempts
+            std::this_thread::sleep_for(interval_between_attempts);
+        }
+
+        _debug_publish_failed_to_send_to_downstream(frame_msg, ds, attempts, max_attempts);
+
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Failed to deliver frame to downstream {} after {} attempts",
+                     boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action, max_attempts);
+        return -1;
     }
 
     //! send a single piece of data to downstream
-    virtual int _send_data_to_downstream(const TargetData_t &target_data,
+    virtual int _send_data_to_downstream(std::shared_ptr<TargetData_t> target_data,
                                          std::shared_ptr<Downstream_t> ds,
                                          TimeUnit_t timeout)
     {
@@ -379,6 +549,18 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
     // the parent node
     rclcpp::Node *m_parent_node = nullptr;
+
+    // callback functions
+
+    //! Transform target data, (output_target_data, input_task)-> error_code
+    std::function<int(TargetData_t &output,
+                      const DeliveryTask_t &input)>
+        m_cb_on_deliver_before;
+
+    //! Clean target data, (output_target_data, input_task)-> error_code
+    std::function<int(TargetData_t &output,
+                      const DeliveryTask_t &input)>
+        m_cb_on_deliver_after;
 
   private:
     //! used tbb to process the delivery tasks

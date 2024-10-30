@@ -86,14 +86,15 @@ concept TimeDurationConcept = requires
 template <typename T>
 concept RetryPolicyConcept = requires(T t,
                                       std::optional<int64_t> retry_count,
-                                      std::optional<typename T::DurationType_t> wait_time)
+                                      std::optional<typename T::DurationType_t> wait_time,
+                                      bool use_fallback_if_not_set)
 {
     typename T::DurationType_t;
     requires TimeDurationConcept<typename T::DurationType_t>;
 
     //! Must have methods to get/set number of retries
     {
-        std::declval<const T &>().get_number_of_retry()
+        std::declval<const T &>().get_number_of_retry(use_fallback_if_not_set)
         } -> std::same_as<std::optional<int64_t>>;
     {
         t.set_number_of_retry(retry_count)
@@ -104,7 +105,7 @@ concept RetryPolicyConcept = requires(T t,
 
     //! Must have methods to get/set wait time between retries
     {
-        std::declval<const T &>().get_wait_time_between_retry()
+        std::declval<const T &>().get_wait_time_between_retry(use_fallback_if_not_set)
         } -> std::same_as<std::optional<typename T::DurationType_t>>;
     {
         t.set_wait_time_between_retry(wait_time)
@@ -115,7 +116,7 @@ concept RetryPolicyConcept = requires(T t,
 
     //! Must have methods to get/set wait time for retry response
     {
-        std::declval<const T &>().get_wait_time_retry_response()
+        std::declval<const T &>().get_wait_time_retry_response(use_fallback_if_not_set)
         } -> std::same_as<std::optional<typename T::DurationType_t>>;
     {
         t.set_wait_time_retry_response(wait_time)
@@ -124,10 +125,6 @@ concept RetryPolicyConcept = requires(T t,
         std::declval<const T &>().get_fallback_wait_time_retry_response()
         } -> std::same_as<typename T::DurationType_t>;
 };
-
-// //! Concept for retry policy, requires to be derived from IRetryPolicy
-// template <typename T>
-// concept RetryPolicyConcept = std::derived_from<T, IRetryPolicy>;
 
 
 enum class DeliveryPrecondition {
@@ -139,6 +136,12 @@ enum class DeliveryPrecondition {
 
     //! All downstreams must be ready
     AllDownstreamsReady = 2,
+};
+
+enum class DeliveryResultCode {
+    Success = 0,
+    TriedButFailed = 1, //!< Tried to do something but failed
+    NotTried = 2,       //!< Not tried to delivery because precondition is not met
 };
 
 enum class DropStrategy {
@@ -186,6 +189,10 @@ concept DeliveryTargetDataConcept = requires(T t)
     typename T::Goal_t;
     requires std::same_as<typename T::Goal_t, typename T::ActionType_t::Goal>;
 
+    //! Must have publish message type, can be used for debug publishing
+    typename T::PublishMessageType_t;
+    requires RosMessageConcept<typename T::PublishMessageType_t>;
+
     //! Must be copyable
     requires std::copyable<T>;
 
@@ -211,6 +218,19 @@ concept DeliveryTargetDataConcept = requires(T t)
     {
         std::declval<const T &>().clone()
         } -> std::same_as<std::shared_ptr<T>>;
+
+    //! Must have method to save/read source data UUID
+    {
+        std::declval<const T &>().get_source_data_uuid()
+        } -> std::same_as<boost::uuids::uuid>;
+    {
+        std::declval<T &>().set_source_data_uuid(std::declval<boost::uuids::uuid>())
+        } -> std::same_as<void>;
+
+    //! Must have method to convert to publish message
+    {
+        std::declval<const T &>().to_publish_message(std::declval<typename T::PublishMessageType_t &>())
+        } -> std::same_as<int>;
 };
 //! data collected during the delivery process
 template <typename T>
@@ -306,6 +326,15 @@ concept DeliveryTaskConcept = requires(T t)
     {
         t.set_drop_strategy(std::declval<DropStrategy>())
         } -> std::same_as<void>;
+
+    //! Get the delivery result code
+    {
+        std::declval<const T &>().get_delivery_result_code()
+        } -> std::same_as<DeliveryResultCode>;
+    //! Set the delivery result code
+    {
+        std::declval<T &>().set_delivery_result_code(std::declval<DeliveryResultCode>())
+        } -> std::same_as<void>;
 };
 
 //! Concept for delivery policy that defines how to send downstream actions
@@ -342,18 +371,26 @@ concept DownstreamSpecConcept = requires(T t)
     typename T::ActionType_t;
     //! Must have delivery policy type
     typename T::DeliveryPolicy_t;
-    //! Must have publisher type
-    typename T::PublisherType_t;
-    //! Must have publish message type
-    typename T::PublishMessageType_t;
-    requires std::same_as<typename T::PublishMessageType_t, typename T::PublisherType_t::MessageType_t>;
+
+    //! Must have publisher type for source data
+    typename T::SourcePublisherType_t;
+    //! Must have publisher type for target data
+    typename T::TargetPublisherType_t;
+    //! Must have publish message type for source data
+    typename T::SourcePublishMessageType_t;
+    //! Must have publish message type for target data
+    typename T::TargetPublishMessageType_t;
+
+    //! Message types must match publisher message types
+    requires RosPublisherConcept<typename T::SourcePublisherType_t>;
+    requires RosPublisherConcept<typename T::TargetPublisherType_t>;
+    requires std::same_as<typename T::SourcePublishMessageType_t, typename T::SourcePublisherType_t::MessageType_t>;
+    requires std::same_as<typename T::TargetPublishMessageType_t, typename T::TargetPublisherType_t::MessageType_t>;
 
     //! Delivery policy type must satisfy DeliveryPolicyConcept
     requires DeliveryPolicyConcept<typename T::DeliveryPolicy_t>;
     //! Action type must satisfy RosActionConcept
     requires RosActionConcept<typename T::ActionType_t>;
-    //! Publisher type must satisfy RosPublisherConcept
-    requires RosPublisherConcept<typename T::PublisherType_t>;
 
     //! Must have method to get its own name
     {
@@ -383,18 +420,31 @@ concept DownstreamSpecConcept = requires(T t)
         std::declval<const T &>().get_use_debug_publish()
         } -> std::same_as<bool>;
 
-    //! Must have methods to get debug topics
+    //! Must have methods to get source data debug topics
     {
-        std::declval<const T &>().get_debug_topic_sending()
-        } -> std::same_as<const std::string *>;
+        std::declval<const T &>().get_debug_topic_source_data_sending()
+        } -> std::same_as<std::optional<std::string>>;
 
     {
-        std::declval<const T &>().get_debug_topic_succeeded()
-        } -> std::same_as<const std::string *>;
+        std::declval<const T &>().get_debug_topic_source_data_succeeded()
+        } -> std::same_as<std::optional<std::string>>;
 
     {
-        std::declval<const T &>().get_debug_topic_failed()
-        } -> std::same_as<const std::string *>;
+        std::declval<const T &>().get_debug_topic_source_data_failed()
+        } -> std::same_as<std::optional<std::string>>;
+
+    //! Must have methods to get target data debug topics
+    {
+        std::declval<const T &>().get_debug_topic_target_data_sending()
+        } -> std::same_as<std::optional<std::string>>;
+
+    {
+        std::declval<const T &>().get_debug_topic_target_data_succeeded()
+        } -> std::same_as<std::optional<std::string>>;
+
+    {
+        std::declval<const T &>().get_debug_topic_target_data_failed()
+        } -> std::same_as<std::optional<std::string>>;
 };
 
 //! Concept for initialization configuration
@@ -443,11 +493,29 @@ concept DownstreamConcept = requires(T t)
     typename T::SendGoalOptions_t;
     requires std::same_as<typename T::SendGoalOptions_t, typename T::ActionClient_t::SendGoalOptions>;
 
-    typename T::PublisherType_t;
-    requires std::same_as<typename T::PublisherType_t, typename T::DownstreamSpec_t::PublisherType_t>;
+    //! Source data publisher type
+    typename T::SourcePublisherType_t;
+    requires RosPublisherConcept<typename T::SourcePublisherType_t>;
+    requires std::same_as<typename T::SourcePublisherType_t,
+                          typename T::DownstreamSpec_t::SourcePublisherType_t>;
 
-    typename T::PublishMessageType_t;
-    requires std::same_as<typename T::PublishMessageType_t, typename T::DownstreamSpec_t::PublishMessageType_t>;
+    //! Source data publish message type
+    typename T::SourcePublishMessageType_t;
+    requires RosMessageConcept<typename T::SourcePublishMessageType_t>;
+    requires std::same_as<typename T::SourcePublishMessageType_t,
+                          typename T::DownstreamSpec_t::SourcePublishMessageType_t>;
+
+    //! Target data publisher type
+    typename T::TargetPublisherType_t;
+    requires RosPublisherConcept<typename T::TargetPublisherType_t>;
+    requires std::same_as<typename T::TargetPublisherType_t,
+                          typename T::DownstreamSpec_t::TargetPublisherType_t>;
+
+    //! Target data publish message type
+    typename T::TargetPublishMessageType_t;
+    requires RosMessageConcept<typename T::TargetPublishMessageType_t>;
+    requires std::same_as<typename T::TargetPublishMessageType_t,
+                          typename T::DownstreamSpec_t::TargetPublishMessageType_t>;
 
     //! Must have method to get downstream spec
     {
@@ -468,18 +536,31 @@ concept DownstreamConcept = requires(T t)
         std::declval<T &>().init_by_spec(std::declval<std::shared_ptr<typename T::DownstreamSpec_t>>(), std::declval<rclcpp::Node *>())
         } -> std::same_as<int>;
 
-    //! Get publisher for debug
+    //! Get source data debug publishers
     {
-        std::declval<const T &>().get_debug_publisher_sending()
-        } -> std::same_as<std::shared_ptr<typename T::PublisherType_t>>;
+        std::declval<const T &>().get_debug_pub_source_data_sending()
+        } -> std::same_as<std::shared_ptr<typename T::SourcePublisherType_t>>;
 
     {
-        std::declval<const T &>().get_debug_publisher_succeeded()
-        } -> std::same_as<std::shared_ptr<typename T::PublisherType_t>>;
+        std::declval<const T &>().get_debug_pub_source_data_succeeded()
+        } -> std::same_as<std::shared_ptr<typename T::SourcePublisherType_t>>;
 
     {
-        std::declval<const T &>().get_debug_publisher_failed()
-        } -> std::same_as<std::shared_ptr<typename T::PublisherType_t>>;
+        std::declval<const T &>().get_debug_pub_source_data_failed()
+        } -> std::same_as<std::shared_ptr<typename T::SourcePublisherType_t>>;
+
+    //! Get target data debug publishers
+    {
+        std::declval<const T &>().get_debug_pub_target_data_sending()
+        } -> std::same_as<std::shared_ptr<typename T::TargetPublisherType_t>>;
+
+    {
+        std::declval<const T &>().get_debug_pub_target_data_succeeded()
+        } -> std::same_as<std::shared_ptr<typename T::TargetPublisherType_t>>;
+
+    {
+        std::declval<const T &>().get_debug_pub_target_data_failed()
+        } -> std::same_as<std::shared_ptr<typename T::TargetPublisherType_t>>;
 };
 
 
