@@ -26,6 +26,7 @@ static constexpr TimeUnit FallbackWaitTimeRetryResponse = std::chrono::milliseco
 //! Retry policy type implementing the RetryPolicyConcept
 class RetryPolicy : public output_port_types::DefaultRetryPolicy<TimeUnit>
 {
+  public:
     RetryPolicy()
     {
         m_fallback_number_of_retry = Defaults::FallbackNumberOfRetry;

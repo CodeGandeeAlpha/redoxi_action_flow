@@ -30,6 +30,12 @@ class DefaultRetryPolicy
   public:
     using DurationType_t = TimeUnitType;
 
+  private: // default fallback values, not visible to the outside
+    inline static constexpr int64_t DefaultNumberOfRetry = 3;
+    inline static constexpr DurationType_t DefaultWaitTimeBetweenRetry = std::chrono::milliseconds(10);
+    inline static constexpr DurationType_t DefaultWaitTimeRetryResponse = std::chrono::milliseconds(100);
+
+  public:
     DefaultRetryPolicy()
     {
         static_assert(RetryPolicyConcept<DefaultRetryPolicy>, "DefaultRetryPolicy must satisfy RetryPolicyConcept");
@@ -103,15 +109,15 @@ class DefaultRetryPolicy
     //! Current number of retry
     std::optional<int64_t> m_number_of_retry;
     //! Fallback number of retry
-    int64_t m_fallback_number_of_retry;
+    int64_t m_fallback_number_of_retry = DefaultNumberOfRetry;
     //! Current wait time between retries
     std::optional<DurationType_t> m_wait_time_between_retry;
     //! Fallback wait time between retries
-    DurationType_t m_fallback_wait_time_between_retry;
+    DurationType_t m_fallback_wait_time_between_retry = DefaultWaitTimeBetweenRetry;
     //! Current wait time for retry response
     std::optional<DurationType_t> m_wait_time_retry_response;
     //! Fallback wait time for retry response
-    DurationType_t m_fallback_wait_time_retry_response;
+    DurationType_t m_fallback_wait_time_retry_response = DefaultWaitTimeRetryResponse;
 
   public:
     JS_OBJECT(JS_MEMBER_WITH_NAME(m_number_of_retry, "number_of_retry"),
@@ -224,6 +230,10 @@ class DefaultDeliveryRequest
     using RetryPolicyType_t = RetryPolicyType;
     using StampType_t = StampType;
 
+  private:
+    inline static constexpr RetryPolicyType_t::DurationType_t DefaultPingResponseWaitTime = std::chrono::milliseconds(50);
+
+  public:
     //! Get the source data
     virtual std::shared_ptr<SourceDataType_t> get_source_data() const
     {
@@ -252,12 +262,6 @@ class DefaultDeliveryRequest
     virtual bool is_ping_request() const
     {
         return m_is_ping;
-    }
-
-    //! Set ping flag
-    virtual void set_ping_request(bool is_ping)
-    {
-        m_is_ping = is_ping;
     }
 
     //! Get the retry policy
@@ -294,6 +298,45 @@ class DefaultDeliveryRequest
     virtual void set_drop_strategy(DropStrategy strategy)
     {
         m_drop_strategy = strategy;
+    }
+
+    static std::shared_ptr<DefaultDeliveryRequest> generate_ping_request()
+    {
+        auto request = std::make_shared<DefaultDeliveryRequest>();
+        auto retry_policy = std::make_shared<RetryPolicyType_t>();
+        retry_policy->set_wait_time_retry_response(DefaultPingResponseWaitTime);
+        request->set_retry_policy(retry_policy);
+        request->set_ping_request(true);
+        return request;
+    }
+
+    /**
+     * Convert this to a ping request, which is always a no-precondition and can always be dropped.
+     * If not so, it will be set. If wait time retry response is not set, it will be set to the default value.
+     */
+    virtual void as_ping()
+    {
+        // already a ping request
+        if (m_is_ping) {
+            return;
+        }
+
+        // create a new retry policy if not already set
+        if (m_retry_policy == nullptr) {
+            m_retry_policy = std::make_shared<RetryPolicyType_t>();
+        }
+
+        // set the ping response wait time if not already set
+        if (!m_retry_policy->get_wait_time_retry_response().has_value()) {
+            m_retry_policy->set_wait_time_retry_response(DefaultPingResponseWaitTime);
+        }
+
+        // ping request has no precondition
+        m_precondition = DeliveryPrecondition::NoPrecondition;
+        m_drop_strategy = DropStrategy::DropAsNeeded;
+
+        // set the ping flag
+        m_is_ping = true;
     }
 
   protected:

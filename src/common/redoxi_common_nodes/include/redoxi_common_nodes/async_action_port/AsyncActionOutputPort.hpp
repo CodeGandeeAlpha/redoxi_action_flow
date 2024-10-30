@@ -2,13 +2,17 @@
 
 #include <string>
 #include <atomic>
-#include "redoxi_common_nodes/redoxi_common_nodes.hpp"
-#include <redoxi_common_cpp/async_processor/SingleBufferExecNode.hpp>
-#include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
-#include <redoxi_common_nodes/async_action_port/ImageOutputPortSpec.hpp>
-#include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <boost/uuid/uuid_io.hpp>
+
+#include "redoxi_common_nodes/redoxi_common_nodes.hpp"
+#include <redoxi_common_cpp/async_processor/SingleBufferExecNode.hpp>
+
+#include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
+#include <redoxi_common_nodes/async_action_port/ImageOutputPortSpec.hpp>
+
+#include <redoxi_common_cpp/ros_utils/SyncActionSender.hpp>
+#include <redoxi_common_cpp/ros_utils/common.hpp>
 
 
 namespace redoxi_works
@@ -37,6 +41,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
     using DeliveryTask_t = typename TSpec::DeliveryTask_t;
     using Downstream_t = typename TSpec::Downstream_t;
     using ActionType_t = typename TSpec::ActionType_t;
+
+    // synchronous action sender
+    using SyncActionSender_t = SyncActionSender<ActionType_t>;
+
+    // returned by sync action sender
+    using SendResult_t = SyncActionSender_t::SendResult_t;
 
   protected:
     using DeliveryTaskNode_t = async_processor::SingleBufferExecNode<DeliveryTask_t>;
@@ -259,72 +269,108 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
     /**
      * @brief Publish debug message when failed to send to downstream
-     * @param task The delivery task containing request information
+     * @param source_data The source data to publish, if nullptr, no source data will be published
+     * @param target_data The target data to publish, if nullptr, no target data will be published
      * @param ds The downstream node to publish to
      * @param ith_attempt Current attempt number
      * @param max_attempts Maximum number of attempts allowed
      * @return 0 on success, otherwise return error code
      */
-    virtual int _debug_publish_failed_to_send_to_downstream(const DeliveryTask_t &task,
+    virtual int _debug_publish_failed_to_send_to_downstream(const SourceData_t *source_data,
+                                                            const TargetData_t *target_data,
                                                             std::shared_ptr<Downstream_t> ds,
                                                             int64_t ith_attempt,
                                                             int64_t max_attempts)
     {
-        auto req = task.get_request();
-        SourceData_t::PublishMessageType_t pub_msg;
-        req->get_source_data()->to_publish_message(pub_msg);
-        auto pub = ds->get_debug_publisher_failed();
-        if (pub != nullptr) {
-            auto s = fmt::format("[FAILED] attempt {}/{}", ith_attempt, max_attempts);
-            pub->publish(pub_msg, s);
+        if (source_data != nullptr) {
+            auto pub = ds->get_debug_pub_source_data_failed();
+            if (pub != nullptr) {
+                SourceData_t::PublishMessageType_t source_pub_msg;
+                source_data->to_publish_message(source_pub_msg);
+                auto s = fmt::format("[FAILED] attempt {}/{}", ith_attempt, max_attempts);
+                pub->publish(source_pub_msg, s);
+            }
+        }
+        if (target_data != nullptr) {
+            auto pub = ds->get_debug_pub_target_data_failed();
+            if (pub != nullptr) {
+                TargetData_t::PublishMessageType_t target_pub_msg;
+                target_data->to_publish_message(target_pub_msg);
+                auto s = fmt::format("[FAILED] attempt {}/{}", ith_attempt, max_attempts);
+                pub->publish(target_pub_msg, s);
+            }
         }
         return 0;
     }
 
     /**
      * @brief Publish debug message when sending to downstream
-     * @param task The delivery task containing request information
+     * @param source_data The source data to publish, if nullptr, no source data will be published
+     * @param target_data The target data to publish, if nullptr, no target data will be published
      * @param ds The downstream node to publish to
      * @param ith_attempt Current attempt number
      * @param max_attempts Maximum number of attempts allowed
      * @return 0 on success, otherwise return error code
      */
-    virtual int _debug_publish_sending_to_downstream(const DeliveryTask_t &task,
+    virtual int _debug_publish_sending_to_downstream(const SourceData_t *source_data,
+                                                     const TargetData_t *target_data,
                                                      std::shared_ptr<Downstream_t> ds,
                                                      int64_t ith_attempt,
                                                      int64_t max_attempts)
     {
-        auto req = task.get_request();
-        SourceData_t::PublishMessageType_t pub_msg;
-        req->get_source_data()->to_publish_message(pub_msg);
-        auto pub = ds->get_debug_publisher_sending();
-        if (pub != nullptr) {
-            auto s = fmt::format("[SENDING] attempt {}/{}", ith_attempt, max_attempts);
-            pub->publish(pub_msg, s);
+        if (source_data != nullptr) {
+            auto pub = ds->get_debug_pub_source_data_sending();
+            if (pub != nullptr) {
+                SourceData_t::PublishMessageType_t source_pub_msg;
+                source_data->to_publish_message(source_pub_msg);
+                auto s = fmt::format("[SENDING] attempt {}/{}", ith_attempt, max_attempts);
+                pub->publish(source_pub_msg, s);
+            }
+        }
+        if (target_data != nullptr) {
+            auto pub = ds->get_debug_pub_target_data_sending();
+            if (pub != nullptr) {
+                TargetData_t::PublishMessageType_t target_pub_msg;
+                target_data->to_publish_message(target_pub_msg);
+                auto s = fmt::format("[SENDING] attempt {}/{}", ith_attempt, max_attempts);
+                pub->publish(target_pub_msg, s);
+            }
         }
         return 0;
     }
 
     /**
-     * @brief Publish debug message when sent to downstream
-     * @param task The delivery task containing request information
+     * @brief Publish debug message when successfully sent to downstream
+     * @param source_data The source data to publish, if nullptr, no source data will be published
+     * @param target_data The target data to publish, if nullptr, no target data will be published
      * @param ds The downstream node to publish to
      * @param ith_attempt Current attempt number
      * @param max_attempts Maximum number of attempts allowed
      * @return 0 on success, otherwise return error code
      */
-    virtual int _debug_publish_sent_to_downstream(const DeliveryTask_t &task,
+    virtual int _debug_publish_sent_to_downstream(const SourceData_t *source_data,
+                                                  const TargetData_t *target_data,
                                                   std::shared_ptr<Downstream_t> ds,
                                                   int64_t ith_attempt,
                                                   int64_t max_attempts)
     {
-        auto req = task.get_request();
-        SourceData_t::PublishMessageType_t pub_msg;
-        req->get_source_data()->to_publish_message(pub_msg);
-        auto pub = ds->get_debug_publisher_succeeded();
-        if (pub != nullptr) {
-            auto s = fmt::format("[SUCCEEDED] attempt {}/{}", ith_attempt, max_attempts);
-            pub->publish(pub_msg, s);
+        if (source_data != nullptr) {
+            auto pub = ds->get_debug_pub_source_data_succeeded();
+            if (pub != nullptr) {
+                SourceData_t::PublishMessageType_t source_pub_msg;
+                source_data->to_publish_message(source_pub_msg);
+                auto s = fmt::format("[SENT] attempt {}/{}", ith_attempt, max_attempts);
+                pub->publish(source_pub_msg, s);
+            }
+        }
+        if (target_data != nullptr) {
+            auto pub = ds->get_debug_pub_target_data_succeeded();
+            if (pub != nullptr) {
+                TargetData_t::PublishMessageType_t target_pub_msg;
+                target_data->to_publish_message(target_pub_msg);
+                auto s = fmt::format("[SENT] attempt {}/{}", ith_attempt, max_attempts);
+                pub->publish(target_pub_msg, s);
+            }
         }
         return 0;
     }
@@ -454,13 +500,13 @@ class AsyncActionOutputPort : public IStartStopProtocol
             // for no_drop, we need to keep trying until the frame is delivered (return in the loop)
 
             //! Publish the frame to the debug topic
-            _debug_publish_sending_to_downstream(target_data, ds, attempts + 1, max_attempts);
+            _debug_publish_sending_to_downstream(nullptr, target_data.get(), ds, attempts + 1, max_attempts);
 
             //! Send the frame to the downstream
-            auto result = _send_frame_to_downstream(frame_msg, ds, timeout_each_attempt);
+            auto result = _send_data_to_downstream(target_data, ds, timeout_each_attempt);
             if (!result.goal_handle_future.valid()) {
-                RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Not sending frame to downstream {}, goal handle future is invalid",
-                             boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Not sending frame to downstream {}, goal handle future is invalid",
+                             boost::uuids::to_string(msg_uuid), ds->get_downstream_spec()->get_name());
             } else {
                 bool wait_indefinitely = timeout_each_attempt < DefaultTimeUnit_t::zero();
 
@@ -468,20 +514,20 @@ class AsyncActionOutputPort : public IStartStopProtocol
                     // it has a response code, check it
                     switch (*result.response_code) {
                         case ActionDownstreamResponse::ACCEPTED:
-                            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame accepted by downstream {}",
-                                         boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+                            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame accepted by downstream {}",
+                                         boost::uuids::to_string(msg_uuid), ds->get_downstream_spec()->get_name());
 
                             //! Publish the frame sent message
-                            _debug_publish_sent_to_downstream(frame_msg, ds, attempts + 1, max_attempts);
+                            _debug_publish_sent_to_downstream(nullptr, target_data.get(), ds, attempts + 1, max_attempts);
 
                             return 0; // Success
                         case ActionDownstreamResponse::REJECTED:
-                            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame rejected by downstream {}",
-                                         boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+                            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame rejected by downstream {}",
+                                         boost::uuids::to_string(msg_uuid), ds->get_downstream_spec()->get_name());
                             break;
                         case ActionDownstreamResponse::TIMEOUT:
-                            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while sending frame to downstream {}",
-                                         boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+                            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while sending frame to downstream {}",
+                                         boost::uuids::to_string(msg_uuid), ds->get_downstream_spec()->get_name());
                             break;
                     }
                 } else {
@@ -495,35 +541,49 @@ class AsyncActionOutputPort : public IStartStopProtocol
                         }
                     } else {
                         //! Regard as failure without additional waiting
-                        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while waiting for goal handle from downstream {}",
-                                     boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action);
+                        RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while waiting for goal handle from downstream {}",
+                                     boost::uuids::to_string(msg_uuid), ds->get_downstream_spec()->get_name());
                     }
                 }
             }
 
             attempts++;
             if (attempts < max_attempts) {
-                RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Retrying frame delivery to downstream {} (attempt {}/{})",
-                             boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action, attempts + 1, max_attempts);
+                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Retrying frame delivery to downstream {} (attempt {}/{})",
+                             boost::uuids::to_string(msg_uuid), ds->get_downstream_spec()->get_name(), attempts + 1, max_attempts);
             }
 
             // sleep for the interval between attempts
             std::this_thread::sleep_for(interval_between_attempts);
         }
 
-        _debug_publish_failed_to_send_to_downstream(frame_msg, ds, attempts, max_attempts);
+        _debug_publish_failed_to_send_to_downstream(nullptr, target_data.get(), ds, attempts, max_attempts);
 
-        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Failed to deliver frame to downstream {} after {} attempts",
-                     boost::uuids::to_string(msg_uuid), ds->spec->accept_frame_action, max_attempts);
+        RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Failed to deliver frame to downstream {} after {} attempts",
+                     boost::uuids::to_string(msg_uuid), ds->get_downstream_spec()->get_name(), max_attempts);
         return -1;
     }
 
     //! send a single piece of data to downstream
-    virtual int _send_data_to_downstream(std::shared_ptr<TargetData_t> target_data,
-                                         std::shared_ptr<Downstream_t> ds,
-                                         TimeUnit_t timeout)
+    virtual SendResult_t _send_data_to_downstream(std::shared_ptr<TargetData_t> target_data,
+                                                  std::shared_ptr<Downstream_t> ds,
+                                                  TimeUnit_t timeout)
     {
-        return 0;
+        //! Get the action client for the downstream
+        auto client = ds->get_action_client();
+
+        //! Create a goal object and populate it with frame message data
+        auto goal = target_data->get_goal();
+        if (goal == nullptr) {
+            auto msg_uuid = target_data->get_source_data_uuid();
+            RDX_RAISE_ERROR("[msg_uuid={}] Goal is empty", boost::uuids::to_string(msg_uuid));
+        }
+
+        //! Use SyncActionSender to send the goal and wait for the response
+        SyncActionSender_t sender(m_parent_node);
+        auto result = sender.send(*goal, *client, timeout);
+
+        return result;
     }
 
     //! Ping the downstream node
@@ -550,6 +610,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
     // the parent node
     rclcpp::Node *m_parent_node = nullptr;
 
+  protected:
     // callback functions
 
     //! Transform target data, (output_target_data, input_task)-> error_code

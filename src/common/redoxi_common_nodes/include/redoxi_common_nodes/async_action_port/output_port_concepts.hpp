@@ -92,6 +92,12 @@ concept RetryPolicyConcept = requires(T t,
     typename T::DurationType_t;
     requires TimeDurationConcept<typename T::DurationType_t>;
 
+    //! Must be default constructible
+    requires std::is_default_constructible_v<T>;
+
+    //! Must be copyable
+    requires std::copyable<T>;
+
     //! Must have methods to get/set number of retries
     {
         std::declval<const T &>().get_number_of_retry(use_fallback_if_not_set)
@@ -104,6 +110,7 @@ concept RetryPolicyConcept = requires(T t,
         } -> std::same_as<int64_t>;
 
     //! Must have methods to get/set wait time between retries
+    //! negative wait time means wait indefinitely, 0 means no wait
     {
         std::declval<const T &>().get_wait_time_between_retry(use_fallback_if_not_set)
         } -> std::same_as<std::optional<typename T::DurationType_t>>;
@@ -115,6 +122,8 @@ concept RetryPolicyConcept = requires(T t,
         } -> std::same_as<typename T::DurationType_t>;
 
     //! Must have methods to get/set wait time for retry response
+    //! @note This is the wait time for the downstream action to respond to the goal
+    //! negative wait time means wait indefinitely, 0 means no wait
     {
         std::declval<const T &>().get_wait_time_retry_response(use_fallback_if_not_set)
         } -> std::same_as<std::optional<typename T::DurationType_t>>;
@@ -252,6 +261,9 @@ concept DeliveryRequestConcept = requires(T t)
     //! Stamp type must satisfy DeliveryStampConcept
     requires DeliveryStampConcept<typename T::StampType_t>;
 
+    //! Required default constructor
+    requires std::is_default_constructible_v<T>;
+
     //! Required methods
     {
         t.get_source_data()
@@ -276,6 +288,12 @@ concept DeliveryRequestConcept = requires(T t)
         } -> std::same_as<DropStrategy>;
     {
         t.set_drop_strategy(std::declval<DropStrategy>())
+        } -> std::same_as<void>;
+
+    //! Must have method to convert this to a ping request
+    //! To create a ping request, you do T().as_ping()
+    {
+        t.as_ping()
         } -> std::same_as<void>;
 };
 
