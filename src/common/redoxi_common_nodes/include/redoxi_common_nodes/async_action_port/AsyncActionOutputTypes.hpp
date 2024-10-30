@@ -155,40 +155,21 @@ class DefaultTargetData
     virtual DefaultTargetData &operator=(const DefaultTargetData &) = default;
 
     //! Get the underlying ROS message
-    virtual const Goal_t *get_goal() const
+    const Goal_t &get_goal() const
     {
-        return m_goal.has_value() ? &m_goal.value() : nullptr;
+        return m_goal;
     }
 
-    //! Set the ROS message
-    virtual void set_goal(const Goal_t &goal)
+    //! Get the underlying ROS message
+    Goal_t &get_goal()
     {
-        m_goal = goal;
-    }
-
-    //! Check if this is a ping signal
-    virtual bool is_ping() const
-    {
-        return m_is_ping;
-    }
-
-    //! Set ping flag
-    virtual void set_ping(bool is_ping)
-    {
-        m_is_ping = is_ping;
+        return m_goal;
     }
 
     //! Copy data to another target data object
     virtual void copy_to(DefaultTargetData &other) const
     {
         other.m_goal = m_goal;
-        other.m_is_ping = m_is_ping;
-    }
-
-    //! Create a clone of this object
-    virtual std::shared_ptr<DefaultTargetData> clone() const
-    {
-        return std::make_shared<DefaultTargetData>(*this);
     }
 
     //! Get the source data UUID
@@ -204,15 +185,14 @@ class DefaultTargetData
     }
 
     //! Convert to publish message
-    virtual int to_publish_message(PublishMessageType_t &msg) const
+    virtual int to_publish_message(PublishMessageType_t &) const
     {
         return 0;
     }
 
   protected:
-    std::optional<Goal_t> m_goal;
+    Goal_t m_goal;
     boost::uuids::uuid m_source_data_uuid;
-    bool m_is_ping{false};
 };
 
 struct DefaultStampData {
@@ -442,25 +422,12 @@ class DefaultDeliveryTask
         m_drop_strategy = strategy;
     }
 
-    //! Get the delivery result code
-    virtual DeliveryResultCode get_delivery_result_code() const
-    {
-        return m_delivery_result_code;
-    }
-
-    //! Set the delivery result code
-    virtual void set_delivery_result_code(DeliveryResultCode result_code)
-    {
-        m_delivery_result_code = result_code;
-    }
-
   protected:
     std::shared_ptr<RequestType_t> m_request;
     std::shared_ptr<TargetDataType_t> m_target_data;
     std::shared_ptr<RetryPolicyType_t> m_retry_policy;
     DeliveryPrecondition m_precondition{DeliveryPrecondition::NoPrecondition};
     DropStrategy m_drop_strategy{DropStrategy::NoDrop};
-    DeliveryResultCode m_delivery_result_code{DeliveryResultCode::NotTried};
 };
 
 //! Default implementation of delivery policy
@@ -783,6 +750,7 @@ class DefaultDownstream
     {
         m_downstream_spec = spec;
         m_node = node;
+
         return 0;
     }
 

@@ -62,17 +62,16 @@ concept DeliveryTargetDataConcept = requires(T t)
     //! Must have method to get ROS message
     {
         std::declval<const T &>().get_goal()
-        } -> std::same_as<const typename T::Goal_t *>;
+        } -> std::same_as<const typename T::Goal_t &>;
+
+    {
+        t.get_goal()
+        } -> std::same_as<typename T::Goal_t &>;
 
     //! Must have method to copy data to another target data object
     {
         std::declval<const T &>().copy_to(std::declval<T &>())
         } -> std::same_as<void>;
-
-    //! Must have method to create a clone of this object
-    {
-        std::declval<const T &>().clone()
-        } -> std::same_as<std::shared_ptr<T>>;
 
     //! Must have method to save/read source data UUID
     {
@@ -189,15 +188,6 @@ concept DeliveryTaskConcept = requires(T t)
         } -> std::same_as<DropStrategy>;
     {
         t.set_drop_strategy(std::declval<DropStrategy>())
-        } -> std::same_as<void>;
-
-    //! Get the delivery result code
-    {
-        std::declval<const T &>().get_delivery_result_code()
-        } -> std::same_as<DeliveryResultCode>;
-    //! Set the delivery result code
-    {
-        std::declval<T &>().set_delivery_result_code(std::declval<DeliveryResultCode>())
         } -> std::same_as<void>;
 };
 
