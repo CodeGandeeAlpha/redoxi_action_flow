@@ -129,11 +129,6 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     {
     }
 
-    virtual void copy_to(DefaultTargetData &other) const
-    {
-        DeliveryTargetDataBase::copy_to(other);
-    }
-
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
         auto &raw_image = this->m_goal.frame.raw_image;
@@ -148,16 +143,16 @@ static_assert(output_port_types::DeliveryTargetDataConcept<DeliveryTargetData>, 
 //! Stamp data type for image output port (nothing to do here, right now)
 using DeliveryStampData = output_port_types::DefaultStampData;
 
+//! Delivery policy type for image output port
+using DeliveryPolicy = output_port_types::DefaultDeliveryPolicy<RetryPolicy>;
+static_assert(output_port_types::DeliveryPolicyConcept<DeliveryPolicy>, "DeliveryPolicy must satisfy DeliveryPolicyConcept");
+
 //! Request type for image output port
-using DeliveryRequest = output_port_types::DefaultDeliveryRequest<DeliverySourceData, RetryPolicy, DeliveryStampData>;
+using DeliveryRequest = output_port_types::DefaultDeliveryRequest<DeliverySourceData, DeliveryPolicy, DeliveryStampData>;
 static_assert(output_port_types::DeliveryRequestConcept<DeliveryRequest>, "DeliveryRequest must satisfy DeliveryRequestConcept");
 
 using DeliveryTask = output_port_types::DefaultDeliveryTask<DeliveryRequest, DeliveryTargetData, RetryPolicy>;
 static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>, "DeliveryTask must satisfy DeliveryTaskConcept");
-
-//! Delivery policy type for image output port
-using DeliveryPolicy = output_port_types::DefaultDeliveryPolicy<RetryPolicy>;
-static_assert(output_port_types::DeliveryPolicyConcept<DeliveryPolicy>, "DeliveryPolicy must satisfy DeliveryPolicyConcept");
 
 //! Downstream debug publisher type for image output port
 class DownstreamDebugPublisher
@@ -245,19 +240,19 @@ class Downstream : public DownstreamBase
                       "DownstreamSpec must satisfy DefaultDownstreamSpecConcept");
     }
 
-    virtual int init_by_spec(std::shared_ptr<DownstreamSpec> spec, rclcpp::Node *node)
+    virtual int init_by_spec(const DownstreamSpec &spec, rclcpp::Node *node)
     {
         auto ret = DownstreamBase::init_by_spec(spec, node);
         if (ret != 0) {
             RDX_RAISE_ERROR("[{}] failed to initialize downstream", __func__);
         }
-        auto qos_source = decltype(spec)::element_type::SourcePublisherType_t::DefaultQoS;
-        auto qos_target = decltype(spec)::element_type::TargetPublisherType_t::DefaultQoS;
-        using SourceInnerPublisherType = decltype(spec)::element_type::SourcePublisherType_t::Publisher_t;
-        using TargetInnerPublisherType = decltype(spec)::element_type::TargetPublisherType_t::Publisher_t;
+        auto qos_source = DownstreamSpec::SourcePublisherType_t::DefaultQoS;
+        auto qos_target = DownstreamSpec::TargetPublisherType_t::DefaultQoS;
+        using SourceInnerPublisherType = DownstreamSpec::SourcePublisherType_t::Publisher_t;
+        using TargetInnerPublisherType = DownstreamSpec::TargetPublisherType_t::Publisher_t;
 
         {
-            auto topic = spec->get_debug_topic_source_data_failed();
+            auto topic = spec.get_debug_topic_source_data_failed();
             if (topic.has_value()) {
                 m_debug_pub_source_data_failed = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<SourceInnerPublisherType>(node, topic.value(), qos_source);
@@ -266,7 +261,7 @@ class Downstream : public DownstreamBase
         }
 
         {
-            auto topic = spec->get_debug_topic_source_data_sending();
+            auto topic = spec.get_debug_topic_source_data_sending();
             if (topic.has_value()) {
                 m_debug_pub_source_data_sending = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<SourceInnerPublisherType>(node, topic.value(), qos_source);
@@ -275,7 +270,7 @@ class Downstream : public DownstreamBase
         }
 
         {
-            auto topic = spec->get_debug_topic_source_data_succeeded();
+            auto topic = spec.get_debug_topic_source_data_succeeded();
             if (topic.has_value()) {
                 m_debug_pub_source_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<SourceInnerPublisherType>(node, topic.value(), qos_source);
@@ -284,7 +279,7 @@ class Downstream : public DownstreamBase
         }
 
         {
-            auto topic = spec->get_debug_topic_target_data_sending();
+            auto topic = spec.get_debug_topic_target_data_sending();
             if (topic.has_value()) {
                 m_debug_pub_target_data_sending = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<TargetInnerPublisherType>(node, topic.value(), qos_target);
@@ -293,7 +288,7 @@ class Downstream : public DownstreamBase
         }
 
         {
-            auto topic = spec->get_debug_topic_target_data_succeeded();
+            auto topic = spec.get_debug_topic_target_data_succeeded();
             if (topic.has_value()) {
                 m_debug_pub_target_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<TargetInnerPublisherType>(node, topic.value(), qos_target);
@@ -302,7 +297,7 @@ class Downstream : public DownstreamBase
         }
 
         {
-            auto topic = spec->get_debug_topic_target_data_failed();
+            auto topic = spec.get_debug_topic_target_data_failed();
             if (topic.has_value()) {
                 m_debug_pub_target_data_failed = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<TargetInnerPublisherType>(node, topic.value(), qos_target);

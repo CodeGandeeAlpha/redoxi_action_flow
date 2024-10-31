@@ -43,6 +43,10 @@ concept RosMessageConcept = requires(T t)
 template <typename T>
 concept RosActionConcept = requires
 {
+    // copyable and default constructible
+    requires std::copyable<T>;
+    requires std::is_default_constructible_v<T>;
+
     //! Check Goal type exists and is accessible
     typename T::Goal;
     requires RosMessageConcept<typename T::Goal>;

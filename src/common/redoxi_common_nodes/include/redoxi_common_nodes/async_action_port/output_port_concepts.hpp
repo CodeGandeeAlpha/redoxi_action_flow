@@ -69,11 +69,6 @@ concept DeliveryTargetDataConcept = requires(T t)
         t.get_goal()
         } -> std::same_as<typename T::Goal_t &>;
 
-    //! Must have method to copy data to another target data object
-    {
-        std::declval<const T &>().copy_to(std::declval<T &>())
-        } -> std::same_as<void>;
-
     //! Must have method to save/read source data UUID
     {
         std::declval<const T &>().get_source_data_uuid()
@@ -112,7 +107,11 @@ concept DeliveryPolicyConcept = requires(T t)
     //! Must have method to get retry policy
     {
         t.get_retry_policy()
-        } -> std::same_as<std::shared_ptr<typename T::RetryPolicyType_t>>;
+        } -> std::same_as<typename T::RetryPolicyType_t &>;
+
+    {
+        std::declval<const T &>().get_retry_policy()
+        } -> std::same_as<const typename T::RetryPolicyType_t &>;
 
     //! Must have method to get precondition
     {
@@ -147,16 +146,25 @@ concept DeliveryRequestConcept = requires(T t)
     //! Required methods
     {
         t.get_source_data()
-        } -> std::same_as<std::shared_ptr<typename T::SourceDataType_t>>;
+        } -> std::same_as<typename T::SourceDataType_t &>;
+    {
+        std::declval<const T &>().get_source_data()
+        } -> std::same_as<const typename T::SourceDataType_t &>;
     {
         t.get_stamp()
-        } -> std::same_as<std::shared_ptr<typename T::StampType_t>>;
+        } -> std::same_as<typename T::StampType_t &>;
+    {
+        std::declval<const T &>().get_stamp()
+        } -> std::same_as<const typename T::StampType_t &>;
     {
         t.is_ping_request()
         } -> std::same_as<bool>;
     {
         t.get_delivery_policy()
-        } -> std::same_as<std::shared_ptr<typename T::DeliveryPolicy_t>>;
+        } -> std::same_as<typename T::DeliveryPolicy_t &>;
+    {
+        std::declval<const T &>().get_delivery_policy()
+        } -> std::same_as<const typename T::DeliveryPolicy_t &>;
 
     //! Must have method to convert this to a ping request
     //! To create a ping request, you do T().as_ping()
@@ -170,6 +178,7 @@ template <typename T>
 concept DeliveryTaskConcept = requires(T t)
 {
     requires std::is_default_constructible_v<T>;
+    requires std::copyable<T>;
 
     //! Must have these type aliases
     typename T::RequestType_t;
@@ -183,15 +192,21 @@ concept DeliveryTaskConcept = requires(T t)
     //! Required methods
     {
         t.get_request()
-        } -> std::same_as<std::shared_ptr<typename T::RequestType_t>>;
+        } -> std::same_as<typename T::RequestType_t &>;
     {
-        t.set_request(std::declval<std::shared_ptr<typename T::RequestType_t>>())
+        std::declval<const T &>().get_request()
+        } -> std::same_as<const typename T::RequestType_t &>;
+    {
+        t.set_request(std::declval<const typename T::RequestType_t &>())
         } -> std::same_as<void>;
     {
         t.get_target_data()
-        } -> std::same_as<std::shared_ptr<typename T::TargetDataType_t>>;
+        } -> std::same_as<typename T::TargetDataType_t &>;
     {
-        t.set_target_data(std::declval<std::shared_ptr<typename T::TargetDataType_t>>())
+        std::declval<const T &>().get_target_data()
+        } -> std::same_as<const typename T::TargetDataType_t &>;
+    {
+        t.set_target_data(std::declval<const typename T::TargetDataType_t &>())
         } -> std::same_as<void>;
 };
 
@@ -201,7 +216,7 @@ template <typename T>
 concept DownstreamSpecConcept = requires(T t)
 {
     requires std::is_default_constructible_v<T>;
-
+    requires std::copyable<T>;
     //! Must have action type
     typename T::ActionType_t;
     //! Must have delivery policy type
@@ -245,10 +260,13 @@ concept DownstreamSpecConcept = requires(T t)
     //! Must have method to get delivery policy
     {
         std::declval<T &>().get_delivery_policy()
-        } -> std::same_as<std::shared_ptr<typename T::DeliveryPolicy_t>>;
+        } -> std::same_as<typename T::DeliveryPolicy_t &>;
     {
-        std::declval<T &>().set_delivery_policy(std::declval<std::shared_ptr<typename T::DeliveryPolicy_t>>())
-        } -> std::same_as<std::shared_ptr<const typename T::DeliveryPolicy_t>>;
+        std::declval<const T &>().get_delivery_policy()
+        } -> std::same_as<const typename T::DeliveryPolicy_t &>;
+    {
+        std::declval<T &>().set_delivery_policy(std::declval<const typename T::DeliveryPolicy_t &>())
+        } -> std::same_as<void>;
 
     //! Must have method to get debug publish flag
     {
@@ -287,18 +305,18 @@ template <typename T>
 concept InitConfigConcept = requires(T t)
 {
     requires std::is_default_constructible_v<T>;
-
+    requires std::copyable<T>;
     typename T::DownstreamSpec_t;
     requires DownstreamSpecConcept<typename T::DownstreamSpec_t>;
 
     //! Must have both const and non-const methods to get downstream specs
     {
         std::declval<const T &>().get_downstream_specs()
-        } -> std::same_as<const std::vector<std::shared_ptr<typename T::DownstreamSpec_t>> &>;
+        } -> std::same_as<const std::vector<typename T::DownstreamSpec_t> &>;
 
     {
         std::declval<T &>().get_downstream_specs()
-        } -> std::same_as<std::vector<std::shared_ptr<typename T::DownstreamSpec_t>> &>;
+        } -> std::same_as<std::vector<typename T::DownstreamSpec_t> &>;
 
     //! Must have method to get number of buffer requests
     {
@@ -316,6 +334,7 @@ template <typename T>
 concept DownstreamConcept = requires(T t)
 {
     requires std::is_default_constructible_v<T>;
+    requires std::copyable<T>;
 
     typename T::DownstreamSpec_t;
     requires DownstreamSpecConcept<typename T::DownstreamSpec_t>;
@@ -359,7 +378,11 @@ concept DownstreamConcept = requires(T t)
     //! Must have method to get downstream spec
     {
         std::declval<const T &>().get_downstream_spec()
-        } -> std::same_as<std::shared_ptr<typename T::DownstreamSpec_t>>;
+        } -> std::same_as<const typename T::DownstreamSpec_t &>;
+
+    {
+        std::declval<T &>().get_downstream_spec()
+        } -> std::same_as<typename T::DownstreamSpec_t &>;
 
     //! Must have methods to get/set action client
     {
@@ -372,7 +395,9 @@ concept DownstreamConcept = requires(T t)
 
     //! Must have initialization method
     {
-        std::declval<T &>().init_by_spec(std::declval<std::shared_ptr<typename T::DownstreamSpec_t>>(), std::declval<rclcpp::Node *>())
+        std::declval<T &>().init_by_spec(
+            std::declval<const typename T::DownstreamSpec_t &>(),
+            std::declval<rclcpp::Node *>())
         } -> std::same_as<int>;
 
     //! Get source data debug publishers
