@@ -13,6 +13,7 @@
 #include <rclcpp/node.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <redoxi_common_nodes/redoxi_common_nodes.hpp>
+#include <json_struct/json_struct.h>
 
 namespace redoxi_works
 {
@@ -202,4 +203,32 @@ enum class DropStrategy {
     //! Drop task/data/messages as needed
     DropAsNeeded = 1,
 };
+
+
 } // namespace redoxi_works
+
+namespace JS
+{
+//! Type handler for time duration
+template <redoxi_works::TimeDurationConcept T>
+struct TypeHandler<T> {
+    static Error to(T &to_type, ParseContext &context)
+    {
+        typename T::rep value;
+        auto err = TypeHandler<typename T::rep>::to(value, context);
+        if (err)
+            return err;
+        to_type = T(value);
+        return Error::NoError;
+    }
+    static void from(const T &from_type, Token &token, Serializer &serializer)
+    {
+        typename T::rep value = from_type.count();
+        TypeHandler<typename T::rep>::from(value, token, serializer);
+    }
+};
+} // namespace JS
+
+JS_ENUM_DECLARE_VALUE_PARSER(redoxi_works::ControlSignalCode);
+JS_ENUM_DECLARE_VALUE_PARSER(redoxi_works::DeliveryPrecondition);
+JS_ENUM_DECLARE_VALUE_PARSER(redoxi_works::DropStrategy);

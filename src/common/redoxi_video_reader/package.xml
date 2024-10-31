@@ -17,6 +17,7 @@
 
   <depend>redoxi_common_cpp</depend>
   <depend>redoxi_public_msgs</depend>
+  <depend>redoxi_common_nodes</depend>
   
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

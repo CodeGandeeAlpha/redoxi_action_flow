@@ -12,8 +12,8 @@ find_package(redoxi_extern_cpp REQUIRED)
 find_package(redoxi_common_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
-find_package(json_struct REQUIRED)
 find_package(cv_bridge REQUIRED)
+find_package(json_struct REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -72,8 +72,8 @@ ament_export_dependencies(
   rclcpp_action
   redoxi_extern_cpp
   redoxi_common_cpp
-  json_struct
   cv_bridge
+  json_struct
   ${cpp_required_to_find}
 )
 

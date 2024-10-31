@@ -11,6 +11,7 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(redoxi_common_cpp REQUIRED)
 find_package(redoxi_public_msgs REQUIRED)
+find_package(redoxi_common_nodes REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(rcutils REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -27,6 +28,7 @@ set(source_files
   src/VideoReaderBase.cpp
   src/VideoReaderBaseTypes.cpp
   src/FrameRelayPublisher.cpp
+  src/VideoReaderBase_v2.cpp  
 )
 
 add_library(redoxi_video_reader ${source_files})
@@ -51,6 +53,7 @@ ament_target_dependencies(
   "sensor_msgs"
   "rcutils"
   "cv_bridge"
+  "redoxi_common_nodes"
 )
 
 # Causes the visibility macros to use dllexport rather than dllimport,
@@ -103,6 +106,7 @@ ament_export_dependencies(
   cv_bridge
   nlohmann_json
   Boost
+  redoxi_common_nodes
 )
 
 

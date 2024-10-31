@@ -10,7 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(redoxi_samples_lib REQUIRED)
 find_package(redoxi_video_reader REQUIRED)
-
+find_package(redoxi_common_nodes REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -19,6 +19,7 @@ set(srcfiles
   src/redoxi_samples_nodes.cpp
   src/generators/RandomFrameVideoGenerator.cpp
   src/generators/SimpleActionGenerator.cpp
+  # src/generators/SimpleActionGenerator_v2.cpp
 )
 
 add_library(redoxi_samples_nodes ${srcfiles})
@@ -35,6 +36,7 @@ target_compile_definitions(redoxi_samples_nodes PRIVATE "REDOXI_SAMPLES_NODES_BU
 ament_target_dependencies(redoxi_samples_nodes PUBLIC 
   redoxi_samples_lib
   redoxi_video_reader
+  redoxi_common_nodes
 )
 
 install(
@@ -61,7 +63,7 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_export_dependencies(redoxi_samples_lib redoxi_video_reader)
+ament_export_dependencies(redoxi_samples_lib redoxi_video_reader redoxi_common_nodes)
 
 ament_export_include_directories(
   include

@@ -7,6 +7,7 @@
 #include <redoxi_public_msgs/action/process_frame.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 #include <boost/uuid/uuid_generators.hpp>
+#include <nlohmann/json.hpp>
 
 namespace redoxi_works
 {
@@ -30,9 +31,9 @@ class RetryPolicy : public output_port_types::DefaultRetryPolicy<TimeUnit>
   public:
     RetryPolicy()
     {
-        m_fallback_number_of_retry = Defaults::FallbackNumberOfRetry;
-        m_fallback_wait_time_between_retry = Defaults::FallbackWaitTimeBetweenRetry;
-        m_fallback_wait_time_retry_response = Defaults::FallbackWaitTimeRetryResponse;
+        fallback_number_of_retry = Defaults::FallbackNumberOfRetry;
+        fallback_wait_time_between_retry = Defaults::FallbackWaitTimeBetweenRetry;
+        fallback_wait_time_retry_response = Defaults::FallbackWaitTimeRetryResponse;
     }
 };
 
@@ -143,6 +144,7 @@ static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>, "DeliveryTas
 
 //! Delivery policy type for image output port
 using DeliveryPolicy = output_port_types::DefaultDeliveryPolicy<RetryPolicy>;
+static_assert(output_port_types::DeliveryPolicyConcept<DeliveryPolicy>, "DeliveryPolicy must satisfy DeliveryPolicyConcept");
 
 //! Downstream debug publisher type for image output port
 class DownstreamDebugPublisher

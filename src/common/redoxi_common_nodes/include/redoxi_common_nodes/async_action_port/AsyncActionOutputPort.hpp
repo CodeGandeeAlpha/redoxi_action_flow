@@ -27,8 +27,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
     inline static constexpr auto PRINT_THREAD_ID = false;
 
   public:
-    AsyncActionOutputPort();
-    ~AsyncActionOutputPort() noexcept = default;
+    AsyncActionOutputPort() = default;
+    virtual ~AsyncActionOutputPort() noexcept = default;
 
     using MasterSpec_t = TSpec; // master specification of this port
     using TimeUnit_t = typename TSpec::TimeUnit_t;
@@ -73,7 +73,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
   public:
     //! Try to push a request to the port
     //! @return true if success, otherwise false
-    bool try_push_request(std::shared_ptr<DeliveryRequest_t> request)
+    virtual bool try_push_request(std::shared_ptr<DeliveryRequest_t> request)
     {
         // must started first
         RDX_ASSERT_CHECK_TRUE(m_status == NodeStatusCode::STARTED, "[{}] must started first", __func__);
@@ -89,7 +89,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
      * @note state transition: BEFORE_INIT -> STOPPED
      * @return 0 if success, otherwise return error code
      */
-    int init(std::shared_ptr<InitConfig_t> init_config)
+    virtual int init(std::shared_ptr<InitConfig_t> init_config)
     {
         // check init_config, should not be set yet
         RDX_ASSERT_CHECK_TRUE(m_init_config == nullptr, "[{}] init_config is already set", __func__);
@@ -128,7 +128,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
      * @note state transition: STOPPED -> STARTED
      * @return 0 if success, otherwise return error code
      */
-    int start() override
+    virtual int start() override
     {
         // already started? skip
         if (m_status == NodeStatusCode::STARTED) {

@@ -45,87 +45,87 @@ class DefaultRetryPolicy
     //! Get the current number of retry
     virtual std::optional<int64_t> get_number_of_retry(bool use_fallback_if_not_set = false) const
     {
-        if (use_fallback_if_not_set && !m_number_of_retry.has_value()) {
-            return m_fallback_number_of_retry;
+        if (use_fallback_if_not_set && !this->number_of_retry.has_value()) {
+            return this->fallback_number_of_retry;
         }
-        return m_number_of_retry;
+        return this->number_of_retry;
     }
 
     //! Set the current number of retr
     virtual void set_number_of_retry(std::optional<int64_t> number_of_retry)
     {
-        m_number_of_retry = number_of_retry;
+        this->number_of_retry = number_of_retry;
     }
 
     //! Get the fallback number of retry
     virtual int64_t get_fallback_number_of_retry() const
     {
-        return m_fallback_number_of_retry;
+        return fallback_number_of_retry;
     }
 
     //! Get the current wait time between retries
     virtual std::optional<DurationType_t> get_wait_time_between_retry(bool use_fallback_if_not_set = false) const
     {
-        if (use_fallback_if_not_set && !m_wait_time_between_retry.has_value()) {
-            return m_fallback_wait_time_between_retry;
+        if (use_fallback_if_not_set && !wait_time_between_retry.has_value()) {
+            return fallback_wait_time_between_retry;
         }
-        return m_wait_time_between_retry;
+        return wait_time_between_retry;
     }
 
     //! Set the current wait time between retries
     virtual void set_wait_time_between_retry(std::optional<DurationType_t> wait_time)
     {
-        m_wait_time_between_retry = wait_time;
+        wait_time_between_retry = wait_time;
     }
 
     //! Get the fallback wait time between retries
     virtual DurationType_t get_fallback_wait_time_between_retry() const
     {
-        return m_fallback_wait_time_between_retry;
+        return fallback_wait_time_between_retry;
     }
 
     //! Get the current wait time for retry response
     virtual std::optional<DurationType_t> get_wait_time_retry_response(bool use_fallback_if_not_set = false) const
     {
-        if (use_fallback_if_not_set && !m_wait_time_retry_response.has_value()) {
-            return m_fallback_wait_time_retry_response;
+        if (use_fallback_if_not_set && !wait_time_retry_response.has_value()) {
+            return fallback_wait_time_retry_response;
         }
-        return m_wait_time_retry_response;
+        return wait_time_retry_response;
     }
 
     //! Set the current wait time for retry response
     virtual void set_wait_time_retry_response(std::optional<DurationType_t> wait_time)
     {
-        m_wait_time_retry_response = wait_time;
+        wait_time_retry_response = wait_time;
     }
 
     //! Get the fallback wait time for retry response
     virtual DurationType_t get_fallback_wait_time_retry_response() const
     {
-        return m_fallback_wait_time_retry_response;
+        return fallback_wait_time_retry_response;
     }
 
-  protected:
+  protected: // no m_ prefix so that you can use json serialization easier
     //! Current number of retry
-    std::optional<int64_t> m_number_of_retry;
+    std::optional<int64_t> number_of_retry;
     //! Fallback number of retry
-    int64_t m_fallback_number_of_retry = DefaultNumberOfRetry;
+    int64_t fallback_number_of_retry = DefaultNumberOfRetry;
     //! Current wait time between retries
-    std::optional<DurationType_t> m_wait_time_between_retry;
+    std::optional<DurationType_t> wait_time_between_retry;
     //! Fallback wait time between retries
-    DurationType_t m_fallback_wait_time_between_retry = DefaultWaitTimeBetweenRetry;
+    DurationType_t fallback_wait_time_between_retry = DefaultWaitTimeBetweenRetry;
     //! Current wait time for retry response
-    std::optional<DurationType_t> m_wait_time_retry_response;
+    std::optional<DurationType_t> wait_time_retry_response;
     //! Fallback wait time for retry response
-    DurationType_t m_fallback_wait_time_retry_response = DefaultWaitTimeRetryResponse;
+    DurationType_t fallback_wait_time_retry_response = DefaultWaitTimeRetryResponse;
 
   public:
-    JS_OBJECT(JS_MEMBER_WITH_NAME(m_number_of_retry, "number_of_retry"),
-              JS_MEMBER_WITH_NAME(m_fallback_number_of_retry, "fallback_number_of_retry"),
-              JS_MEMBER_WITH_NAME(m_wait_time_between_retry, "wait_time_between_retry"),
-              JS_MEMBER_WITH_NAME(m_fallback_wait_time_between_retry, "fallback_wait_time_between_retry"),
-              JS_MEMBER_WITH_NAME(m_wait_time_retry_response, "wait_time_retry_response"),
-              JS_MEMBER_WITH_NAME(m_fallback_wait_time_retry_response, "fallback_wait_time_retry_response"));
+    JS_OBJECT(JS_MEMBER(number_of_retry),
+              JS_MEMBER(fallback_number_of_retry),
+              JS_MEMBER(wait_time_between_retry),
+              JS_MEMBER(fallback_wait_time_between_retry),
+              JS_MEMBER(wait_time_retry_response),
+              JS_MEMBER(fallback_wait_time_retry_response));
 };
 
 
@@ -446,25 +446,29 @@ class DefaultDeliveryPolicy
     //! Get the retry policy
     virtual std::shared_ptr<RetryPolicyType_t> get_retry_policy() const
     {
-        return m_retry_policy;
+        return this->retry_policy;
     }
 
     //! Get the precondition
     virtual DeliveryPrecondition get_precondition() const
     {
-        return m_precondition;
+        return this->precondition;
     }
 
     //! Get the drop strategy
     virtual DropStrategy get_drop_strategy() const
     {
-        return m_drop_strategy;
+        return this->drop_strategy;
     }
 
-  protected:
-    std::shared_ptr<RetryPolicyType_t> m_retry_policy;
-    DeliveryPrecondition m_precondition{DeliveryPrecondition::NoPrecondition};
-    DropStrategy m_drop_strategy{DropStrategy::NoDrop};
+  public:
+    std::shared_ptr<RetryPolicyType_t> retry_policy;
+    DeliveryPrecondition precondition{DeliveryPrecondition::NoPrecondition};
+    DropStrategy drop_strategy{DropStrategy::NoDrop};
+
+    JS_OBJECT(JS_MEMBER(retry_policy),
+              JS_MEMBER(precondition),
+              JS_MEMBER(drop_strategy));
 };
 
 //! Default implementation of downstream specification
@@ -492,128 +496,129 @@ class DefaultDownstreamSpec
     //! Initialize the downstream spec
     virtual void init(const std::string &name, const std::string &action_name)
     {
-        m_name = name;
-        m_action_name = action_name;
-        m_debug_topic_source_data_sending = "debug/" + name + "/source_data/sending";
-        m_debug_topic_source_data_succeeded = "debug/" + name + "/source_data/succeeded";
-        m_debug_topic_source_data_failed = "debug/" + name + "/source_data/failed";
-        m_debug_topic_target_data_sending = "debug/" + name + "/target_data/sending";
-        m_debug_topic_target_data_succeeded = "debug/" + name + "/target_data/succeeded";
-        m_debug_topic_target_data_failed = "debug/" + name + "/target_data/failed";
+        this->name = name;
+        this->action_name = action_name;
+        this->debug_topic_source_data_sending = "debug/" + name + "/source_data/sending";
+        this->debug_topic_source_data_succeeded = "debug/" + name + "/source_data/succeeded";
+        this->debug_topic_source_data_failed = "debug/" + name + "/source_data/failed";
+        this->debug_topic_target_data_sending = "debug/" + name + "/target_data/sending";
+        this->debug_topic_target_data_succeeded = "debug/" + name + "/target_data/succeeded";
+        this->debug_topic_target_data_failed = "debug/" + name + "/target_data/failed";
     }
 
     //! Get the name
     virtual const std::string &get_name() const
     {
-        return m_name;
+        return this->name;
     }
 
     //! Set the name
     virtual void set_name(const std::string &name)
     {
-        m_name = name;
+        this->name = name;
     }
 
     //! Get the action name
     virtual const std::string &get_action_name() const
     {
-        return m_action_name;
+        return this->action_name;
     }
 
     //! Set the action name
     virtual void set_action_name(const std::string &action_name)
     {
-        m_action_name = action_name;
+        this->action_name = action_name;
     }
 
     //! Get the delivery policy
     virtual std::shared_ptr<DeliveryPolicy_t> get_delivery_policy()
     {
-        return m_delivery_policy;
+        return this->delivery_policy;
     }
 
     //! Set the delivery policy
     virtual std::shared_ptr<const DeliveryPolicy_t> set_delivery_policy(std::shared_ptr<DeliveryPolicy_t> policy)
     {
-        m_delivery_policy = policy;
-        return m_delivery_policy;
+        this->delivery_policy = policy;
+        return this->delivery_policy;
     }
 
     //! Get whether to use debug publish
     virtual bool get_use_debug_publish() const
     {
-        return m_use_debug_publish;
+        return this->use_debug_publish;
     }
 
     //! Get the debug topic for source data sending
     virtual std::optional<std::string> get_debug_topic_source_data_sending() const
     {
-        return m_debug_topic_source_data_sending;
+        return this->debug_topic_source_data_sending;
     }
 
     //! Get the debug topic for source data succeeded
     virtual std::optional<std::string> get_debug_topic_source_data_succeeded() const
     {
-        return m_debug_topic_source_data_succeeded;
+        return this->debug_topic_source_data_succeeded;
     }
 
     //! Get the debug topic for source data failed
     virtual std::optional<std::string> get_debug_topic_source_data_failed() const
     {
-        return m_debug_topic_source_data_failed;
+        return this->debug_topic_source_data_failed;
     }
 
     //! Get the debug topic for target data sending
     virtual std::optional<std::string> get_debug_topic_target_data_sending() const
     {
-        return m_debug_topic_target_data_sending;
+        return this->debug_topic_target_data_sending;
     }
 
     //! Get the debug topic for target data succeeded
     virtual std::optional<std::string> get_debug_topic_target_data_succeeded() const
     {
-        return m_debug_topic_target_data_succeeded;
+        return this->debug_topic_target_data_succeeded;
     }
 
     //! Get the debug topic for target data failed
     virtual std::optional<std::string> get_debug_topic_target_data_failed() const
     {
-        return m_debug_topic_target_data_failed;
+        return this->debug_topic_target_data_failed;
     }
 
-  protected:
+  protected: // no m_ prefix so that you can use json serialization easier
     //! The name of this output port
-    std::string m_name;
+    std::string name;
 
     //! The action name
-    std::string m_action_name;
+    std::string action_name;
 
     //! The delivery policy
-    std::shared_ptr<DeliveryPolicy_t> m_delivery_policy;
+    std::shared_ptr<DeliveryPolicy_t> delivery_policy;
 
     //! Whether to use debug publish
-    bool m_use_debug_publish{false};
+    bool use_debug_publish{false};
 
     //! Debug topics for publishing source data events
-    std::optional<std::string> m_debug_topic_source_data_sending;
-    std::optional<std::string> m_debug_topic_source_data_succeeded;
-    std::optional<std::string> m_debug_topic_source_data_failed;
+    std::optional<std::string> debug_topic_source_data_sending;
+    std::optional<std::string> debug_topic_source_data_succeeded;
+    std::optional<std::string> debug_topic_source_data_failed;
 
     //! Debug topics for publishing target data events
-    std::optional<std::string> m_debug_topic_target_data_sending;
-    std::optional<std::string> m_debug_topic_target_data_succeeded;
-    std::optional<std::string> m_debug_topic_target_data_failed;
+    std::optional<std::string> debug_topic_target_data_sending;
+    std::optional<std::string> debug_topic_target_data_succeeded;
+    std::optional<std::string> debug_topic_target_data_failed;
 
   public:
-    JS_OBJECT(JS_MEMBER_WITH_NAME(m_name, "name"),
-              JS_MEMBER_WITH_NAME(m_action_name, "action_name"),
-              JS_MEMBER_WITH_NAME(m_use_debug_publish, "use_debug_publish"),
-              JS_MEMBER_WITH_NAME(m_debug_topic_source_data_sending, "debug_topic_source_data_sending"),
-              JS_MEMBER_WITH_NAME(m_debug_topic_source_data_succeeded, "debug_topic_source_data_succeeded"),
-              JS_MEMBER_WITH_NAME(m_debug_topic_source_data_failed, "debug_topic_source_data_failed"),
-              JS_MEMBER_WITH_NAME(m_debug_topic_target_data_sending, "debug_topic_target_data_sending"),
-              JS_MEMBER_WITH_NAME(m_debug_topic_target_data_succeeded, "debug_topic_target_data_succeeded"),
-              JS_MEMBER_WITH_NAME(m_debug_topic_target_data_failed, "debug_topic_target_data_failed"));
+    JS_OBJECT(JS_MEMBER(name),
+              JS_MEMBER(action_name),
+              JS_MEMBER(delivery_policy),
+              JS_MEMBER(use_debug_publish),
+              JS_MEMBER(debug_topic_source_data_sending),
+              JS_MEMBER(debug_topic_source_data_succeeded),
+              JS_MEMBER(debug_topic_source_data_failed),
+              JS_MEMBER(debug_topic_target_data_sending),
+              JS_MEMBER(debug_topic_target_data_succeeded),
+              JS_MEMBER(debug_topic_target_data_failed));
 };
 
 //! Implementation of InitConfigConcept
@@ -635,36 +640,36 @@ class DefaultInitConfig
     //! Get downstream specs (const)
     virtual const std::vector<std::shared_ptr<DownstreamSpec_t>> &get_downstream_specs() const
     {
-        return m_downstream_specs;
+        return this->downstream_specs;
     }
 
     //! Get downstream specs (non-const)
     virtual std::vector<std::shared_ptr<DownstreamSpec_t>> &get_downstream_specs()
     {
-        return m_downstream_specs;
+        return this->downstream_specs;
     }
 
     //! Get number of buffer requests
     virtual int get_num_buffer_requests() const
     {
-        return m_num_buffer_requests;
+        return this->num_buffer_requests;
     }
 
     //! Get preserve request order flag
     virtual bool get_preserve_request_order() const
     {
-        return m_preserve_request_order;
+        return this->preserve_request_order;
     }
 
-  protected:
-    std::vector<std::shared_ptr<DownstreamSpec_t>> m_downstream_specs;
-    int m_num_buffer_requests{1};
-    bool m_preserve_request_order{true};
+  protected: // no m_ prefix so that you can use json serialization easier
+    std::vector<std::shared_ptr<DownstreamSpec_t>> downstream_specs;
+    int num_buffer_requests{1};
+    bool preserve_request_order{true};
 
   public:
-    JS_OBJECT(JS_MEMBER_WITH_NAME(m_num_buffer_requests, "num_buffer_requests"),
-              JS_MEMBER_WITH_NAME(m_preserve_request_order, "preserve_request_order"),
-              JS_MEMBER_WITH_NAME(m_downstream_specs, "downstream_specs"));
+    JS_OBJECT(JS_MEMBER(downstream_specs),
+              JS_MEMBER(num_buffer_requests),
+              JS_MEMBER(preserve_request_order));
 };
 
 //! Implementation of DownstreamConcept
