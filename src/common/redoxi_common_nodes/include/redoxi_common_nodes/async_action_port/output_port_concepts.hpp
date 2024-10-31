@@ -96,108 +96,6 @@ concept DeliveryStampConcept = requires(T t)
     requires std::copyable<T>;
 };
 
-//! The request to deliver to the downstream action
-template <typename T>
-concept DeliveryRequestConcept = requires(T t)
-{
-    //! Must have these type aliases
-    typename T::SourceDataType_t;
-    typename T::RetryPolicyType_t;
-    typename T::StampType_t;
-
-    //! Source data type must satisfy DeliverySourceDataConcept
-    requires DeliverySourceDataConcept<typename T::SourceDataType_t>;
-    //! Retry policy type must satisfy RetryPolicyConcept
-    requires RetryPolicyConcept<typename T::RetryPolicyType_t>;
-    //! Stamp type must satisfy DeliveryStampConcept
-    requires DeliveryStampConcept<typename T::StampType_t>;
-
-    //! Required default constructor
-    requires std::is_default_constructible_v<T>;
-
-    //! Required methods
-    {
-        t.get_source_data()
-        } -> std::same_as<std::shared_ptr<typename T::SourceDataType_t>>;
-    {
-        t.get_stamp()
-        } -> std::same_as<std::shared_ptr<typename T::StampType_t>>;
-    {
-        t.is_ping_request()
-        } -> std::same_as<bool>;
-    {
-        t.get_retry_policy()
-        } -> std::same_as<std::shared_ptr<typename T::RetryPolicyType_t>>;
-    {
-        t.get_precondition()
-        } -> std::same_as<DeliveryPrecondition>;
-    {
-        t.set_precondition(std::declval<DeliveryPrecondition>())
-        } -> std::same_as<void>;
-    {
-        t.get_drop_strategy()
-        } -> std::same_as<DropStrategy>;
-    {
-        t.set_drop_strategy(std::declval<DropStrategy>())
-        } -> std::same_as<void>;
-
-    //! Must have method to convert this to a ping request
-    //! To create a ping request, you do T().as_ping()
-    {
-        t.as_ping()
-        } -> std::same_as<void>;
-};
-
-//! A task to deliver to the downstream action
-template <typename T>
-concept DeliveryTaskConcept = requires(T t)
-{
-    requires std::is_default_constructible_v<T>;
-
-    //! Must have these type aliases
-    typename T::RequestType_t;
-    typename T::TargetDataType_t;
-    typename T::RetryPolicyType_t;
-
-    //! Request type must satisfy DeliveryRequestConcept
-    requires DeliveryRequestConcept<typename T::RequestType_t>;
-    //! Target data type must satisfy DeliveryTargetDataConcept
-    requires DeliveryTargetDataConcept<typename T::TargetDataType_t>;
-    //! Retry policy type must satisfy RetryPolicyConcept
-    requires RetryPolicyConcept<typename T::RetryPolicyType_t>;
-
-    //! Required methods
-    {
-        t.get_request()
-        } -> std::same_as<std::shared_ptr<typename T::RequestType_t>>;
-    {
-        t.set_request(std::declval<std::shared_ptr<typename T::RequestType_t>>())
-        } -> std::same_as<void>;
-    {
-        t.get_target_data()
-        } -> std::same_as<std::shared_ptr<typename T::TargetDataType_t>>;
-    {
-        t.set_target_data(std::declval<std::shared_ptr<typename T::TargetDataType_t>>())
-        } -> std::same_as<void>;
-    {
-        t.get_retry_policy()
-        } -> std::same_as<std::shared_ptr<typename T::RetryPolicyType_t>>;
-    {
-        t.set_retry_policy(std::declval<std::shared_ptr<typename T::RetryPolicyType_t>>())
-        } -> std::same_as<void>;
-    {
-        t.get_precondition()
-        } -> std::same_as<DeliveryPrecondition>;
-    {
-        t.set_precondition(std::declval<DeliveryPrecondition>())
-        } -> std::same_as<void>;
-    {
-        t.get_drop_strategy()
-        } -> std::same_as<DropStrategy>;
-    {
-        t.set_drop_strategy(std::declval<DropStrategy>())
-        } -> std::same_as<void>;
-};
 
 //! Concept for delivery policy that defines how to send downstream actions
 template <typename T>
@@ -226,6 +124,77 @@ concept DeliveryPolicyConcept = requires(T t)
         t.get_drop_strategy()
         } -> std::same_as<DropStrategy>;
 };
+
+//! The request to deliver to the downstream action
+template <typename T>
+concept DeliveryRequestConcept = requires(T t)
+{
+    //! Must have these type aliases
+    typename T::SourceDataType_t;
+    typename T::DeliveryPolicy_t;
+    typename T::StampType_t;
+
+    //! Source data type must satisfy DeliverySourceDataConcept
+    requires DeliverySourceDataConcept<typename T::SourceDataType_t>;
+    //! Delivery policy type must satisfy DeliveryPolicyConcept
+    requires DeliveryPolicyConcept<typename T::DeliveryPolicy_t>;
+    //! Stamp type must satisfy DeliveryStampConcept
+    requires DeliveryStampConcept<typename T::StampType_t>;
+
+    //! Required default constructor
+    requires std::is_default_constructible_v<T>;
+
+    //! Required methods
+    {
+        t.get_source_data()
+        } -> std::same_as<std::shared_ptr<typename T::SourceDataType_t>>;
+    {
+        t.get_stamp()
+        } -> std::same_as<std::shared_ptr<typename T::StampType_t>>;
+    {
+        t.is_ping_request()
+        } -> std::same_as<bool>;
+    {
+        t.get_delivery_policy()
+        } -> std::same_as<std::shared_ptr<typename T::DeliveryPolicy_t>>;
+
+    //! Must have method to convert this to a ping request
+    //! To create a ping request, you do T().as_ping()
+    {
+        t.as_ping()
+        } -> std::same_as<void>;
+};
+
+//! A task to deliver to the downstream action
+template <typename T>
+concept DeliveryTaskConcept = requires(T t)
+{
+    requires std::is_default_constructible_v<T>;
+
+    //! Must have these type aliases
+    typename T::RequestType_t;
+    typename T::TargetDataType_t;
+
+    //! Request type must satisfy DeliveryRequestConcept
+    requires DeliveryRequestConcept<typename T::RequestType_t>;
+    //! Target data type must satisfy DeliveryTargetDataConcept
+    requires DeliveryTargetDataConcept<typename T::TargetDataType_t>;
+
+    //! Required methods
+    {
+        t.get_request()
+        } -> std::same_as<std::shared_ptr<typename T::RequestType_t>>;
+    {
+        t.set_request(std::declval<std::shared_ptr<typename T::RequestType_t>>())
+        } -> std::same_as<void>;
+    {
+        t.get_target_data()
+        } -> std::same_as<std::shared_ptr<typename T::TargetDataType_t>>;
+    {
+        t.set_target_data(std::declval<std::shared_ptr<typename T::TargetDataType_t>>())
+        } -> std::same_as<void>;
+};
+
 
 //! Concept for downstream specification that defines how to send downstream actions
 template <typename T>

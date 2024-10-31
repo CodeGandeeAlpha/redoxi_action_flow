@@ -120,6 +120,17 @@ void RedoxiVideoReaderBase_v2::_set_status_code(int status_code)
     m_status_code = status_code;
 }
 
+std::shared_ptr<RedoxiVideoReaderBase_v2::DeliveryRequest_t>
+    RedoxiVideoReaderBase_v2::_create_delivery_request(std::shared_ptr<SourceData_t> source_data)
+{
+    //! Create delivery request
+    auto req = std::make_shared<DeliveryRequest_t>();
+    req->set_source_data(source_data);
+
+    return req;
+}
+
+
 void RedoxiVideoReaderBase_v2::_step()
 {
     if (m_status_code != NodeStatusCode::STARTED) {

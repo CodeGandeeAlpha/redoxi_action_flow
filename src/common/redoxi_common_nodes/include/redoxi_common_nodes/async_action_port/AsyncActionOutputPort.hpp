@@ -40,6 +40,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
     using Downstream_t = typename TSpec::Downstream_t;
     using ActionType_t = typename TSpec::ActionType_t;
     using ActionDataTrait_t = typename TSpec::ActionDataTrait_t;
+    using RetryPolicyType_t = typename DeliveryRequest_t::RetryPolicyType_t;
 
     // synchronous action sender
     using SyncActionSender_t = SyncActionSender<ActionType_t>;
@@ -89,6 +90,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         if (m_delivery_graph != nullptr) {
             m_delivery_graph->wait_for_all();
         }
+        m_task_group.wait();
     }
 
   public:
@@ -563,7 +565,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
     //! delivery data to downstream, with retry logic
     virtual int _deliver_data_with_retry(std::shared_ptr<TargetData_t> target_data,
-                                         std::shared_ptr<Downstream_t> ds)
+                                         std::shared_ptr<Downstream_t> ds,
+                                         std::shared_ptr<RetryPolicyType_t> prefer_retry_policy = nullptr)
     {
         //! Set up retry strategy
         int attempts = 0;

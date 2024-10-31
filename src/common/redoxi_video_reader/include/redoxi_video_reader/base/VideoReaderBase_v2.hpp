@@ -173,7 +173,7 @@ class RedoxiVideoReaderBase_v2 : public rclcpp::Node,
      * @return the delivery request
      */
     virtual std::shared_ptr<DeliveryRequest_t>
-        _create_delivery_request(const SourceData_t &source_data);
+        _create_delivery_request(std::shared_ptr<SourceData_t> source_data);
 
     //! create primary output port
     virtual std::shared_ptr<OutputPort_t> _create_primary_output_port();

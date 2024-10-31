@@ -354,7 +354,6 @@ class DefaultDeliveryTask
   public:
     using RequestType_t = RequestType;
     using TargetDataType_t = TargetDataType;
-    using RetryPolicyType_t = RetryPolicyType;
     ~DefaultDeliveryTask() = default;
 
     DefaultDeliveryTask()
@@ -386,48 +385,9 @@ class DefaultDeliveryTask
         m_target_data = target_data;
     }
 
-    //! Get the retry policy
-    virtual std::shared_ptr<RetryPolicyType_t> get_retry_policy() const
-    {
-        return m_retry_policy;
-    }
-
-    //! Set the retry policy
-    virtual void set_retry_policy(std::shared_ptr<RetryPolicyType_t> policy)
-    {
-        m_retry_policy = policy;
-    }
-
-    //! Get the precondition
-    virtual DeliveryPrecondition get_precondition() const
-    {
-        return m_precondition;
-    }
-
-    //! Set the precondition
-    virtual void set_precondition(DeliveryPrecondition precondition)
-    {
-        m_precondition = precondition;
-    }
-
-    //! Get the drop strategy
-    virtual DropStrategy get_drop_strategy() const
-    {
-        return m_drop_strategy;
-    }
-
-    //! Set the drop strategy
-    virtual void set_drop_strategy(DropStrategy strategy)
-    {
-        m_drop_strategy = strategy;
-    }
-
   protected:
     std::shared_ptr<RequestType_t> m_request;
     std::shared_ptr<TargetDataType_t> m_target_data;
-    std::shared_ptr<RetryPolicyType_t> m_retry_policy;
-    DeliveryPrecondition m_precondition{DeliveryPrecondition::NoPrecondition};
-    DropStrategy m_drop_strategy{DropStrategy::NoDrop};
 };
 
 //! Default implementation of delivery policy
