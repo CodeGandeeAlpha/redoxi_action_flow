@@ -40,7 +40,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
     using Downstream_t = typename TSpec::Downstream_t;
     using ActionType_t = typename TSpec::ActionType_t;
     using ActionDataTrait_t = typename TSpec::ActionDataTrait_t;
-    using RetryPolicyType_t = typename DeliveryRequest_t::RetryPolicyType_t;
+    using DeliveryPolicy_t = typename DeliveryRequest_t::DeliveryPolicy_t;
+    using RetryPolicy_t = typename DeliveryPolicy_t::RetryPolicyType_t;
 
     // synchronous action sender
     using SyncActionSender_t = SyncActionSender<ActionType_t>;
@@ -74,7 +75,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
   public:
     //! Try to push a request to the port
     //! @return true if success, otherwise false
-    virtual bool try_push_request(std::shared_ptr<DeliveryRequest_t> request)
+    virtual bool try_push_request(const DeliveryRequest_t &request)
     {
         // must started first
         RDX_ASSERT_CHECK_TRUE(m_status == NodeStatusCode::STARTED, "[{}] must started first", __func__);
@@ -99,11 +100,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
      * @note state transition: BEFORE_INIT -> STOPPED
      * @return 0 if success, otherwise return error code
      */
-    virtual int init(std::shared_ptr<InitConfig_t> init_config)
+    virtual int init(const InitConfig_t &init_config)
     {
-        // check init_config, should not be set yet
-        RDX_ASSERT_CHECK_TRUE(m_init_config == nullptr, "[{}] init_config is already set", __func__);
-
         // state must be BEFORE_INIT
         RDX_ASSERT_CHECK_TRUE(m_status == NodeStatusCode::BEFORE_INIT, "[{}] state must be BEFORE_INIT", __func__);
 
@@ -204,11 +202,11 @@ class AsyncActionOutputPort : public IStartStopProtocol
     }
 
     // get the init config
-    std::shared_ptr<const InitConfig_t> get_init_config() const
+    const InitConfig_t &get_init_config() const
     {
         return m_init_config;
     }
-    std::shared_ptr<InitConfig_t> get_init_config()
+    InitConfig_t &get_init_config()
     {
         return m_init_config;
     }
@@ -258,9 +256,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         // set node params
         RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "Setting node params ...");
-        auto buffer_size = m_init_config->get_num_buffer_requests();
+        auto buffer_size = m_init_config.get_num_buffer_requests();
         node.set_input_data_buffer_size(buffer_size);
-        node.set_preserve_order(m_init_config->get_preserve_request_order());
+        node.set_preserve_order(m_init_config.get_preserve_request_order());
 
         // sync mode, all functions are executed in the graph
         RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "Setting node to sync mode ...");
@@ -309,16 +307,13 @@ class AsyncActionOutputPort : public IStartStopProtocol
     //! @return 0 if success, otherwise return error code
     virtual int _connect_to_downstreams()
     {
-        //! Ensure m_init_config is set before connecting to downstreams
-        RDX_ASSERT_CHECK_TRUE(m_init_config != nullptr,
-                              "[{}] Init config is not set", __func__);
 
         // find and connect to downstreams
         m_downstreams.clear();
-        for (auto &it : m_init_config->get_downstream_specs()) {
-            auto ds = std::make_shared<Downstream_t>();
+        for (auto &it : m_init_config.get_downstream_specs()) {
+            Downstream_t ds;
             RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "Initializing downstream ...");
-            auto ret = ds->init_by_spec(it, m_parent_node);
+            auto ret = ds.init_by_spec(it, m_parent_node);
             if (ret != 0) {
                 RDX_RAISE_ERROR("[{}] failed to initialize downstream", __func__);
             }
@@ -334,7 +329,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         m_status = status_code;
     }
 
-    virtual void _create_frame_delivery_task(std::shared_ptr<DeliveryRequest_t> request, DeliveryTask_t &task_output)
+    virtual void _create_frame_delivery_task(const DeliveryRequest_t &request, DeliveryTask_t &task_output)
     {
         task_output.set_request(request);
     }
@@ -351,7 +346,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
      */
     virtual int _debug_publish_failed_to_send_to_downstream(const SourceData_t *source_data,
                                                             const TargetData_t *target_data,
-                                                            std::shared_ptr<Downstream_t> ds,
+                                                            const Downstream_t &ds,
                                                             int64_t ith_attempt,
                                                             int64_t max_attempts)
     {
@@ -360,7 +355,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         }
 
         if (source_data != nullptr) {
-            auto pub = ds->get_debug_pub_source_data_failed();
+            auto pub = ds.get_debug_pub_source_data_failed();
             if (pub != nullptr) {
                 SourceData_t::PublishMessageType_t source_pub_msg;
                 source_data->to_publish_message(source_pub_msg);
@@ -369,7 +364,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
             }
         }
         if (target_data != nullptr) {
-            auto pub = ds->get_debug_pub_target_data_failed();
+            auto pub = ds.get_debug_pub_target_data_failed();
             if (pub != nullptr) {
                 TargetData_t::PublishMessageType_t target_pub_msg;
                 target_data->to_publish_message(target_pub_msg);
@@ -391,7 +386,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
      */
     virtual int _debug_publish_sending_to_downstream(const SourceData_t *source_data,
                                                      const TargetData_t *target_data,
-                                                     std::shared_ptr<Downstream_t> ds,
+                                                     const Downstream_t &ds,
                                                      int64_t ith_attempt,
                                                      int64_t max_attempts)
     {
@@ -400,7 +395,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         }
 
         if (source_data != nullptr) {
-            auto pub = ds->get_debug_pub_source_data_sending();
+            auto pub = ds.get_debug_pub_source_data_sending();
             if (pub != nullptr) {
                 SourceData_t::PublishMessageType_t source_pub_msg;
                 source_data->to_publish_message(source_pub_msg);
@@ -409,7 +404,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
             }
         }
         if (target_data != nullptr) {
-            auto pub = ds->get_debug_pub_target_data_sending();
+            auto pub = ds.get_debug_pub_target_data_sending();
             if (pub != nullptr) {
                 TargetData_t::PublishMessageType_t target_pub_msg;
                 target_data->to_publish_message(target_pub_msg);
@@ -431,7 +426,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
      */
     virtual int _debug_publish_sent_to_downstream(const SourceData_t *source_data,
                                                   const TargetData_t *target_data,
-                                                  std::shared_ptr<Downstream_t> ds,
+                                                  const Downstream_t &ds,
                                                   int64_t ith_attempt,
                                                   int64_t max_attempts)
     {
@@ -440,7 +435,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         }
 
         if (source_data != nullptr) {
-            auto pub = ds->get_debug_pub_source_data_succeeded();
+            auto pub = ds.get_debug_pub_source_data_succeeded();
             if (pub != nullptr) {
                 SourceData_t::PublishMessageType_t source_pub_msg;
                 source_data->to_publish_message(source_pub_msg);
@@ -449,7 +444,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
             }
         }
         if (target_data != nullptr) {
-            auto pub = ds->get_debug_pub_target_data_succeeded();
+            auto pub = ds.get_debug_pub_target_data_succeeded();
             if (pub != nullptr) {
                 TargetData_t::PublishMessageType_t target_pub_msg;
                 target_data->to_publish_message(target_pub_msg);
@@ -460,9 +455,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
         return 0;
     }
 
-    virtual int _create_target_data(TargetData_t &target_data, std::shared_ptr<const DeliveryRequest_t> request)
+    virtual int _create_target_data(TargetData_t &target_data, const DeliveryRequest_t &request)
     {
-        target_data.set_source_data_uuid(request->get_source_data()->get_uuid());
+        target_data.set_source_data_uuid(request.get_source_data().get_uuid());
         return 0;
     }
 
@@ -482,18 +477,18 @@ class AsyncActionOutputPort : public IStartStopProtocol
         // check if any downstream is ready to accept new frame
         bool downstream_ready = false;
         for (auto &ds : m_downstreams) {
-            auto delivery_policy = ds->get_downstream_spec()->get_delivery_policy();
+            auto &delivery_policy = ds.get_downstream_spec().get_delivery_policy();
 
             // should we ping at all?
-            auto precondition = delivery_policy->get_precondition();
+            auto precondition = delivery_policy.get_precondition();
             if (precondition == DeliveryPrecondition::NoPrecondition) {
                 // some downstream is assumed to be always ready
                 downstream_ready = true;
             } else {
                 // check if downstream is ready
-                auto retry_policy = delivery_policy->get_retry_policy();
-                auto fallback_wait_time = retry_policy->get_fallback_wait_time_retry_response();
-                auto ping_wait_time = retry_policy->get_wait_time_retry_response().value_or(fallback_wait_time);
+                auto &retry_policy = delivery_policy.get_retry_policy();
+                auto fallback_wait_time = retry_policy.get_fallback_wait_time_retry_response();
+                auto ping_wait_time = retry_policy.get_wait_time_retry_response().value_or(fallback_wait_time);
                 downstream_ready |= _ping(ds, ping_wait_time);
             }
 
@@ -510,7 +505,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         // deliver data to downstreams
         // we define lambda function here because for later use in other cases
-        auto func_deliver_data = [this](std::shared_ptr<TargetData_t> target_data) -> int {
+        auto func_deliver_data = [this](TargetData_t &target_data) -> int {
             int ret = 0;
             bool sent = false;
             for (auto &ds : m_downstreams) {
@@ -518,7 +513,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 if (ret != 0) {
                     RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
                                  "Failed to deliver frame to downstream {}",
-                                 ds->get_downstream_spec()->get_name());
+                                 ds.get_downstream_spec().get_name());
                 } else {
                     sent = true;
                 }
@@ -530,12 +525,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
         };
 
         // create target delivery data
-        auto target_data = std::make_shared<TargetData_t>();
-        _create_target_data(*target_data, task.get_request());
+        TargetData_t target_data;
+        _create_target_data(target_data, task.get_request());
 
         // do whatever preprocessing you need
         if (m_cb_on_deliver_before) {
-            auto ret = m_cb_on_deliver_before(*target_data, task);
+            auto ret = m_cb_on_deliver_before(target_data, task);
             if (ret != 0) {
                 RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "on_deliver_before callback failed");
             }
@@ -554,7 +549,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         // do whatever postprocessing you need
         if (m_cb_on_deliver_after) {
-            auto ret = m_cb_on_deliver_after(*target_data, task, result);
+            auto ret = m_cb_on_deliver_after(target_data, task, result);
             if (ret != 0) {
                 RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "on_deliver_after callback failed");
             }
@@ -564,22 +559,25 @@ class AsyncActionOutputPort : public IStartStopProtocol
     }
 
     //! delivery data to downstream, with retry logic
-    virtual int _deliver_data_with_retry(std::shared_ptr<TargetData_t> target_data,
-                                         std::shared_ptr<Downstream_t> ds,
-                                         std::shared_ptr<RetryPolicyType_t> prefer_retry_policy = nullptr)
+    virtual int _deliver_data_with_retry(const TargetData_t &target_data,
+                                         const Downstream_t &ds,
+                                         const RetryPolicy_t *prefer_retry_policy = nullptr)
     {
         //! Set up retry strategy
         int attempts = 0;
 
-        auto delivery_policy = ds->get_downstream_spec()->get_delivery_policy();
-        auto retry_policy = delivery_policy->get_retry_policy();
+        auto &delivery_policy = ds.get_downstream_spec().get_delivery_policy();
+        auto retry_policy = delivery_policy.get_retry_policy();
+        if (prefer_retry_policy != nullptr) {
+            retry_policy = *prefer_retry_policy;
+        }
 
         //! +1 for the first attempt
-        bool no_drop = delivery_policy->get_drop_strategy() == DropStrategy::NoDrop;
-        auto max_attempts = retry_policy->get_number_of_retry(true).value() + 1;
-        auto timeout_each_attempt = retry_policy->get_wait_time_retry_response(true).value();
-        auto interval_between_attempts = retry_policy->get_wait_time_between_retry(true).value();
-        auto msg_uuid = target_data->get_source_data_uuid();
+        bool no_drop = delivery_policy.get_drop_strategy() == DropStrategy::NoDrop;
+        auto max_attempts = retry_policy.get_number_of_retry(true).value() + 1;
+        auto timeout_each_attempt = retry_policy.get_wait_time_retry_response(true).value();
+        auto interval_between_attempts = retry_policy.get_wait_time_between_retry(true).value();
+        auto msg_uuid = target_data.get_source_data_uuid();
 
         while (attempts < max_attempts || no_drop) {
             if (!rclcpp::ok()) {
@@ -588,13 +586,13 @@ class AsyncActionOutputPort : public IStartStopProtocol
             // for no_drop, we need to keep trying until the frame is delivered (return in the loop)
 
             //! Publish the frame to the debug topic
-            _debug_publish_sending_to_downstream(nullptr, target_data.get(), ds, attempts + 1, max_attempts);
+            _debug_publish_sending_to_downstream(nullptr, &target_data, ds, attempts + 1, max_attempts);
 
             //! Send the frame to the downstream
             auto result = _send_data_to_downstream(target_data, ds, timeout_each_attempt);
             if (!result.goal_handle_future.valid()) {
                 RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Not sending frame to downstream {}, goal handle future is invalid",
-                             boost::uuids::to_string(msg_uuid), ds->get_downstream_spec()->get_name());
+                             boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
             } else {
                 bool wait_indefinitely = timeout_each_attempt < DefaultTimeUnit_t::zero();
 
@@ -603,19 +601,19 @@ class AsyncActionOutputPort : public IStartStopProtocol
                     switch (*result.response_code) {
                         case ActionDownstreamResponse::ACCEPTED:
                             RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame accepted by downstream {}",
-                                         boost::uuids::to_string(msg_uuid), ds->get_downstream_spec()->get_name());
+                                         boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
 
                             //! Publish the frame sent message
-                            _debug_publish_sent_to_downstream(nullptr, target_data.get(), ds, attempts + 1, max_attempts);
+                            _debug_publish_sent_to_downstream(nullptr, &target_data, ds, attempts + 1, max_attempts);
 
                             return 0; // Success
                         case ActionDownstreamResponse::REJECTED:
                             RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame rejected by downstream {}",
-                                         boost::uuids::to_string(msg_uuid), ds->get_downstream_spec()->get_name());
+                                         boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
                             break;
                         case ActionDownstreamResponse::TIMEOUT:
                             RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while sending frame to downstream {}",
-                                         boost::uuids::to_string(msg_uuid), ds->get_downstream_spec()->get_name());
+                                         boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
                             break;
                     }
                 } else {
@@ -630,7 +628,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                     } else {
                         //! Regard as failure without additional waiting
                         RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while waiting for goal handle from downstream {}",
-                                     boost::uuids::to_string(msg_uuid), ds->get_downstream_spec()->get_name());
+                                     boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
                     }
                 }
             }
@@ -638,30 +636,30 @@ class AsyncActionOutputPort : public IStartStopProtocol
             attempts++;
             if (attempts < max_attempts) {
                 RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Retrying frame delivery to downstream {} (attempt {}/{})",
-                             boost::uuids::to_string(msg_uuid), ds->get_downstream_spec()->get_name(), attempts + 1, max_attempts);
+                             boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name(), attempts + 1, max_attempts);
             }
 
             // sleep for the interval between attempts
             std::this_thread::sleep_for(interval_between_attempts);
         }
 
-        _debug_publish_failed_to_send_to_downstream(nullptr, target_data.get(), ds, attempts, max_attempts);
+        _debug_publish_failed_to_send_to_downstream(nullptr, &target_data, ds, attempts, max_attempts);
 
         RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Failed to deliver frame to downstream {} after {} attempts",
-                     boost::uuids::to_string(msg_uuid), ds->get_downstream_spec()->get_name(), max_attempts);
+                     boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name(), max_attempts);
         return -1;
     }
 
     //! send a single piece of data to downstream
-    virtual SendResult_t _send_data_to_downstream(std::shared_ptr<TargetData_t> target_data,
-                                                  std::shared_ptr<Downstream_t> ds,
+    virtual SendResult_t _send_data_to_downstream(const TargetData_t &target_data,
+                                                  const Downstream_t &ds,
                                                   TimeUnit_t timeout)
     {
         //! Get the action client for the downstream
-        auto client = ds->get_action_client();
+        auto client = ds.get_action_client();
 
         //! Create a goal object and populate it with frame message data
-        auto &goal = target_data->get_goal();
+        auto &goal = target_data.get_goal();
 
         //! Use SyncActionSender to send the goal and wait for the response
         SyncActionSender_t sender(m_parent_node);
@@ -672,12 +670,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
     //! Ping the downstream node
     //! @return true if success, otherwise false
-    virtual bool _ping(std::shared_ptr<Downstream_t> ds, TimeUnit_t timeout)
+    virtual bool _ping(const Downstream_t &ds, TimeUnit_t timeout)
     {
         //! Create a target data object for pinging
-        auto target_data = std::make_shared<TargetData_t>();
-        target_data->set_source_data_uuid(boost::uuids::random_generator()());
-        ActionDataTrait_t::mark_with_control_signal(target_data->get_goal(), ControlSignalCode::Ping);
+        TargetData_t target_data;
+        target_data.set_source_data_uuid(boost::uuids::random_generator()());
+        ActionDataTrait_t::mark_with_control_signal(target_data.get_goal(), ControlSignalCode::Ping);
 
         //! Send the ping message to the downstream
         auto result = _send_data_to_downstream(target_data, ds, timeout);
@@ -708,10 +706,10 @@ class AsyncActionOutputPort : public IStartStopProtocol
     std::atomic<bool> m_publish_to_debug_topic = false;
 
     // init config
-    std::shared_ptr<InitConfig_t> m_init_config;
+    InitConfig_t m_init_config;
 
     // downstreams
-    std::vector<std::shared_ptr<Downstream_t>> m_downstreams;
+    std::vector<Downstream_t> m_downstreams;
 
     // the parent node
     rclcpp::Node *m_parent_node = nullptr;

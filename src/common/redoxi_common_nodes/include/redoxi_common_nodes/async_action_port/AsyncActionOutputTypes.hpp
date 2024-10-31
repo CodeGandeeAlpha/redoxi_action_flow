@@ -373,6 +373,12 @@ class DefaultDeliveryRequest
         return m_source_data;
     }
 
+    //! Set the source data
+    virtual void set_source_data(const SourceDataType_t &source_data)
+    {
+        m_source_data = source_data;
+    }
+
     //! Get the stamp
     virtual const StampType_t &get_stamp() const
     {
@@ -396,13 +402,17 @@ class DefaultDeliveryRequest
     {
         return m_delivery_policy;
     }
+    //! Set the delivery policy
+    virtual void set_delivery_policy(const DeliveryPolicy_t &delivery_policy)
+    {
+        m_delivery_policy = delivery_policy;
+    }
 
     //! Get the delivery policy
     DeliveryPolicy_t &get_delivery_policy()
     {
         return m_delivery_policy;
     }
-
     /**
      * Convert this to a ping request, which is always a no-precondition and can always be dropped.
      * If not so, it will be set. If wait time retry response is not set, it will be set to the default value.

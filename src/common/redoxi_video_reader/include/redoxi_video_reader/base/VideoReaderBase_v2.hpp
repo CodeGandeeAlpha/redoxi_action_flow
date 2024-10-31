@@ -54,21 +54,21 @@ class RedoxiVideoReaderBase_v2 : public rclcpp::Node,
   public:
     //! Initialize with configurations, must be called once before open()
     //! state transition: BEFORE_INIT -> CLOSED
-    virtual int init(std::shared_ptr<InitConfig_t> config,
-                     std::shared_ptr<RuntimeConfig_t> runtime_config);
+    virtual int init(const InitConfig_t &config,
+                     const RuntimeConfig_t &runtime_config);
 
     /**
      * @brief Update the init config, only when the node is in CLOSED status
      * @param config the new init config
      * @return 0 if success, otherwise error code
      */
-    virtual int update_init_config(std::shared_ptr<InitConfig_t> config);
+    virtual int update_init_config(const InitConfig_t &config);
 
     /**
      * @brief Get the init config
      * @return the init config
      */
-    virtual const std::shared_ptr<InitConfig_t> &get_init_config() const
+    virtual const InitConfig_t &get_init_config() const
     {
         return m_init_config;
     }
@@ -78,13 +78,13 @@ class RedoxiVideoReaderBase_v2 : public rclcpp::Node,
      * @param config the new runtime config
      * @return 0 if success, otherwise error code
      */
-    virtual int update_runtime_config(std::shared_ptr<RuntimeConfig_t> config);
+    virtual int update_runtime_config(const RuntimeConfig_t &config);
 
     /**
      * @brief Get the runtime config
      * @return the runtime config
      */
-    virtual const std::shared_ptr<RuntimeConfig_t> &get_runtime_config() const
+    virtual const RuntimeConfig_t &get_runtime_config() const
     {
         return m_runtime_config;
     }
@@ -172,8 +172,7 @@ class RedoxiVideoReaderBase_v2 : public rclcpp::Node,
      * @param source_data the source data to be filled with the read frame
      * @return the delivery request
      */
-    virtual std::shared_ptr<DeliveryRequest_t>
-        _create_delivery_request(std::shared_ptr<SourceData_t> source_data);
+    virtual DeliveryRequest_t _create_delivery_request(const SourceData_t &source_data);
 
     //! create primary output port
     virtual std::shared_ptr<OutputPort_t> _create_primary_output_port();
@@ -201,8 +200,8 @@ class RedoxiVideoReaderBase_v2 : public rclcpp::Node,
     std::shared_ptr<OutputPort_t> m_primary_output_port;
 
     // configuration
-    std::shared_ptr<InitConfig_t> m_init_config;
-    std::shared_ptr<RuntimeConfig_t> m_runtime_config;
+    InitConfig_t m_init_config;
+    RuntimeConfig_t m_runtime_config;
 
     // status code
     std::atomic<int> m_status_code{NodeStatusCode::BEFORE_INIT};

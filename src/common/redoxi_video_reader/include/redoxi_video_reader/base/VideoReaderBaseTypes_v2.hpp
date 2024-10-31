@@ -23,7 +23,7 @@ struct REDOXI_VIDEO_READER_PUBLIC InitConfig {
     virtual ~InitConfig() = default;
 
     //! The downstream nodes, indexed by node name
-    std::map<std::string, std::shared_ptr<OutputPortSpec::DownstreamSpec_t>> downstreams;
+    std::map<std::string, OutputPortSpec::DownstreamSpec_t> downstreams;
 
     //! create the debug publish topic for this video reader?
     bool create_debug_pub = true;
@@ -55,19 +55,12 @@ class REDOXI_VIDEO_READER_PUBLIC RuntimeConfig
     virtual ~RuntimeConfig() = default;
     RuntimeConfig()
     {
-        fallback_primary_output_policy = std::make_shared<OutputPortSpec::DeliveryPolicy_t>();
-
-        // default policy for making frame delivery request
-        frame_request_policy = std::make_shared<RequestPolicy>();
-
-        {
-            auto p = frame_request_policy;
-            p->set_drop_strategy(DropStrategy::DropAsNeeded);
-            p->set_precondition(DeliveryPrecondition::AnyDownstreamReady);
-            p->get_retry_policy()->set_number_of_retry(DEFAULT_REQUEST_RETRY_NUMBER);
-            p->get_retry_policy()->set_wait_time_between_retry(DEFAULT_REQUEST_RETRY_INTERVAL);
-            p->get_retry_policy()->set_wait_time_retry_response(DEFAULT_REQUEST_RETRY_RESPONSE_TIME);
-        }
+        auto &p = frame_request_policy;
+        p.set_drop_strategy(DropStrategy::DropAsNeeded);
+        p.set_precondition(DeliveryPrecondition::AnyDownstreamReady);
+        p.get_retry_policy().set_number_of_retry(DEFAULT_REQUEST_RETRY_NUMBER);
+        p.get_retry_policy().set_wait_time_between_retry(DEFAULT_REQUEST_RETRY_INTERVAL);
+        p.get_retry_policy().set_wait_time_retry_response(DEFAULT_REQUEST_RETRY_RESPONSE_TIME);
     }
 
     //! The step interval in ms
@@ -88,10 +81,10 @@ class REDOXI_VIDEO_READER_PUBLIC RuntimeConfig
     bool publish_to_debug_topic = false;
 
     //! fallback delivery policy for primary output port
-    std::shared_ptr<OutputPortSpec::DeliveryPolicy_t> fallback_primary_output_policy;
+    OutputPortSpec::DeliveryPolicy_t fallback_primary_output_policy;
 
     //! delivery policy for frame delivery request
-    std::shared_ptr<RequestPolicy> frame_request_policy;
+    RequestPolicy frame_request_policy;
 
     //! Load parameters from node, this will override empty existing parameters
     virtual void from_parameters(rclcpp::Node *){};

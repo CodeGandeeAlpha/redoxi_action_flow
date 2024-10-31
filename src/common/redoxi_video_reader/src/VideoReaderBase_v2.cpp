@@ -32,17 +32,12 @@ bool RedoxiVideoReaderBase_v2::get_publish_to_debug_topic() const
     return m_publish_to_debug_topic;
 }
 
-int RedoxiVideoReaderBase_v2::init(std::shared_ptr<InitConfig_t> config,
-                                   std::shared_ptr<RuntimeConfig_t> runtime_config)
+int RedoxiVideoReaderBase_v2::init(const InitConfig_t &config,
+                                   const RuntimeConfig_t &runtime_config)
 {
     //! Check if already initialized
     if (m_status_code != NodeStatusCode::BEFORE_INIT) {
         RDX_RAISE_ERROR("[{}] Cannot init in status {}", __func__, m_status_code);
-    }
-
-    //! Check input parameters
-    if (!config || !runtime_config) {
-        RDX_RAISE_ERROR("[{}] Invalid input parameters", __func__);
     }
 
     //! Create implementation details of this node
@@ -61,14 +56,8 @@ int RedoxiVideoReaderBase_v2::init(std::shared_ptr<InitConfig_t> config,
     return 0;
 }
 
-int RedoxiVideoReaderBase_v2::update_init_config(std::shared_ptr<InitConfig_t> config)
+int RedoxiVideoReaderBase_v2::update_init_config(const InitConfig_t &config)
 {
-    //! Check input parameters
-    if (!config) {
-        RDX_RAISE_ERROR("[{}] Invalid input parameters", __func__);
-        return -1;
-    }
-
     //! Can only update init config in CLOSED status
     if (m_status_code != NodeStatusCode::CLOSED) {
         RDX_RAISE_ERROR("[{}] Cannot update init config in status {}", __func__, m_status_code);
@@ -88,14 +77,8 @@ int RedoxiVideoReaderBase_v2::update_init_config(std::shared_ptr<InitConfig_t> c
     return 0;
 }
 
-int RedoxiVideoReaderBase_v2::update_runtime_config(std::shared_ptr<RuntimeConfig_t> config)
+int RedoxiVideoReaderBase_v2::update_runtime_config(const RuntimeConfig_t &config)
 {
-    //! Check input parameters
-    if (!config) {
-        RDX_RAISE_ERROR("[{}] Invalid input parameters", __func__);
-        return -1;
-    }
-
     //! Can only update runtime config in CLOSED or STOPPED status
     if (m_status_code != NodeStatusCode::CLOSED && m_status_code != NodeStatusCode::STOPPED) {
         RDX_RAISE_ERROR("[{}] Cannot update runtime config in status {}", __func__, m_status_code);
@@ -111,7 +94,7 @@ int RedoxiVideoReaderBase_v2::update_runtime_config(std::shared_ptr<RuntimeConfi
 std::shared_ptr<RedoxiVideoReaderImpl_v2> RedoxiVideoReaderBase_v2::_create_impl()
 {
     auto impl = std::make_shared<RedoxiVideoReaderImpl_v2>();
-    impl->m_ros_time_token = std::make_shared<RosTimeToken>(this);
+    impl->m_ros_time_token = std::make_shared<RosTimeToken>(this, m_runtime_config.frame_interval);
     return impl;
 }
 
@@ -120,12 +103,12 @@ void RedoxiVideoReaderBase_v2::_set_status_code(int status_code)
     m_status_code = status_code;
 }
 
-std::shared_ptr<RedoxiVideoReaderBase_v2::DeliveryRequest_t>
-    RedoxiVideoReaderBase_v2::_create_delivery_request(std::shared_ptr<SourceData_t> source_data)
+RedoxiVideoReaderBase_v2::DeliveryRequest_t
+    RedoxiVideoReaderBase_v2::_create_delivery_request(const SourceData_t &source_data)
 {
     //! Create delivery request
-    auto req = std::make_shared<DeliveryRequest_t>();
-    req->set_source_data(source_data);
+    DeliveryRequest_t req;
+    req.set_source_data(source_data);
 
     return req;
 }
@@ -150,12 +133,12 @@ void RedoxiVideoReaderBase_v2::_step()
         auto msg_uuid = source_data->get_uuid();
 
         // get qos
-        auto qos = m_runtime_config->frame_request_policy;
+        auto &qos = m_runtime_config.frame_request_policy;
 
         // publish
-        auto max_attempts = qos->get_retry_policy()->get_number_of_retry(true).value() + 1;
-        auto interval_between_attempts = qos->get_retry_policy()->get_wait_time_between_retry(true).value();
-        auto drop_frame_strategy = qos->get_drop_strategy();
+        auto max_attempts = qos.get_retry_policy().get_number_of_retry(true).value() + 1;
+        auto interval_between_attempts = qos.get_retry_policy().get_wait_time_between_retry(true).value();
+        auto drop_frame_strategy = qos.get_drop_strategy();
 
         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
                      "try to push request in {} attempts, retry interval={}ms",
