@@ -83,6 +83,14 @@ class AsyncActionOutputPort : public IStartStopProtocol
         return m_delivery_task_node->put_data(task);
     }
 
+    // wait for all requests to be processed
+    void wait_for_all_requests()
+    {
+        if (m_delivery_graph != nullptr) {
+            m_delivery_graph->wait_for_all();
+        }
+    }
+
   public:
     /**
      * @brief Initialize the port

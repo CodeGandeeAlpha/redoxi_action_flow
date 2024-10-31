@@ -14,6 +14,7 @@ template <typename T>
 concept DeliverySourceDataConcept = requires(T t)
 {
     requires std::copyable<T>;
+    requires std::is_default_constructible_v<T>;
 
     //! The source data can be converted to this type for publishing
     typename T::PublishMessageType_t;
@@ -86,9 +87,14 @@ concept DeliveryTargetDataConcept = requires(T t)
         std::declval<const T &>().to_publish_message(std::declval<typename T::PublishMessageType_t &>())
         } -> std::same_as<int>;
 };
+
 //! data collected during the delivery process
 template <typename T>
-concept DeliveryStampConcept = std::copyable<T>;
+concept DeliveryStampConcept = requires(T t)
+{
+    requires std::is_default_constructible_v<T>;
+    requires std::copyable<T>;
+};
 
 //! The request to deliver to the downstream action
 template <typename T>
@@ -146,6 +152,8 @@ concept DeliveryRequestConcept = requires(T t)
 template <typename T>
 concept DeliveryTaskConcept = requires(T t)
 {
+    requires std::is_default_constructible_v<T>;
+
     //! Must have these type aliases
     typename T::RequestType_t;
     typename T::TargetDataType_t;
@@ -195,6 +203,8 @@ concept DeliveryTaskConcept = requires(T t)
 template <typename T>
 concept DeliveryPolicyConcept = requires(T t)
 {
+    requires std::is_default_constructible_v<T>;
+
     //! Must have these type aliases
     typename T::RetryPolicyType_t;
 
@@ -221,6 +231,8 @@ concept DeliveryPolicyConcept = requires(T t)
 template <typename T>
 concept DownstreamSpecConcept = requires(T t)
 {
+    requires std::is_default_constructible_v<T>;
+
     //! Must have action type
     typename T::ActionType_t;
     //! Must have delivery policy type
@@ -305,6 +317,8 @@ concept DownstreamSpecConcept = requires(T t)
 template <typename T>
 concept InitConfigConcept = requires(T t)
 {
+    requires std::is_default_constructible_v<T>;
+
     typename T::DownstreamSpec_t;
     requires DownstreamSpecConcept<typename T::DownstreamSpec_t>;
 
@@ -332,6 +346,8 @@ concept InitConfigConcept = requires(T t)
 template <typename T>
 concept DownstreamConcept = requires(T t)
 {
+    requires std::is_default_constructible_v<T>;
+
     typename T::DownstreamSpec_t;
     requires DownstreamSpecConcept<typename T::DownstreamSpec_t>;
 

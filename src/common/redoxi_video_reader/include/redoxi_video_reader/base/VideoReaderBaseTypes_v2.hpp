@@ -10,17 +10,20 @@ namespace redoxi_works
 {
 class RedoxiVideoReaderBase_v2;
 
-namespace RedoxiVideoReaderBaseTypes_v2
+namespace video_reader_base_v2
 {
 
-using MainSpec = async_action_image_output_port::ImageOutputPortSpec;
+using OutputPortSpec = async_action_image_output_port::ImageOutputPortSpec;
+
+//! The delivery policy for making frame delivery request
+using RequestPolicy = OutputPortSpec::DeliveryPolicy_t;
 
 //! The init config for RedoxiVideoReaderBase or its subclass
 struct REDOXI_VIDEO_READER_PUBLIC InitConfig {
     virtual ~InitConfig() = default;
 
     //! The downstream nodes, indexed by node name
-    std::map<std::string, std::shared_ptr<MainSpec::DownstreamSpec_t>> downstreams;
+    std::map<std::string, std::shared_ptr<OutputPortSpec::DownstreamSpec_t>> downstreams;
 
     //! create the debug publish topic for this video reader?
     bool create_debug_pub = true;
@@ -44,19 +47,34 @@ class REDOXI_VIDEO_READER_PUBLIC RuntimeConfig
 {
   public:
     inline static const std::string DEFAULT_OUTPUT_IMAGE_ENCODING = "bgr8";
-    inline static const MainSpec::TimeUnit_t DEFAULT_STEP_INTERVAL{10};
+    inline static const DefaultTimeUnit_t DEFAULT_STEP_INTERVAL{10};
+    inline static const DefaultTimeUnit_t DEFAULT_REQUEST_RETRY_INTERVAL{std::chrono::milliseconds(5)};
+    inline static const DefaultTimeUnit_t DEFAULT_REQUEST_RETRY_RESPONSE_TIME{std::chrono::milliseconds(5)};
+    inline static const int DEFAULT_REQUEST_RETRY_NUMBER{5};
 
     virtual ~RuntimeConfig() = default;
     RuntimeConfig()
     {
-        fallback_delivery_policy = std::make_shared<MainSpec::DeliveryPolicy_t>();
+        fallback_primary_output_policy = std::make_shared<OutputPortSpec::DeliveryPolicy_t>();
+
+        // default policy for making frame delivery request
+        frame_request_policy = std::make_shared<RequestPolicy>();
+
+        {
+            auto p = frame_request_policy;
+            p->set_drop_strategy(DropStrategy::DropAsNeeded);
+            p->set_precondition(DeliveryPrecondition::AnyDownstreamReady);
+            p->get_retry_policy()->set_number_of_retry(DEFAULT_REQUEST_RETRY_NUMBER);
+            p->get_retry_policy()->set_wait_time_between_retry(DEFAULT_REQUEST_RETRY_INTERVAL);
+            p->get_retry_policy()->set_wait_time_retry_response(DEFAULT_REQUEST_RETRY_RESPONSE_TIME);
+        }
     }
 
     //! The step interval in ms
-    MainSpec::TimeUnit_t step_interval{DEFAULT_STEP_INTERVAL};
+    OutputPortSpec::TimeUnit_t step_interval{DEFAULT_STEP_INTERVAL};
 
     //! The frame interval in ms, 0 means as fast as possible
-    MainSpec::TimeUnit_t frame_interval{0};
+    OutputPortSpec::TimeUnit_t frame_interval{0};
 
     //! The output image size. If input is different, resize to output_image_size.
     //! If output_image_size.width=-1 or output_image_size.height=-1, keep aspect ratio.
@@ -69,8 +87,11 @@ class REDOXI_VIDEO_READER_PUBLIC RuntimeConfig
     //! publish in debug topic?
     bool publish_to_debug_topic = false;
 
-    //! The frame delivery quality of service
-    std::shared_ptr<MainSpec::DeliveryPolicy_t> fallback_delivery_policy;
+    //! fallback delivery policy for primary output port
+    std::shared_ptr<OutputPortSpec::DeliveryPolicy_t> fallback_primary_output_policy;
+
+    //! delivery policy for frame delivery request
+    std::shared_ptr<RequestPolicy> frame_request_policy;
 
     //! Load parameters from node, this will override empty existing parameters
     virtual void from_parameters(rclcpp::Node *){};
@@ -81,9 +102,10 @@ class REDOXI_VIDEO_READER_PUBLIC RuntimeConfig
               JS_MEMBER(output_image_size),
               JS_MEMBER(output_image_encoding),
               JS_MEMBER(publish_to_debug_topic),
-              JS_MEMBER(fallback_delivery_policy));
+              JS_MEMBER(fallback_primary_output_policy),
+              JS_MEMBER(frame_request_policy));
 };
 
-} // namespace RedoxiVideoReaderBaseTypes_v2
+} // namespace video_reader_base_v2
 
 } // namespace redoxi_works

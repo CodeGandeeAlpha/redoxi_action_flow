@@ -76,6 +76,18 @@ class DeliverySourceData
         m_image = image;
     }
 
+    //! Get the frame number
+    virtual int64_t get_frame_number() const
+    {
+        return m_frame_number;
+    }
+
+    //! Set the frame number
+    virtual void set_frame_number(int64_t frame_number)
+    {
+        m_frame_number = frame_number;
+    }
+
     //! Convert the source data to a ROS message for publishing
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
@@ -98,6 +110,7 @@ class DeliverySourceData
     cv::Mat m_image;
     std::string m_encoding = DefaultEncoding;
     boost::uuids::uuid m_uuid;
+    int64_t m_frame_number = 0;
 };
 
 

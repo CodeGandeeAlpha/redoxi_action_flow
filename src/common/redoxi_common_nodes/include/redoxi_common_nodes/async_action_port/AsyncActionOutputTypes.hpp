@@ -441,6 +441,7 @@ class DefaultDeliveryPolicy
     DefaultDeliveryPolicy()
     {
         static_assert(DeliveryPolicyConcept<DefaultDeliveryPolicy>, "DefaultDeliveryPolicy must satisfy DeliveryPolicyConcept");
+        retry_policy = std::make_shared<RetryPolicyType_t>();
     }
 
     //! Get the retry policy
@@ -461,11 +462,30 @@ class DefaultDeliveryPolicy
         return this->drop_strategy;
     }
 
-  public:
+    //! Set the retry policy
+    virtual void set_retry_policy(std::shared_ptr<RetryPolicyType_t> policy)
+    {
+        this->retry_policy = policy;
+    }
+
+    //! Set the precondition
+    virtual void set_precondition(DeliveryPrecondition precond)
+    {
+        this->precondition = precond;
+    }
+
+    //! Set the drop strategy
+    virtual void set_drop_strategy(DropStrategy strategy)
+    {
+        this->drop_strategy = strategy;
+    }
+
+  protected:
     std::shared_ptr<RetryPolicyType_t> retry_policy;
     DeliveryPrecondition precondition{DeliveryPrecondition::NoPrecondition};
     DropStrategy drop_strategy{DropStrategy::NoDrop};
 
+  public:
     JS_OBJECT(JS_MEMBER(retry_policy),
               JS_MEMBER(precondition),
               JS_MEMBER(drop_strategy));
