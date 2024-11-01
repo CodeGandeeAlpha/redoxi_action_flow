@@ -2,8 +2,10 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
+#include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputPort.hpp>
 #include <redoxi_video_reader/base/VideoReaderBaseTypes_v2.hpp>
+#include <nlohmann/json.hpp>
 
 namespace redoxi_works
 {
@@ -50,6 +52,12 @@ class RedoxiVideoReaderBase_v2 : public rclcpp::Node,
     //! enable or disable image publishing
     virtual void set_publish_to_debug_topic(bool enable);
     virtual bool get_publish_to_debug_topic() const;
+
+    //! get json parameters parsed from ros parameters
+    virtual const nlohmann::json &get_json_parameters() const
+    {
+        return m_json_parameters;
+    }
 
   public:
     //! Initialize with configurations, must be called once before open()
@@ -118,7 +126,10 @@ class RedoxiVideoReaderBase_v2 : public rclcpp::Node,
      * @brief Get the status code of this node
      * @return the status code
      */
-    virtual int get_status_code() const;
+    virtual int get_status_code() const
+    {
+        return m_status_code;
+    }
 
   protected:
     //! Open video source, intended to be overridden by subclass
@@ -216,6 +227,13 @@ class RedoxiVideoReaderBase_v2 : public rclcpp::Node,
 
     //! implementation details of this node
     std::shared_ptr<RedoxiVideoReaderImpl_v2> m_impl;
+
+    //! json parameters read from ros parameters
+    nlohmann::json m_json_parameters;
+
+    //! debug publishers
+    StampedImagePub m_pub_task_enqueue;
+    StampedImagePub m_pub_task_drop;
 };
 
 } // namespace redoxi_works

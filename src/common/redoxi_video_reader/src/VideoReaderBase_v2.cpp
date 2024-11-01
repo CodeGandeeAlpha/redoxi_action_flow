@@ -3,6 +3,7 @@
 #include <redoxi_video_reader/base/VideoReaderBase_v2.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <cv_bridge/cv_bridge.hpp>
+#include <json_struct/json_struct.h>
 
 #define PRINT_THREAD_ID_IN_LOG (true)
 
@@ -22,6 +23,116 @@ RedoxiVideoReaderBase_v2::RedoxiVideoReaderBase_v2(const std::string &name, cons
     _declare_all_parameters();
 }
 
+RedoxiVideoReaderBase_v2::~RedoxiVideoReaderBase_v2()
+{
+    // wait for all requests to be processed
+    if (m_primary_output_port) {
+        m_primary_output_port->wait_for_all_requests();
+    }
+}
+
+int RedoxiVideoReaderBase_v2::open()
+{
+    //! Can only open in CLOSED status
+    if (m_status_code != NodeStatusCode::CLOSED) {
+        RDX_RAISE_ERROR("[{}] status must be in CLOSED, got {}", __func__, m_status_code);
+        return -1;
+    }
+
+    //! Reset frame number
+    m_frame_number = -1;
+
+    //! Call subclass open implementation
+    auto ret = _open();
+    if (ret != 0) {
+        RDX_RAISE_ERROR("[{}] Failed to open video source, ret={}", __func__, ret);
+        return ret;
+    }
+
+    //! Change status to OPENED
+    _set_status_code(NodeStatusCode::OPENED);
+
+    return 0;
+}
+
+int RedoxiVideoReaderBase_v2::start()
+{
+    //! Can only start in OPENED or STOPPED status
+    if (m_status_code != NodeStatusCode::OPENED && m_status_code != NodeStatusCode::STOPPED) {
+        RDX_RAISE_ERROR("[{}] status must be in OPENED or STOPPED, got {}", __func__, NodeStatusCodeToString(m_status_code));
+        return -1;
+    }
+
+    //! Start primary output port
+    if (m_primary_output_port) {
+        auto ret = m_primary_output_port->start();
+        if (ret != 0) {
+            RDX_RAISE_ERROR("[{}] Failed to start primary output port, ret={}", __func__, ret);
+            return ret;
+        }
+    }
+
+    //! Call subclass start implementation
+    auto ret = _start();
+    if (ret != 0) {
+        RDX_RAISE_ERROR("[{}] Failed to start video source, ret={}", __func__, ret);
+        return ret;
+    }
+
+    //! Change status to STARTED
+    _set_status_code(NodeStatusCode::STARTED);
+
+    return 0;
+}
+
+int RedoxiVideoReaderBase_v2::stop()
+{
+    //! Can only stop in STARTED status
+    if (m_status_code != NodeStatusCode::STARTED) {
+        RDX_RAISE_ERROR("[{}] status must be in STARTED, got {}", __func__, NodeStatusCodeToString(m_status_code));
+        return -1;
+    }
+
+    //! Stop primary output port
+    if (m_primary_output_port) {
+        m_primary_output_port->stop();
+    }
+
+    //! Call subclass stop implementation
+    auto ret = _stop();
+    if (ret != 0) {
+        RDX_RAISE_ERROR("[{}] Failed to stop video source, ret={}", __func__, ret);
+        return ret;
+    }
+
+    //! Change status to STOPPED
+    _set_status_code(NodeStatusCode::STOPPED);
+
+    return 0;
+}
+
+int RedoxiVideoReaderBase_v2::close()
+{
+    //! Can only close in OPENED or STOPPED status
+    if (m_status_code != NodeStatusCode::OPENED && m_status_code != NodeStatusCode::STOPPED) {
+        RDX_RAISE_ERROR("[{}] status must be in OPENED or STOPPED, got {}", __func__, NodeStatusCodeToString(m_status_code));
+        return -1;
+    }
+
+    //! Call subclass close implementation
+    auto ret = _close();
+    if (ret != 0) {
+        RDX_RAISE_ERROR("[{}] Failed to close video source, ret={}", __func__, ret);
+        return ret;
+    }
+
+    //! Change status to CLOSED
+    _set_status_code(NodeStatusCode::CLOSED);
+
+    return 0;
+}
+
+
 void RedoxiVideoReaderBase_v2::set_publish_to_debug_topic(bool enable)
 {
     m_publish_to_debug_topic = enable;
@@ -37,7 +148,7 @@ int RedoxiVideoReaderBase_v2::init(const InitConfig_t &config,
 {
     //! Check if already initialized
     if (m_status_code != NodeStatusCode::BEFORE_INIT) {
-        RDX_RAISE_ERROR("[{}] Cannot init in status {}", __func__, m_status_code);
+        RDX_RAISE_ERROR("[{}] status must be in BEFORE_INIT, got {}", __func__, NodeStatusCodeToString(m_status_code));
     }
 
     //! Create implementation details of this node
@@ -58,11 +169,15 @@ int RedoxiVideoReaderBase_v2::init(const InitConfig_t &config,
 
 int RedoxiVideoReaderBase_v2::update_init_config(const InitConfig_t &config)
 {
-    //! Can only update init config in CLOSED status
-    if (m_status_code != NodeStatusCode::CLOSED) {
-        RDX_RAISE_ERROR("[{}] Cannot update init config in status {}", __func__, m_status_code);
+    //! Can only update init config in BEFORE_INIT or CLOSED status
+    if (m_status_code != NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::CLOSED) {
+        RDX_RAISE_ERROR("[{}] status must be in BEFORE_INIT or CLOSED, got {}", __func__, NodeStatusCodeToString(m_status_code));
         return -1;
     }
+
+    // parse the config into a string and print it
+    auto config_str = JS::serializeStruct(config);
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "init config: {}", config_str);
 
     //! Initialize output ports
     auto primary_output_port = _create_primary_output_port();
@@ -70,6 +185,17 @@ int RedoxiVideoReaderBase_v2::update_init_config(const InitConfig_t &config)
         RDX_RAISE_ERROR("[{}] Failed to create primary output port", __func__);
     }
     m_primary_output_port = primary_output_port;
+
+    //! Initialize debug publishers
+    if (m_init_config.create_debug_pub) {
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                     "initialize debug publishers, enqueue topic={}, drop topic={}",
+                     m_init_config.debug_pub_task_enqueue_name,
+                     m_init_config.debug_pub_task_drop_name);
+        auto debug_qos = DefaultParams::DebugPublisherQoS;
+        m_pub_task_enqueue.init(this, m_init_config.debug_pub_task_enqueue_name, debug_qos);
+        m_pub_task_drop.init(this, m_init_config.debug_pub_task_drop_name, debug_qos);
+    }
 
     //! Store configurations
     m_init_config = config;
@@ -79,11 +205,15 @@ int RedoxiVideoReaderBase_v2::update_init_config(const InitConfig_t &config)
 
 int RedoxiVideoReaderBase_v2::update_runtime_config(const RuntimeConfig_t &config)
 {
-    //! Can only update runtime config in CLOSED or STOPPED status
-    if (m_status_code != NodeStatusCode::CLOSED && m_status_code != NodeStatusCode::STOPPED) {
-        RDX_RAISE_ERROR("[{}] Cannot update runtime config in status {}", __func__, m_status_code);
+    //! cannot be updated in STARTED status
+    if (m_status_code == NodeStatusCode::STARTED) {
+        RDX_RAISE_ERROR("[{}] status must not be in STARTED, got {}", __func__, NodeStatusCodeToString(m_status_code));
         return -1;
     }
+
+    //! parse the config into a string and print it
+    auto config_str = JS::serializeStruct(config);
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "runtime config: {}", config_str);
 
     //! Store configurations
     m_runtime_config = config;
@@ -114,6 +244,38 @@ RedoxiVideoReaderBase_v2::DeliveryRequest_t
     return req;
 }
 
+std::shared_ptr<RedoxiVideoReaderBase_v2::OutputPort_t>
+    RedoxiVideoReaderBase_v2::_create_primary_output_port()
+{
+    auto port = std::make_shared<OutputPort_t>();
+    // OutputPort_t::InitConfig_t port_config;
+    // std::vector<OutputPort_t::DownstreamSpec_t> downstreams;
+    // for (const auto &[node_name, ds] : m_init_config.downstreams) {
+    //     downstreams.push_back(ds);
+    // }
+    // port_config.set_downstream_specs(downstreams);
+    // port_config.set_num_buffer_requests(1); // always keep the latest one
+    // port_config.set_preserve_request_order(true);
+    auto &port_config = m_init_config.primary_output_spec;
+    port->init(port_config);
+    return port;
+}
+
+int RedoxiVideoReaderBase_v2::_declare_all_parameters()
+{
+    auto ret = declare_default_parameters_for_node(this);
+    if (ret != 0) {
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                     "Failed to declare default parameters for node, ret={}", ret);
+        return ret;
+    }
+
+    // parse json parameters
+    auto node = this;
+    m_json_parameters = RDX_GET_JSON_PARAM_FROM_NODE(node);
+
+    return 0;
+}
 
 void RedoxiVideoReaderBase_v2::_step()
 {

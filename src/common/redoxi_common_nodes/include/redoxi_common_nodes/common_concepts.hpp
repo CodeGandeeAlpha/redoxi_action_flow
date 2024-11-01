@@ -220,7 +220,7 @@ struct TypeHandler<T> {
     {
         typename T::rep value;
         auto err = TypeHandler<typename T::rep>::to(value, context);
-        if (err)
+        if (err != Error::NoError)
             return err;
         to_type = T(value);
         return Error::NoError;

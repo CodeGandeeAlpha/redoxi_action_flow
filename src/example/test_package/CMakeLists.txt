@@ -45,7 +45,8 @@ option(BUILD_TEST_TBB_TASK_MANAGEMENT "Build test_tbb_task_management target"
 option(BUILD_TEST_VIDEO_READER_RANDOM "Build test_video_reader_random target"
        ON)
 option(BUILD_TEST_VIDEO_SINK "Build test_video_sink target" ON)
-option(BUILD_TEST_SIMPLE_ACTION_GENERATOR "Build test_simple_action_generator target" ON)
+option(BUILD_TEST_SIMPLE_ACTION_GENERATOR "Build test_simple_action_generator target" OFF)
+option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2 "Build test_simple_action_generator_v2 target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -61,6 +62,10 @@ function(configure_target target_name)
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2)
+  configure_target(v2_simple_action)
+endif()
 
 if(BUILD_TEST_SIMPLE_ACTION_GENERATOR)
   configure_target(test_simple_action_generator)

@@ -28,7 +28,14 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
   public:
     AsyncActionOutputPort() = default;
-    virtual ~AsyncActionOutputPort() noexcept = default;
+    virtual ~AsyncActionOutputPort() noexcept
+    {
+        // must finish all tasks
+        if (m_delivery_graph != nullptr) {
+            m_delivery_graph->wait_for_all();
+        }
+        m_task_group.wait();
+    }
 
     using MasterSpec_t = TSpec; // master specification of this port
     using TimeUnit_t = typename TSpec::TimeUnit_t;
@@ -38,6 +45,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
     using DeliveryRequest_t = typename TSpec::DeliveryRequest_t;
     using DeliveryTask_t = typename TSpec::DeliveryTask_t;
     using Downstream_t = typename TSpec::Downstream_t;
+    using DownstreamSpec_t = typename TSpec::DownstreamSpec_t;
     using ActionType_t = typename TSpec::ActionType_t;
     using ActionDataTrait_t = typename TSpec::ActionDataTrait_t;
     using DeliveryPolicy_t = typename DeliveryRequest_t::DeliveryPolicy_t;

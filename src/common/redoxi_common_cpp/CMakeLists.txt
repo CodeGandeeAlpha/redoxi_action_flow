@@ -22,12 +22,14 @@ find_package(rcpputils REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(redoxi_public_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
+find_package(json_struct REQUIRED)
+
 set(source_files
     src/redoxi_common_cpp.cpp src/redoxi_v6d.cpp src/redoxi_ros_util.cpp
     src/image_proc/ImageStamper.cpp src/ros_utils/StampedImagePub.cpp)
 
 set(required_dependencies ${VINEYARD_LIBRARIES} ${OpenCV_LIBS} fmt::fmt
-                          nlohmann_json::nlohmann_json TBB::tbb)
+                          nlohmann_json::nlohmann_json TBB::tbb json_struct::json_struct)
 set(required_includes ${OpenCV_INCLUDE_DIRS} ${VINEYARD_INCLUDE_DIRS})
 
 add_library(redoxi_common_cpp ${source_files})
@@ -91,6 +93,7 @@ ament_export_dependencies(
   nlohmann_json
   fmt
   vineyard
-  OpenCV)
+  OpenCV
+  json_struct)
 
 ament_package()

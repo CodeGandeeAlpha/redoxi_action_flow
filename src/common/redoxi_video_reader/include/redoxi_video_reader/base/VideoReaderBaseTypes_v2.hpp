@@ -3,6 +3,7 @@
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputPort.hpp>
 #include <redoxi_common_nodes/async_action_port/ImageOutputPortSpec.hpp>
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
+#include <redoxi_common_cpp/redoxi_json_struct_conversion.hpp>
 #include <redoxi_video_reader/visibility_control.h>
 #include <json_struct/json_struct.h>
 
@@ -22,8 +23,12 @@ using RequestPolicy = OutputPortSpec::DeliveryPolicy_t;
 struct InitConfig {
     virtual ~InitConfig() = default;
 
+    //! The time unit for the step interval, see redoxi_common_cpp::get_default_time_unit_name for more details
+    //! @note: this is just for json serialization, intended as a comment, do not modify it
+    std::optional<std::string> _time_unit = get_default_time_unit_name();
+
     //! The downstream nodes, indexed by node name
-    std::map<std::string, OutputPortSpec::DownstreamSpec_t> downstreams;
+    OutputPortSpec::InitConfig_t primary_output_spec;
 
     //! create the debug publish topic for this video reader?
     bool create_debug_pub = true;
@@ -32,10 +37,11 @@ struct InitConfig {
     std::string debug_pub_task_drop_name = "debug_port/task_drop";
 
     //! Load parameters from node, this will override empty existing parameters
-    virtual void from_parameters(rclcpp::Node *){};
+    virtual void from_parameters(RedoxiVideoReaderBase_v2 *);
 
     // json serialize
-    JS_OBJECT(JS_MEMBER(downstreams),
+    JS_OBJECT(JS_MEMBER(_time_unit),
+              JS_MEMBER(primary_output_spec),
               JS_MEMBER(create_debug_pub),
               JS_MEMBER(debug_pub_queue_size),
               JS_MEMBER(debug_pub_task_enqueue_name),
@@ -63,6 +69,10 @@ class RuntimeConfig
         p.get_retry_policy().set_wait_time_retry_response(DEFAULT_REQUEST_RETRY_RESPONSE_TIME);
     }
 
+    //! The time unit for the step interval, see redoxi_common_cpp::get_default_time_unit_name for more details
+    //! @note: this is just for json serialization, do not modify it
+    std::optional<std::string> _time_unit = get_default_time_unit_name();
+
     //! The step interval in ms
     OutputPortSpec::TimeUnit_t step_interval{DEFAULT_STEP_INTERVAL};
 
@@ -87,10 +97,11 @@ class RuntimeConfig
     RequestPolicy frame_request_policy;
 
     //! Load parameters from node, this will override empty existing parameters
-    virtual void from_parameters(rclcpp::Node *){};
+    virtual void from_parameters(RedoxiVideoReaderBase_v2 *);
 
     // json serialize
-    JS_OBJECT(JS_MEMBER(step_interval),
+    JS_OBJECT(JS_MEMBER(_time_unit),
+              JS_MEMBER(step_interval),
               JS_MEMBER(frame_interval),
               JS_MEMBER(output_image_size),
               JS_MEMBER(output_image_encoding),

@@ -701,6 +701,24 @@ class DefaultInitConfig
         return this->preserve_request_order;
     }
 
+    //! Set downstream specs
+    virtual void set_downstream_specs(const std::vector<DownstreamSpec_t> &specs)
+    {
+        this->downstream_specs = specs;
+    }
+
+    //! Set number of buffer requests
+    virtual void set_num_buffer_requests(int num)
+    {
+        this->num_buffer_requests = num;
+    }
+
+    //! Set preserve request order flag
+    virtual void set_preserve_request_order(bool preserve)
+    {
+        this->preserve_request_order = preserve;
+    }
+
   protected: // no m_ prefix so that you can use json serialization easier
     std::vector<DownstreamSpec_t> downstream_specs;
     int num_buffer_requests{1};

@@ -19,6 +19,38 @@ const double DefaultNodeStepIntervalMs = 1;
 // default time unit for processing and waiting
 using DefaultTimeUnit_t = std::chrono::microseconds;
 
+/**
+ * @brief Get the name of the time unit based on the std::chrono::duration type.
+ *
+ * @tparam DurationType The std::chrono::duration type.
+ * @return constexpr const char* The name of the time unit.
+ */
+template <typename DurationType>
+constexpr const char *_get_time_unit_name()
+{
+    if constexpr (std::is_same_v<DurationType, std::chrono::hours>) {
+        return "hours";
+    } else if constexpr (std::is_same_v<DurationType, std::chrono::minutes>) {
+        return "minutes";
+    } else if constexpr (std::is_same_v<DurationType, std::chrono::seconds>) {
+        return "seconds";
+    } else if constexpr (std::is_same_v<DurationType, std::chrono::milliseconds>) {
+        return "ms(1e-3s)";
+    } else if constexpr (std::is_same_v<DurationType, std::chrono::microseconds>) {
+        return "us(1e-6s)";
+    } else if constexpr (std::is_same_v<DurationType, std::chrono::nanoseconds>) {
+        return "ns(1e-9s)";
+    } else {
+        return "unknown";
+    }
+}
+
+inline constexpr const char *get_default_time_unit_name()
+{
+    return _get_time_unit_name<DefaultTimeUnit_t>();
+}
+
+
 namespace DefaultParams
 {
 
@@ -109,6 +141,27 @@ const int INITIALIZED = 1; // NOT USED anymore
 // reserved status code, your custom status code should be greater than this
 const int MAX_RESERVED_STATUS = 10000;
 }; // namespace NodeStatusCode
+
+inline constexpr const char *NodeStatusCodeToString(int status_code)
+{
+    switch (status_code) {
+        case NodeStatusCode::BEFORE_INIT:
+            return "BEFORE_INIT";
+        case NodeStatusCode::OPENED:
+            return "OPENED";
+        case NodeStatusCode::STARTED:
+            return "STARTED";
+        case NodeStatusCode::STOPPED:
+            return "STOPPED";
+        case NodeStatusCode::CLOSED:
+            return "CLOSED";
+        case NodeStatusCode::INITIALIZED:
+            return "INITIALIZED";
+        default:
+            return "UNKNOWN_STATUS";
+    }
+}
+
 
 namespace SignalCode
 {

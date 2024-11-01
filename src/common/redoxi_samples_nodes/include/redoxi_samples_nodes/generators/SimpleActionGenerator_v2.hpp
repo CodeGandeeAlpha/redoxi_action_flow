@@ -1,10 +1,11 @@
 #pragma once
 
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputPort.hpp>
+#include <redoxi_video_reader/base/VideoReaderBase_v2.hpp>
 
 namespace redoxi_works
 {
-class SimpleActionGenerator_v2
+class SimpleActionGenerator_v2 : public RedoxiVideoReaderBase_v2
 {
   public:
     SimpleActionGenerator_v2(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
@@ -13,7 +14,7 @@ class SimpleActionGenerator_v2
     void _step() override;
 
     //! Implement _read_frame method
-    int _read_frame(cv::Mat &frame,
+    int _read_frame(SourceData_t &source_data,
                     std::atomic<int64_t> &frame_number) override;
 
 
@@ -28,5 +29,8 @@ class SimpleActionGenerator_v2
 
     //! send by tbb graph
     void _step_send_by_tbb_graph();
+
+  protected:
+    //! Create delivery request
 };
 } // namespace redoxi_works
