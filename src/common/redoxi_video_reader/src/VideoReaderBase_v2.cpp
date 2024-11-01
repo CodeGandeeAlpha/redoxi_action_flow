@@ -109,6 +109,7 @@ RedoxiVideoReaderBase_v2::DeliveryRequest_t
     //! Create delivery request
     DeliveryRequest_t req;
     req.set_source_data(source_data);
+    req.set_delivery_policy(m_runtime_config.fallback_primary_output_policy);
 
     return req;
 }

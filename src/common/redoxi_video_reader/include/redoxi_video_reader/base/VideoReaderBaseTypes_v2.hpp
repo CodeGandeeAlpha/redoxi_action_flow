@@ -19,7 +19,7 @@ using OutputPortSpec = async_action_image_output_port::ImageOutputPortSpec;
 using RequestPolicy = OutputPortSpec::DeliveryPolicy_t;
 
 //! The init config for RedoxiVideoReaderBase or its subclass
-struct REDOXI_VIDEO_READER_PUBLIC InitConfig {
+struct InitConfig {
     virtual ~InitConfig() = default;
 
     //! The downstream nodes, indexed by node name
@@ -43,7 +43,7 @@ struct REDOXI_VIDEO_READER_PUBLIC InitConfig {
 };
 
 //! The runtime config for RedoxiVideoReaderBase or its subclass
-class REDOXI_VIDEO_READER_PUBLIC RuntimeConfig
+class RuntimeConfig
 {
   public:
     inline static const std::string DEFAULT_OUTPUT_IMAGE_ENCODING = "bgr8";

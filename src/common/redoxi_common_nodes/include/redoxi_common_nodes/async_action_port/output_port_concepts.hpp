@@ -161,10 +161,10 @@ concept DeliveryRequestConcept = requires(T t)
         } -> std::same_as<bool>;
     {
         t.get_delivery_policy()
-        } -> std::same_as<typename T::DeliveryPolicy_t &>;
+        } -> std::same_as<typename T::DeliveryPolicy_t *>;
     {
         std::declval<const T &>().get_delivery_policy()
-        } -> std::same_as<const typename T::DeliveryPolicy_t &>;
+        } -> std::same_as<const typename T::DeliveryPolicy_t *>;
 
     //! Must have method to convert this to a ping request
     //! To create a ping request, you do T().as_ping()

@@ -397,21 +397,21 @@ class DefaultDeliveryRequest
         return m_is_ping;
     }
 
-    //! Get the delivery policy
-    virtual const DeliveryPolicy_t &get_delivery_policy() const
+    //! Get the delivery policy, nullptr if not set
+    virtual const DeliveryPolicy_t *get_delivery_policy() const
     {
-        return m_delivery_policy;
+        return m_delivery_policy.has_value() ? &m_delivery_policy.value() : nullptr;
     }
-    //! Set the delivery policy
+    //! Set the delivery policy, use nullptr to unset
     virtual void set_delivery_policy(const DeliveryPolicy_t &delivery_policy)
     {
         m_delivery_policy = delivery_policy;
     }
 
-    //! Get the delivery policy
-    DeliveryPolicy_t &get_delivery_policy()
+    //! Get the delivery policy, nullptr if not set
+    DeliveryPolicy_t *get_delivery_policy()
     {
-        return m_delivery_policy;
+        return m_delivery_policy.has_value() ? &m_delivery_policy.value() : nullptr;
     }
     /**
      * Convert this to a ping request, which is always a no-precondition and can always be dropped.
@@ -424,15 +424,20 @@ class DefaultDeliveryRequest
             return;
         }
 
+        // create a new delivery policy if not already set
+        if (!m_delivery_policy.has_value()) {
+            m_delivery_policy = DeliveryPolicy_t();
+        }
+
         // set the ping response wait time if not already set
-        auto &retry_policy = m_delivery_policy.get_retry_policy();
+        auto &retry_policy = m_delivery_policy.value().get_retry_policy();
         if (!retry_policy.get_wait_time_retry_response().has_value()) {
             retry_policy.set_wait_time_retry_response(DefaultPingResponseWaitTime);
         }
 
         // ping request has no precondition
-        m_delivery_policy.set_precondition(DeliveryPrecondition::NoPrecondition);
-        m_delivery_policy.set_drop_strategy(DropStrategy::DropAsNeeded);
+        m_delivery_policy.value().set_precondition(DeliveryPrecondition::NoPrecondition);
+        m_delivery_policy.value().set_drop_strategy(DropStrategy::DropAsNeeded);
 
         // set the ping flag
         m_is_ping = true;
@@ -446,7 +451,7 @@ class DefaultDeliveryRequest
     StampType_t m_stamp;
 
     //! The delivery policy
-    DeliveryPolicy_t m_delivery_policy;
+    std::optional<DeliveryPolicy_t> m_delivery_policy;
 
     //! Flag indicating if this is a ping request
     bool m_is_ping{false};
