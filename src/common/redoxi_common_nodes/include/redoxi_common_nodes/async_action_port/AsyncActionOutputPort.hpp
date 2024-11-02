@@ -480,10 +480,11 @@ class AsyncActionOutputPort : public IStartStopProtocol
     }
 
     //! main delivery logic
+    //! @note request's precondition is checked before delivery happens, downstream precondition is ignored
     virtual DeliveryResult_t _do_task_delivery_main(const DeliveryTask_t &task)
     {
         // default precondition is any downstream ready
-        auto request_precondition = DeliveryPrecondition::AnyDownstreamReady;
+        auto request_precondition = m_init_config.get_fallback_delivery_precondition();
 
         // get the request's delivery policy, if any
         auto request_delivery_policy = task.get_request().get_delivery_policy();
@@ -492,19 +493,24 @@ class AsyncActionOutputPort : public IStartStopProtocol
             request_precondition = request_delivery_policy->get_precondition();
         }
 
-        // check if any downstream is ready to accept new frame
-        bool downstream_ready = false;
+        // check if precondition is satisfied
+        bool precondition_satisfied = false;
         if (request_precondition == DeliveryPrecondition::DontCare || request_precondition == DeliveryPrecondition::NoPrecondition) {
-            downstream_ready = true;
-        } else {
+            // if precondition is dont care or no precondition, it is regarded as satisfied
+            precondition_satisfied = true;
+        } else if (request_precondition == DeliveryPrecondition::AnyDownstreamReady || request_precondition == DeliveryPrecondition::AllDownstreamsReady) {
+            // test for precondition: any downstream ready or all downstreams ready
+
             // count the number of downstreams that are ready, apply precondition
             size_t num_downstream_ready = 0;
             for (auto &ds : m_downstreams) {
                 bool ds_ready = false;
-                auto &delivery_policy = ds.get_downstream_spec().get_delivery_policy();
+
+                // when testing precondition, we use the downstream's delivery policy
+                auto &ds_policy = ds.get_downstream_spec().get_delivery_policy();
 
                 // check if downstream is ready
-                auto &retry_policy = delivery_policy.get_retry_policy();
+                auto &retry_policy = ds_policy.get_retry_policy();
                 auto fallback_wait_time = retry_policy.get_fallback_wait_time_retry_response();
                 auto ping_wait_time = retry_policy.get_wait_time_retry_response().value_or(fallback_wait_time);
                 ds_ready = _ping(ds, ping_wait_time);
@@ -515,22 +521,24 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 // if any downstream is ready, break
                 if (request_precondition == DeliveryPrecondition::AnyDownstreamReady) {
                     if (num_downstream_ready > 0) {
-                        downstream_ready = true;
+                        precondition_satisfied = true;
                         break;
                     }
                 } else if (request_precondition == DeliveryPrecondition::AllDownstreamsReady) {
                     if (num_downstream_ready == m_downstreams.size()) {
-                        downstream_ready = true;
+                        precondition_satisfied = true;
                         break;
                     }
                 }
             }
         }
 
-        if (!downstream_ready) {
-            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "No downstream is ready to accept new frame");
+        if (!precondition_satisfied) {
+            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Precondition is not satisfied");
             return DeliveryResult_t{DeliveryResultCode::NotTried};
         }
+
+        RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Precondition is satisfied, start delivery ...");
 
         // create target delivery data
         TargetData_t target_data;
@@ -547,7 +555,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
         //! Deliver data
         DeliveryResult_t result;
         {
-            int ret_deliver_data = -1;
+            bool delivered_to_any_downstream = false;
+
+            // deliver to all downstreams, if any delivery succeeds, the result is regarded as success
             for (auto &ds : m_downstreams) {
                 auto ret = _deliver_data_with_retry(target_data, ds, request_delivery_policy);
                 if (ret != 0) {
@@ -555,15 +565,15 @@ class AsyncActionOutputPort : public IStartStopProtocol
                                  "Failed to deliver frame to downstream {}",
                                  ds.get_downstream_spec().get_name());
                 } else {
-                    ret_deliver_data = 0; // At least one delivery succeeded
+                    delivered_to_any_downstream = true;
                 }
             }
 
-            if (ret_deliver_data != 0) {
-                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Failed to deliver frame");
+            if (!delivered_to_any_downstream) {
+                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Failed to deliver data to any downstream");
                 result = DeliveryResult_t{DeliveryResultCode::TriedButFailed};
             } else {
-                // ok
+                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Successfully delivered data to some downstreams");
                 result = DeliveryResult_t{DeliveryResultCode::Success};
             }
         }
@@ -604,12 +614,14 @@ class AsyncActionOutputPort : public IStartStopProtocol
         auto interval_between_attempts = retry_policy.get_wait_time_between_retry(true).value();
         auto msg_uuid = target_data.get_source_data_uuid();
 
+        // deliver until max attempts reached, or until success when no drop is required
         while (attempts < max_attempts || no_drop) {
             if (!rclcpp::ok()) {
+                // system is shutting down, get out
                 return -1;
             }
-            // for no_drop, we need to keep trying until the frame is delivered (return in the loop)
 
+            // for no_drop, we need to keep trying until the frame is delivered (return in the loop)
             //! Publish the frame to the debug topic
             _debug_publish_sending_to_downstream(nullptr, &target_data, ds, attempts + 1, max_attempts);
 
@@ -738,6 +750,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
     // the parent node
     rclcpp::Node *m_parent_node = nullptr;
+
 
   protected:
     // callback functions

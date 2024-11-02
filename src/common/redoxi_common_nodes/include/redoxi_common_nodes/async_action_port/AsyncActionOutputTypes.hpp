@@ -719,15 +719,29 @@ class DefaultInitConfig
         this->preserve_request_order = preserve;
     }
 
+    //! Get fallback delivery precondition
+    virtual DeliveryPrecondition get_fallback_delivery_precondition() const
+    {
+        return this->fallback_delivery_precondition;
+    }
+
+    //! Set fallback delivery precondition
+    virtual void set_fallback_delivery_precondition(DeliveryPrecondition precondition)
+    {
+        this->fallback_delivery_precondition = precondition;
+    }
+
   protected: // no m_ prefix so that you can use json serialization easier
     std::vector<DownstreamSpec_t> downstream_specs;
     int num_buffer_requests{1};
     bool preserve_request_order{true};
+    DeliveryPrecondition fallback_delivery_precondition{DeliveryPrecondition::DontCare};
 
   public:
     JS_OBJECT(JS_MEMBER(downstream_specs),
               JS_MEMBER(num_buffer_requests),
-              JS_MEMBER(preserve_request_order));
+              JS_MEMBER(preserve_request_order),
+              JS_MEMBER(fallback_delivery_precondition));
 };
 using _SampleInitConfig = DefaultInitConfig<_SampleDownstreamSpec>;
 static_assert(InitConfigConcept<_SampleInitConfig>,

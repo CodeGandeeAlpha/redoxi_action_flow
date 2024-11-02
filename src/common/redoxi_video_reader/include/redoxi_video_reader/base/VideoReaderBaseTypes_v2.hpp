@@ -22,6 +22,12 @@ using RequestPolicy = OutputPortSpec::DeliveryPolicy_t;
 //! The init config for RedoxiVideoReaderBase or its subclass
 struct InitConfig {
     virtual ~InitConfig() = default;
+    InitConfig()
+    {
+        // by default, only starts sending any data when some downstream is ready
+        // skip if no downstream is ready
+        primary_output_spec.set_fallback_delivery_precondition(DeliveryPrecondition::AnyDownstreamReady);
+    }
 
     //! The time unit for the step interval, see redoxi_common_cpp::get_default_time_unit_name for more details
     //! @note: this is just for json serialization, intended as a comment, do not modify it

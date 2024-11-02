@@ -327,6 +327,11 @@ concept InitConfigConcept = requires(T t)
     {
         std::declval<const T &>().get_preserve_request_order()
         } -> std::same_as<bool>;
+
+    //! Must have method to get fallback delivery precondition
+    {
+        std::declval<const T &>().get_fallback_delivery_precondition()
+        } -> std::same_as<DeliveryPrecondition>;
 };
 
 //! Concept for downstream interface

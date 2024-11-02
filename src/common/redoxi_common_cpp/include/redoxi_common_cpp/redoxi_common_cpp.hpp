@@ -35,11 +35,11 @@ constexpr const char *_get_time_unit_name()
     } else if constexpr (std::is_same_v<DurationType, std::chrono::seconds>) {
         return "seconds";
     } else if constexpr (std::is_same_v<DurationType, std::chrono::milliseconds>) {
-        return "ms(1e-3s)";
+        return "ms(1e-3)";
     } else if constexpr (std::is_same_v<DurationType, std::chrono::microseconds>) {
-        return "us(1e-6s)";
+        return "us(1e-6)";
     } else if constexpr (std::is_same_v<DurationType, std::chrono::nanoseconds>) {
-        return "ns(1e-9s)";
+        return "ns(1e-9)";
     } else {
         return "unknown";
     }
