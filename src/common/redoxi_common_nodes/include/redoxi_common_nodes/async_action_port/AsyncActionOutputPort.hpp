@@ -482,27 +482,48 @@ class AsyncActionOutputPort : public IStartStopProtocol
     //! main delivery logic
     virtual DeliveryResult_t _do_task_delivery_main(const DeliveryTask_t &task)
     {
+        // default precondition is any downstream ready
+        auto request_precondition = DeliveryPrecondition::AnyDownstreamReady;
+
+        // get the request's delivery policy, if any
+        auto request_delivery_policy = task.get_request().get_delivery_policy();
+        if (request_delivery_policy) {
+            // use the request's delivery policy if it is set
+            request_precondition = request_delivery_policy->get_precondition();
+        }
+
         // check if any downstream is ready to accept new frame
         bool downstream_ready = false;
-        for (auto &ds : m_downstreams) {
-            auto &delivery_policy = ds.get_downstream_spec().get_delivery_policy();
+        if (request_precondition == DeliveryPrecondition::DontCare || request_precondition == DeliveryPrecondition::NoPrecondition) {
+            downstream_ready = true;
+        } else {
+            // count the number of downstreams that are ready, apply precondition
+            size_t num_downstream_ready = 0;
+            for (auto &ds : m_downstreams) {
+                bool ds_ready = false;
+                auto &delivery_policy = ds.get_downstream_spec().get_delivery_policy();
 
-            // should we ping at all?
-            auto precondition = delivery_policy.get_precondition();
-            if (precondition == DeliveryPrecondition::NoPrecondition) {
-                // some downstream is assumed to be always ready
-                downstream_ready = true;
-            } else {
                 // check if downstream is ready
                 auto &retry_policy = delivery_policy.get_retry_policy();
                 auto fallback_wait_time = retry_policy.get_fallback_wait_time_retry_response();
                 auto ping_wait_time = retry_policy.get_wait_time_retry_response().value_or(fallback_wait_time);
-                downstream_ready |= _ping(ds, ping_wait_time);
-            }
+                ds_ready = _ping(ds, ping_wait_time);
 
-            // if any downstream is ready, break
-            if (downstream_ready) {
-                break;
+                // count the number of downstreams that are ready
+                num_downstream_ready += ds_ready ? 1 : 0;
+
+                // if any downstream is ready, break
+                if (request_precondition == DeliveryPrecondition::AnyDownstreamReady) {
+                    if (num_downstream_ready > 0) {
+                        downstream_ready = true;
+                        break;
+                    }
+                } else if (request_precondition == DeliveryPrecondition::AllDownstreamsReady) {
+                    if (num_downstream_ready == m_downstreams.size()) {
+                        downstream_ready = true;
+                        break;
+                    }
+                }
             }
         }
 
@@ -510,27 +531,6 @@ class AsyncActionOutputPort : public IStartStopProtocol
             RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "No downstream is ready to accept new frame");
             return DeliveryResult_t{DeliveryResultCode::NotTried};
         }
-
-        // deliver data to downstreams
-        // we define lambda function here because for later use in other cases
-        auto func_deliver_data = [this](TargetData_t &target_data) -> int {
-            int ret = 0;
-            bool sent = false;
-            for (auto &ds : m_downstreams) {
-                auto ret = _deliver_data_with_retry(target_data, ds);
-                if (ret != 0) {
-                    RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
-                                 "Failed to deliver frame to downstream {}",
-                                 ds.get_downstream_spec().get_name());
-                } else {
-                    sent = true;
-                }
-            }
-            if (!sent) {
-                ret = -1;
-            }
-            return ret;
-        };
 
         // create target delivery data
         TargetData_t target_data;
@@ -546,13 +546,26 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         //! Deliver data
         DeliveryResult_t result;
-        auto ret_deliver_data = func_deliver_data(target_data);
-        if (ret_deliver_data != 0) {
-            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Failed to deliver frame");
-            result = DeliveryResult_t{DeliveryResultCode::TriedButFailed};
-        } else {
-            // ok
-            result = DeliveryResult_t{DeliveryResultCode::Success};
+        {
+            int ret_deliver_data = -1;
+            for (auto &ds : m_downstreams) {
+                auto ret = _deliver_data_with_retry(target_data, ds, request_delivery_policy);
+                if (ret != 0) {
+                    RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
+                                 "Failed to deliver frame to downstream {}",
+                                 ds.get_downstream_spec().get_name());
+                } else {
+                    ret_deliver_data = 0; // At least one delivery succeeded
+                }
+            }
+
+            if (ret_deliver_data != 0) {
+                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Failed to deliver frame");
+                result = DeliveryResult_t{DeliveryResultCode::TriedButFailed};
+            } else {
+                // ok
+                result = DeliveryResult_t{DeliveryResultCode::Success};
+            }
         }
 
         // do whatever postprocessing you need
@@ -567,22 +580,26 @@ class AsyncActionOutputPort : public IStartStopProtocol
     }
 
     //! delivery data to downstream, with retry logic
-    virtual int _deliver_data_with_retry(const TargetData_t &target_data,
-                                         const Downstream_t &ds,
-                                         const RetryPolicy_t *prefer_retry_policy = nullptr)
+    virtual int
+        _deliver_data_with_retry(const TargetData_t &target_data,
+                                 const Downstream_t &ds,
+                                 const DeliveryPolicy_t *prefer_delivery_policy = nullptr)
     {
         //! Set up retry strategy
         int attempts = 0;
 
-        auto &delivery_policy = ds.get_downstream_spec().get_delivery_policy();
-        auto retry_policy = delivery_policy.get_retry_policy();
-        if (prefer_retry_policy != nullptr) {
-            retry_policy = *prefer_retry_policy;
+        //! use the preferred delivery policy if provided, otherwise use the downstream's delivery policy
+        const DeliveryPolicy_t *delivery_policy = nullptr;
+        if (prefer_delivery_policy != nullptr) {
+            delivery_policy = prefer_delivery_policy;
+        } else {
+            delivery_policy = &ds.get_downstream_spec().get_delivery_policy();
         }
+        const auto &retry_policy = delivery_policy->get_retry_policy();
 
-        //! +1 for the first attempt
-        bool no_drop = delivery_policy.get_drop_strategy() == DropStrategy::NoDrop;
-        auto max_attempts = retry_policy.get_number_of_retry(true).value() + 1;
+        // get the retry parameters
+        bool no_drop = delivery_policy->get_drop_strategy() == DropStrategy::NoDrop;
+        auto max_attempts = retry_policy.get_number_of_retry(true).value() + 1; // +1 for the first attempt
         auto timeout_each_attempt = retry_policy.get_wait_time_retry_response(true).value();
         auto interval_between_attempts = retry_policy.get_wait_time_between_retry(true).value();
         auto msg_uuid = target_data.get_source_data_uuid();

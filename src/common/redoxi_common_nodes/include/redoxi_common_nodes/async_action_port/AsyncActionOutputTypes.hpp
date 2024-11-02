@@ -331,8 +331,8 @@ class DefaultDeliveryPolicy
 
   protected:
     RetryPolicyType_t retry_policy;
-    DeliveryPrecondition precondition{DeliveryPrecondition::NoPrecondition};
-    DropStrategy drop_strategy{DropStrategy::NoDrop};
+    DeliveryPrecondition precondition{DeliveryPrecondition::DontCare};
+    DropStrategy drop_strategy{DropStrategy::DontCare};
 
   public:
     JS_OBJECT(JS_MEMBER(retry_policy),

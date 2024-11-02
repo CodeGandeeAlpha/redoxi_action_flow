@@ -22,11 +22,23 @@ namespace redoxi_works
 //! @note If a message contains other messages that contain control signals,
 //!       only the top level control message is used
 enum class ControlSignalCode {
-    Normal = 0,                                    //!< Normal signal, no special action needed
-    Ping = 1,                                      //!< Ping signal - downstream should reply but not process data
-    Flush = 2,                                     //!< Flush signal - finish processing previous data and process new data in clean state
-    Reset = 3,                                     //!< Reset signal - reset to initial state as if previous data never existed
-    Terminate = 4,                                 //!< Terminate signal - no more data will be sent after this
+    Normal = 0,    //!< Normal signal, no special action needed
+    Ping = 1,      //!< Ping signal - downstream should reply but not process data
+    Flush = 2,     //!< Flush signal - finish processing previous data and process new data in clean state
+    Reset = 3,     //!< Reset signal - reset to initial state as if previous data never existed
+    Terminate = 4, //!< Terminate signal - no more data will be sent after this
+
+    // leave for custom use
+    Custom_1 = 10001,
+    Custom_2 = 10002,
+    Custom_3 = 10003,
+    Custom_4 = 10004,
+    Custom_5 = 10005,
+    Custom_6 = 10006,
+    Custom_7 = 10007,
+    Custom_8 = 10008,
+    Custom_9 = 10009,
+
     Unknown = std::numeric_limits<int32_t>::max(), //!< Unknown signal, should be ignored
 };
 
@@ -184,14 +196,28 @@ concept RetryPolicyConcept = requires(T t,
 
 
 enum class DeliveryPrecondition {
+    //! Not care about precondition, let the system decide
+    DontCare = 0,
+
     //! No precondition, just deliver
-    NoPrecondition = 0,
+    NoPrecondition = 1,
 
     //! Any downstream must be ready
-    AnyDownstreamReady = 1,
+    AnyDownstreamReady = 2,
 
     //! All downstreams must be ready
-    AllDownstreamsReady = 2,
+    AllDownstreamsReady = 3,
+
+    //! leave for custom use
+    Custom_1 = 10001,
+    Custom_2 = 10002,
+    Custom_3 = 10003,
+    Custom_4 = 10004,
+    Custom_5 = 10005,
+    Custom_6 = 10006,
+    Custom_7 = 10007,
+    Custom_8 = 10008,
+    Custom_9 = 10009,
 };
 
 enum class DeliveryResultCode {
@@ -201,11 +227,25 @@ enum class DeliveryResultCode {
 };
 
 enum class DropStrategy {
+    //! Not care about drop strategy, let the system decide
+    DontCare = 0,
+
     //! Do not drop
-    NoDrop = 0,
+    NoDrop = 1,
 
     //! Drop task/data/messages as needed
-    DropAsNeeded = 1,
+    DropAsNeeded = 2,
+
+    //! leave for custom use
+    Custom_1 = 10001,
+    Custom_2 = 10002,
+    Custom_3 = 10003,
+    Custom_4 = 10004,
+    Custom_5 = 10005,
+    Custom_6 = 10006,
+    Custom_7 = 10007,
+    Custom_8 = 10008,
+    Custom_9 = 10009,
 };
 
 

@@ -314,7 +314,7 @@ void RedoxiVideoReaderBase_v2::_step()
                 std::this_thread::sleep_for(interval_between_attempts);
             }
             success = true;
-        } else {
+        } else if (drop_frame_strategy == DropStrategy::DropAsNeeded) {
             // Try up to max attempts if dropping is allowed
             for (int attempt = 0; attempt < max_attempts; ++attempt) {
                 if (m_primary_output_port->try_push_request(delivery_request)) {
@@ -324,6 +324,8 @@ void RedoxiVideoReaderBase_v2::_step()
                 // wait for next attempt
                 std::this_thread::sleep_for(interval_between_attempts);
             }
+        } else {
+            RDX_RAISE_ERROR("[{}] invalid drop strategy, got {}", __func__, int(drop_frame_strategy));
         }
 
         if (success) {
