@@ -12,7 +12,7 @@
 
 using namespace std::placeholders;
 
-#define _DEBUG_ENABLE_RANDOM_BLOCKING
+// #define _DEBUG_ENABLE_RANDOM_BLOCKING
 
 #ifdef _DEBUG_ENABLE_RANDOM_BLOCKING
 namespace _random_block_params
@@ -120,12 +120,12 @@ void FrameRelayPublisher::init(std::shared_ptr<InitConfig_t> config)
     m_config = config;
 
     // create the async processing graph
-    RDX_INFO_DEV(this, __func__, print_thread_id, "Creating async processing graph");
+    RDX_INFO_DEV(this, __func__, print_thread_id, "{}", "Creating async processing graph");
     m_impl->m_async_graph = std::make_shared<tbb::flow::graph>();
     m_impl->m_async_node = std::make_shared<async_processor::SingleBufferExecNode<FrameDeliveryTask_t>>(*m_impl->m_async_graph);
     m_impl->m_async_node->set_input_data_buffer_size(m_config->goal_buffer_size);
     m_impl->m_async_node->set_output_callback([this](const auto &output) -> int {
-        RDX_INFO_DEV(this, __func__, print_thread_id, "Delivering frame using output callback");
+        RDX_INFO_DEV(this, __func__, print_thread_id, "{}", "Delivering frame using output callback");
         FrameDeliveryTask_t task = std::get<0>(output);
 
         RDX_INFO_DEV(this, __func__, print_thread_id, "[goal_uuid={}] Trying to get payload",
@@ -154,7 +154,7 @@ void FrameRelayPublisher::init(std::shared_ptr<InitConfig_t> config)
     }
 
 
-    RDX_INFO_DEV(this, __func__, print_thread_id, "Creating action server");
+    RDX_INFO_DEV(this, __func__, print_thread_id, "{}", "Creating action server");
     m_frame_receive_action_server =
         rclcpp_action::create_server<FrameReceiveAction_t>(
             this,
@@ -167,22 +167,22 @@ void FrameRelayPublisher::init(std::shared_ptr<InitConfig_t> config)
     m_pub_relayed_frame->init(this, config->relayed_frame_topic_name, config->publish_queue_size);
 
     // create publisher, regardless of whether debug pub is enabled
-    RDX_INFO_DEV(this, __func__, print_thread_id, "Creating image publisher");
+    RDX_INFO_DEV(this, __func__, print_thread_id, "{}", "Creating image publisher");
     m_debug_pub_accepted_goal = std::make_shared<StampedImagePub>();
     m_debug_pub_accepted_goal->init(this, "debug_port/accepted_goal", DefaultParams::DebugPublisherQoS);
     m_debug_pub_rejected_goal = std::make_shared<StampedImagePub>();
     m_debug_pub_rejected_goal->init(this, "debug_port/rejected_goal", DefaultParams::DebugPublisherQoS);
 
-    RDX_INFO_DEV(this, __func__, print_thread_id, "Initialization completed");
+    RDX_INFO_DEV(this, __func__, print_thread_id, "{}", "Initialization completed");
 }
 
 int FrameRelayPublisher::_deliver_frame(FrameDeliveryTask_t &task)
 {
-    RDX_INFO_DEV(this, __func__, print_thread_id, "Trying to get payload");
+    RDX_INFO_DEV(this, __func__, print_thread_id, "{}", "Trying to get payload");
     auto payload = task.payload.get();
 
     if (payload->is_valid()) {
-        RDX_INFO_DEV(this, __func__, print_thread_id, "Got payload");
+        RDX_INFO_DEV(this, __func__, print_thread_id, "{}", "Got payload");
         auto msg_uuid = to_boost_uuid(payload->goal_handle->get_goal()->x_uid);
 
         RDX_INFO_DEV(this, __func__, print_thread_id, "[msg_uuid={}][goal_uuid={}] Delivering frame",
@@ -500,7 +500,7 @@ void FrameRelayPublisher::InitConfig_t::from_parameters(const rclcpp::Node *node
     using JsonPointer_t = nlohmann::json::json_pointer;
     auto json_params = RDX_GET_JSON_PARAM_FROM_NODE(node);
     if (json_params.empty()) {
-        RDX_LOG_ERROR(node, __func__, "Failed to get JSON parameters from node");
+        RDX_LOG_ERROR(node, __func__, "{}", "Failed to get JSON parameters from node");
         return;
     }
 

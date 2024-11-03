@@ -5,6 +5,7 @@
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputPort.hpp>
 #include <redoxi_video_reader/base/VideoReaderBaseTypes_v2.hpp>
+#include <thread>
 #include <nlohmann/json.hpp>
 
 namespace redoxi_works
@@ -35,9 +36,12 @@ class RedoxiVideoReaderBase_v2 : public rclcpp::Node,
     using InitConfig_t = video_reader_base_v2::InitConfig;
     using RuntimeConfig_t = video_reader_base_v2::RuntimeConfig;
 
-    using FrameMessage_t = OutputPort_t::ActionType_t::Goal;
     using Downstream_t = OutputPort_t::Downstream_t;
+    using DownstreamSpec_t = Downstream_t::DownstreamSpec_t;
+
+    using DeliveryGoal_t = OutputPort_t::ActionType_t::Goal;
     using DeliveryRequest_t = OutputPort_t::DeliveryRequest_t;
+    using DeliveryPolicy_t = DeliveryRequest_t::DeliveryPolicy_t;
     using SendFrameResult_t = OutputPort_t::SendResult_t;
     using SourceData_t = OutputPort_t::SourceData_t;
 
@@ -234,6 +238,10 @@ class RedoxiVideoReaderBase_v2 : public rclcpp::Node,
     //! debug publishers
     StampedImagePub m_pub_task_enqueue;
     StampedImagePub m_pub_task_drop;
+
+    //! thread for periodic step
+    std::shared_ptr<std::thread> m_step_thread;
+    std::atomic<bool> m_step_running{false};
 };
 
 } // namespace redoxi_works

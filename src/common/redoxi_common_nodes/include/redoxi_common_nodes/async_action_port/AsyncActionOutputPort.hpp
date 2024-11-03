@@ -27,7 +27,11 @@ class AsyncActionOutputPort : public IStartStopProtocol
     inline static constexpr auto PRINT_THREAD_ID = false;
 
   public:
-    AsyncActionOutputPort() = default;
+    AsyncActionOutputPort(rclcpp::Node *parent_node)
+        : m_parent_node(parent_node)
+    {
+    }
+
     virtual ~AsyncActionOutputPort() noexcept
     {
         // must finish all tasks
@@ -249,11 +253,11 @@ class AsyncActionOutputPort : public IStartStopProtocol
         constexpr auto PRINT_THREAD_ID = false;
 
         // create graph and node
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "Creating graph ...");
+        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Creating graph ...");
         m_delivery_graph = std::make_shared<tbb::flow::graph>();
         auto &g = *m_delivery_graph;
 
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "Creating frame delivery node ...");
+        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Creating frame delivery node ...");
         m_delivery_task_node = std::make_shared<
             async_processor::SingleBufferExecNode<DeliveryTask_t>>(g);
         auto &node = *m_delivery_task_node;
@@ -263,13 +267,13 @@ class AsyncActionOutputPort : public IStartStopProtocol
         }
 
         // set node params
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "Setting node params ...");
+        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Setting node params ...");
         auto buffer_size = m_init_config.get_num_buffer_requests();
         node.set_input_data_buffer_size(buffer_size);
         node.set_preserve_order(m_init_config.get_preserve_request_order());
 
         // sync mode, all functions are executed in the graph
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "Setting node to sync mode ...");
+        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Setting node to sync mode ...");
         node.set_use_async_callback(false);
         using DeliveryTaskNode_t = async_processor::SingleBufferExecNode<DeliveryTask_t>;
         using WorkInput_t = DeliveryTaskNode_t::InputWithTokens_t;
@@ -277,7 +281,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         // setup work function, nothing to do because during work function
         // frames are out of order
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "Setting work function ...");
+        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Setting work function ...");
         node.set_work_function(
             [this](const WorkInput_t &input, WorkOutput_t &output) -> int {
                 // copy input to output
@@ -285,7 +289,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 const auto &in_payload = std::get<0>(input);
                 auto ret = this->_do_task_delivery_preprocess(in_payload, out_payload);
                 if (ret != 0) {
-                    RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Failed to preprocess frame, error code: {}", ret);
+                    RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Failed to preprocess data, error code: {}", ret);
                 }
 
                 return ret;
@@ -293,19 +297,19 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         // output callback
         // send frame to downstreams
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "Setting output callback ...");
+        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Setting output callback ...");
         node.set_output_callback(
             [this](const WorkOutput_t &output) -> int {
                 auto &out_payload = std::get<0>(output);
                 auto result = this->_do_task_delivery_main(out_payload);
                 if (result.result_code != DeliveryResultCode::Success) {
-                    RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Failed to deliver frame, error code: {}", (int)result.result_code);
+                    RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Failed to deliver data, error code: {}", (int)result.result_code);
                 }
                 return static_cast<int>(result.result_code);
             });
 
         // build the node
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "Building frame delivery node ...");
+        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Building frame delivery node ...");
         node.build();
 
         return 0;
@@ -320,12 +324,17 @@ class AsyncActionOutputPort : public IStartStopProtocol
         m_downstreams.clear();
         for (auto &it : m_init_config.get_downstream_specs()) {
             Downstream_t ds;
-            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "Initializing downstream ...");
+            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Initializing downstream ...");
             auto ret = ds.init_by_spec(it, m_parent_node);
             if (ret != 0) {
                 RDX_RAISE_ERROR("[{}] failed to initialize downstream", __func__);
             }
             m_downstreams.push_back(ds);
+        }
+
+        if (m_downstreams.empty()) {
+            RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID,
+                         "{}", "No downstreams found");
         }
 
         return 0;
@@ -466,6 +475,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
     virtual int _create_target_data(TargetData_t &target_data, const DeliveryRequest_t &request)
     {
         target_data.set_source_data_uuid(request.get_source_data().get_uuid());
+
+        // ping signal?
+        if (request.is_ping_request()) {
+            target_data.set_control_signal_code(ControlSignalCode::Ping);
+        }
+
         return 0;
     }
 
@@ -483,6 +498,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
     //! @note request's precondition is checked before delivery happens, downstream precondition is ignored
     virtual DeliveryResult_t _do_task_delivery_main(const DeliveryTask_t &task)
     {
+        RDX_LOG_DEBUG(m_parent_node, __func__, "[msg_uuid={}] received delivery task",
+                      boost::uuids::to_string(task.get_request().get_source_data().get_uuid()));
+
         // default precondition is any downstream ready
         auto request_precondition = m_init_config.get_fallback_delivery_precondition();
 
@@ -496,6 +514,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
         // check if precondition is satisfied
         bool precondition_satisfied = false;
         if (request_precondition == DeliveryPrecondition::DontCare || request_precondition == DeliveryPrecondition::NoPrecondition) {
+            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "{}",
+                         "Precondition is set to dont care or no precondition, proceed with delivery");
             // if precondition is dont care or no precondition, it is regarded as satisfied
             precondition_satisfied = true;
         } else if (request_precondition == DeliveryPrecondition::AnyDownstreamReady || request_precondition == DeliveryPrecondition::AllDownstreamsReady) {
@@ -505,6 +525,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
             size_t num_downstream_ready = 0;
             for (auto &ds : m_downstreams) {
                 bool ds_ready = false;
+                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
+                             "Testing precondition for downstream {}", ds.get_downstream_spec().get_name());
 
                 // when testing precondition, we use the downstream's delivery policy
                 auto &ds_policy = ds.get_downstream_spec().get_delivery_policy();
@@ -514,6 +536,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 auto fallback_wait_time = retry_policy.get_fallback_wait_time_retry_response();
                 auto ping_wait_time = retry_policy.get_wait_time_retry_response().value_or(fallback_wait_time);
                 ds_ready = _ping(ds, ping_wait_time);
+
+                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
+                             "Downstream readiness is: {}", ds_ready ? "READY" : "NOT READY");
 
                 // count the number of downstreams that are ready
                 num_downstream_ready += ds_ready ? 1 : 0;
@@ -534,11 +559,11 @@ class AsyncActionOutputPort : public IStartStopProtocol
         }
 
         if (!precondition_satisfied) {
-            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Precondition is not satisfied");
+            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Precondition is not satisfied");
             return DeliveryResult_t{DeliveryResultCode::NotTried};
         }
 
-        RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Precondition is satisfied, start delivery ...");
+        RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Precondition is satisfied, start delivery ...");
 
         // create target delivery data
         TargetData_t target_data;
@@ -548,7 +573,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         if (m_cb_on_deliver_before) {
             auto ret = m_cb_on_deliver_before(target_data, task);
             if (ret != 0) {
-                RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "on_deliver_before callback failed");
+                RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "on_deliver_before callback failed");
             }
         }
 
@@ -562,7 +587,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 auto ret = _deliver_data_with_retry(target_data, ds, request_delivery_policy);
                 if (ret != 0) {
                     RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
-                                 "Failed to deliver frame to downstream {}",
+                                 "Failed to deliver data to downstream {}",
                                  ds.get_downstream_spec().get_name());
                 } else {
                     delivered_to_any_downstream = true;
@@ -570,10 +595,10 @@ class AsyncActionOutputPort : public IStartStopProtocol
             }
 
             if (!delivered_to_any_downstream) {
-                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Failed to deliver data to any downstream");
+                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Failed to deliver data to any downstream");
                 result = DeliveryResult_t{DeliveryResultCode::TriedButFailed};
             } else {
-                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Successfully delivered data to some downstreams");
+                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Successfully delivered data to some downstreams");
                 result = DeliveryResult_t{DeliveryResultCode::Success};
             }
         }
@@ -582,7 +607,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         if (m_cb_on_deliver_after) {
             auto ret = m_cb_on_deliver_after(target_data, task, result);
             if (ret != 0) {
-                RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "on_deliver_after callback failed");
+                RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "on_deliver_after callback failed");
             }
         }
 
@@ -597,6 +622,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
     {
         //! Set up retry strategy
         int attempts = 0;
+        RDX_LOG_DEBUG(m_parent_node, __func__, "[msg_uuid={}] Delivering data to downstream {}",
+                      boost::uuids::to_string(target_data.get_source_data_uuid()),
+                      ds.get_downstream_spec().get_name());
 
         //! use the preferred delivery policy if provided, otherwise use the downstream's delivery policy
         const DeliveryPolicy_t *delivery_policy = nullptr;
@@ -615,6 +643,11 @@ class AsyncActionOutputPort : public IStartStopProtocol
         auto msg_uuid = target_data.get_source_data_uuid();
 
         // deliver until max attempts reached, or until success when no drop is required
+        RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
+                     "Delivering data to downstream {}, max attempts: {}, timeout each attempt: {}, interval between attempts: {}",
+                     ds.get_downstream_spec().get_name(), max_attempts,
+                     timeout_each_attempt.count(), interval_between_attempts.count());
+
         while (attempts < max_attempts || no_drop) {
             if (!rclcpp::ok()) {
                 // system is shutting down, get out
@@ -626,6 +659,11 @@ class AsyncActionOutputPort : public IStartStopProtocol
             _debug_publish_sending_to_downstream(nullptr, &target_data, ds, attempts + 1, max_attempts);
 
             //! Send the frame to the downstream
+            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
+                         "[msg_uuid={}] Sending frame to downstream {} (attempt {}/{}, no_drop={})",
+                         boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name(),
+                         attempts + 1, max_attempts, no_drop ? "true" : "false");
+
             auto result = _send_data_to_downstream(target_data, ds, timeout_each_attempt);
             if (!result.goal_handle_future.valid()) {
                 RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Not sending frame to downstream {}, goal handle future is invalid",
@@ -694,9 +732,15 @@ class AsyncActionOutputPort : public IStartStopProtocol
     {
         //! Get the action client for the downstream
         auto client = ds.get_action_client();
+        if (client == nullptr) {
+            RDX_RAISE_ERROR("{}: {} Action client is nullptr", __func__, ds.get_downstream_spec().get_name());
+        }
 
         //! Create a goal object and populate it with frame message data
         auto &goal = target_data.get_goal();
+        RDX_LOG_DEBUG(m_parent_node, __func__, "[msg_uuid={}] Sending goal to downstream {}",
+                      boost::uuids::to_string(target_data.get_source_data_uuid()),
+                      ds.get_downstream_spec().get_name());
 
         //! Use SyncActionSender to send the goal and wait for the response
         SyncActionSender_t sender(m_parent_node);

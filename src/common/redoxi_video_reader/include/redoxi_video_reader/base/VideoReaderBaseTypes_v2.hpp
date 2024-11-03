@@ -59,7 +59,7 @@ class RuntimeConfig
 {
   public:
     inline static const std::string DEFAULT_OUTPUT_IMAGE_ENCODING = "bgr8";
-    inline static const DefaultTimeUnit_t DEFAULT_STEP_INTERVAL{10};
+    inline static const DefaultTimeUnit_t DEFAULT_STEP_INTERVAL{std::chrono::milliseconds(5)};
     inline static const DefaultTimeUnit_t DEFAULT_REQUEST_RETRY_INTERVAL{std::chrono::milliseconds(5)};
     inline static const DefaultTimeUnit_t DEFAULT_REQUEST_RETRY_RESPONSE_TIME{std::chrono::milliseconds(5)};
     inline static const int DEFAULT_REQUEST_RETRY_NUMBER{5};

@@ -29,6 +29,12 @@ RedoxiVideoReaderBase_v2::~RedoxiVideoReaderBase_v2()
     if (m_primary_output_port) {
         m_primary_output_port->wait_for_all_requests();
     }
+
+    // stop step thread
+    m_step_running = false;
+    if (m_step_thread != nullptr && m_step_thread->joinable()) {
+        m_step_thread->join();
+    }
 }
 
 int RedoxiVideoReaderBase_v2::open()
@@ -82,6 +88,16 @@ int RedoxiVideoReaderBase_v2::start()
     //! Change status to STARTED
     _set_status_code(NodeStatusCode::STARTED);
 
+    //! Start step thread
+    auto step_interval = m_runtime_config.step_interval;
+    m_step_running = true;
+    m_step_thread = std::make_shared<std::thread>([this, step_interval]() {
+        while (m_status_code == NodeStatusCode::STARTED && rclcpp::ok() && m_step_running) {
+            _step();
+            std::this_thread::sleep_for(step_interval);
+        }
+    });
+
     return 0;
 }
 
@@ -107,6 +123,12 @@ int RedoxiVideoReaderBase_v2::stop()
 
     //! Change status to STOPPED
     _set_status_code(NodeStatusCode::STOPPED);
+
+    //! Stop step thread
+    m_step_running = false;
+    if (m_step_thread != nullptr && m_step_thread->joinable()) {
+        m_step_thread->join();
+    }
 
     return 0;
 }
@@ -175,9 +197,16 @@ int RedoxiVideoReaderBase_v2::update_init_config(const InitConfig_t &config)
         return -1;
     }
 
+    //! Store configurations, this must come before other operations
+    m_init_config = config;
+
     // parse the config into a string and print it
     auto config_str = JS::serializeStruct(config);
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "init config: {}", config_str);
+
+    //! config must have some downstream
+    // RDX_ASSERT_CHECK_TRUE(!config.primary_output_spec.get_downstream_specs().empty(),
+    //                       "[{}] init config must have at least one downstream", __func__);
 
     //! Initialize output ports
     auto primary_output_port = _create_primary_output_port();
@@ -196,9 +225,6 @@ int RedoxiVideoReaderBase_v2::update_init_config(const InitConfig_t &config)
         m_pub_task_enqueue.init(this, m_init_config.debug_pub_task_enqueue_name, debug_qos);
         m_pub_task_drop.init(this, m_init_config.debug_pub_task_drop_name, debug_qos);
     }
-
-    //! Store configurations
-    m_init_config = config;
 
     return 0;
 }
@@ -247,16 +273,11 @@ RedoxiVideoReaderBase_v2::DeliveryRequest_t
 std::shared_ptr<RedoxiVideoReaderBase_v2::OutputPort_t>
     RedoxiVideoReaderBase_v2::_create_primary_output_port()
 {
-    auto port = std::make_shared<OutputPort_t>();
-    // OutputPort_t::InitConfig_t port_config;
-    // std::vector<OutputPort_t::DownstreamSpec_t> downstreams;
-    // for (const auto &[node_name, ds] : m_init_config.downstreams) {
-    //     downstreams.push_back(ds);
-    // }
-    // port_config.set_downstream_specs(downstreams);
-    // port_config.set_num_buffer_requests(1); // always keep the latest one
-    // port_config.set_preserve_request_order(true);
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "create primary output port");
+    auto port = std::make_shared<OutputPort_t>(this);
     auto &port_config = m_init_config.primary_output_spec;
+    // RDX_ASSERT_CHECK_TRUE(!port_config.get_downstream_specs().empty(),
+    //                       "[{}] port_config must have at least one downstream", __func__);
     port->init(port_config);
     return port;
 }

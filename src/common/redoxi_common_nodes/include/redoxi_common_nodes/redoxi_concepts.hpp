@@ -56,7 +56,7 @@ struct RedoxiActionDataTrait {
 
     static void set_uuid(Goal_t &goal, const boost::uuids::uuid &uuid)
     {
-        goal.x_uid = to_ros_goal_uuid(uuid);
+        goal.x_uid = to_ros_uuid_msg(uuid);
     }
 };
 

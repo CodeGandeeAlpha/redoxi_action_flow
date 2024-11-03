@@ -74,7 +74,7 @@ void InitConfig::from_parameters(RedoxiVideoReaderBase *node)
 
     //! Nothing to parse, return
     if (json_params.empty()) {
-        RDX_INFO_DEV(node, __func__, "No JSON parameters found");
+        RDX_INFO_DEV(node, __func__, "{}", "No JSON parameters found");
         return;
     }
 
@@ -104,7 +104,7 @@ void InitConfig::from_parameters(RedoxiVideoReaderBase *node)
     if (json_params.contains(downstreams_ptr) && json_params[downstreams_ptr].is_array()) {
         for (const auto &action_config : json_params[downstreams_ptr]) {
             if (!action_config.contains("name")) {
-                RDX_LOG_WARN(node, __func__, "Skipping downstream action without a name");
+                RDX_LOG_WARN(node, __func__, "{}", "Skipping downstream action without a name");
                 continue;
             }
 
@@ -153,7 +153,7 @@ void InitConfig::from_parameters(RedoxiVideoReaderBase *node)
             RDX_INFO_DEV(node, __func__, "Added downstream spec for action: {}", action_name);
         }
     } else {
-        RDX_INFO_DEV(node, __func__, "No valid downstream configuration found in JSON parameters");
+        RDX_INFO_DEV(node, __func__, "{}", "No valid downstream configuration found in JSON parameters");
     }
 }
 

@@ -10,6 +10,8 @@ namespace redoxi_works
 SimpleActionGenerator_v2::SimpleActionGenerator_v2(const std::string &name, const rclcpp::NodeOptions &options)
     : RedoxiVideoReaderBase_v2(name, options)
 {
+    // this->get_logger().set_level(rclcpp::Logger::Level::Debug);
+    RDX_LOG_DEBUG(this, __func__, true, "{}", "create SimpleActionGenerator_v2");
 }
 
 int SimpleActionGenerator_v2::_read_frame(SourceData_t &source_data, std::atomic<int64_t> &frame_number)
@@ -43,7 +45,7 @@ void SimpleActionGenerator_v2::_step_send_by_tbb_graph()
     {
         auto ret = _read_frame(source_data, m_frame_number);
         if (ret != 0) {
-            RDX_LOG_ERROR(this, __func__, true, "Failed to read frame");
+            RDX_LOG_ERROR(this, __func__, true, "{}", "Failed to read frame");
             return;
         }
     }
@@ -62,6 +64,17 @@ void SimpleActionGenerator_v2::_step_send_by_tbb_graph()
             RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] put data FAILED", boost::uuids::to_string(msg_uuid));
         } else {
             RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] put data SUCCESS", boost::uuids::to_string(msg_uuid));
+        }
+    }
+
+    //! send it
+    {
+        RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] enqueue", boost::uuids::to_string(msg_uuid));
+        auto ok = m_primary_output_port->try_push_request(delivery_request);
+        if (!ok) {
+            RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] enqueue FAILED", boost::uuids::to_string(msg_uuid));
+        } else {
+            RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] enqueue SUCCESS", boost::uuids::to_string(msg_uuid));
         }
     }
 

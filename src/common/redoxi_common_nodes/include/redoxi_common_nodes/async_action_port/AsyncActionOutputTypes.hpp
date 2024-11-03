@@ -1,11 +1,14 @@
 #pragma once
 
-#include <redoxi_common_nodes/async_action_port/output_port_concepts.hpp>
 #include <optional>
+#include <sensor_msgs/msg/image.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
 #include <json_struct/json_struct.h>
 
+#include <redoxi_common_nodes/async_action_port/output_port_concepts.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
-#include <sensor_msgs/msg/image.hpp>
+#include <redoxi_common_cpp/ros_utils/common.hpp>
+
 
 // default types for the async action output port
 namespace redoxi_works
@@ -251,13 +254,26 @@ class DefaultTargetData
     //! Get the source data UUID
     virtual boost::uuids::uuid get_source_data_uuid() const
     {
-        return m_source_data_uuid;
+        return ActionDataTrait_t::get_uuid(m_goal);
     }
 
     //! Set the source data UUID
     virtual void set_source_data_uuid(boost::uuids::uuid uuid)
     {
-        m_source_data_uuid = uuid;
+        // mark the goal with the source data UUID
+        ActionDataTrait_t::set_uuid(m_goal, uuid);
+    }
+
+    //! Get the control signal code
+    virtual ControlSignalCode get_control_signal_code() const
+    {
+        return ActionDataTrait_t::get_control_signal_code(m_goal);
+    }
+
+    //! Set the control signal code
+    virtual void set_control_signal_code(ControlSignalCode code)
+    {
+        ActionDataTrait_t::mark_with_control_signal(m_goal, code);
     }
 
     //! Convert to publish message
@@ -268,7 +284,6 @@ class DefaultTargetData
 
   protected:
     Goal_t m_goal;
-    boost::uuids::uuid m_source_data_uuid;
 };
 using _SampleTargetData = DefaultTargetData<_SampleAction, _SampleActionDataTrait, _SampleImage>;
 static_assert(DeliveryTargetDataConcept<_SampleTargetData>,
@@ -832,8 +847,26 @@ class DefaultDownstream
     //! Initialize downstream from spec
     virtual int init_by_spec(const DownstreamSpec_t &spec, rclcpp::Node *node)
     {
+        if (node == nullptr) {
+            RDX_RAISE_ERROR("[{}()]: Node is nullptr when initializing downstream with spec '{}'", __func__, spec.get_name());
+        }
+
         m_downstream_spec = spec;
         m_node = node;
+
+        // create action client
+        RDX_LOG_DEBUG(node, "[{}] Creating action client for action '{}'", __func__, spec.get_action_name());
+        m_action_client = rclcpp_action::create_client<ActionType_t>(node, spec.get_action_name());
+        if (m_action_client == nullptr) {
+            RDX_RAISE_ERROR("[{}()]: Failed to create action client for action '{}'", __func__, spec.get_action_name());
+        }
+
+        bool ret = m_action_client->wait_for_action_server();
+        if (!ret) {
+            RDX_RAISE_ERROR("[{}()]: Failed to wait for action server for action '{}'", __func__, spec.get_action_name());
+        }
+
+        RDX_LOG_DEBUG(node, "[{}] Action client for action '{}' created", __func__, spec.get_action_name());
 
         return 0;
     }

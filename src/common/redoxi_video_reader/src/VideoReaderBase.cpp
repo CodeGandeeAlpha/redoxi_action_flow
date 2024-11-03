@@ -69,21 +69,21 @@ int RedoxiVideoReaderBase::init(const std::shared_ptr<InitConfig_t> &config,
                           "[init()] Runtime config is not set");
 
     // create the implementation
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Creating implementation ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "{}", "Creating implementation ...");
     m_impl = _create_impl(config, runtime_config);
 
     // init shared memory storage if it is supported
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Initializing shared memory storage ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "{}", "Initializing shared memory storage ...");
     if (m_impl->is_shared_memory_supported()) {
         int ret = m_impl->init_shared_memory_storage();
         if (ret != 0) {
-            RDX_LOG_WARN(this, __func__, PRINT_THREAD_ID, "Failed to initialize shared memory storage, continue without shared memory");
+            RDX_LOG_WARN(this, __func__, PRINT_THREAD_ID, "{}", "Failed to initialize shared memory storage, continue without shared memory");
         }
     }
 
     // set init_config
     {
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Updating init config ...");
+        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "{}", "Updating init config ...");
         auto ret = update_init_config(config);
         if (ret != 0) {
             RDX_RAISE_ERROR("[init()] Failed to update init config");
@@ -93,7 +93,7 @@ int RedoxiVideoReaderBase::init(const std::shared_ptr<InitConfig_t> &config,
 
     // set runtime_config
     {
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Updating runtime config ...");
+        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "{}", "Updating runtime config ...");
         auto ret = update_runtime_config(runtime_config);
         if (ret != 0) {
             RDX_RAISE_ERROR("[init()] Failed to update runtime config");
@@ -101,7 +101,7 @@ int RedoxiVideoReaderBase::init(const std::shared_ptr<InitConfig_t> &config,
         }
     }
 
-    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "Initialization completed successfully");
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "{}", "Initialization completed successfully");
     return 0;
 }
 
@@ -137,7 +137,7 @@ int RedoxiVideoReaderBase::update_init_config(const std::shared_ptr<InitConfig_t
         m_impl->debug_pub_task_dropped = std::make_shared<StampedImagePub>(
             this, m_init_config->debug_pub_task_drop_name, DefaultParams::DebugPublisherQoS);
 
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Debug publishers created");
+        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "{}", "Debug publishers created");
     }
 
     //! Set status code to closed
@@ -169,7 +169,7 @@ int RedoxiVideoReaderBase::update_runtime_config(const std::shared_ptr<RuntimeCo
 
     //! create frame delivery tasks
     {
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Initializing frame delivery tasks ...");
+        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "{}", "Initializing frame delivery tasks ...");
         int ret = _init_frame_delivery_tasks();
         if (ret != 0) {
             RDX_RAISE_ERROR("[{}()] Failed to initialize frame delivery tasks", __func__);
@@ -187,7 +187,7 @@ int RedoxiVideoReaderBase::update_runtime_config(const std::shared_ptr<RuntimeCo
     //! Apply any necessary changes based on the new runtime config
     //! This might involve updating internal parameters or reconfiguring components
 
-    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "Runtime config updated successfully");
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "{}", "Runtime config updated successfully");
 
     return 0;
 }
@@ -206,7 +206,7 @@ int RedoxiVideoReaderBase::open()
     // do subclass work first, to avoid side effect on failure
     auto ret = _open();
     if (ret != 0) {
-        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to open node");
+        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "{}", "Failed to open node");
         return ret;
     }
 
@@ -234,7 +234,7 @@ int RedoxiVideoReaderBase::start()
     // do subclass work first, to avoid side effect on failure
     auto ret = _start();
     if (ret != 0) {
-        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to start node");
+        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "{}", "Failed to start node");
         return ret;
     }
 
@@ -280,7 +280,7 @@ int RedoxiVideoReaderBase::stop()
     // do subclass work first, to avoid side effect on failure
     auto ret = _stop();
     if (ret != 0) {
-        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to stop node");
+        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "{}", "Failed to stop node");
         return ret;
     }
 
@@ -318,7 +318,7 @@ int RedoxiVideoReaderBase::close()
     if (m_status_code == NodeStatusCode::STARTED) {
         auto ret = stop();
         if (ret != 0) {
-            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to stop node");
+            RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "{}", "Failed to stop node");
             return ret;
         }
     }
@@ -326,7 +326,7 @@ int RedoxiVideoReaderBase::close()
     // do subclass work first, to avoid side effect on failure
     auto ret = _close();
     if (ret != 0) {
-        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "Failed to close node");
+        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID, "{}", "Failed to close node");
         return ret;
     }
 
@@ -389,11 +389,11 @@ int RedoxiVideoReaderBase::_connect_to_downstreams()
 int RedoxiVideoReaderBase::_init_frame_delivery_tasks()
 {
     // create graph and node
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Creating graph ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "{}", "Creating graph ...");
     m_impl->frame_delivery_graph = std::make_shared<tbb::flow::graph>();
     auto &g = *m_impl->frame_delivery_graph;
 
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Creating frame delivery node ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "{}", "Creating frame delivery node ...");
     m_impl->frame_delivery_node = std::make_shared<
         ap::SingleBufferExecNode<
             mytypes::FrameDeliveryTask,
@@ -405,13 +405,13 @@ int RedoxiVideoReaderBase::_init_frame_delivery_tasks()
     }
 
     // set node params
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Setting node params ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "{}", "Setting node params ...");
     auto buffer_size = m_runtime_config->frame_delivery_options->num_buffer_frames;
     node.set_input_data_buffer_size(buffer_size);
     node.set_preserve_order(true);
 
     // sync mode, all functions are executed in the graph
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Setting node to sync mode ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "{}", "Setting node to sync mode ...");
     node.set_use_async_callback(false);
     using FrameDeliveryNode_t = ap::SingleBufferExecNode<mytypes::FrameDeliveryTask, mytypes::FrameDeliveryTask>;
     using WorkInput_t = FrameDeliveryNode_t::InputWithTokens_t;
@@ -419,7 +419,7 @@ int RedoxiVideoReaderBase::_init_frame_delivery_tasks()
 
     // setup work function, nothing to do because during work function
     // frames are out of order
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Setting work function ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "{}", "Setting work function ...");
     node.set_work_function(
         [this](const WorkInput_t &input, WorkOutput_t &output) -> int {
             // copy input to output
@@ -435,7 +435,7 @@ int RedoxiVideoReaderBase::_init_frame_delivery_tasks()
 
     // output callback
     // send frame to downstreams
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Setting output callback ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "{}", "Setting output callback ...");
     node.set_output_callback(
         [this](const WorkOutput_t &output) -> int {
             auto &out_payload = std::get<0>(output);
@@ -447,7 +447,7 @@ int RedoxiVideoReaderBase::_init_frame_delivery_tasks()
         });
 
     // build the node
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "Building frame delivery node ...");
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID, "{}", "Building frame delivery node ...");
     node.build();
 
     return 0;
@@ -512,7 +512,7 @@ int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &ta
         }
     }
     if (!downstream_ready) {
-        RDX_LOG_WARN(this, __func__, PRINT_THREAD_ID, "No downstream is ready to accept new frame");
+        RDX_LOG_WARN(this, __func__, PRINT_THREAD_ID, "{}", "No downstream is ready to accept new frame");
         return 0;
     }
 
@@ -560,7 +560,7 @@ int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &ta
         //! Remove frame from shared memory if failed to deliver
         if (ret_deliver_frame != 0) {
             //! Failed to deliver frame, removing frame from shared memory
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "Failed to deliver frame, removing frame from shared memory");
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "{}", "Failed to deliver frame, removing frame from shared memory");
             m_impl->remove_from_shared_memory(shared_memory_id);
         }
 
@@ -572,7 +572,7 @@ int RedoxiVideoReaderBase::_do_frame_delivery_main(const FrameDeliveryTask_t &ta
         //! Deliver frame
         auto ret_deliver_frame = func_deliver_frame(frame_msg);
         if (ret_deliver_frame != 0) {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "Failed to deliver frame");
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID, "{}", "Failed to deliver frame");
         }
 
         return ret_deliver_frame;

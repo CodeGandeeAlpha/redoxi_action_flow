@@ -77,6 +77,14 @@ concept DeliveryTargetDataConcept = requires(T t)
         std::declval<T &>().set_source_data_uuid(std::declval<boost::uuids::uuid>())
         } -> std::same_as<void>;
 
+    //! Must have method to get the control signal code
+    {
+        std::declval<const T &>().get_control_signal_code()
+        } -> std::same_as<ControlSignalCode>;
+    {
+        std::declval<T &>().set_control_signal_code(std::declval<ControlSignalCode>())
+        } -> std::same_as<void>;
+
     //! Must have method to convert to publish message
     {
         std::declval<const T &>().to_publish_message(std::declval<typename T::PublishMessageType_t &>())

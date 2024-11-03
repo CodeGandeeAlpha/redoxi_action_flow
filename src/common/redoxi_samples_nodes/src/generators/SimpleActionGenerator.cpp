@@ -40,7 +40,7 @@ void SimpleActionGenerator::_step_send_by_tbb_graph()
     {
         auto ret = _read_frame(frame, m_frame_number);
         if (ret != 0) {
-            RDX_LOG_ERROR(this, __func__, true, "Failed to read frame");
+            RDX_LOG_ERROR(this, __func__, true, "{}", "Failed to read frame");
             return;
         }
     }
@@ -133,7 +133,7 @@ void SimpleActionGenerator::_step_send_and_block()
 
         // block myself
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        RDX_INFO_DEV(this, __func__, true, "unblocked myself");
+        RDX_INFO_DEV(this, __func__, true, "{}", "unblocked myself");
     }
 
     return;
