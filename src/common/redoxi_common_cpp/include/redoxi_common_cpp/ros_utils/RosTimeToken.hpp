@@ -126,7 +126,6 @@ class _RosTimeToken
     //! pop a token from the queue, wait until the token is available if necessary
     virtual bool pop_token(TokenType *token = nullptr)
     {
-        bool ok = false;
         if (m_is_started && m_interval == IntervalType(0)) {
             // if the interval is 0, the token is always available
             if (token) {
@@ -134,13 +133,13 @@ class _RosTimeToken
             } // else do nothing
         } else {
             if (token) {
-                ok = m_queue->pop(*token);
+                m_queue->pop(*token);
             } else {
                 TokenType _token;
-                ok = m_queue->pop(_token);
+                m_queue->pop(_token);
             }
         }
-        return ok;
+        return true;
     }
 
     //! Get the number of tokens in the queue

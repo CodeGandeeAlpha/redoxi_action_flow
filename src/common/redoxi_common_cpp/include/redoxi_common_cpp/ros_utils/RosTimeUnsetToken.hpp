@@ -104,10 +104,12 @@ class _RosTimeUnsetToken
             return true;
         }
         if (token) {
-            return m_queue->try_push(*token);
+            m_queue->push(*token);
         } else {
-            return m_queue->try_push(TokenType());
+            m_queue->push(TokenType());
         }
+
+        return true;
     }
 
     virtual bool try_push_token(const TokenType *token = nullptr)
