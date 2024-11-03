@@ -1,3 +1,5 @@
+[] bugfix: the uuid of message is changed during delivery, unknown why, and boost uuid and ros2 uuid are not the same
+--------------------------------
 [] implement the frame payload type
 [] make use of vineyard to deliver the frame payload
 [] test random blocking from the receiver side
