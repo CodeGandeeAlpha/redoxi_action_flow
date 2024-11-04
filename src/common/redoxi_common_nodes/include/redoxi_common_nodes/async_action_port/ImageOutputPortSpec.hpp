@@ -1,5 +1,6 @@
 #pragma once
 
+#include <any>
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -110,6 +111,9 @@ class DeliverySourceData
         m_uuid = uuid;
     }
 
+    // auxiliary data for easy extension without inheritance
+    std::any auxiliary_data;
+
   protected:
     cv::Mat m_image;
     std::string m_encoding = DefaultEncoding;
@@ -141,6 +145,10 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         }
         return 0;
     }
+
+  public:
+    // auxiliary data for easy extension without inheritance
+    std::any auxiliary_data;
 };
 static_assert(output_port_types::DeliveryTargetDataConcept<DeliveryTargetData>, "DeliveryTargetData must satisfy DeliveryTargetDataConcept");
 
@@ -153,8 +161,6 @@ static_assert(output_port_types::DeliveryPolicyConcept<DeliveryPolicy>, "Deliver
 
 //! Request type for image output port
 using DeliveryRequestBase = output_port_types::DefaultDeliveryRequest<DeliverySourceData, DeliveryTargetData, DeliveryPolicy, DeliveryStampData>;
-
-static_assert(output_port_types::DeliveryRequestConcept<DeliveryRequestBase>, "DeliveryRequest must satisfy DeliveryRequestConcept");
 class DeliveryRequest : public DeliveryRequestBase
 {
   public:
@@ -185,7 +191,12 @@ class DeliveryRequest : public DeliveryRequestBase
 
         return 0;
     }
+
+  public:
+    // auxiliary data for easy extension without inheritance
+    std::any auxiliary_data;
 };
+static_assert(output_port_types::DeliveryRequestConcept<DeliveryRequest>, "DeliveryRequest must satisfy DeliveryRequestConcept");
 using DeliveryTask = output_port_types::DefaultDeliveryTask<DeliveryRequest, DeliveryTargetData, RetryPolicy>;
 static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>, "DeliveryTask must satisfy DeliveryTaskConcept");
 

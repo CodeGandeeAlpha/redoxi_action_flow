@@ -28,8 +28,6 @@ set(source_files
   src/VideoReaderBase.cpp
   src/VideoReaderBaseTypes.cpp
   src/FrameRelayPublisher.cpp
-  src/VideoReaderBase_v2.cpp  
-  src/VideoReaderBaseTypes_v2.cpp
 )
 
 add_library(redoxi_video_reader ${source_files})

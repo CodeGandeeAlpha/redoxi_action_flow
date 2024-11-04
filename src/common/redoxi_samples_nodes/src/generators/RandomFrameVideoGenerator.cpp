@@ -1,5 +1,4 @@
 #include <redoxi_samples_nodes/generators/RandomFrameVideoGenerator.hpp>
-#include <redoxi_video_reader/base/VideoReaderBaseImpl.hpp>
 #include <redoxi_samples_lib/random_image.hpp>
 #include <redoxi_common_cpp/image_proc/ImageStamper.hpp>
 

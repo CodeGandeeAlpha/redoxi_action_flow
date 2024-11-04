@@ -24,7 +24,7 @@ class _RosTimeUnsetToken
                   "IntervalType must be a std::chrono::duration");
 
   public:
-    _RosTimeUnsetToken(rclcpp::Node *node, IntervalType interval, size_t token_capacity = 1)
+    _RosTimeUnsetToken(rclcpp::Node *node, IntervalType interval = IntervalType(0), size_t token_capacity = 1)
         : m_node(node), m_interval(interval), m_token_capacity(token_capacity)
     {
         m_queue = std::make_shared<tbb::concurrent_bounded_queue<TokenType>>();

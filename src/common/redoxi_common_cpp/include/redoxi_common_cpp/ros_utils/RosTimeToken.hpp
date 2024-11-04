@@ -23,7 +23,7 @@ class _RosTimeToken
                   "IntervalType must be a std::chrono::duration");
 
   public:
-    _RosTimeToken(rclcpp::Node *node, IntervalType interval, size_t token_capacity = 1)
+    _RosTimeToken(rclcpp::Node *node, IntervalType interval = IntervalType(0), size_t token_capacity = 1)
     {
         m_node = node;
         m_interval = interval;

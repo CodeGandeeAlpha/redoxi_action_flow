@@ -5,7 +5,7 @@
 namespace redoxi_works
 {
 
-class RandomFrameVideoGeneratorRuntimeConfig : public RedoxiVideoReaderBaseTypes::RuntimeConfig
+class RandomFrameVideoGeneratorRuntimeConfig : public RedoxiVideoReaderBase::RuntimeConfig_t
 {
   public:
     inline static const cv::Size DEFAULT_FRAME_SIZE{640, 480};
