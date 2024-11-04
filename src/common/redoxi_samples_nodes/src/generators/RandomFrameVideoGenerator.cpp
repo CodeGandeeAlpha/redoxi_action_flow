@@ -9,7 +9,7 @@ RandomFrameVideoGenerator::RandomFrameVideoGenerator(const std::string &name, co
 {
 }
 
-int RandomFrameVideoGenerator::update_runtime_config(const std::shared_ptr<RedoxiVideoReaderBase::RuntimeConfig_t> &config)
+int RandomFrameVideoGenerator::update_runtime_config(std::shared_ptr<RedoxiVideoReaderBase::RuntimeConfig_t> config)
 {
     // ensure the output image size is valid, otherwise uses default size
     if (config->output_image_size.width <= 0 || config->output_image_size.height <= 0) {
@@ -27,18 +27,19 @@ int RandomFrameVideoGenerator::update_runtime_config(const std::shared_ptr<Redox
     return 0;
 }
 
-int RandomFrameVideoGenerator::_read_frame(cv::Mat &frame, std::atomic<int64_t> &frame_number)
+int RandomFrameVideoGenerator::_read_frame(SourceData_t &data, std::atomic<int64_t> &frame_number)
 {
     auto frame_size = m_runtime_config->output_image_size;
     if (frame_size.empty()) {
-        RDX_RAISE_ERROR("[%s][_read_frame()] output_image_size is not set", this->get_name());
+        RDX_RAISE_ERROR("[{}][_read_frame()] output_image_size is not set", this->get_name());
     }
 
     //! Generate a random frame with the UUID text
     cv::Mat random_frame;
     random_image_with_text(random_frame, frame_size);
 
-    frame = random_frame;
+    data.set_image(random_frame);
+    data.set_frame_number(frame_number);
     frame_number++;
     return 0;
 }

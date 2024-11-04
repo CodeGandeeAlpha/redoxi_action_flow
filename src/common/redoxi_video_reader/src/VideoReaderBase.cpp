@@ -263,6 +263,33 @@ int RedoxiVideoReaderBase::update_runtime_config(std::shared_ptr<RuntimeConfig_t
     //! Store configurations
     m_runtime_config = config;
 
+    //! set callback on request enqueued to resize image if needed
+    auto output_image_size = m_runtime_config->output_image_size;
+    m_primary_output_port->set_callback_on_request_enqueued([output_image_size](DeliveryRequest_t &request) {
+        // resize image if needed
+        auto original_size = request.get_source_data().get_image().size();
+        if ((output_image_size.width <= 0 && output_image_size.height <= 0) || output_image_size == original_size) {
+            return;
+        }
+
+        auto image = request.get_source_data().get_image();
+        cv::Mat resized_image;
+
+        if (output_image_size.width > 0 && output_image_size.height > 0) {
+            cv::resize(image, resized_image, output_image_size);
+        } else if (output_image_size.width > 0) {
+            int new_height = static_cast<int>(original_size.height * (static_cast<double>(output_image_size.width) / original_size.width));
+            new_height = std::max(1, new_height);
+            cv::resize(image, resized_image, cv::Size(output_image_size.width, new_height));
+        } else if (output_image_size.height > 0) {
+            int new_width = static_cast<int>(original_size.width * (static_cast<double>(output_image_size.height) / original_size.height));
+            new_width = std::max(1, new_width);
+            cv::resize(image, resized_image, cv::Size(new_width, output_image_size.height));
+        }
+
+        request.get_source_data().set_image(resized_image);
+    });
+
     //! set publish to debug topic
     set_publish_to_debug_topic(config->publish_to_debug_topic);
 

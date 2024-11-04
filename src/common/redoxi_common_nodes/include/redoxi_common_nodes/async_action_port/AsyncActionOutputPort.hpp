@@ -504,13 +504,6 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
     virtual int _create_target_data(TargetData_t &target_data, const DeliveryRequest_t &request)
     {
-        // target_data.set_source_data_uuid(request.get_source_data().get_uuid());
-
-        // // ping signal?
-        // if (request.is_ping_request()) {
-        //     target_data.set_control_signal_code(ControlSignalCode::Ping);
-        // }
-
         request.to_target_data(target_data);
         return 0;
     }
@@ -520,8 +513,14 @@ class AsyncActionOutputPort : public IStartStopProtocol
         const DeliveryTask_t &task_input,
         DeliveryTask_t &task_output)
     {
-        // nothing to do, just do shallow copy
+        // nothing to do, just copy data
         task_output = task_input;
+
+        // transform the request if needed
+        if (m_cb_on_request_enqueued) {
+            m_cb_on_request_enqueued(task_output.get_request());
+        }
+
         return 0;
     }
 
@@ -831,6 +830,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
   protected:
     // callback functions
 
+    // callback function when a request is enqueued, to transform the request
+    std::function<void(DeliveryRequest_t &request)> m_cb_on_request_enqueued;
+
     //! Transform target data, (output_target_data, input_task)-> error_code
     std::function<int(TargetData_t &output,
                       const DeliveryTask_t &input)>
@@ -841,6 +843,25 @@ class AsyncActionOutputPort : public IStartStopProtocol
                       const DeliveryTask_t &input,
                       const DeliveryResult_t &result)>
         m_cb_on_deliver_after;
+
+  public:
+    //! set the callback function when a request is enqueued
+    void set_callback_on_request_enqueued(std::function<void(DeliveryRequest_t &request)> cb)
+    {
+        m_cb_on_request_enqueued = cb;
+    }
+
+    //! set the callback function to transform the target data before delivery to any downstream
+    void set_callback_on_deliver_before(std::function<int(TargetData_t &target_data, const DeliveryTask_t &task)> cb)
+    {
+        m_cb_on_deliver_before = cb;
+    }
+
+    //! set the callback function to clean the target data after (failed or succeeded) delivery to any downstream
+    void set_callback_on_deliver_after(std::function<int(TargetData_t &target_data, const DeliveryTask_t &task, const DeliveryResult_t &result)> cb)
+    {
+        m_cb_on_deliver_after = cb;
+    }
 
   private:
     //! used tbb to process the delivery tasks

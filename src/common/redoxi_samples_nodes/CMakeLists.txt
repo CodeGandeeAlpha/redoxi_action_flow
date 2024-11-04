@@ -17,7 +17,7 @@ find_package(redoxi_common_nodes REQUIRED)
 
 set(srcfiles 
   src/redoxi_samples_nodes.cpp
-  # src/generators/RandomFrameVideoGenerator.cpp
+  src/generators/RandomFrameVideoGenerator.cpp
   src/generators/SimpleActionGenerator.cpp
 )
 

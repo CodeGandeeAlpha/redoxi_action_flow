@@ -166,6 +166,12 @@ class DeliveryRequest : public DeliveryRequestBase
   public:
     virtual int to_target_data(DeliveryTargetData &target_data) const
     {
+        // apply custom function if set
+        if (custom_to_target_data) {
+            custom_to_target_data(target_data, *this);
+            return 0;
+        }
+
         auto &goal = target_data.get_goal();
 
         // fill payload
@@ -195,7 +201,11 @@ class DeliveryRequest : public DeliveryRequestBase
   public:
     // auxiliary data for easy extension without inheritance
     std::any auxiliary_data;
+
+    // custom function to transform the request to target data, if set, this will override the default behavior
+    std::function<void(DeliveryTargetData &target_data, const DeliveryRequest &request)> custom_to_target_data;
 };
+
 static_assert(output_port_types::DeliveryRequestConcept<DeliveryRequest>, "DeliveryRequest must satisfy DeliveryRequestConcept");
 using DeliveryTask = output_port_types::DefaultDeliveryTask<DeliveryRequest, DeliveryTargetData, RetryPolicy>;
 static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>, "DeliveryTask must satisfy DeliveryTaskConcept");
