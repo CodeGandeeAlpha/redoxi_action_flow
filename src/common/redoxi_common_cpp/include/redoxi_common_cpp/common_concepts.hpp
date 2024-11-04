@@ -9,11 +9,11 @@
 #include <limits>
 
 #include <unique_identifier_msgs/msg/uuid.hpp>
-#include <rclcpp_action/client.hpp>
-#include <rclcpp/node.hpp>
 #include <boost/uuid/uuid.hpp>
-#include <redoxi_common_nodes/redoxi_common_nodes.hpp>
 #include <json_struct/json_struct.h>
+
+#include <redoxi_common_cpp/redoxi_common_cpp.hpp>
+
 
 namespace redoxi_works
 {
@@ -138,6 +138,31 @@ concept ActionDataTraitConcept = requires(T t)
     {
         T::set_uuid(std::declval<typename T::Goal_t &>(), std::declval<boost::uuids::uuid>())
         } -> std::same_as<void>;
+};
+template <RosActionConcept ActionType>
+struct NoneActionDataTrait {
+    using ActionType_t = ActionType;
+    using Goal_t = typename ActionType_t::Goal;
+    using Result_t = typename ActionType_t::Result;
+    using Feedback_t = typename ActionType_t::Feedback;
+
+    static ControlSignalCode get_control_signal_code(const Goal_t &)
+    {
+        return ControlSignalCode::Unknown;
+    }
+
+    static void mark_with_control_signal(Goal_t &, ControlSignalCode)
+    {
+    }
+
+    static boost::uuids::uuid get_uuid(const Goal_t &)
+    {
+        return boost::uuids::uuid();
+    }
+
+    static void set_uuid(Goal_t &, const boost::uuids::uuid &)
+    {
+    }
 };
 
 //! Interface for retry policy, if anything needs to retry, its configuration should be here

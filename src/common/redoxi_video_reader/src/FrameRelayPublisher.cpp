@@ -110,6 +110,10 @@ FrameRelayPublisher::FrameRelayPublisher(const std::string &name, const rclcpp::
 
 FrameRelayPublisher::~FrameRelayPublisher()
 {
+    // // shutdown the action server
+    // m_frame_receive_action_server.reset();
+
+    // wait for all tasks to be processed
     if (m_impl && m_impl->m_async_graph) {
         m_impl->m_async_graph->wait_for_all();
     }
@@ -548,6 +552,10 @@ void FrameRelayPublisher::InitConfig_t::from_parameters(const rclcpp::Node *node
 
 int FrameRelayPublisher::_debug_publish_accepted_goal(const FrameReceiveAction_t::Goal &goal)
 {
+    if (!rclcpp::ok()) {
+        return -1;
+    }
+
     const auto &raw_image = goal.frame.raw_image;
     auto msg_uuid = to_boost_uuid(goal.x_uid);
     if (raw_image.data.empty()) {
@@ -566,6 +574,10 @@ int FrameRelayPublisher::_debug_publish_accepted_goal(const FrameReceiveAction_t
 
 int FrameRelayPublisher::_debug_publish_rejected_goal(const FrameReceiveAction_t::Goal &goal)
 {
+    if (!rclcpp::ok()) {
+        return -1;
+    }
+
     const auto &raw_image = goal.frame.raw_image;
     auto msg_uuid = to_boost_uuid(goal.x_uid);
     if (raw_image.data.empty()) {
@@ -584,6 +596,10 @@ int FrameRelayPublisher::_debug_publish_rejected_goal(const FrameReceiveAction_t
 
 int FrameRelayPublisher::_publish_relayed_frame(const FrameReceiveAction_t::Goal &goal)
 {
+    if (!rclcpp::ok()) {
+        return -1;
+    }
+
     auto msg_uuid = to_boost_uuid(goal.x_uid);
     if (!m_pub_relayed_frame->valid()) {
         RDX_INFO_DEV(this, __func__, "[msg_uuid={}] Relay frame publish channel is not valid",

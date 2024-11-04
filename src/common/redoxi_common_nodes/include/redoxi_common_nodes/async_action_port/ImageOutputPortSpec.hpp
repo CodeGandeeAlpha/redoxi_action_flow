@@ -1,6 +1,6 @@
 #pragma once
 
-#include <redoxi_common_nodes/redoxi_concepts.hpp>
+#include <redoxi_common_cpp/redoxi_concepts.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
@@ -101,9 +101,13 @@ class DeliverySourceData
     //! Get the UUID associated with this source data
     virtual boost::uuids::uuid get_uuid() const
     {
-        // Generate or retrieve a UUID for this image data
-        // This is a placeholder for actual UUID generation logic
-        return boost::uuids::random_generator()();
+        return m_uuid;
+    }
+
+    //! Set the UUID associated with this source data
+    virtual void set_uuid(const boost::uuids::uuid &uuid)
+    {
+        m_uuid = uuid;
     }
 
   protected:

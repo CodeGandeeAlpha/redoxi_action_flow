@@ -8,7 +8,7 @@ import json
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
     "log_level",
-    default_value="debug",
+    default_value="info",
     description="Logging level",
 )
 
@@ -46,7 +46,7 @@ source_node_json_params = {
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
-        "step_interval": 10000000,
+        "step_interval": 2000,
         "frame_interval": 0,
         "output_image_size": {"width": -1, "height": -1},
         "output_image_encoding": "bgr8",

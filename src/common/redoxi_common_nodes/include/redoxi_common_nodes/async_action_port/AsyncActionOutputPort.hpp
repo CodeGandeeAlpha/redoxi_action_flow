@@ -90,7 +90,11 @@ class AsyncActionOutputPort : public IStartStopProtocol
     virtual bool try_push_request(const DeliveryRequest_t &request)
     {
         // must started first
-        RDX_ASSERT_CHECK_TRUE(m_status == NodeStatusCode::STARTED, "[{}] must started first", __func__);
+        // RDX_ASSERT_CHECK_TRUE(m_status == NodeStatusCode::STARTED, "[{}] must started first", __func__);
+        if (m_status != NodeStatusCode::STARTED) {
+            RDX_LOG_WARN(m_parent_node, __func__, true, "[{}] pushing to stopped port, please start first", __func__);
+            return false;
+        }
 
         DeliveryTask_t task;
         _create_frame_delivery_task(request, task);
@@ -348,6 +352,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
     virtual void _create_frame_delivery_task(const DeliveryRequest_t &request, DeliveryTask_t &task_output)
     {
+        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID,
+                      "[msg_uuid={}] creating frame delivery task",
+                      boost::uuids::to_string(request.get_source_data().get_uuid()));
         task_output.set_request(request);
     }
 
@@ -744,7 +751,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         //! Use SyncActionSender to send the goal and wait for the response
         SyncActionSender_t sender(m_parent_node);
-        auto result = sender.send(goal, *client, timeout);
+        auto logging_callbacks = sender.get_logging_callbacks<ActionDataTrait_t>(goal);
+        auto result = sender.send<ActionDataTrait_t>(goal, *client, timeout, logging_callbacks);
 
         return result;
     }

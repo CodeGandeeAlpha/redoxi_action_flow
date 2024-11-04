@@ -1,6 +1,6 @@
 #pragma once
 
-#include <redoxi_common_nodes/common_concepts.hpp>
+#include <redoxi_common_cpp/common_concepts.hpp>
 #include <redoxi_common_cpp/ros_utils/message_conversion.hpp>
 #include <redoxi_public_msgs/msg/control.hpp>
 
@@ -59,5 +59,6 @@ struct RedoxiActionDataTrait {
         goal.x_uid = to_ros_uuid_msg(uuid);
     }
 };
+
 
 } // namespace redoxi_works
