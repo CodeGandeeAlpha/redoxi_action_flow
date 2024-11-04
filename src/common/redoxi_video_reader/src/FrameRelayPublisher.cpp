@@ -12,14 +12,14 @@
 
 using namespace std::placeholders;
 
-// #define _DEBUG_ENABLE_RANDOM_BLOCKING
+#define _DEBUG_ENABLE_RANDOM_BLOCKING
 
 #ifdef _DEBUG_ENABLE_RANDOM_BLOCKING
 namespace _random_block_params
 {
 //! The interval to block, random between BlockThisLongMin and BlockThisLongMax
-constexpr static std::chrono::milliseconds BlockThisLongMin = std::chrono::milliseconds(100);
-constexpr static std::chrono::milliseconds BlockThisLongMax = std::chrono::milliseconds(1000);
+constexpr static std::chrono::milliseconds BlockThisLongMin = std::chrono::milliseconds(10);
+constexpr static std::chrono::milliseconds BlockThisLongMax = std::chrono::milliseconds(100);
 
 //! The probability to block
 constexpr static double BlockThisLikely = 0.2;
@@ -339,12 +339,22 @@ rclcpp_action::GoalResponse
     RDX_INFO_DEV(this, __func__, print_thread_id, "[msg_uuid={}] Received goal, is_ping_request={}",
                  boost::uuids::to_string(msg_uuid), is_ping_request ? "true" : "false");
 
+    // reject with 60% probability
+    // {
+    //     std::random_device rd;
+    //     std::mt19937 gen(rd());
+    //     std::uniform_real_distribution<> dis(0.0, 1.0);
+    //     if (dis(gen) < 0.6) {
+    //         RDX_INFO_DEV(this, __func__, print_thread_id, "[msg_uuid={}] Rejecting goal with probability 0.6",
+    //                      boost::uuids::to_string(msg_uuid));
+    //         return rclcpp_action::GoalResponse::REJECT;
+    //     }
+    // }
+
     if (is_ping_request) {
         //! Always accept ping requests
         return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
     }
-
-    // return rclcpp_action::GoalResponse::REJECT;
 
 #ifdef _DEBUG_ENABLE_RANDOM_BLOCKING
     // do we already have a blocking signal? if no, generate one using probability
@@ -397,6 +407,11 @@ rclcpp_action::GoalResponse
     } else {
         RDX_LOG_ERROR(this, __func__, "[msg_uuid={}] Goal rejected",
                       boost::uuids::to_string(msg_uuid));
+
+        if (get_debug_pub_enabled()) {
+            _debug_publish_rejected_goal(*goal);
+        }
+
         return rclcpp_action::GoalResponse::REJECT;
     }
 }
@@ -420,42 +435,44 @@ void FrameRelayPublisher::_on_goal_accepted(std::shared_ptr<FrameReceiveGoalHand
 
         RDX_INFO_DEV(this, __func__, print_thread_id, "[msg_uuid={}][goal_uuid={}] Signaled goal as success (ping request)",
                      boost::uuids::to_string(msg_uuid), boost::uuids::to_string(goal_uuid));
-    } else {
 
-#ifdef _DEBUG_ENABLE_RANDOM_BLOCKING
-        // publish the accepted goal
-        if (get_debug_pub_enabled()) {
-            _debug_publish_accepted_goal(*goal_handle->get_goal());
-        }
-#endif
+        // do not need to do anything else for ping request
+        return;
+    }
 
-        // resolve the goal payload
-        auto ret = _resolve_goal_payload(goal_handle);
-        if (ret != 0) {
-            RDX_LOG_ERROR(this, __func__, "[msg_uuid={}][goal_uuid={}] Failed to resolve goal payload",
-                          boost::uuids::to_string(msg_uuid), boost::uuids::to_string(goal_uuid));
-            return;
-        }
 
-        // if in sync mode, we need to call _deliver_frame by ourselves
-        if (!m_config->use_async) {
-            // get task from the map
-            FrameDeliveryTask_t task;
-            {
-                // find the goal in the map, wrap it in a scope to avoid long living reference
-                decltype(m_impl->m_goal2payload)::accessor acc;
-                if (m_impl->m_goal2payload.find(acc, goal_uuid)) {
-                    task = acc->second;
-                } else {
-                    RDX_LOG_ERROR(this, __func__, "[msg_uuid={}][goal_uuid={}] Failed to find goal in map",
-                                  boost::uuids::to_string(msg_uuid), boost::uuids::to_string(goal_uuid));
-                    return;
-                }
+    // publish the accepted goal
+    if (get_debug_pub_enabled()) {
+        _debug_publish_accepted_goal(*goal_handle->get_goal());
+    }
+
+
+    // resolve the goal payload
+    auto ret = _resolve_goal_payload(goal_handle);
+    if (ret != 0) {
+        RDX_LOG_ERROR(this, __func__, "[msg_uuid={}][goal_uuid={}] Failed to resolve goal payload",
+                      boost::uuids::to_string(msg_uuid), boost::uuids::to_string(goal_uuid));
+        return;
+    }
+
+    // if in sync mode, we need to call _deliver_frame by ourselves
+    if (!m_config->use_async) {
+        // get task from the map
+        FrameDeliveryTask_t task;
+        {
+            // find the goal in the map, wrap it in a scope to avoid long living reference
+            decltype(m_impl->m_goal2payload)::accessor acc;
+            if (m_impl->m_goal2payload.find(acc, goal_uuid)) {
+                task = acc->second;
+            } else {
+                RDX_LOG_ERROR(this, __func__, "[msg_uuid={}][goal_uuid={}] Failed to find goal in map",
+                              boost::uuids::to_string(msg_uuid), boost::uuids::to_string(goal_uuid));
+                return;
             }
-            _deliver_frame(task);
-        } else {
-            // do nothing, async work will be done in the tbb graph
         }
+        _deliver_frame(task);
+    } else {
+        // do nothing, async work will be done in the tbb graph
     }
 }
 

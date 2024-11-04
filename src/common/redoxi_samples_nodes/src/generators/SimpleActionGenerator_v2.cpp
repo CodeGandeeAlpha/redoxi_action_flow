@@ -40,7 +40,7 @@ void SimpleActionGenerator_v2::_step()
 
 void SimpleActionGenerator_v2::_step_send_by_tbb_graph()
 {
-    bool AlwaysUsePing = true;
+    bool AlwaysUsePing = false;
 
     //! Read a frame
     SourceData_t source_data;

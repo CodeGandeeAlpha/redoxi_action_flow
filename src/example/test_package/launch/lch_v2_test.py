@@ -46,14 +46,14 @@ source_node_json_params = {
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
-        "step_interval": 2000,
+        "step_interval": 10000,
         "frame_interval": 0,
         "output_image_size": {"width": -1, "height": -1},
         "output_image_encoding": "bgr8",
         "publish_to_debug_topic": False,
         "fallback_primary_output_policy": {
             "retry_policy": {
-                "fallback_number_of_retry": 3,
+                "fallback_number_of_retry": 5,
                 "fallback_wait_time_between_retry": 5000,
                 "fallback_wait_time_retry_response": 1000000,
             },

@@ -138,13 +138,19 @@ concept DeliveryRequestConcept = requires(T t)
 {
     //! Must have these type aliases
     typename T::SourceDataType_t;
+    typename T::TargetDataType_t;
     typename T::DeliveryPolicy_t;
     typename T::StampType_t;
 
     //! Source data type must satisfy DeliverySourceDataConcept
     requires DeliverySourceDataConcept<typename T::SourceDataType_t>;
+
+    //! Target data type must satisfy DeliveryTargetDataConcept
+    requires DeliveryTargetDataConcept<typename T::TargetDataType_t>;
+
     //! Delivery policy type must satisfy DeliveryPolicyConcept
     requires DeliveryPolicyConcept<typename T::DeliveryPolicy_t>;
+
     //! Stamp type must satisfy DeliveryStampConcept
     requires DeliveryStampConcept<typename T::StampType_t>;
 
@@ -179,6 +185,12 @@ concept DeliveryRequestConcept = requires(T t)
     {
         t.as_ping()
         } -> std::same_as<void>;
+
+    //! must be able to convert to target data
+    //! @return 0 if success, -1 if failed
+    {
+        std::declval<const T &>().to_target_data(std::declval<typename T::TargetDataType_t &>())
+        } -> std::same_as<int>;
 };
 
 //! A task to deliver to the downstream action

@@ -360,6 +360,7 @@ static_assert(DeliveryPolicyConcept<_SampleDeliveryPolicy>,
 
 //! Default implementation of DeliveryRequestConcept
 template <DeliverySourceDataConcept SourceDataType,
+          DeliveryTargetDataConcept TargetDataType,
           DeliveryPolicyConcept DeliveryPolicyType,
           DeliveryStampConcept StampType>
 class DefaultDeliveryRequest
@@ -368,6 +369,7 @@ class DefaultDeliveryRequest
     virtual ~DefaultDeliveryRequest() = default;
 
     using SourceDataType_t = SourceDataType;
+    using TargetDataType_t = TargetDataType;
     using DeliveryPolicy_t = DeliveryPolicyType;
     using StampType_t = StampType;
     using TimeUnit_t = typename DeliveryPolicy_t::RetryPolicyType_t::DurationType_t;
@@ -458,6 +460,13 @@ class DefaultDeliveryRequest
         m_is_ping = true;
     }
 
+    //! Convert to target data
+    virtual int to_target_data(TargetDataType_t &) const
+    {
+        // we have default implementation here so that static_assert can be used to check all concepts are satisfied
+        throw std::runtime_error("to_target_data() not implemented");
+    }
+
   protected:
     //! Source data for the delivery request
     SourceDataType_t m_source_data;
@@ -471,7 +480,7 @@ class DefaultDeliveryRequest
     //! Flag indicating if this is a ping request
     bool m_is_ping{false};
 };
-using _SampleDeliveryRequest = DefaultDeliveryRequest<_SampleSourceData, _SampleDeliveryPolicy, DefaultStampData>;
+using _SampleDeliveryRequest = DefaultDeliveryRequest<_SampleSourceData, _SampleTargetData, _SampleDeliveryPolicy, DefaultStampData>;
 static_assert(DeliveryRequestConcept<_SampleDeliveryRequest>,
               "_SampleDeliveryRequest must satisfy DeliveryRequestConcept");
 

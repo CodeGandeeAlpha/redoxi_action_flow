@@ -152,9 +152,40 @@ using DeliveryPolicy = output_port_types::DefaultDeliveryPolicy<RetryPolicy>;
 static_assert(output_port_types::DeliveryPolicyConcept<DeliveryPolicy>, "DeliveryPolicy must satisfy DeliveryPolicyConcept");
 
 //! Request type for image output port
-using DeliveryRequest = output_port_types::DefaultDeliveryRequest<DeliverySourceData, DeliveryPolicy, DeliveryStampData>;
-static_assert(output_port_types::DeliveryRequestConcept<DeliveryRequest>, "DeliveryRequest must satisfy DeliveryRequestConcept");
+using DeliveryRequestBase = output_port_types::DefaultDeliveryRequest<DeliverySourceData, DeliveryTargetData, DeliveryPolicy, DeliveryStampData>;
 
+static_assert(output_port_types::DeliveryRequestConcept<DeliveryRequestBase>, "DeliveryRequest must satisfy DeliveryRequestConcept");
+class DeliveryRequest : public DeliveryRequestBase
+{
+  public:
+    virtual int to_target_data(DeliveryTargetData &target_data) const
+    {
+        auto &goal = target_data.get_goal();
+
+        // fill payload
+        auto image = this->m_source_data.get_image();
+
+        // convert image to ROS message
+        cv_bridge::CvImage cv_bridge_image;
+        cv_bridge_image.image = image;
+        cv_bridge_image.encoding = sensor_msgs::image_encodings::BGR8;
+        cv_bridge_image.toImageMsg(goal.frame.raw_image);
+        goal.frame.frame_num = this->m_source_data.get_frame_number();
+
+        // set additional information into the goal
+        using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
+
+        // set the source data UUID
+        ActionTrait::set_uuid(goal, this->m_source_data.get_uuid());
+
+        // set the control signal code
+        if (this->is_ping_request()) {
+            ActionTrait::mark_with_control_signal(goal, ControlSignalCode::Ping);
+        }
+
+        return 0;
+    }
+};
 using DeliveryTask = output_port_types::DefaultDeliveryTask<DeliveryRequest, DeliveryTargetData, RetryPolicy>;
 static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>, "DeliveryTask must satisfy DeliveryTaskConcept");
 

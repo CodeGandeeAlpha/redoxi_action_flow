@@ -481,13 +481,14 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
     virtual int _create_target_data(TargetData_t &target_data, const DeliveryRequest_t &request)
     {
-        target_data.set_source_data_uuid(request.get_source_data().get_uuid());
+        // target_data.set_source_data_uuid(request.get_source_data().get_uuid());
 
-        // ping signal?
-        if (request.is_ping_request()) {
-            target_data.set_control_signal_code(ControlSignalCode::Ping);
-        }
+        // // ping signal?
+        // if (request.is_ping_request()) {
+        //     target_data.set_control_signal_code(ControlSignalCode::Ping);
+        // }
 
+        request.to_target_data(target_data);
         return 0;
     }
 
