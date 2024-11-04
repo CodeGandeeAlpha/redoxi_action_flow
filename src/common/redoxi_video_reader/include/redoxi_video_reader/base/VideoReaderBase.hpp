@@ -31,7 +31,7 @@ class RedoxiVideoReaderBase : public rclcpp::Node,
     //! Import all names from RedoxiVideoReaderInternalTypes
     //! @note: this is to allow subclass to override the type definitions
     // using OutputPortSpec = video_reader_base::OutputPortSpec;
-    using OutputPort_t = AsyncActionOutputPort;
+    using OutputPort_t = video_reader_base::OutputPortType;
 
     using InitConfig_t = video_reader_base::InitConfig;
     using RuntimeConfig_t = video_reader_base::RuntimeConfig;

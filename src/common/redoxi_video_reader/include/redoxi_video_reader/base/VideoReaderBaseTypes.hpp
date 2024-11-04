@@ -15,6 +15,7 @@ namespace video_reader_base
 {
 
 using OutputPortSpec = async_action_image_output_port::ImageOutputPortSpec;
+using OutputPortType = AsyncActionOutputPort<OutputPortSpec>;
 
 //! The delivery policy for making frame delivery request
 using RequestPolicy = OutputPortSpec::DeliveryPolicy_t;

@@ -16,11 +16,11 @@
 namespace redoxi_works
 {
 
-using TSpec = async_action_image_output_port::ImageOutputPortSpec;
+// using TSpec = async_action_image_output_port::ImageOutputPortSpec;
 
 //! Sends action requests to downstream nodes, asynchronously
 //! Thread safe, can be used in multi thread executor
-// template <output_port_types::AsyncActionOutputPortSpecConcept TSpec>
+template <output_port_types::AsyncActionOutputPortSpecConcept TSpec>
 class AsyncActionOutputPort : public IStartStopProtocol
 {
   private:
@@ -398,7 +398,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
             if (pub != nullptr) {
                 RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Publishing to source publisher ...",
                               boost::uuids::to_string(source_data->get_uuid()));
-                SourceData_t::PublishMessageType_t source_pub_msg;
+                typename SourceData_t::PublishMessageType_t source_pub_msg;
                 source_data->to_publish_message(source_pub_msg);
                 auto s = fmt::format("[FAILED] attempt {}/{}", ith_attempt, max_attempts);
                 pub->publish(source_pub_msg, s);
@@ -411,7 +411,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
             if (pub != nullptr) {
                 RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Publishing to target publisher ...",
                               boost::uuids::to_string(target_data->get_source_data_uuid()));
-                TargetData_t::PublishMessageType_t target_pub_msg;
+                typename TargetData_t::PublishMessageType_t target_pub_msg;
                 target_data->to_publish_message(target_pub_msg);
                 auto s = fmt::format("[FAILED] attempt {}/{}", ith_attempt, max_attempts);
                 pub->publish(target_pub_msg, s);
@@ -444,7 +444,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         if (source_data != nullptr) {
             auto pub = ds.get_debug_pub_source_data_sending();
             if (pub != nullptr) {
-                SourceData_t::PublishMessageType_t source_pub_msg;
+                typename SourceData_t::PublishMessageType_t source_pub_msg;
                 source_data->to_publish_message(source_pub_msg);
                 auto s = fmt::format("[SENDING] attempt {}/{}", ith_attempt, max_attempts);
                 pub->publish(source_pub_msg, s);
@@ -453,7 +453,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         if (target_data != nullptr) {
             auto pub = ds.get_debug_pub_target_data_sending();
             if (pub != nullptr) {
-                TargetData_t::PublishMessageType_t target_pub_msg;
+                typename TargetData_t::PublishMessageType_t target_pub_msg;
                 target_data->to_publish_message(target_pub_msg);
                 auto s = fmt::format("[SENDING] attempt {}/{}", ith_attempt, max_attempts);
                 pub->publish(target_pub_msg, s);
@@ -484,7 +484,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         if (source_data != nullptr) {
             auto pub = ds.get_debug_pub_source_data_succeeded();
             if (pub != nullptr) {
-                SourceData_t::PublishMessageType_t source_pub_msg;
+                typename SourceData_t::PublishMessageType_t source_pub_msg;
                 source_data->to_publish_message(source_pub_msg);
                 auto s = fmt::format("[SENT] attempt {}/{}", ith_attempt, max_attempts);
                 pub->publish(source_pub_msg, s);
@@ -493,7 +493,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         if (target_data != nullptr) {
             auto pub = ds.get_debug_pub_target_data_succeeded();
             if (pub != nullptr) {
-                TargetData_t::PublishMessageType_t target_pub_msg;
+                typename TargetData_t::PublishMessageType_t target_pub_msg;
                 target_data->to_publish_message(target_pub_msg);
                 auto s = fmt::format("[SENT] attempt {}/{}", ith_attempt, max_attempts);
                 pub->publish(target_pub_msg, s);
@@ -774,8 +774,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         //! Use SyncActionSender to send the goal and wait for the response
         SyncActionSender_t sender(m_parent_node);
-        auto logging_callbacks = sender.get_logging_callbacks<ActionDataTrait_t>(goal);
-        auto result = sender.send<ActionDataTrait_t>(goal, *client, timeout, logging_callbacks);
+        auto logging_callbacks = sender.template get_logging_callbacks<ActionDataTrait_t>(goal);
+        auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout, logging_callbacks);
 
         return result;
     }
