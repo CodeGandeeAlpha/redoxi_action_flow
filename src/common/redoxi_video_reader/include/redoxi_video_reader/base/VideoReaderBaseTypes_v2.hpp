@@ -67,7 +67,7 @@ class RuntimeConfig
     virtual ~RuntimeConfig() = default;
     RuntimeConfig()
     {
-        auto &p = frame_request_policy;
+        auto &p = frame_enqueue_policy;
         p.set_drop_strategy(DropStrategy::DropAsNeeded);
         p.set_precondition(DeliveryPrecondition::AnyDownstreamReady);
         p.get_retry_policy().set_number_of_retry(DEFAULT_REQUEST_RETRY_NUMBER);
@@ -96,11 +96,12 @@ class RuntimeConfig
     //! publish in debug topic?
     bool publish_to_debug_topic = false;
 
-    //! fallback delivery policy for primary output port
-    OutputPortSpec::DeliveryPolicy_t fallback_primary_output_policy;
+    //! delivery policy for frame delivery request, after the frame is enqueued
+    //! when this is set, it will override the individual downstream delivery policies in the output port
+    std::optional<OutputPortSpec::DeliveryPolicy_t> frame_request_policy;
 
-    //! delivery policy for frame delivery request
-    RequestPolicy frame_request_policy;
+    //! delivery policy for frame enqueue request
+    RequestPolicy frame_enqueue_policy;
 
     //! Load parameters from node, this will override empty existing parameters
     virtual void from_parameters(RedoxiVideoReaderBase_v2 *);
@@ -112,8 +113,8 @@ class RuntimeConfig
               JS_MEMBER(output_image_size),
               JS_MEMBER(output_image_encoding),
               JS_MEMBER(publish_to_debug_topic),
-              JS_MEMBER(fallback_primary_output_policy),
-              JS_MEMBER(frame_request_policy));
+              JS_MEMBER(frame_request_policy),
+              JS_MEMBER(frame_enqueue_policy));
 };
 
 } // namespace video_reader_base_v2

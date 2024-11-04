@@ -158,6 +158,11 @@ int RedoxiVideoReaderBase_v2::close()
 void RedoxiVideoReaderBase_v2::set_publish_to_debug_topic(bool enable)
 {
     m_publish_to_debug_topic = enable;
+    if (m_publish_to_debug_topic) {
+        if (m_primary_output_port) {
+            m_primary_output_port->set_publish_to_debug_topic(enable);
+        }
+    }
 }
 
 bool RedoxiVideoReaderBase_v2::get_publish_to_debug_topic() const
@@ -244,6 +249,9 @@ int RedoxiVideoReaderBase_v2::update_runtime_config(const RuntimeConfig_t &confi
     //! Store configurations
     m_runtime_config = config;
 
+    //! set publish to debug topic
+    set_publish_to_debug_topic(config.publish_to_debug_topic);
+
     return 0;
 }
 
@@ -265,7 +273,9 @@ RedoxiVideoReaderBase_v2::DeliveryRequest_t
     //! Create delivery request
     DeliveryRequest_t req;
     req.set_source_data(source_data);
-    req.set_delivery_policy(m_runtime_config.fallback_primary_output_policy);
+    if (m_runtime_config.frame_request_policy.has_value()) {
+        req.set_delivery_policy(*m_runtime_config.frame_request_policy);
+    }
 
     return req;
 }
@@ -279,6 +289,7 @@ std::shared_ptr<RedoxiVideoReaderBase_v2::OutputPort_t>
     // RDX_ASSERT_CHECK_TRUE(!port_config.get_downstream_specs().empty(),
     //                       "[{}] port_config must have at least one downstream", __func__);
     port->init(port_config);
+
     return port;
 }
 
@@ -317,7 +328,7 @@ void RedoxiVideoReaderBase_v2::_step()
         auto msg_uuid = source_data->get_uuid();
 
         // get qos
-        auto &qos = m_runtime_config.frame_request_policy;
+        auto &qos = m_runtime_config.frame_enqueue_policy;
 
         // publish
         auto max_attempts = qos.get_retry_policy().get_number_of_retry(true).value() + 1;

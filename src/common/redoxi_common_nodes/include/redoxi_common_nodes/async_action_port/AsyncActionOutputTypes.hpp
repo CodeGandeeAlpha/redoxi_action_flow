@@ -555,18 +555,7 @@ class DefaultDownstreamSpec
     using TargetPublishMessageType_t = typename TargetPublisherType_t::MessageType_t;
 
     virtual ~DefaultDownstreamSpec() = default;
-    //! Initialize the downstream spec
-    virtual void init(const std::string &name, const std::string &action_name)
-    {
-        this->name = name;
-        this->action_name = action_name;
-        this->debug_topic_source_data_sending = "debug/" + name + "/source_data/sending";
-        this->debug_topic_source_data_succeeded = "debug/" + name + "/source_data/succeeded";
-        this->debug_topic_source_data_failed = "debug/" + name + "/source_data/failed";
-        this->debug_topic_target_data_sending = "debug/" + name + "/target_data/sending";
-        this->debug_topic_target_data_succeeded = "debug/" + name + "/target_data/succeeded";
-        this->debug_topic_target_data_failed = "debug/" + name + "/target_data/failed";
-    }
+
 
     //! Get the name
     virtual const std::string &get_name() const
@@ -613,46 +602,111 @@ class DefaultDownstreamSpec
     //! Get whether to use debug publish
     virtual bool get_use_debug_publish() const
     {
-        return this->use_debug_publish;
+        return this->create_debug_pub;
     }
-
     //! Get the debug topic for source data sending
     virtual std::optional<std::string> get_debug_topic_source_data_sending() const
     {
-        return this->debug_topic_source_data_sending;
+        if (this->debug_topic_source_data_sending.has_value()) {
+            return this->debug_topic_source_data_sending;
+        }
+        return make_debug_topic_name(this->name, "source", "sending");
+    }
+
+    //! Set the debug topic for source data sending
+    virtual void set_debug_topic_source_data_sending(const std::optional<std::string> &topic)
+    {
+        this->debug_topic_source_data_sending = topic;
     }
 
     //! Get the debug topic for source data succeeded
     virtual std::optional<std::string> get_debug_topic_source_data_succeeded() const
     {
-        return this->debug_topic_source_data_succeeded;
+        if (this->debug_topic_source_data_succeeded.has_value()) {
+            return this->debug_topic_source_data_succeeded;
+        }
+        return make_debug_topic_name(this->name, "source", "succeeded");
+    }
+
+    //! Set the debug topic for source data succeeded
+    virtual void set_debug_topic_source_data_succeeded(const std::optional<std::string> &topic)
+    {
+        this->debug_topic_source_data_succeeded = topic;
     }
 
     //! Get the debug topic for source data failed
     virtual std::optional<std::string> get_debug_topic_source_data_failed() const
     {
-        return this->debug_topic_source_data_failed;
+        if (this->debug_topic_source_data_failed.has_value()) {
+            return this->debug_topic_source_data_failed;
+        }
+        return make_debug_topic_name(this->name, "source", "failed");
+    }
+
+    //! Set the debug topic for source data failed
+    virtual void set_debug_topic_source_data_failed(const std::optional<std::string> &topic)
+    {
+        this->debug_topic_source_data_failed = topic;
     }
 
     //! Get the debug topic for target data sending
     virtual std::optional<std::string> get_debug_topic_target_data_sending() const
     {
-        return this->debug_topic_target_data_sending;
+        if (this->debug_topic_target_data_sending.has_value()) {
+            return this->debug_topic_target_data_sending;
+        }
+        return make_debug_topic_name(this->name, "target", "sending");
+    }
+
+    //! Set the debug topic for target data sending
+    virtual void set_debug_topic_target_data_sending(const std::optional<std::string> &topic)
+    {
+        this->debug_topic_target_data_sending = topic;
     }
 
     //! Get the debug topic for target data succeeded
     virtual std::optional<std::string> get_debug_topic_target_data_succeeded() const
     {
-        return this->debug_topic_target_data_succeeded;
+        if (this->debug_topic_target_data_succeeded.has_value()) {
+            return this->debug_topic_target_data_succeeded;
+        }
+        return make_debug_topic_name(this->name, "target", "succeeded");
+    }
+
+    //! Set the debug topic for target data succeeded
+    virtual void set_debug_topic_target_data_succeeded(const std::optional<std::string> &topic)
+    {
+        this->debug_topic_target_data_succeeded = topic;
     }
 
     //! Get the debug topic for target data failed
     virtual std::optional<std::string> get_debug_topic_target_data_failed() const
     {
-        return this->debug_topic_target_data_failed;
+        if (this->debug_topic_target_data_failed.has_value()) {
+            return this->debug_topic_target_data_failed;
+        }
+        return make_debug_topic_name(this->name, "target", "failed");
+    }
+
+    //! Set the debug topic for target data failed
+    virtual void set_debug_topic_target_data_failed(const std::optional<std::string> &topic)
+    {
+        this->debug_topic_target_data_failed = topic;
     }
 
   protected: // no m_ prefix so that you can use json serialization easier
+    static std::string make_debug_topic_name(const std::string &name,
+                                             const std::string &data_type,
+                                             const std::string &event)
+    {
+        std::string output = fmt::format("downstream_debug/{}/{}/{}", name, data_type, event);
+        // Remove consecutive forward slashes using std::unique
+        output.erase(std::unique(output.begin(), output.end(),
+                                 [](char a, char b) { return a == '/' && b == '/'; }),
+                     output.end());
+        return output;
+    }
+
     //! The name of this output port
     std::string name;
 
@@ -663,7 +717,7 @@ class DefaultDownstreamSpec
     DeliveryPolicy_t delivery_policy;
 
     //! Whether to use debug publish
-    bool use_debug_publish{false};
+    bool create_debug_pub{false};
 
     //! Debug topics for publishing source data events
     std::optional<std::string> debug_topic_source_data_sending;
@@ -679,7 +733,7 @@ class DefaultDownstreamSpec
     JS_OBJECT(JS_MEMBER(name),
               JS_MEMBER(action_name),
               JS_MEMBER(delivery_policy),
-              JS_MEMBER(use_debug_publish),
+              JS_MEMBER(create_debug_pub),
               JS_MEMBER(debug_topic_source_data_sending),
               JS_MEMBER(debug_topic_source_data_succeeded),
               JS_MEMBER(debug_topic_source_data_failed),

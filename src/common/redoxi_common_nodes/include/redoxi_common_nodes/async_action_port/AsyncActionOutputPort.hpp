@@ -374,13 +374,30 @@ class AsyncActionOutputPort : public IStartStopProtocol
                                                             int64_t ith_attempt,
                                                             int64_t max_attempts)
     {
+        if (source_data != nullptr) {
+            auto msg_uuid = source_data->get_uuid();
+            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID,
+                          "[msg_uuid={}] Publishing failed to send to downstream debug message ...", boost::uuids::to_string(msg_uuid));
+        }
+
+        if (target_data != nullptr) {
+            auto msg_uuid = target_data->get_source_data_uuid();
+            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID,
+                          "[msg_uuid={}] Publishing failed to send to downstream debug message ...", boost::uuids::to_string(msg_uuid));
+        }
+
         if (!get_publish_to_debug_topic()) {
+            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Publishing to debug topic is disabled");
             return 0;
         }
 
         if (source_data != nullptr) {
+            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Source publisher existence: {}",
+                          boost::uuids::to_string(source_data->get_uuid()), source_data != nullptr);
             auto pub = ds.get_debug_pub_source_data_failed();
             if (pub != nullptr) {
+                RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Publishing to source publisher ...",
+                              boost::uuids::to_string(source_data->get_uuid()));
                 SourceData_t::PublishMessageType_t source_pub_msg;
                 source_data->to_publish_message(source_pub_msg);
                 auto s = fmt::format("[FAILED] attempt {}/{}", ith_attempt, max_attempts);
@@ -388,14 +405,20 @@ class AsyncActionOutputPort : public IStartStopProtocol
             }
         }
         if (target_data != nullptr) {
+            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Target publisher existence: {}",
+                          boost::uuids::to_string(target_data->get_source_data_uuid()), target_data != nullptr);
             auto pub = ds.get_debug_pub_target_data_failed();
             if (pub != nullptr) {
+                RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Publishing to target publisher ...",
+                              boost::uuids::to_string(target_data->get_source_data_uuid()));
                 TargetData_t::PublishMessageType_t target_pub_msg;
                 target_data->to_publish_message(target_pub_msg);
                 auto s = fmt::format("[FAILED] attempt {}/{}", ith_attempt, max_attempts);
                 pub->publish(target_pub_msg, s);
             }
         }
+
+        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Leaving publish failed to send to downstream debug message ...");
         return 0;
     }
 

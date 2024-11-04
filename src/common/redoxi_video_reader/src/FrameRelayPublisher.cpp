@@ -12,14 +12,14 @@
 
 using namespace std::placeholders;
 
-#define _DEBUG_ENABLE_RANDOM_BLOCKING
+// #define _DEBUG_ENABLE_RANDOM_BLOCKING
 
 #ifdef _DEBUG_ENABLE_RANDOM_BLOCKING
 namespace _random_block_params
 {
 //! The interval to block, random between BlockThisLongMin and BlockThisLongMax
 constexpr static std::chrono::milliseconds BlockThisLongMin = std::chrono::milliseconds(10);
-constexpr static std::chrono::milliseconds BlockThisLongMax = std::chrono::milliseconds(100);
+constexpr static std::chrono::milliseconds BlockThisLongMax = std::chrono::milliseconds(1000);
 
 //! The probability to block
 constexpr static double BlockThisLikely = 0.2;

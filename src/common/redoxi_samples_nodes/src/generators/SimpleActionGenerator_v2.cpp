@@ -69,16 +69,7 @@ void SimpleActionGenerator_v2::_step_send_by_tbb_graph()
         }
     }
 
-    //! send it
-    {
-        RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] enqueue", boost::uuids::to_string(msg_uuid));
-        auto ok = m_primary_output_port->try_push_request(delivery_request);
-        if (!ok) {
-            RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] enqueue FAILED", boost::uuids::to_string(msg_uuid));
-        } else {
-            RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] enqueue SUCCESS", boost::uuids::to_string(msg_uuid));
-        }
-    }
+    // auto publish_to_debug_topic = get_publish_to_debug_topic();
 
     //! Publish debug info if enabled
     // if (m_publish_to_debug_topic) {
