@@ -12,7 +12,7 @@
 
 using namespace std::placeholders;
 
-// #define _DEBUG_ENABLE_RANDOM_BLOCKING
+#define _DEBUG_ENABLE_RANDOM_BLOCKING
 
 #ifdef _DEBUG_ENABLE_RANDOM_BLOCKING
 namespace _random_block_params

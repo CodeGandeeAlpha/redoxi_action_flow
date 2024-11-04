@@ -33,12 +33,6 @@ source_node_json_params = {
                         "drop_strategy": "dont_care",
                     },
                     "create_debug_pub": True,
-                    # "debug_topic_source_data_sending": "ds/video_sink/source_data_sending",
-                    # "debug_topic_source_data_succeeded": "ds/video_sink/source_data_succeeded",
-                    # "debug_topic_source_data_failed": "ds/video_sink/source_data_failed",
-                    # "debug_topic_target_data_sending": "ds/video_sink/target_data_sending",
-                    # "debug_topic_target_data_succeeded": "ds/video_sink/target_data_succeeded",
-                    # "debug_topic_target_data_failed": "ds/video_sink/target_data_failed",
                 }
             ],
             "num_buffer_requests": 1,
@@ -52,14 +46,14 @@ source_node_json_params = {
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
-        "step_interval": 10000,
+        "step_interval": 1000,
         "frame_interval": 0,
         "output_image_size": {"width": -1, "height": -1},
         "output_image_encoding": "bgr8",
         "publish_to_debug_topic": True,
         "frame_request_policy": {
             "retry_policy": {
-                "fallback_number_of_retry": 3,
+                "fallback_number_of_retry": 0,
                 "fallback_wait_time_between_retry": 5000,
                 "fallback_wait_time_retry_response": 1000000,
             },

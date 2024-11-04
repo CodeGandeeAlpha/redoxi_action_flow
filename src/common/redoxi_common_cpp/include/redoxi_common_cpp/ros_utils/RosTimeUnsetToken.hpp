@@ -75,6 +75,11 @@ class _RosTimeUnsetToken
             m_timer.reset();
         }
 
+        // if someone is waiting for the token, wake them up
+        if (m_queue) {
+            m_queue->abort();
+        }
+
         m_is_started = false;
         return true;
     }

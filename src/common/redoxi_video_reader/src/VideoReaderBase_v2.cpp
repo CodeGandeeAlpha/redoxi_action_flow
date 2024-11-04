@@ -30,6 +30,11 @@ RedoxiVideoReaderBase_v2::~RedoxiVideoReaderBase_v2()
         m_primary_output_port->wait_for_all_requests();
     }
 
+    // stop ros time token
+    if (m_impl->m_ros_time_token) {
+        m_impl->m_ros_time_token->stop();
+    }
+
     // stop step thread
     m_step_running = false;
     if (m_step_thread != nullptr && m_step_thread->joinable()) {
@@ -78,6 +83,12 @@ int RedoxiVideoReaderBase_v2::start()
         }
     }
 
+    //! start ros time token
+    {
+        auto interval = m_runtime_config.frame_interval;
+        m_impl->m_ros_time_token->start(interval);
+    }
+
     //! Call subclass start implementation
     auto ret = _start();
     if (ret != 0) {
@@ -113,6 +124,9 @@ int RedoxiVideoReaderBase_v2::stop()
     if (m_primary_output_port) {
         m_primary_output_port->stop();
     }
+
+    //! stop ros time token
+    m_impl->m_ros_time_token->stop();
 
     //! Call subclass stop implementation
     auto ret = _stop();
@@ -315,17 +329,19 @@ void RedoxiVideoReaderBase_v2::_step()
         return;
     }
 
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "step once");
+
     if (m_impl->m_ros_time_token->try_pop_token()) {
         // time to get a new frame
-        auto source_data = std::make_shared<SourceData_t>();
-        int ret = _read_frame(*source_data, m_frame_number);
+        SourceData_t source_data;
+        int ret = _read_frame(source_data, m_frame_number);
         if (ret != 0) {
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "Failed to read frame, ret={}", ret);
         }
 
         // create delivery request
-        auto delivery_request = _create_delivery_request(*source_data);
-        auto msg_uuid = source_data->get_uuid();
+        auto delivery_request = _create_delivery_request(source_data);
+        auto msg_uuid = source_data.get_uuid();
 
         // get qos
         auto &qos = m_runtime_config.frame_enqueue_policy;

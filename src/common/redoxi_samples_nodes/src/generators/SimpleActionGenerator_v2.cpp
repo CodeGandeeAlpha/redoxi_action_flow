@@ -27,20 +27,20 @@ int SimpleActionGenerator_v2::_read_frame(SourceData_t &source_data, std::atomic
     source_data.set_image(frame);
     source_data.set_frame_number(frame_number);
     frame_number++;
-
-    // source_data.set_uuid(boost::uuids::random_generator()());
+    source_data.set_uuid(uuid);
 
     return 0;
 }
 
 void SimpleActionGenerator_v2::_step()
 {
-    _step_send_by_tbb_graph();
+    RedoxiVideoReaderBase_v2::_step();
+    // _step_send_by_tbb_graph();
 }
 
 void SimpleActionGenerator_v2::_step_send_by_tbb_graph()
 {
-    bool AlwaysUsePing = false;
+    bool AlwaysUsePing = true;
 
     //! Read a frame
     SourceData_t source_data;

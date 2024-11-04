@@ -83,6 +83,9 @@ class _RosTimeToken
             m_timer.reset();
         }
 
+        // if someone is waiting for the token, wake them up
+        m_queue->abort();
+
         // reset the started flag
         m_is_started = false;
         return true;
@@ -112,6 +115,7 @@ class _RosTimeToken
             if (token) {
                 *token = _generate_token();
             } // else do nothing
+            ok = true;
         } else {
             if (token) {
                 ok = m_queue->try_pop(*token);
