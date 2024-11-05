@@ -5,10 +5,13 @@
 #include <tbb/concurrent_hash_map.h>
 #include <tbb/concurrent_queue.h>
 #include <boost/uuid/uuid_io.hpp>
+#include <boost/thread/synchronized_value.hpp>
 
 #include <redoxi_common_nodes/async_action_port/input_port_concepts.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionInputTypes.hpp>
 #include <redoxi_common_cpp/redoxi_tbb_util.hpp>
+
+// #define ASYNC_INPUT_PORT_USE_TBB_HASH_MAP
 
 namespace redoxi_works
 {
@@ -196,6 +199,7 @@ class AsyncActionInputPort : public IStartStopProtocol
     virtual rclcpp_action::GoalResponse _on_goal_received(const rclcpp_action::GoalUUID &uuid,
                                                           std::shared_ptr<const ActionGoal_t> goal)
     {
+        auto start_time = std::chrono::high_resolution_clock::now();
         const auto msg_uuid = ActionDataTrait_t::get_uuid(*goal);
         const auto msg_uuid_str = boost::uuids::to_string(msg_uuid);
         const bool is_ping = ActionDataTrait_t::get_control_signal_code(*goal) == ControlSignalCode::Ping;
@@ -247,12 +251,16 @@ class AsyncActionInputPort : public IStartStopProtocol
 
             // save to map
             auto key = to_boost_uuid(uuid);
+#ifdef ASYNC_INPUT_PORT_USE_TBB_HASH_MAP
             SourceDataMap_t::accessor acc;
             bool inserted_as_new = m_source_data_map.insert(acc, key);
             if (!inserted_as_new) {
                 RDX_RAISE_ERROR("{} Failed to insert goal to map", log_prefix);
             }
             acc->second = source_data;
+#else
+            m_source_data_map->insert({key, source_data});
+#endif
 
             // notify user
             if (m_on_goal_enqueued_callback) {
@@ -261,6 +269,11 @@ class AsyncActionInputPort : public IStartStopProtocol
 
             RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{} ACCEPTED, Goal enqueued, waiting for goal handle", log_prefix);
 
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+            RDX_INFO_DEV(m_parent_node, __func__, true, "[msg_uuid={}] goal enqueue time: {} ms", boost::uuids::to_string(msg_uuid),
+                         elapsed_time.count());
+
             return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
         } else {
             // failed to push to queue, reject the goal
@@ -268,6 +281,12 @@ class AsyncActionInputPort : public IStartStopProtocol
             if (m_on_goal_rejected_callback) {
                 m_on_goal_rejected_callback(uuid, goal);
             }
+
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+            RDX_INFO_DEV(m_parent_node, __func__, true, "[msg_uuid={}] goal enqueue time: {} ms", boost::uuids::to_string(msg_uuid),
+                         elapsed_time.count());
+
             return rclcpp_action::GoalResponse::REJECT;
         }
     }
@@ -309,6 +328,7 @@ class AsyncActionInputPort : public IStartStopProtocol
     //! Handle accepted goal
     virtual void _on_goal_accepted(std::shared_ptr<GoalHandle_t> goal_handle)
     {
+        auto start_time = std::chrono::high_resolution_clock::now();
         const auto msg_uuid = ActionDataTrait_t::get_uuid(*goal_handle->get_goal());
         const auto msg_uuid_str = boost::uuids::to_string(msg_uuid);
         const bool is_ping = ActionDataTrait_t::get_control_signal_code(*goal_handle->get_goal()) == ControlSignalCode::Ping;
@@ -330,9 +350,54 @@ class AsyncActionInputPort : public IStartStopProtocol
 
         _resolve_source_data(goal_handle);
 
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        RDX_INFO_DEV(m_parent_node, __func__, true, "[msg_uuid={}] goal accepted time: {} ms", boost::uuids::to_string(msg_uuid),
+                     elapsed_time.count());
+
         RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{} ACCEPTED, goal promise set, removed goal from map", log_prefix);
     }
 
+#ifndef ASYNC_INPUT_PORT_USE_TBB_HASH_MAP
+    virtual void _resolve_source_data(std::shared_ptr<GoalHandle_t> goal_handle)
+    {
+        const auto key = to_boost_uuid(goal_handle->get_goal_id());
+        const auto key_str = boost::uuids::to_string(key);
+        const std::string log_prefix = "[msg_uuid=" + key_str + "]";
+
+        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID,
+                      "{} Resolving goal handle", log_prefix);
+
+        // lock the map
+        auto locked_map = m_source_data_map.synchronize();
+
+        // look for the goal in the map
+        auto it = locked_map->find(key);
+        if (it == locked_map->end()) {
+            // may have been cancelled, just return
+            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{} COMPLETED, though goal is not in the map", log_prefix);
+            return;
+        }
+
+        // set the result
+        auto p = it->second->get_goal_handle_promise();
+        if (p) {
+            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{} COMPLETED, setting promise to wake up waiting threads", log_prefix);
+            try {
+                p->set_value(goal_handle);
+            } catch (const std::future_error &e) {
+                if (e.code() != std::future_errc::promise_already_satisfied) {
+                    throw; // rethrow if it's not the promise already satisfied error
+                }
+                // Otherwise, ignore the exception as the promise is already set
+            }
+        }
+
+        // remove the goal from the map
+        locked_map->erase(it);
+        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{} COMPLETED, num of unresolved goals={}", log_prefix, locked_map->size());
+    }
+#else
     virtual void _resolve_source_data(std::shared_ptr<GoalHandle_t> goal_handle)
     {
         // get from the map
@@ -369,6 +434,7 @@ class AsyncActionInputPort : public IStartStopProtocol
         m_source_data_map.erase(acc);
         RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{} COMPLETED, num of unresolved goals={}", log_prefix, m_source_data_map.size());
     }
+#endif
 
   protected:
     rclcpp::Node *m_parent_node = nullptr;
@@ -377,16 +443,20 @@ class AsyncActionInputPort : public IStartStopProtocol
     // the action server
     rclcpp_action::Server<ActionType_t>::SharedPtr m_action_server;
 
+#ifdef ASYNC_INPUT_PORT_USE_TBB_HASH_MAP
     // buffer map for storing source data, unordered
     using SourceDataMap_t = tbb::concurrent_hash_map<boost::uuids::uuid,
                                                      std::shared_ptr<SourceData_t>,
                                                      TbbBoostUuidHash>;
-    // buffer map for storing source data, unordered
     SourceDataMap_t m_source_data_map{InitialSourceDataMapSize};
-
+#else
+    using SourceDataMap_t = boost::synchronized_value<std::map<boost::uuids::uuid, std::shared_ptr<SourceData_t>>>;
+    SourceDataMap_t m_source_data_map;
+#endif
     // queue for storing source data, ordered
     using SourceDataQueue_t = tbb::concurrent_bounded_queue<std::shared_ptr<SourceData_t>>;
     SourceDataQueue_t m_source_data_queue;
+
 
   protected:
     // callbacks, note that these callbacks do not receive ping signal

@@ -11,6 +11,7 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(redoxi_samples_lib REQUIRED)
 find_package(redoxi_video_reader REQUIRED)
 find_package(redoxi_common_nodes REQUIRED)
+find_package(Boost REQUIRED COMPONENTS timer)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -33,6 +34,7 @@ target_include_directories(redoxi_samples_nodes PUBLIC
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
 target_compile_definitions(redoxi_samples_nodes PRIVATE "REDOXI_SAMPLES_NODES_BUILDING_LIBRARY")
+target_link_libraries(redoxi_samples_nodes PRIVATE Boost::boost Boost::timer)
 
 ament_target_dependencies(redoxi_samples_nodes PUBLIC 
   redoxi_samples_lib
@@ -64,7 +66,11 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_export_dependencies(redoxi_samples_lib redoxi_video_reader redoxi_common_nodes)
+ament_export_dependencies(
+  redoxi_samples_lib
+  redoxi_video_reader
+  redoxi_common_nodes
+)
 
 ament_export_include_directories(
   include

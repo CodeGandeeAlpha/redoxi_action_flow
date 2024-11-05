@@ -109,6 +109,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
         m_task_group.wait();
     }
 
+    // get all downstreams
+    const std::vector<Downstream_t> &get_downstreams() const
+    {
+        return m_downstreams;
+    }
+
   public:
     /**
      * @brief Initialize the port

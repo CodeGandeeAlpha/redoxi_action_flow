@@ -2,6 +2,7 @@
 #include <redoxi_common_cpp/ros_utils/SyncActionSender.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <redoxi_samples_lib/random_image.hpp>
+#include <boost/timer/timer.hpp>
 
 namespace redoxi_works
 {
@@ -16,31 +17,44 @@ SimpleActionGenerator::SimpleActionGenerator(const std::string &name, const rclc
 
 int SimpleActionGenerator::_read_frame(SourceData_t &source_data, std::atomic<int64_t> &frame_number)
 {
-    //! Generate a random UUID and convert it to a string
-    boost::uuids::random_generator gen;
-    boost::uuids::uuid uuid = gen();
-    std::string random_string = boost::uuids::to_string(uuid);
+    // //! Generate a random UUID and convert it to a string
+    // boost::uuids::random_generator gen;
+    // boost::uuids::uuid uuid = gen();
+    // std::string random_string = boost::uuids::to_string(uuid);
 
-    //! Use the random string to generate the frame content
-    cv::Mat frame;
-    random_image_with_text(frame, cv::Size(640, 480), random_string);
-    source_data.set_image(frame);
+    // //! Use the random string to generate the frame content
+    // cv::Mat frame;
+    // random_image_with_text(frame, cv::Size(640, 480), random_string);
+    // source_data.set_image(frame);
+    // source_data.set_frame_number(frame_number);
+    // frame_number++;
+    // source_data.set_uuid(uuid);
+    auto frame_size = m_runtime_config->output_image_size;
+    if (frame_size.empty()) {
+        RDX_RAISE_ERROR("[{}][_read_frame()] output_image_size is not set", this->get_name());
+    }
+
+    //! Generate a random frame with the UUID text
+    cv::Mat random_frame;
+    auto uuid = source_data.get_uuid();
+    auto frame_text = fmt::format("{}\nFrame Number: {}", boost::uuids::to_string(uuid), frame_number.load());
+    random_image_with_text(random_frame, frame_size, frame_text);
+
+    source_data.set_image(random_frame);
     source_data.set_frame_number(frame_number);
     frame_number++;
-    source_data.set_uuid(uuid);
-
     return 0;
 }
 
 void SimpleActionGenerator::_step()
 {
-    RedoxiVideoReaderBase::_step();
-    // _step_send_by_tbb_graph();
+    // RedoxiVideoReaderBase::_step();
+    _step_send_by_tbb_graph();
 }
 
 void SimpleActionGenerator::_step_send_by_tbb_graph()
 {
-    bool AlwaysUsePing = true;
+    bool AlwaysUsePing = false;
 
     //! Read a frame
     SourceData_t source_data;
@@ -60,12 +74,52 @@ void SimpleActionGenerator::_step_send_by_tbb_graph()
 
     //! Put the delivery request into the frame delivery node
     auto msg_uuid = delivery_request.get_source_data().get_uuid();
-    {
-        auto ok = m_primary_output_port->try_push_request(delivery_request);
-        if (!ok) {
-            RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] put data FAILED", boost::uuids::to_string(msg_uuid));
-        } else {
-            RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] put data SUCCESS", boost::uuids::to_string(msg_uuid));
+    auto frame_num = delivery_request.get_source_data().get_frame_number();
+    // {
+    //     auto ok = m_primary_output_port->try_push_request(delivery_request);
+    //     if (!ok) {
+    //         RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] put data FAILED", boost::uuids::to_string(msg_uuid));
+    //     } else {
+    //         RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] put data SUCCESS", boost::uuids::to_string(msg_uuid));
+    //     }
+    // }
+
+    const auto &downstreams = m_primary_output_port->get_downstreams();
+    for (const auto &downstream : downstreams) {
+        RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] sending to downstream, frame_number={}",
+                     boost::uuids::to_string(msg_uuid), frame_num);
+        auto client = downstream.get_action_client();
+        if (client) {
+            auto start_time = std::chrono::high_resolution_clock::now();
+            OutputPort_t::TargetData_t target_data;
+            delivery_request.to_target_data(target_data);
+            OutputPort_t::Downstream_t::ActionClient_t::SendGoalOptions opt;
+            opt.result_callback = [this, msg_uuid](const auto &) {
+                RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] goal result",
+                             boost::uuids::to_string(msg_uuid));
+            };
+            auto send_result = client->async_send_goal(target_data.get_goal(), opt);
+            {
+                auto end_time = std::chrono::high_resolution_clock::now();
+                auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+                RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] async_send_goal time: {} ms", boost::uuids::to_string(msg_uuid),
+                             elapsed_time.count());
+            }
+
+            // wait for the result
+            auto goal_handle = send_result.get();
+            {
+                auto end_time = std::chrono::high_resolution_clock::now();
+                auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+                RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] get response time: {} ms", boost::uuids::to_string(msg_uuid),
+                             elapsed_time.count());
+            }
+
+            if (goal_handle) {
+                RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] goal accepted", boost::uuids::to_string(msg_uuid));
+            } else {
+                RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] goal send FAILED", boost::uuids::to_string(msg_uuid));
+            }
         }
     }
 

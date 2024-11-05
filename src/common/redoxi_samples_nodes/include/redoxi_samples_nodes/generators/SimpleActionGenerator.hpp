@@ -32,5 +32,6 @@ class SimpleActionGenerator : public RedoxiVideoReaderBase
 
   protected:
     //! Create delivery request
+    rclcpp_action::Client<OutputPort_t::ActionType_t>::SharedPtr m_action_client;
 };
 } // namespace redoxi_works

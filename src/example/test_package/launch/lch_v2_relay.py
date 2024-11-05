@@ -46,9 +46,9 @@ source_node_json_params = {
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
-        "step_interval": 10000,
+        "step_interval": 1000,
         "frame_interval": 0,
-        "output_image_size": {"width": -1, "height": -1},
+        "output_image_size": {"width": 640, "height": 480},
         "output_image_encoding": "bgr8",
         "publish_to_debug_topic": True,
         "frame_request_policy": {
@@ -82,7 +82,7 @@ relay_node_json_params = {
     "init_config": {
         "input_port_config": {"buffer_capacity": 10, "action_name": "in/action"},
         "_time_unit": "us(1e-6)",
-        "step_interval": 1000,
+        "step_interval": 500,
         "publish_topic": "out/relayed_frame",
         "enable_debug_topics": True,
         "debug_topic_frame_accepted": "debug_port/frame_accepted",
@@ -93,22 +93,25 @@ relay_node_json_params = {
 
 # common_prefix = ["valgrind --tool=callgrind --dump-instr=yes -v --instr-atstart=no"]
 common_prefix = None
+# common_ros_args = ["--disable-external-lib-logs"]
+common_ros_args = []
 
-# simple_action_generator = Node(
-#     package="test_package",
-#     executable="v2_simple_action",
-#     name="simple_action_generator",
-#     namespace="simple_action_generator",
-#     parameters=[
-#         {
-#             "param_as_json_string": json.dumps(
-#                 source_node_json_params, separators=(",", ":")
-#             ),
-#         },
-#     ],
-#     prefix=common_prefix,
-#     arguments=["--ros-args", "--log-level", ["simple_action_generator:=", logger]],
-# )
+simple_action_generator = Node(
+    package="test_package",
+    executable="v2_simple_action",
+    name="simple_action_generator",
+    namespace="simple_action_generator",
+    parameters=[
+        {
+            "param_as_json_string": json.dumps(
+                source_node_json_params, separators=(",", ":")
+            ),
+        },
+    ],
+    prefix=common_prefix,
+    arguments=["--ros-args", "--log-level", ["simple_action_generator:=", logger]]
+    + common_ros_args,
+)
 
 video_source_node = Node(
     package="test_package",
@@ -138,7 +141,7 @@ video_sink_node = Node(
             ),
         },
     ],
-    arguments=["--ros-args", "--log-level", ["video_sink:=", logger]],
+    arguments=["--ros-args", "--log-level", ["video_sink:=", logger]] + common_ros_args,
 )
 
 
@@ -158,7 +161,8 @@ def generate_launch_description():
         [
             *env_var_settings,
             log_level_arg,
-            video_source_node,
+            simple_action_generator,
+            # video_source_node,
             video_sink_node,
         ]
     )

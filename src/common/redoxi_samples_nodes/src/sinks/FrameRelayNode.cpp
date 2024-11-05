@@ -155,12 +155,12 @@ void FrameRelayNode::_step()
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] {}",
                  msg_uuid_str, "frame received and goal resolved");
     auto &raw_image = goal_handle->get_goal()->frame.raw_image;
-    m_pub_relayed_frame.publish(raw_image);
+    // m_pub_relayed_frame.publish(raw_image);
 
-    // publish debug topic?
-    if (get_debug_topics_enabled()) {
-        m_pub_frame_accepted.publish(raw_image, "accepted");
-    }
+    // // publish debug topic?
+    // if (get_debug_topics_enabled()) {
+    //     m_pub_frame_accepted.publish(raw_image, "accepted");
+    // }
 
     // at the end, terminate the goal
     auto result_msg = std::make_shared<InputPort_t::ActionResult_t>();
