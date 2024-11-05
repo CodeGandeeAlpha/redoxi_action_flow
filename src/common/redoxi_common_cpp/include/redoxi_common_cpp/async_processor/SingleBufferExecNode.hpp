@@ -3,7 +3,7 @@
 #pragma once
 #include <redoxi_common_cpp/async_processor/common.hpp>
 #include <functional>
-#include <tbb/tbb.h>
+#include <tbb/flow_graph.h>
 #include <cassert>
 #include <type_traits>
 

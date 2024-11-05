@@ -1,6 +1,5 @@
 #pragma once
 
-#include <string>
 #include <atomic>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <boost/uuid/uuid_io.hpp>

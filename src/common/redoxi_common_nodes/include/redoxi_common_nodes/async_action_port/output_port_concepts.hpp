@@ -341,7 +341,7 @@ concept InitConfigConcept = requires(T t)
     //! Must have method to get number of buffer requests
     {
         std::declval<const T &>().get_num_buffer_requests()
-        } -> std::same_as<int>;
+        } -> std::convertible_to<int64_t>;
 
     //! Must have method to get preserve request order flag
     {
