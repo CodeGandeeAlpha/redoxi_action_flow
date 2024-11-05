@@ -68,7 +68,7 @@ int FrameRelayNode::init(std::shared_ptr<InitConfig_t> init_config)
     m_input_port->init(m_init_config->input_port_config);
 
     // create the publishers
-    m_pub_relayed_frame.init(this, m_init_config->publish_topic);
+    m_pub_relayed_frame.init(this, m_init_config->publish_topic, StampedImagePub::DefaultUnreliableQoS);
     m_pub_frame_accepted.init(this, m_init_config->debug_topic_frame_accepted, StampedImagePub::DefaultUnreliableQoS);
     m_pub_frame_rejected.init(this, m_init_config->debug_topic_frame_rejected, StampedImagePub::DefaultUnreliableQoS);
 
