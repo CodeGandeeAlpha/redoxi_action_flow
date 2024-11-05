@@ -22,7 +22,7 @@ int StampedImagePub::init(rclcpp::Node *node,
     if (qos) {
         m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, *qos);
     } else {
-        m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, DefaultParams::DebugPublisherQoS);
+        m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, DefaultQoS);
     }
     return m_pub != nullptr ? 0 : -1;
 }

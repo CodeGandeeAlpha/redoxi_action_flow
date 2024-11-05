@@ -369,16 +369,17 @@ void RedoxiVideoReaderBase::_step()
 
         // create delivery request
         auto delivery_request = _create_delivery_request(source_data);
+
+        // this is used for logging
         auto msg_uuid = source_data.get_uuid();
 
-        // get qos
+        // get qos, controls how to retry and drop frames
         auto &qos = m_runtime_config->frame_enqueue_policy;
-
-        // publish
         auto max_attempts = qos.get_retry_policy().get_number_of_retry(true).value() + 1;
         auto interval_between_attempts = qos.get_retry_policy().get_wait_time_between_retry(true).value();
         auto drop_frame_strategy = qos.get_drop_strategy();
 
+        // start pushing request to output port
         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
                      "try to push request in {} attempts, retry interval={}ms",
                      max_attempts, interval_between_attempts.count());

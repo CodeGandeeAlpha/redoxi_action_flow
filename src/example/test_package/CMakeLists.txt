@@ -50,6 +50,7 @@ option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2 "Build test_simple_action_generator
 option(BUILD_TEST_UUID_CONVERSION "Build test_uuid_conversion target" OFF)
 option(BUILD_TEST_V2_JSON_EXAMPLES "Build test_v2_json_examples target" OFF)
 option(BUILD_TEST_V2_VIDEO_SINK "Build test_v2_video_sink target" ON)
+option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -65,6 +66,10 @@ function(configure_target target_name)
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE)
+  configure_target(v2_random_video_source)
+endif()
 
 if(BUILD_TEST_V2_VIDEO_SINK)
   configure_target(v2_video_sink)

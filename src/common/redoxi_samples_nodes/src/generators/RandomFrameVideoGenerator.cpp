@@ -1,6 +1,9 @@
 #include <redoxi_samples_nodes/generators/RandomFrameVideoGenerator.hpp>
 #include <redoxi_samples_lib/random_image.hpp>
 #include <redoxi_common_cpp/image_proc/ImageStamper.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 namespace redoxi_works
 {
@@ -36,7 +39,9 @@ int RandomFrameVideoGenerator::_read_frame(SourceData_t &data, std::atomic<int64
 
     //! Generate a random frame with the UUID text
     cv::Mat random_frame;
-    random_image_with_text(random_frame, frame_size);
+    auto uuid = data.get_uuid();
+    auto frame_text = fmt::format("{}\nFrame Number: {}", boost::uuids::to_string(uuid), frame_number.load());
+    random_image_with_text(random_frame, frame_size, frame_text);
 
     data.set_image(random_frame);
     data.set_frame_number(frame_number);

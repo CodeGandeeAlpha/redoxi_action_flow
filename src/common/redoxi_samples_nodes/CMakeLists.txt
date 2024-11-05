@@ -20,6 +20,7 @@ set(srcfiles
   src/generators/RandomFrameVideoGenerator.cpp
   src/generators/SimpleActionGenerator.cpp
   src/sinks/FrameRelayPublisher.cpp
+  src/sinks/FrameRelayNode.cpp
 )
 
 add_library(redoxi_samples_nodes ${srcfiles})

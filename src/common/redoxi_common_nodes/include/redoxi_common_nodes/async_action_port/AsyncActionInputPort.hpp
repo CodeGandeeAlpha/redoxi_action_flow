@@ -19,6 +19,10 @@ class AsyncActionInputPort : public IStartStopProtocol
   private:
     inline static constexpr auto PRINT_THREAD_ID = false;
 
+    // initial size of the source data map, must be large enough to avoid rehashing
+    inline static constexpr auto InitialSourceDataMapSize = 10000;
+    inline static constexpr auto GoalHandleTimeout = DefaultParams::GoalHandleTimeout;
+
   public:
     AsyncActionInputPort(rclcpp::Node *parent_node)
         : m_parent_node(parent_node)
@@ -42,11 +46,12 @@ class AsyncActionInputPort : public IStartStopProtocol
 
   public:
     //! Initialize the port, state transition: BEFORE_INIT -> STOPPED
-    void init(std::shared_ptr<InitConfig_t> config)
+    int init(std::shared_ptr<InitConfig_t> config)
     {
         // assert status must be before init
         if (m_status != NodeStatusCode::BEFORE_INIT) {
             RDX_RAISE_ERROR("[{}] Port is not in the correct status, got {}", __func__, NodeStatusCodeToString(m_status));
+            return -1;
         }
 
         m_init_config = config;
@@ -55,24 +60,33 @@ class AsyncActionInputPort : public IStartStopProtocol
         auto action_name = m_init_config->get_action_name();
         if (action_name.empty()) {
             RDX_RAISE_ERROR("[{}] Action name is empty", __func__);
+            return -1;
         }
 
         // create the action server
         RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "Creating action server [{}]", action_name);
+
+        // override the default result timeout, otherwise there may be too many pending goals
+        rcl_action_server_options_t server_options = rcl_action_server_get_default_options();
+        std::chrono::nanoseconds timeout_ns = GoalHandleTimeout;
+        server_options.result_timeout.nanoseconds = timeout_ns.count();
+
         m_action_server = rclcpp_action::create_server<ActionType_t>(
             m_parent_node, action_name,
             std::bind(&AsyncActionInputPort::_on_goal_received, this, std::placeholders::_1, std::placeholders::_2),
             std::bind(&AsyncActionInputPort::_on_goal_cancel_request, this, std::placeholders::_1),
-            std::bind(&AsyncActionInputPort::_on_goal_accepted, this, std::placeholders::_1));
+            std::bind(&AsyncActionInputPort::_on_goal_accepted, this, std::placeholders::_1),
+            server_options);
 
         // initialize the queue
-        int64_t num_buffer_requests = m_init_config->get_num_buffer_requests();
-        if (num_buffer_requests > 0) {
-            m_source_data_queue.set_capacity(num_buffer_requests);
+        int64_t buffer_capacity = m_init_config->get_buffer_capacity();
+        if (buffer_capacity > 0) {
+            m_source_data_queue.set_capacity(buffer_capacity);
         }
 
         // state transition: BEFORE_INIT -> STOPPED
         _set_status(NodeStatusCode::STOPPED);
+        return 0;
     }
 
     //! Start the port, state transition: STOPPED -> STARTED
@@ -110,6 +124,9 @@ class AsyncActionInputPort : public IStartStopProtocol
         if (m_status != NodeStatusCode::STARTED) {
             RDX_RAISE_ERROR("[{}] Port is not in the correct status, got {}", __func__, NodeStatusCodeToString(m_status));
         }
+
+        // reset the queue
+        _reset_queue();
 
         // state transition: STARTED -> STOPPED
         _set_status(NodeStatusCode::STOPPED);
@@ -157,6 +174,19 @@ class AsyncActionInputPort : public IStartStopProtocol
     }
 
   protected:
+    //! Reset the queue, clear all data and wake up all waiting threads
+    void _reset_queue()
+    {
+        // wake up all waiting threads
+        m_source_data_queue.abort();
+
+        // pop all data at once until the queue is empty
+        std::shared_ptr<SourceData_t> data;
+        while (m_source_data_queue.try_pop(data)) {
+        }
+    }
+
+    //! Set the status
     void _set_status(int status)
     {
         m_status = status;
@@ -203,14 +233,17 @@ class AsyncActionInputPort : public IStartStopProtocol
         // create source data
         auto source_data = std::make_shared<SourceData_t>();
 
+        // must fill the following before pushing to the queue
+        // otherwise, it may get dequeued by other threads and processed while the goal is not set
+        source_data->set_goal(goal);
+        source_data->set_goal_uuid(uuid);
+        source_data->set_goal_handle_promise(std::make_shared<SourceData_t::GoalHandlePromise_t>());
+
         // can we push it to the queue?
         bool enqueued = m_source_data_queue.try_push(source_data);
         if (enqueued) {
             // enqueued successfully, set the goal data, and bookkeep the promise
             RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{} ACCEPTED, Goal enqueued, num goals in the queue={}", log_prefix, m_source_data_queue.size());
-            source_data->set_goal(goal);
-            source_data->set_goal_uuid(uuid);
-            source_data->set_goal_handle_promise(std::make_shared<SourceData_t::GoalHandlePromise_t>());
 
             // save to map
             auto key = to_boost_uuid(uuid);
@@ -284,7 +317,9 @@ class AsyncActionInputPort : public IStartStopProtocol
         RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{} Goal accepted, is_ping={}", log_prefix, is_ping);
         if (is_ping) {
             // ping signal, do nothing
-            goal_handle->succeed(m_ping_response);
+            // goal_handle->succeed(m_ping_response);
+            // use abort to terminate the goal immediately
+            goal_handle->abort(m_ping_response);
             return;
         }
 
@@ -305,6 +340,9 @@ class AsyncActionInputPort : public IStartStopProtocol
         const auto key = to_boost_uuid(goal_handle->get_goal_id());
         const auto key_str = boost::uuids::to_string(key);
         const std::string log_prefix = "[msg_uuid=" + key_str + "]";
+
+        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID,
+                      "{} Resolving goal handle", log_prefix);
 
         bool found = m_source_data_map.find(acc, key);
         if (!found) {
@@ -344,7 +382,7 @@ class AsyncActionInputPort : public IStartStopProtocol
                                                      std::shared_ptr<SourceData_t>,
                                                      TbbBoostUuidHash>;
     // buffer map for storing source data, unordered
-    SourceDataMap_t m_source_data_map;
+    SourceDataMap_t m_source_data_map{InitialSourceDataMapSize};
 
     // queue for storing source data, ordered
     using SourceDataQueue_t = tbb::concurrent_bounded_queue<std::shared_ptr<SourceData_t>>;

@@ -3,6 +3,7 @@
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
 #include <redoxi_common_nodes/async_action_port/input_port_concepts.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
+#include <json_struct/json_struct.h>
 
 namespace redoxi_works
 {
@@ -67,8 +68,8 @@ struct DefaultReceiveSourceData {
   public:
     rclcpp_action::GoalUUID m_goal_uuid;
     std::shared_ptr<const Goal_t> m_goal;
-    std::shared_future<std::shared_ptr<GoalHandle_t>> m_goal_handle_future;
     std::shared_ptr<GoalHandlePromise_t> m_goal_handle_promise;
+    std::shared_future<std::shared_ptr<GoalHandle_t>> m_goal_handle_future;
 };
 static_assert(ReceiveSourceDataConcept<DefaultReceiveSourceData>,
               "DefaultReceiveSourceData does not satisfy ReceiveSourceDataConcept");
@@ -77,9 +78,9 @@ static_assert(ReceiveSourceDataConcept<DefaultReceiveSourceData>,
 struct DefaultInitConfig {
     //! Get number of buffer requests
     //! If the value is not positive, it means the queue is unbounded
-    int64_t get_num_buffer_requests() const
+    int64_t get_buffer_capacity() const
     {
-        return num_buffer_requests;
+        return buffer_capacity;
     }
 
     //! Get the name of the action
@@ -88,9 +89,24 @@ struct DefaultInitConfig {
         return action_name;
     }
 
+    //! Set the buffer capacity
+    void set_buffer_capacity(int64_t capacity)
+    {
+        buffer_capacity = capacity;
+    }
+
+    //! Set the action name
+    void set_action_name(const std::string &name)
+    {
+        action_name = name;
+    }
+
   protected:
-    int64_t num_buffer_requests = -1;
+    int64_t buffer_capacity = -1;
     std::string action_name;
+
+  public:
+    JS_OBJECT(JS_MEMBER(buffer_capacity), JS_MEMBER(action_name));
 };
 
 //! The specification for the action input port
