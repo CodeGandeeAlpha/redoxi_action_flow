@@ -68,7 +68,7 @@ int FrameRelayNode::init(std::shared_ptr<InitConfig_t> init_config)
     m_input_port->init(m_init_config->input_port_config);
 
     // create the publishers
-    m_pub_relayed_frame.init(this, m_init_config->publish_topic, StampedImagePub::DefaultUnreliableQoS);
+    m_pub_relayed_frame.init(this, m_init_config->publish_topic, StampedImagePub::DefaultQoS);
     m_pub_frame_accepted.init(this, m_init_config->debug_topic_frame_accepted, StampedImagePub::DefaultUnreliableQoS);
     m_pub_frame_rejected.init(this, m_init_config->debug_topic_frame_rejected, StampedImagePub::DefaultUnreliableQoS);
 
@@ -155,12 +155,12 @@ void FrameRelayNode::_step()
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] {}",
                  msg_uuid_str, "frame received and goal resolved");
     auto &raw_image = goal_handle->get_goal()->frame.raw_image;
-    // m_pub_relayed_frame.publish(raw_image);
+    m_pub_relayed_frame.publish(raw_image);
 
-    // // publish debug topic?
-    // if (get_debug_topics_enabled()) {
-    //     m_pub_frame_accepted.publish(raw_image, "accepted");
-    // }
+    // publish debug topic?
+    if (get_debug_topics_enabled()) {
+        m_pub_frame_accepted.publish(raw_image, "accepted");
+    }
 
     // at the end, terminate the goal
     auto result_msg = std::make_shared<InputPort_t::ActionResult_t>();

@@ -161,8 +161,8 @@ def generate_launch_description():
         [
             *env_var_settings,
             log_level_arg,
-            simple_action_generator,
-            # video_source_node,
+            # simple_action_generator,
+            video_source_node,
             video_sink_node,
         ]
     )
