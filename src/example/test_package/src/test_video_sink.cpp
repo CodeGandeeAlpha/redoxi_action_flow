@@ -1,4 +1,4 @@
-#include <redoxi_video_reader/sinks/FrameRelayPublisher.hpp>
+#include <redoxi_samples_nodes/sinks/FrameRelayPublisher.hpp>
 #include <spdlog/spdlog.h>
 
 namespace rdx = redoxi_works;

@@ -1,4 +1,4 @@
-#include <redoxi_video_reader/sinks/FrameRelayPublisher.hpp>
+#include <redoxi_samples_nodes/sinks/FrameRelayPublisher.hpp>
 #include <redoxi_common_cpp/async_processor/SingleBufferExecNode.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <cv_bridge/cv_bridge.hpp>

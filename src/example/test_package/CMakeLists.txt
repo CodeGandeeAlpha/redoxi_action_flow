@@ -47,8 +47,9 @@ option(BUILD_TEST_VIDEO_READER_RANDOM "Build test_video_reader_random target"
 option(BUILD_TEST_VIDEO_SINK "Build test_video_sink target" ON)
 option(BUILD_TEST_SIMPLE_ACTION_GENERATOR "Build test_simple_action_generator target" OFF)
 option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2 "Build test_simple_action_generator_v2 target" ON)
-option(BUILD_TEST_V2_JSON_EXAMPLES "Build test_v2_json_examples target" ON)
 option(BUILD_TEST_UUID_CONVERSION "Build test_uuid_conversion target" OFF)
+option(BUILD_TEST_V2_JSON_EXAMPLES "Build test_v2_json_examples target" OFF)
+option(BUILD_TEST_V2_VIDEO_SINK "Build test_v2_video_sink target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -64,6 +65,10 @@ function(configure_target target_name)
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_TEST_V2_VIDEO_SINK)
+  configure_target(v2_video_sink)
+endif()
 
 if(BUILD_TEST_UUID_CONVERSION)
   configure_target(test_uuid_conversion)
