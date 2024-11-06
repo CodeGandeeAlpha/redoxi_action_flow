@@ -5,6 +5,7 @@ std_msgs/Header header
 
 # cache data in external storage (such as shared memory)
 CacheData cache
+SharedMemoryToken shm_token
 
 # raw data, mainly for debugging, usually empty
 sensor_msgs/Image raw_image

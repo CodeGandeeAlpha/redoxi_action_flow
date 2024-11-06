@@ -58,7 +58,7 @@ struct FrameRelayPublisherImpl {
         }
 #endif
         m_ping_response = std::make_shared<FrameReceiveAction_t::Result>();
-        m_ping_response->return_code = 0;
+        m_ping_response->x_return.code = m_ping_response->x_return.SUCCESS;
     }
     inline constexpr static size_t DefaultPayloadMapSize = 10000;
     using FrameReceiveAction_t = FrameRelayPublisher::FrameReceiveAction_t;
@@ -198,7 +198,7 @@ int FrameRelayPublisher::_deliver_frame(FrameDeliveryTask_t &task)
         RDX_INFO_DEV(this, __func__, print_thread_id, "[msg_uuid={}][goal_uuid={}] Signaling goal as success",
                      boost::uuids::to_string(msg_uuid), boost::uuids::to_string(task.goal_uuid));
         auto result = std::make_shared<FrameReceiveAction_t::Result>();
-        result->return_code = 0;
+        result->x_return.code = result->x_return.SUCCESS;
         payload->goal_handle->succeed(result);
     } else {
         RDX_LOG_ERROR(this, __func__, print_thread_id, "[goal_uuid={}] payload is not valid, skipping",

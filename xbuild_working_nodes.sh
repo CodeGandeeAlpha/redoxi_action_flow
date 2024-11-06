@@ -28,7 +28,10 @@ display_help() {
 #                  rosboard \
 #                  cv_bridge"
 
-PackagesToBuild="redoxi_common_nodes test_package rosboard"
+PackagesToBuild="redoxi_common_nodes \
+                 redoxi_shared_memory \
+                 test_package \
+                 rosboard"
 
 # Check if --help flag is provided
 if [[ "$*" == *"--help"* ]]; then
