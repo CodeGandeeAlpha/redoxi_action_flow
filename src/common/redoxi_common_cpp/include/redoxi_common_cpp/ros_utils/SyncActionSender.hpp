@@ -171,21 +171,24 @@ class SyncActionSender
 
   public:
     /**
-     * @brief Send an action goal and wait for the response
+     * @brief Send an action goal and handle the response based on the timeout
      *
-     * @details This method sends an action goal to the specified client and waits for a response.
-     * The waiting behavior is determined by the timeout parameter.
+     * @details This method sends an action goal to the specified client and handles the response
+     * based on the provided timeout parameter. The method supports different waiting behaviors:
+     * - If timeout < 0, the method waits indefinitely until the goal is received.
+     * - If timeout == 0, the method sends the goal without waiting for a response.
+     * - If timeout > 0, the method waits for the specified duration before considering the request timed out.
      *
-     * @param goal The action goal to send
-     * @param client The action client to use for sending the goal
-     * @param timeout Timeout duration.
-     *                If timeout < 0, wait indefinitely until the goal is received.
-     *                If timeout == 0, no wait (returns immediately).
-     *                If timeout > 0, wait for that duration before considering the request timed out.
+     * The method also supports optional callbacks for handling goal responses.
+     *
+     * @param goal The action goal to send.
+     * @param client The action client to use for sending the goal.
+     * @param timeout Timeout duration for waiting for the goal response.
+     * @param callbacks Optional callbacks for handling goal responses.
      *
      * @return SendResult_t A struct containing:
-     *         - response_code: An optional ActionDownstreamResponse indicating the result (ACCEPTED, REJECTED, TIMEOUT, or not set)
-     *         - goal_handle_future: A shared future that can be used to retrieve the goal handle, could be nullptr if the goal is rejected
+     *         - response_code: An optional ActionDownstreamResponse indicating the result (ACCEPTED, REJECTED, TIMEOUT, or not set).
+     *         - goal_handle_future: A shared future that can be used to retrieve the goal handle, could be nullptr if the goal is rejected.
      *
      * @note If timeout < 0, the response_code in the result will not be set, and the user should use
      *       goal_handle_future.wait() to wait for and process the result.

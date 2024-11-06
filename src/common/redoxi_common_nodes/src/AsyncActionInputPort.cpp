@@ -2,5 +2,5 @@
 
 namespace redoxi_works
 {
-static AsyncActionInputPort port(nullptr);
+// static AsyncActionInputPort port(nullptr);
 } // namespace redoxi_works

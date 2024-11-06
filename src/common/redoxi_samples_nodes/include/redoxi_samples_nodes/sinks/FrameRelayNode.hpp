@@ -3,7 +3,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <nlohmann/json.hpp>
 #include <redoxi_samples_nodes/redoxi_samples_nodes.hpp>
-#include <redoxi_common_nodes/async_action_port/AsyncActionInputPort.hpp>
+#include <redoxi_common_nodes/async_action_port/AsyncImageInputPort.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 
 namespace redoxi_works
@@ -18,7 +18,7 @@ struct FrameRelayNodeInitConfig {
     //! time unit name
     std::string _time_unit = get_default_time_unit_name();
 
-    using InputPort_t = AsyncActionInputPort;
+    using InputPort_t = AsyncImageInputPort;
     std::shared_ptr<InputPort_t::InitConfig_t>
         input_port_config = std::make_shared<InputPort_t::InitConfig_t>();
 
@@ -53,7 +53,7 @@ class FrameRelayNode : public rclcpp::Node, public IStartStopProtocol
     virtual ~FrameRelayNode();
 
   public: // useful types
-    using InputPort_t = AsyncActionInputPort;
+    using InputPort_t = AsyncImageInputPort;
     using SourceData_t = InputPort_t::SourceData_t;
     using ActionDataTrait_t = InputPort_t::ActionDataTrait_t;
 

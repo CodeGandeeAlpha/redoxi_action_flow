@@ -15,8 +15,9 @@
 
 namespace redoxi_works
 {
-using TSpec = input_port_types::AsyncActionInputPortSpec;
+// using TSpec = input_port_types::AsyncActionInputPortSpec;
 
+template <input_port_types::AsyncActionInputPortSpecConcept TSpec>
 class AsyncActionInputPort : public IStartStopProtocol
 {
   private:
@@ -46,6 +47,7 @@ class AsyncActionInputPort : public IStartStopProtocol
     using SourceData_t = TSpec::ReceiveSourceData_t;
     using GoalHandle_t = SourceData_t::GoalHandle_t;
     using GoalUUID_t = rclcpp_action::GoalUUID;
+    using TimeUnit_t = TSpec::TimeUnit_t;
 
   public:
     //! Initialize the port, state transition: BEFORE_INIT -> STOPPED
@@ -71,7 +73,7 @@ class AsyncActionInputPort : public IStartStopProtocol
 
         // override the default result timeout, otherwise there may be too many pending goals
         rcl_action_server_options_t server_options = rcl_action_server_get_default_options();
-        std::chrono::nanoseconds timeout_ns = GoalHandleTimeout;
+        std::chrono::nanoseconds timeout_ns = m_init_config->get_goal_result_expire_time();
         server_options.result_timeout.nanoseconds = timeout_ns.count();
 
         m_action_server = rclcpp_action::create_server<ActionType_t>(
@@ -241,7 +243,7 @@ class AsyncActionInputPort : public IStartStopProtocol
         // otherwise, it may get dequeued by other threads and processed while the goal is not set
         source_data->set_goal(goal);
         source_data->set_goal_uuid(uuid);
-        source_data->set_goal_handle_promise(std::make_shared<SourceData_t::GoalHandlePromise_t>());
+        source_data->set_goal_handle_promise(std::make_shared<typename SourceData_t::GoalHandlePromise_t>());
 
         // can we push it to the queue?
         bool enqueued = m_source_data_queue.try_push(source_data);

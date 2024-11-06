@@ -1,14 +1,15 @@
 #pragma once
 
 #include <any>
+#include <boost/uuid/uuid_generators.hpp>
+#include <sensor_msgs/msg/image.hpp>
+#include <cv_bridge/cv_bridge.hpp>
+
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
-#include <sensor_msgs/msg/image.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
-#include <cv_bridge/cv_bridge.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <nlohmann/json.hpp>
+
 
 namespace redoxi_works
 {

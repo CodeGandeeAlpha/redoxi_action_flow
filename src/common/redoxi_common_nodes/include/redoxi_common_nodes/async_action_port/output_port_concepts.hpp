@@ -1,6 +1,8 @@
 #pragma once
 
 #include <redoxi_common_cpp/common_concepts.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
 
 namespace redoxi_works
 {
