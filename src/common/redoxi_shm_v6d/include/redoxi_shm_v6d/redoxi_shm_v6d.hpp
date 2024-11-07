@@ -3,17 +3,9 @@
 
 #include "redoxi_shm_v6d/visibility_control.h"
 
-namespace redoxi_shm_v6d
+namespace redoxi_works
 {
 
-class RedoxiShmV6D
-{
-public:
-  RedoxiShmV6D();
+} // namespace redoxi_works
 
-  virtual ~RedoxiShmV6D();
-};
-
-}  // namespace redoxi_shm_v6d
-
-#endif  // REDOXI_SHM_V6D__REDOXI_SHM_V6D_HPP_
+#endif // REDOXI_SHM_V6D__REDOXI_SHM_V6D_HPP_

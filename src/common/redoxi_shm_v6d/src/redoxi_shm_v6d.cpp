@@ -1,14 +1,6 @@
 #include "redoxi_shm_v6d/redoxi_shm_v6d.hpp"
 
-namespace redoxi_shm_v6d
+namespace redoxi_works::shared_memory
 {
 
-RedoxiShmV6D::RedoxiShmV6D()
-{
-}
-
-RedoxiShmV6D::~RedoxiShmV6D()
-{
-}
-
-}  // namespace redoxi_shm_v6d
+} // namespace redoxi_works::shared_memory

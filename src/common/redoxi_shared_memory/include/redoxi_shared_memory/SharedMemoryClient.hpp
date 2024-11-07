@@ -12,57 +12,74 @@ namespace shared_memory
 class SharedMemoryClient
 {
   public:
-  public:
     SharedMemoryClient() = default;
     virtual ~SharedMemoryClient() = default;
     /**
-     * @brief Connect to a shared memory region
-     * @param region_key The key of the shared memory region
-     * @param context The additional user-defined context of the shared memory region
-     * @return 0 if success, -1 if failed
+     * @brief Connect to a shared memory region.
+     *
+     * Establishes a connection to a specified shared memory region using the provided key.
+     *
+     * @param region_key The unique key identifying the shared memory region.
+     * @param params Optional parameters for connection, can be user-defined.
+     * @return 0 if the connection is successful, -1 if it fails.
      */
-    virtual int connect(const std::string &region_key, void *context = nullptr) = 0;
+    virtual int connect(const std::string &region_key, const KeyValueStore *params = nullptr) = 0;
 
     /**
-     * @brief Put data to the shared memory region
-     * @param output_object_id The output object identifier
-     * @param data_block The data block to put
-     * @param metadata The metadata of the data block, optional
-     * @return 0 if success, -1 if failed
+     * @brief Put data into the shared memory region.
+     *
+     * Stores a data block in the shared memory region and assigns an identifier to it.
+     *
+     * @param output_object_id The identifier for the stored data block.
+     * @param data_block The data block to be stored.
+     * @param metadata Optional metadata associated with the data block.
+     * @return 0 if the operation is successful, -1 if it fails.
      */
     virtual int put_data(ObjectIdentifier *output_object_id,
                          const DataBlock *data_block,
-                         const Metadata *metadata = nullptr) = 0;
+                         const KeyValueStore *metadata = nullptr) = 0;
 
     /**
-     * @brief Get data from the shared memory region
-     * @param output_data_block The output data block, if nullptr, the data will not be returned
-     * @param output_metadata The output metadata, if nullptr, the metadata will not be returned
-     * @param identifier The identifier of the data block
-     * @return 0 if success, -1 if failed
+     * @brief Retrieve data from the shared memory region.
+     *
+     * Fetches a data block and its metadata from the shared memory region using the specified identifier.
+     *
+     * @param output_data_block The data block to be retrieved. If nullptr, data will not be returned.
+     * @param output_metadata The metadata to be retrieved. If nullptr, metadata will not be returned.
+     * @param identifier The identifier of the data block to be fetched.
+     * @return 0 if the retrieval is successful, -1 if it fails.
      */
     virtual int get_data(DataBlock *output_data_block,
-                         Metadata *output_metadata,
+                         KeyValueStore *output_metadata,
                          const ObjectIdentifier &identifier) = 0;
 
     /**
-     * @brief Check if the shared memory client is connected to the shared memory region
-     * @return true if connected, false otherwise
+     * @brief Check the connection status to the shared memory region.
+     *
+     * Determines whether the client is currently connected to the shared memory region.
+     *
+     * @return true if the client is connected, false otherwise.
      */
     virtual bool is_connected() const = 0;
 
     /**
-     * @brief Release a shared memory object
-     * @param identifier The identifier of the object to release, either the key or the id must be set
-     * @param metadata The metadata of the object, optional
-     * @return 0 if success, -1 if failed
+     * @brief Release a shared memory object.
+     *
+     * Deletes a specified object from the shared memory region using its identifier.
+     *
+     * @param identifier The identifier of the object to be released. Either the key or the id must be set.
+     * @param metadata Optional metadata associated with the object, usually not required.
+     * @return 0 if the deletion is successful, -1 if it fails.
      */
     virtual int delete_object(const ObjectIdentifier &identifier,
-                              const Metadata *metadata = nullptr) = 0;
+                              const KeyValueStore *metadata = nullptr) = 0;
 
     /**
-     * @brief Close the connection to the shared memory region
-     * @return 0 if success, -1 if failed
+     * @brief Close the connection to the shared memory region.
+     *
+     * Terminates the connection to the shared memory region.
+     *
+     * @return 0 if the closure is successful, -1 if it fails.
      */
     virtual int close() = 0;
 };
