@@ -39,7 +39,7 @@ class RetryPolicy : public output_port_types::DefaultRetryPolicy<TimeUnit>
     }
 };
 
-//! Source data type for image output port
+//! Source data type for document output port
 //! This type must satisfy the DeliverySourceDataConcept
 class DeliverySourceData
 {
@@ -55,36 +55,22 @@ class DeliverySourceData
 
 
     //! Get the image
-    virtual const cv::Mat &get_image() const
+    virtual const redoxi_public_msgs::msg::Frame &get_frame() const
     {
-        return m_image;
+        return m_frame;
     }
 
     //! Set the image
-    virtual void set_image(const cv::Mat &image)
+    virtual void set_frame(const redoxi_public_msgs::msg::Frame &frame)
     {
-        m_image = image;
-    }
-
-    //! Get the frame number
-    virtual int64_t get_frame_number() const
-    {
-        return m_frame_number;
-    }
-
-    //! Set the frame number
-    virtual void set_frame_number(int64_t frame_number)
-    {
-        m_frame_number = frame_number;
+        m_frame = frame;
     }
 
     //! Convert the source data to a ROS message for publishing
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        cv_bridge::CvImage cv_image;
-        cv_image.image = m_image;
-        cv_image.encoding = m_encoding;
-        cv_image.toImageMsg(msg);
+        msg.frame = m_frame;
+        std::copy(m_uuid.begin(), m_uuid.end(), msg.uuid.uuid.begin());
         return 0;
     }
 
@@ -105,6 +91,7 @@ class DeliverySourceData
 
   protected:
     boost::uuids::uuid m_uuid;
+    redoxi_public_msgs::msg::Frame m_frame;
 };
 
 
@@ -125,10 +112,7 @@ class DeliveryTargetData : public DeliveryTargetDataBase
 
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        auto &raw_image = this->m_goal.frame.raw_image;
-        if (!raw_image.data.empty()) {
-            msg = raw_image;
-        }
+        msg = this->m_goal.document;
         return 0;
     }
 
@@ -161,14 +145,10 @@ class DeliveryRequest : public DeliveryRequestBase
         auto &goal = target_data.get_goal();
 
         // fill payload
-        auto image = this->m_source_data.get_image();
+        auto frame = this->m_source_data.get_frame();
 
-        // convert image to ROS message
-        cv_bridge::CvImage cv_bridge_image;
-        cv_bridge_image.image = image;
-        cv_bridge_image.encoding = sensor_msgs::image_encodings::BGR8;
-        cv_bridge_image.toImageMsg(goal.frame.raw_image);
-        goal.frame.frame_num = this->m_source_data.get_frame_number();
+        // convert frame to document
+        goal.document.frame = frame;
 
         // set additional information into the goal
         using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
