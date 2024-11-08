@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(vineyard REQUIRED)
 find_package(redoxi_shared_memory REQUIRED)
+find_package(redoxi_common_cpp REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -31,6 +32,7 @@ target_compile_definitions(redoxi_shm_v6d PRIVATE "REDOXI_SHM_V6D_BUILDING_LIBRA
 
 ament_target_dependencies(redoxi_shm_v6d PUBLIC
   redoxi_shared_memory
+  redoxi_common_cpp
 )
 
 install(
@@ -60,6 +62,7 @@ endif()
 ament_export_dependencies(
   vineyard
   redoxi_shared_memory
+  redoxi_common_cpp
 )
 
 ament_export_include_directories(

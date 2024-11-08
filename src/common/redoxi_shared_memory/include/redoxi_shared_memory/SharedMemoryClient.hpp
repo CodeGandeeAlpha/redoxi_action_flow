@@ -2,6 +2,7 @@
 
 #include <string>
 #include <redoxi_shared_memory/redoxi_shared_memory.hpp>
+#include <rclcpp/rclcpp.hpp>
 
 
 namespace redoxi_works
@@ -82,6 +83,27 @@ class SharedMemoryClient
      * @return 0 if the closure is successful, -1 if it fails.
      */
     virtual int close() = 0;
+
+    /**
+     * @brief Set the parent node for the shared memory client, mainly used for logging.
+     *
+     * @param node The parent node. If nullptr, no logging will be done.
+     */
+    virtual void set_parent_node(rclcpp::Node *node) = 0;
+
+    /**
+     * @brief Get the parent node for the shared memory client, mainly used for logging.
+     *
+     * @return The parent node.
+     */
+    virtual rclcpp::Node *get_parent_node() = 0;
+
+    /**
+     * @brief Get the parent node for the shared memory client, mainly used for logging.
+     *
+     * @return The parent node.
+     */
+    virtual const rclcpp::Node *get_parent_node() const = 0;
 };
 
 } // namespace shared_memory

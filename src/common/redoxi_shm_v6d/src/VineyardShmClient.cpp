@@ -1,5 +1,8 @@
 #include <redoxi_shm_v6d/VineyardShmClient.hpp>
 #include <redoxi_shm_v6d/v6d_helpers.hpp>
+#include <memory>
+#include <rclcpp/rclcpp.hpp>
+
 
 namespace redoxi_works::shared_memory
 {
@@ -70,9 +73,27 @@ int VineyardShmClient::put_data(vineyard::ObjectID *object_id, const cv::Mat &ma
     }
 }
 
-int put_data(vineyard::ObjectID *output_object_id, const uint8_t *data, size_t size)
+int VineyardShmClient::put_data(vineyard::ObjectID *output_object_id,
+                                const uint8_t *data, size_t size)
 {
-    return 0;
+    try {
+        vineyard::TensorBuilder<uint8_t> builder(*m_client, {int64_t(size)});
+        auto tensor_data = builder.data();
+
+        std::memcpy(tensor_data, data, size);
+
+        auto sealed = std::dynamic_pointer_cast<vineyard::Tensor<uint8_t>>(builder.Seal(*m_client));
+        VINEYARD_CHECK_OK(m_client->Persist(sealed->id()));
+
+        //! Set the object id if it is not null
+        if (output_object_id) {
+            *output_object_id = sealed->id();
+        }
+        return 0;
+    } catch (const std::exception &e) {
+        // Handle any exceptions that might occur during the process
+        return -1;
+    }
 }
 
 std::shared_ptr<VineyardShmClient::VineyardTensor_u8>
@@ -97,7 +118,18 @@ int VineyardShmClient::put_data(ObjectIdentifier *output_object_id,
                                 const DataBlock *data_block,
                                 const KeyValueStore *metadata)
 {
+    //! Cast the DataBlock and KeyValueStore into internal classes
+    auto _data_block = dynamic_cast<const VineyardDataBlock *>(data_block);
+    auto _metadata = dynamic_cast<const VineyardParams *>(metadata);
 
+    //! Check if the casting was successful
+    if (!_data_block || !_metadata) {
+
+        return -1; // Return error if casting failed
+    }
+
+    //! Proceed with the logic using internal_data_block and internal_metadata
+    // INSERT_YOUR_LOGIC_HERE
     return 0;
 }
 
