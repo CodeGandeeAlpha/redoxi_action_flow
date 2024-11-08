@@ -11,11 +11,13 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(vineyard REQUIRED)
 find_package(redoxi_shared_memory REQUIRED)
 find_package(redoxi_common_cpp REQUIRED)
+find_package(pluginlib REQUIRED)
+pluginlib_export_plugin_description_file(redoxi_shared_memory plugins.xml)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-set(srcfiles src/VineyardShmClient.cpp src/redoxi_shm_v6d.cpp)
+set(srcfiles src/VineyardShmClient.cpp src/redoxi_shm_v6d.cpp src/v6d_helpers.cpp)
 
 add_library(redoxi_shm_v6d ${srcfiles})
 add_library(redoxi_shm_v6d::redoxi_shm_v6d ALIAS redoxi_shm_v6d)
@@ -33,6 +35,7 @@ target_compile_definitions(redoxi_shm_v6d PRIVATE "REDOXI_SHM_V6D_BUILDING_LIBRA
 ament_target_dependencies(redoxi_shm_v6d PUBLIC
   redoxi_shared_memory
   redoxi_common_cpp
+  pluginlib
 )
 
 install(
@@ -70,6 +73,7 @@ ament_export_include_directories(
 )
 ament_export_libraries(
   redoxi_shm_v6d
+  pluginlib
 )
 ament_export_targets(
   export_${PROJECT_NAME}

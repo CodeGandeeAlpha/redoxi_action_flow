@@ -13,13 +13,17 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(TBB REQUIRED)
+find_package(pluginlib REQUIRED)
+find_package(redoxi_shared_memory REQUIRED)
 
 # Set dependencies
 set(DEPENDENCIES
     psg_private_msgs
     redoxi_video_reader
     redoxi_samples_lib
-    redoxi_samples_nodes)
+    redoxi_samples_nodes
+    redoxi_shared_memory
+    pluginlib)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb)
 
@@ -44,13 +48,14 @@ option(BUILD_TEST_TBB_TASK_MANAGEMENT "Build test_tbb_task_management target"
        OFF)
 option(BUILD_TEST_VIDEO_READER_RANDOM "Build test_video_reader_random target"
        OFF)
-option(BUILD_TEST_VIDEO_SINK "Build test_video_sink target" ON)
+option(BUILD_TEST_VIDEO_SINK "Build test_video_sink target" OFF)
 option(BUILD_TEST_SIMPLE_ACTION_GENERATOR "Build test_simple_action_generator target" OFF)
-option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2 "Build test_simple_action_generator_v2 target" ON)
 option(BUILD_TEST_UUID_CONVERSION "Build test_uuid_conversion target" OFF)
 option(BUILD_TEST_V2_JSON_EXAMPLES "Build test_v2_json_examples target" OFF)
-option(BUILD_TEST_V2_VIDEO_SINK "Build test_v2_video_sink target" ON)
-option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target" ON)
+option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2 "Build test_simple_action_generator_v2 target" OFF)
+option(BUILD_TEST_V2_VIDEO_SINK "Build test_v2_video_sink target" OFF)
+option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target" OFF)
+option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -66,6 +71,10 @@ function(configure_target target_name)
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_TEST_V6D_PLUGIN)
+  configure_target(test_v6d_plugin)
+endif()
 
 if(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE)
   configure_target(v2_random_video_source)

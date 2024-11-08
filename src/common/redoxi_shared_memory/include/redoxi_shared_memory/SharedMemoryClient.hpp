@@ -104,6 +104,22 @@ class SharedMemoryClient
      * @return The parent node.
      */
     virtual const rclcpp::Node *get_parent_node() const = 0;
+
+    /**
+     * @brief Create a local data block, which is used for uploading local data to shared memory,
+     *        or receiving data from shared memory.
+     *
+     * @return A shared pointer to the data block.
+     */
+    virtual std::shared_ptr<DataBlock> create_datablock() const = 0;
+
+    /**
+     * @brief Create a local key-value store, which is used for uploading local metadata to shared memory,
+     *        or receiving metadata from shared memory.
+     *
+     * @return A shared pointer to the key-value store.
+     */
+    virtual std::shared_ptr<KeyValueStore> create_kvstore() const = 0;
 };
 
 } // namespace shared_memory
