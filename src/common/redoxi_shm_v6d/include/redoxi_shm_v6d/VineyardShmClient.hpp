@@ -45,6 +45,11 @@ class VineyardShmClient : public SharedMemoryClient
     int delete_object(const ObjectIdentifier &identifier,
                       const KeyValueStore *metadata = nullptr) override;
 
+    // SharedMemoryClient interface
+    void set_parent_node(rclcpp::Node *node) override;
+    rclcpp::Node *get_parent_node() override;
+    const rclcpp::Node *get_parent_node() const override;
+
     // --- Vineyard specific methods ---
   public:
     //! Get the underlying vineyard client
@@ -61,6 +66,7 @@ class VineyardShmClient : public SharedMemoryClient
 
   private:
     std::shared_ptr<vineyard::Client> m_client;
+    rclcpp::Node *m_node;
 };
 
 } // namespace redoxi_works::shared_memory

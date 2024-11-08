@@ -2,7 +2,6 @@
 #define REDOXI_SHARED_MEMORY__REDOXI_SHARED_MEMORY_HPP_
 
 #include <redoxi_shared_memory/visibility_control.h>
-#include <variant>
 #include <string>
 #include <map>
 #include <cstdint>
