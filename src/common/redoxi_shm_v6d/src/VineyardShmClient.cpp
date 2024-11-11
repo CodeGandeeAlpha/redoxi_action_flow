@@ -24,11 +24,17 @@ rclcpp::Logger VineyardShmClient::_get_logger() const
     return logger;
 }
 
+const std::string &VineyardShmClient::get_region_key() const
+{
+    return m_region_key;
+}
+
 int VineyardShmClient::connect(const std::string &region_key,
                                const KeyValueStore *)
 {
     try {
         m_client = create_v6d_client(region_key);
+        m_region_key = region_key;
         return 0;
     } catch (const std::exception &e) {
         // Handle any exceptions that might occur during connection

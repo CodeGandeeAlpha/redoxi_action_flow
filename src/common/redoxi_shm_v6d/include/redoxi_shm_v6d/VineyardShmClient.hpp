@@ -25,7 +25,14 @@ class VineyardShmClient : public SharedMemoryClient
 
     // SharedMemoryClient interface, KeyValueStore is VineyardParams object
     int connect(const std::string &region_key, const KeyValueStore *params = nullptr) override;
+
+    //! Get the region key, empty string if not set yet
+    const std::string &get_region_key() const override;
+
+    //! Check if the client is connected
     bool is_connected() const override;
+
+    //! Close the client
     int close() override;
 
     // SharedMemoryClient interface, DataBlock is VineyardDataBlock object, KeyValueStore is VineyardParams object
@@ -68,7 +75,7 @@ class VineyardShmClient : public SharedMemoryClient
   private:
     std::shared_ptr<vineyard::Client> m_client;
     rclcpp::Node *m_node = nullptr;
-
+    std::string m_region_key;
     rclcpp::Logger _get_logger() const;
 };
 

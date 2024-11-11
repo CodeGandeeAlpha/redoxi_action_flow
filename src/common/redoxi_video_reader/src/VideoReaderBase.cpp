@@ -330,7 +330,19 @@ std::shared_ptr<RedoxiVideoReaderBase::OutputPort_t>
     auto &port_config = m_init_config->primary_output_spec;
     // RDX_ASSERT_CHECK_TRUE(!port_config.get_downstream_specs().empty(),
     //                       "[{}] port_config must have at least one downstream", __func__);
+
     port->init(port_config);
+
+    // register callbacks
+    port->set_callback_on_deliver_task_begin([this](TargetData_t &target_data, const DeliveryTask_t &task) {
+        return _on_delivery_task_begin(target_data, task.get_request());
+    });
+    port->set_callback_on_deliver_task_finish([this](TargetData_t &target_data, const DeliveryTask_t &task, const DeliveryResult_t &result) {
+        return _on_delivery_task_finish(target_data, task.get_request(), result);
+    });
+    port->set_callback_on_deliver_to_downstream_finish([this](TargetData_t &target_data, SendResult_t &result, const Downstream_t &ds) {
+        return _on_deliver_to_downstream_finish(target_data, result, ds);
+    });
 
     return port;
 }

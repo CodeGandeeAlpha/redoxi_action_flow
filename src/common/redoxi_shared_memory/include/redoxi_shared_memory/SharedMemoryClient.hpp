@@ -26,6 +26,9 @@ class SharedMemoryClient
      */
     virtual int connect(const std::string &region_key, const KeyValueStore *params = nullptr) = 0;
 
+    //! Get the region key, empty string if not connected
+    virtual const std::string &get_region_key() const = 0;
+
     /**
      * @brief Put data into the shared memory region.
      *
