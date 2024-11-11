@@ -12,6 +12,8 @@ find_package(redoxi_samples_lib REQUIRED)
 find_package(redoxi_video_reader REQUIRED)
 find_package(redoxi_common_nodes REQUIRED)
 find_package(Boost REQUIRED COMPONENTS timer)
+find_package(cv_bridge REQUIRED)
+
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -40,6 +42,7 @@ ament_target_dependencies(redoxi_samples_nodes PUBLIC
   redoxi_samples_lib
   redoxi_video_reader
   redoxi_common_nodes
+  cv_bridge
 )
 
 install(
@@ -70,6 +73,7 @@ ament_export_dependencies(
   redoxi_samples_lib
   redoxi_video_reader
   redoxi_common_nodes
+  cv_bridge
 )
 
 ament_export_include_directories(

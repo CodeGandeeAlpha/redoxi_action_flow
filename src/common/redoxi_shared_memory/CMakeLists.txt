@@ -12,6 +12,7 @@ find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(rcutils REQUIRED)
+find_package(json_struct REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -24,7 +25,7 @@ target_include_directories(redoxi_shared_memory PUBLIC
   $<INSTALL_INTERFACE:include>)
 
 target_include_directories(redoxi_shared_memory PUBLIC ${OpenCV_INCLUDE_DIRS})
-target_link_libraries(redoxi_shared_memory PUBLIC ${OpenCV_LIBS})
+target_link_libraries(redoxi_shared_memory PUBLIC ${OpenCV_LIBS} json_struct::json_struct)
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
@@ -70,6 +71,7 @@ ament_export_dependencies(
   rclcpp
   pluginlib
   OpenCV
+  json_struct
 )
 
 

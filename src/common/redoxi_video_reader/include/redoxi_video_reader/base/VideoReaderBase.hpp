@@ -5,6 +5,7 @@
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputPort.hpp>
 #include <redoxi_video_reader/base/VideoReaderBaseTypes.hpp>
+#include <redoxi_shared_memory/SharedMemoryClient.hpp>
 #include <thread>
 #include <nlohmann/json.hpp>
 
@@ -210,23 +211,12 @@ class RedoxiVideoReaderBase : public rclcpp::Node,
   protected: // output port callback
     //! callback when a delivery task is started, about to send to any downstream
     virtual int _on_delivery_task_begin(TargetData_t &target_data,
-                                        const DeliveryRequest_t &request)
-    {
-        (void)target_data;
-        (void)request;
-        return 0;
-    };
+                                        const DeliveryRequest_t &request);
 
     //! callback when a delivery task is finished, after sending to all downstreams
     virtual int _on_delivery_task_finish(TargetData_t &target_data,
                                          const DeliveryRequest_t &request,
-                                         const DeliveryResult_t &result)
-    {
-        (void)target_data;
-        (void)request;
-        (void)result;
-        return 0;
-    };
+                                         const DeliveryResult_t &result);
 
     //! callback when a frame is sent to a downstream, failure or success
     virtual int _on_deliver_to_downstream_finish(TargetData_t &target_data,
@@ -279,6 +269,9 @@ class RedoxiVideoReaderBase : public rclcpp::Node,
     //! thread for periodic step
     std::shared_ptr<std::thread> m_step_thread;
     std::atomic<bool> m_step_running{false};
+
+    //! shared memory client
+    std::shared_ptr<shared_memory::SharedMemoryClient> m_shm_client;
 };
 
 } // namespace redoxi_works

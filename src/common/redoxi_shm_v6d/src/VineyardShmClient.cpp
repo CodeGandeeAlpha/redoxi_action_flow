@@ -1,3 +1,4 @@
+#include <redoxi_shared_memory/SharedMemoryFactory.hpp>
 #include <redoxi_shm_v6d/VineyardShmClient.hpp>
 #include <redoxi_shm_v6d/v6d_helpers.hpp>
 #include <memory>
@@ -13,6 +14,12 @@ VineyardShmClient::VineyardShmClient()
 
 VineyardShmClient::~VineyardShmClient()
 {
+}
+
+const std::string &VineyardShmClient::get_service_name() const
+{
+    static const std::string name = shm_service_types::Vineyard;
+    return name;
 }
 
 rclcpp::Logger VineyardShmClient::_get_logger() const

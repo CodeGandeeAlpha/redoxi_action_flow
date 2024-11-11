@@ -28,7 +28,6 @@ find_package(Boost REQUIRED)
 set(source_files
   src/VideoReaderBase.cpp
   src/VideoReaderBaseTypes.cpp
-  src/ShmVideoReaderBase.cpp
 )
 
 add_library(redoxi_video_reader ${source_files})

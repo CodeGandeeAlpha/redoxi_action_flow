@@ -7,6 +7,7 @@
 #include <string>
 #include <opencv2/opencv.hpp>
 #include <sstream>
+#include <iostream>
 
 namespace rdx_shm = redoxi_works::shared_memory;
 const std::string vineyard_socket = "/soft/data/vineyard.sock";
@@ -60,8 +61,8 @@ int main(int argc, char **argv)
         }
 
         // get it from vineyard
+        auto datablock = client->create_datablock();
         {
-            auto datablock = client->create_datablock();
             auto ret = client->get_data(datablock.get(), nullptr, oid);
             if (ret == 0)
                 spdlog::info("Get from vineyard, Object ID: {}", oid.id.value());
@@ -77,7 +78,11 @@ int main(int argc, char **argv)
 
         // remove it from vineyard
         {
+            spdlog::info("Before delete,press Enter to continue");
+            std::cin.get();
             auto ret = client->delete_object(oid);
+            spdlog::info("After delete, press Enter to continue");
+            std::cin.get();
             if (ret == 0)
                 spdlog::info("Remove from vineyard, Object ID: {}", oid.id.value());
             else

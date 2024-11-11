@@ -4,6 +4,7 @@
 #include <redoxi_shared_memory/SharedMemoryClient.hpp>
 #include <redoxi_shared_memory/SharedMemoryFactory.hpp>
 #include <json_struct/json_struct.h>
+
 namespace redoxi_works
 {
 namespace video_reader
@@ -11,37 +12,10 @@ namespace video_reader
 
 namespace shm_video_reader_base
 {
-struct SharedMemoryConfig {
-    // shm env keys, do not modify them
-    std::string _env_region_key = shared_memory::env_names::RegionKey;
-    std::string _env_service_type = shared_memory::env_names::ShmServiceType;
 
-    // shm service type, you can set the env service type to this value
-    std::string _service_type_vineyard = shared_memory::shm_service_types::Vineyard;
-
-    // if some shm setting is not given, then read them from env variable
-    bool read_setting_from_env = true;
-
-    // shm region key, if not given, then read from env variable
-    // if given, ignore env variable
-    std::string region_key;
-
-    // service type, if not given, then read from env variable
-    // if given, ignore env variable
-    std::string service_type;
-
-    JS_OBJECT(JS_MEMBER(_env_region_key),
-              JS_MEMBER(_env_service_type),
-              JS_MEMBER(_service_type_vineyard),
-              JS_MEMBER(read_setting_from_env),
-              JS_MEMBER(region_key),
-              JS_MEMBER(service_type));
-};
 
 struct RuntimeConfig : public RedoxiVideoReaderBase::RuntimeConfig_t {
-    SharedMemoryConfig shm_config;
-    JS_OBJECT_WITH_SUPER(JS_SUPER(RedoxiVideoReaderBase::RuntimeConfig_t),
-                         JS_MEMBER(shm_config));
+    JS_OBJECT_WITH_SUPER(JS_SUPER(RedoxiVideoReaderBase::RuntimeConfig_t));
 };
 
 } // namespace shm_video_reader_base

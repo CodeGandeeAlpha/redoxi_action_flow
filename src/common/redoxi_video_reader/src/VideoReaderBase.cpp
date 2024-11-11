@@ -1,6 +1,8 @@
 // #include <redoxi_video_reader/base/VideoReaderBase.hpp>
 #include <redoxi_video_reader/base/VideoReaderBaseTypes.hpp>
 #include <redoxi_video_reader/base/VideoReaderBase.hpp>
+#include <redoxi_shared_memory/SharedMemoryClient.hpp>
+#include <redoxi_shared_memory/SharedMemoryFactory.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 #include <json_struct/json_struct.h>
@@ -56,6 +58,19 @@ int RedoxiVideoReaderBase::open()
     if (ret != 0) {
         RDX_RAISE_ERROR("[{}] Failed to open video source, ret={}", __func__, ret);
         return ret;
+    }
+
+    // create shm client
+    auto shm_config = shared_memory::SharedMemoryFactory::get_shm_config_from_node(this);
+    RDX_INFO_DEV(this, __func__, "Creating shm client, region key={}, service name={}",
+                 shm_config.region_key, shm_config.service_name);
+    auto shm_client = shared_memory::SharedMemoryFactory::create_client_by_config(shm_config);
+    if (shm_client == nullptr) {
+        RDX_INFO_DEV(this, __func__, "{}", "Failed to create shm client, not using shared memory");
+    } else {
+        RDX_INFO_DEV(this, __func__, "Created shm client, region key={}, service name={}",
+                     shm_config.region_key, shm_config.service_name);
+        m_shm_client = shm_client;
     }
 
     //! Change status to OPENED
@@ -160,6 +175,9 @@ int RedoxiVideoReaderBase::close()
         return ret;
     }
 
+    //! destroy shm client
+    m_shm_client.reset();
+
     //! Change status to CLOSED
     _set_status_code(NodeStatusCode::CLOSED);
 
@@ -245,6 +263,101 @@ int RedoxiVideoReaderBase::update_init_config(std::shared_ptr<InitConfig_t> conf
         m_pub_task_drop.init(this, m_init_config->debug_pub_task_drop_name, debug_qos);
     }
 
+    return 0;
+}
+
+int RedoxiVideoReaderBase::_on_delivery_task_begin(TargetData_t &target_data,
+                                                   const DeliveryRequest_t &request)
+{
+    // ping request, do nothing
+    if (request.is_ping_request()) {
+        return 0;
+    }
+
+    // send data to shm if shm client is initialized
+    auto msg_uuid_str = boost::uuids::to_string(request.get_source_data().get_uuid());
+
+    // shm client is not initialized, do nothing
+    if (!m_shm_client) {
+        return 0;
+    }
+
+    // shm client is not connected, do nothing
+    if (!m_shm_client->is_connected()) {
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Shm client is not connected", msg_uuid_str);
+        return 0;
+    }
+
+    // write data to shm
+    const auto &img = request.get_source_data().get_image();
+    if (img.empty()) {
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Image is empty, nothing to do", msg_uuid_str);
+        return 0;
+    }
+
+    // send image to shm
+    RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] Uploading image to shm", msg_uuid_str);
+    shared_memory::ObjectIdentifier oid;
+    auto datablock = m_shm_client->create_datablock();
+    if (!datablock) {
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to create datablock", msg_uuid_str);
+        return -1;
+    }
+    datablock->from_cvmat(img);
+    bool put_ok = m_shm_client->put_data(&oid, datablock.get(), nullptr) == 0;
+    if (!put_ok) {
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to put data to shm", msg_uuid_str);
+        return -1;
+    }
+
+    // set target data
+    auto &shm_token = target_data.get_goal().frame.shm_token;
+    if (oid.id.has_value()) {
+        shm_token.object_id = oid.id.value();
+    }
+    if (oid.key.has_value()) {
+        shm_token.object_key = oid.key.value();
+    }
+    shm_token.service_name = m_shm_client->get_service_name();
+    shm_token.region_key = m_shm_client->get_region_key();
+    shm_token.object_size = img.total() * img.elemSize();
+    return 0;
+}
+
+int RedoxiVideoReaderBase::_on_delivery_task_finish(TargetData_t &target_data,
+                                                    const DeliveryRequest_t &request,
+                                                    const DeliveryResult_t &result)
+{
+    if (result.result_code == DeliveryResultCode::Success) {
+        // success, do nothing
+        return 0;
+    }
+
+    if (!m_shm_client || !m_shm_client->is_connected()) {
+        // shm client is not initialized or not connected, do nothing, no shared memory to remove
+        return 0;
+    }
+
+    auto msg_uuid_str = boost::uuids::to_string(request.get_source_data().get_uuid());
+
+    // failed, remove shm object, if any
+    RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] Failed to send data to shm, removing object from shm", msg_uuid_str);
+    auto &shm_token = target_data.get_goal().frame.shm_token;
+    if (shm_token.object_size >= 0) {
+        shared_memory::ObjectIdentifier oid;
+        if (shm_token.object_id != 0) {
+            oid.id = shm_token.object_id;
+        }
+        if (!shm_token.object_key.empty()) {
+            oid.key = shm_token.object_key;
+        }
+        auto ret = m_shm_client->delete_object(oid);
+        if (ret != 0) {
+            RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to delete object from shm", msg_uuid_str);
+            return -1;
+        }
+        RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] Removed object from shm", msg_uuid_str);
+    }
     return 0;
 }
 
