@@ -5,6 +5,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <rcpputils/asserts.hpp>
+#include <rcutils/logging_macros.h>
 #include <fmt/format.h>
 
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
@@ -34,12 +35,14 @@
 
 namespace redoxi_works
 {
+constexpr const char *DefaultRDXLoggerName = "rdx_default_logger";
 
 namespace DefaultParams
 {
 
 //! publisher queue size when the topic is intended to be used for debugging
 constexpr int DebugPublisherQueueSize = 10;
+
 
 //! QoS for the debug publisher
 const rclcpp::QoS DebugPublisherQoS = rclcpp::QoS(DebugPublisherQueueSize).best_effort();
@@ -200,7 +203,8 @@ concept NodeOrLoggerConcept = requires(T t)
 {
     requires std::is_same_v<std::remove_cvref_t<T>, rclcpp::Logger> ||
         std::is_convertible_v < std::remove_cvref_t<T>,
-    const rclcpp::Node * > ;
+    const rclcpp::Node * > ||
+        std::is_null_pointer_v<std::remove_cvref_t<T>>;
 };
 
 //! Log a message using RCLCPP macros with or without thread ID
@@ -212,75 +216,148 @@ void RDX_LOG_GENERIC_(NodeOrLogger node_or_logger, const char *func_name, _Stric
         return;
     }
 
+    // Check if node_or_logger is nullptr
+    bool is_null_logger = std::is_null_pointer_v<std::remove_cvref_t<NodeOrLogger>>;
+
     // Get the logger based on input type
     auto logger = [&node_or_logger]() -> rclcpp::Logger {
-        if constexpr (std::is_same_v<NodeOrLogger, rclcpp::Logger>) {
+        if constexpr (std::is_null_pointer_v<std::remove_cvref_t<NodeOrLogger>>) {
+            return rclcpp::get_logger(DefaultRDXLoggerName);
+        } else if constexpr (std::is_same_v<NodeOrLogger, rclcpp::Logger>) {
             return node_or_logger;
-        } else {
+        } else if constexpr (std::is_convertible_v<NodeOrLogger, const rclcpp::Node *>) {
             return node_or_logger->get_logger();
+        } else {
+            return rclcpp::get_logger(DefaultRDXLoggerName);
         }
     }();
 
     switch (Severity) {
         case log_severity::DEBUG:
             if (with_thread_id) {
-                RCLCPP_DEBUG(logger, "[f=%s()][tid=%lu] %s", func_name,
-                             static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
-                             fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                if (is_null_logger) {
+                    RCUTILS_LOG_DEBUG("[f=%s()][tid=%lu] %s", func_name,
+                                      static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                                      fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                } else {
+                    RCLCPP_DEBUG(logger, "[f=%s()][tid=%lu] %s", func_name,
+                                 static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                                 fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                }
             } else {
-                RCLCPP_DEBUG(logger, "[f=%s()] %s", func_name,
-                             fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                if (is_null_logger) {
+                    RCUTILS_LOG_DEBUG("[f=%s()] %s", func_name,
+                                      fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                } else {
+                    RCLCPP_DEBUG(logger, "[f=%s()] %s", func_name,
+                                 fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                }
             }
             break;
         case log_severity::INFO:
             if (with_thread_id) {
-                RCLCPP_INFO(logger, "[f=%s()][tid=%lu] %s", func_name,
-                            static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
-                            fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                if (is_null_logger) {
+                    RCUTILS_LOG_INFO("[f=%s()][tid=%lu] %s", func_name,
+                                     static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                                     fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                } else {
+                    RCLCPP_INFO(logger, "[f=%s()][tid=%lu] %s", func_name,
+                                static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                                fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                }
             } else {
-                RCLCPP_INFO(logger, "[f=%s()] %s", func_name,
-                            fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                if (is_null_logger) {
+                    RCUTILS_LOG_INFO("[f=%s()] %s", func_name,
+                                     fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                } else {
+                    RCLCPP_INFO(logger, "[f=%s()] %s", func_name,
+                                fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                }
             }
             break;
         case log_severity::WARN:
             if (with_thread_id) {
-                RCLCPP_WARN(logger, "[f=%s()][tid=%lu] %s", func_name,
-                            static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
-                            fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                if (is_null_logger) {
+                    RCUTILS_LOG_WARN("[f=%s()][tid=%lu] %s", func_name,
+                                     static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                                     fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                } else {
+                    RCLCPP_WARN(logger, "[f=%s()][tid=%lu] %s", func_name,
+                                static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                                fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                }
             } else {
-                RCLCPP_WARN(logger, "[f=%s()] %s", func_name,
-                            fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                if (is_null_logger) {
+                    RCUTILS_LOG_WARN("[f=%s()] %s", func_name,
+                                     fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                } else {
+                    RCLCPP_WARN(logger, "[f=%s()] %s", func_name,
+                                fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                }
             }
             break;
         case log_severity::ERROR:
             if (with_thread_id) {
-                RCLCPP_ERROR(logger, "[f=%s()][tid=%lu] %s", func_name,
-                             static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
-                             fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                if (is_null_logger) {
+                    RCUTILS_LOG_ERROR("[f=%s()][tid=%lu] %s", func_name,
+                                      static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                                      fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                } else {
+                    RCLCPP_ERROR(logger, "[f=%s()][tid=%lu] %s", func_name,
+                                 static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                                 fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                }
             } else {
-                RCLCPP_ERROR(logger, "[f=%s()] %s", func_name,
-                             fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                if (is_null_logger) {
+                    RCUTILS_LOG_ERROR("[f=%s()] %s", func_name,
+                                      fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                } else {
+                    RCLCPP_ERROR(logger, "[f=%s()] %s", func_name,
+                                 fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                }
             }
             break;
         case log_severity::FATAL:
             if (with_thread_id) {
-                RCLCPP_FATAL(logger, "[f=%s()][tid=%lu] %s", func_name,
-                             static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
-                             fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                if (is_null_logger) {
+                    RCUTILS_LOG_FATAL("[f=%s()][tid=%lu] %s", func_name,
+                                      static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                                      fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                } else {
+                    RCLCPP_FATAL(logger, "[f=%s()][tid=%lu] %s", func_name,
+                                 static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                                 fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                }
             } else {
-                RCLCPP_FATAL(logger, "[f=%s()] %s", func_name,
-                             fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                if (is_null_logger) {
+                    RCUTILS_LOG_FATAL("[f=%s()] %s", func_name,
+                                      fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                } else {
+                    RCLCPP_FATAL(logger, "[f=%s()] %s", func_name,
+                                 fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                }
             }
             break;
         default:
             // Use INFO level for unknown severity
             if (with_thread_id) {
-                RCLCPP_INFO(logger, "[f=%s()][tid=%lu] %s", func_name,
-                            static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
-                            fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                if (is_null_logger) {
+                    RCUTILS_LOG_INFO("[f=%s()][tid=%lu] %s", func_name,
+                                     static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                                     fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                } else {
+                    RCLCPP_INFO(logger, "[f=%s()][tid=%lu] %s", func_name,
+                                static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id())),
+                                fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                }
             } else {
-                RCLCPP_INFO(logger, "[f=%s()] %s", func_name,
-                            fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                if (is_null_logger) {
+                    RCUTILS_LOG_INFO("[f=%s()] %s", func_name,
+                                     fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                } else {
+                    RCLCPP_INFO(logger, "[f=%s()] %s", func_name,
+                                fmt::format(format, std::forward<FirstArg>(first_arg), std::forward<RestArgs>(rest_args)...).c_str());
+                }
             }
             break;
     }

@@ -1,6 +1,8 @@
 #include <pluginlib/class_loader.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <redoxi_shared_memory/SharedMemoryClient.hpp>
+#include <redoxi_shared_memory/SharedMemoryFactory.hpp>
+#include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <spdlog/spdlog.h>
 #include <string>
 #include <opencv2/opencv.hpp>
@@ -8,9 +10,11 @@
 
 namespace rdx_shm = redoxi_works::shared_memory;
 const std::string vineyard_socket = "/soft/data/vineyard.sock";
+namespace rdx = redoxi_works;
 
 int main(int argc, char **argv)
 {
+    rdx::RDX_INFO_DEV(nullptr, __func__, "{}", "Starting test_v6d_plugin");
     // do this so that we have rclcpp loggers
     rclcpp::init(argc, argv);
 
@@ -18,11 +22,16 @@ int main(int argc, char **argv)
                                                                    "redoxi_works::shared_memory::SharedMemoryClient");
 
     try {
-        auto client = shm_loader.createSharedInstance("redoxi_works::shared_memory::VineyardShmClient");
+        // auto client = shm_loader.createSharedInstance("redoxi_works::shared_memory::VineyardShmClient");
+        auto client = rdx_shm::SharedMemoryFactory::create_client_by_env();
+        if (!client) {
+            spdlog::error("Failed to create shared memory client");
+            return -1;
+        }
         spdlog::info("Client created");
 
         // connect to vineyard
-        {
+        if (!client->is_connected()) {
             auto ret = client->connect(vineyard_socket);
             if (ret == 0)
                 spdlog::info("Client connected to vineyard");
