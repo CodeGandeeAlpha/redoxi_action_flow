@@ -9,6 +9,7 @@
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 #include <psg_private_msgs/action/process_psg_document.hpp>
+#include <psg_master_node/StampedDocumentPub.hpp>
 
 
 namespace redoxi_works
@@ -180,8 +181,8 @@ static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>, "DeliveryTas
 class DownstreamDebugPublisher
 {
   public:
-    using MessageType_t = sensor_msgs::msg::Image;
-    using Publisher_t = redoxi_works::StampedImagePub;
+    using MessageType_t = psg_private_msgs::msg::PsgDocument;
+    using Publisher_t = StampedDocumentPub;
     inline static const cv::Scalar DefaultHeaderColor{255, 0, 0};
     inline static constexpr double DefaultHeaderScale = 1.0;
     inline static const rclcpp::QoS DefaultQoS = DefaultParams::DebugPublisherQoS;
@@ -195,13 +196,9 @@ class DownstreamDebugPublisher
     virtual ~DownstreamDebugPublisher() = default;
 
     //! Initialize the DownstreamDebugPublisher with a shared pointer to a publisher
-    virtual void init(std::shared_ptr<Publisher_t> pub,
-                      std::optional<cv::Scalar> header_color = std::nullopt,
-                      std::optional<double> header_scale = std::nullopt)
+    virtual void init(std::shared_ptr<Publisher_t> pub)
     {
         m_pub = pub;
-        m_header_color = header_color.value_or(DefaultHeaderColor);
-        m_header_scale = header_scale.value_or(DefaultHeaderScale);
     }
 
     //! Set the publisher for the DownstreamDebugPublisher
@@ -217,11 +214,6 @@ class DownstreamDebugPublisher
     }
 
     //! Publish an image with the DownstreamDebugPublisher
-    virtual int publish(const cv::Mat &image)
-    {
-        return m_pub->publish(image);
-    }
-
     virtual int publish(const MessageType_t &msg)
     {
         return m_pub->publish(msg);
@@ -230,13 +222,11 @@ class DownstreamDebugPublisher
     virtual int publish(const MessageType_t &msg,
                         const std::string &header_text)
     {
-        return m_pub->publish(msg, header_text, m_header_color, m_header_scale);
+        return m_pub->publish(msg, header_text);
     }
 
   protected:
     std::shared_ptr<Publisher_t> m_pub;
-    cv::Scalar m_header_color{DefaultHeaderColor};
-    double m_header_scale = DefaultHeaderScale;
 };
 
 //! Downstream spec type for image output port
@@ -331,14 +321,14 @@ class Downstream : public DownstreamBase
     }
 };
 
-//! Image output port spec
+//! document output port spec
 //! This type must satisfy the AsyncActionOutputPortSpecConcept
 //! Any async output port can use this spec as a template argument
-struct ImageOutputPortSpec {
-    ImageOutputPortSpec()
+struct PSGDocumentOutputPortSpec {
+    PSGDocumentOutputPortSpec()
     {
-        static_assert(output_port_types::AsyncActionOutputPortSpecConcept<ImageOutputPortSpec>,
-                      "ImageOutputPortSpec must satisfy AsyncActionOutputPortSpecConcept");
+        static_assert(output_port_types::AsyncActionOutputPortSpecConcept<PSGDocumentOutputPortSpec>,
+                      "PSGDocumentOutputPortSpec must satisfy AsyncActionOutputPortSpecConcept");
     }
     //! Action type and related types
     using ActionType_t = DeliveryActionType;

@@ -11,7 +11,7 @@ find_package(rclcpp REQUIRED)
 find_package(redoxi_common_nodes REQUIRED)
 find_package(psg_private_msgs REQUIRED)
 
-add_executable(psg_master_node src/psg_master_node.cpp)
+add_executable(psg_master_node src/psg_master_node.cpp src/StampedDocumentPub.cpp src/MasterNodeTypes.cpp)
 target_include_directories(psg_master_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)

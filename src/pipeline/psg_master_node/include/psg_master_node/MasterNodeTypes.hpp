@@ -2,7 +2,7 @@
 
 #include <redoxi_common_nodes/async_action_port/AsyncImageInputPort.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputPort.hpp>
-#include <redoxi_common_nodes/async_action_port/ImageOutputPortSpec.hpp>
+#include <psg_master_node/DocumentOutputSpec.hpp>
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
 #include <redoxi_common_cpp/redoxi_json_struct_conversion.hpp>
 #include <json_struct/json_struct.h>
@@ -14,7 +14,7 @@ class PSGMasterNode;
 namespace psg_master_node
 {
 using InputPortType = AsyncImageInputPort;
-using OutputPortSpec = async_action_image_output_port::ImageOutputPortSpec; // FIXME: 修改为自己的document spec类型
+using OutputPortSpec = async_action_document_output_port::PSGDocumentOutputPortSpec;
 using OutputPortType = AsyncActionOutputPort<OutputPortSpec>;
 
 //! The delivery policy for making frame delivery request
@@ -27,7 +27,7 @@ struct InitConfig {
     {
         // by default, only starts sending any data when some downstream is ready
         // skip if no downstream is ready
-        primary_output_spec.set_fallback_delivery_precondition(DeliveryPrecondition::AnyDownstreamReady);
+        output_port_config.set_fallback_delivery_precondition(DeliveryPrecondition::AnyDownstreamReady);
     }
 
     //! The time unit for the step interval, see redoxi_common_cpp::get_default_time_unit_name for more details

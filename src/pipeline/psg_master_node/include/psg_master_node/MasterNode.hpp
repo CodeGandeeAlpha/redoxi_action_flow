@@ -2,7 +2,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
-#include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
+#include <psg_master_node/StampedDocumentPub.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputPort.hpp>
 #include <psg_master_node/MasterNodeTypes.hpp>
 #include <thread>
