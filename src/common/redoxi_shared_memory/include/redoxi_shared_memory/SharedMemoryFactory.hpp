@@ -28,6 +28,11 @@ class SharedMemoryFactory
     static std::shared_ptr<SharedMemoryClient>
         create_client_by_env();
 
+    //! Create a shared memory client based on the service type
+    //! @return a shared memory client, nullptr if failed
+    static std::shared_ptr<SharedMemoryClient>
+        create_client_by_type(const std::string &service_type);
+
     //! Get the shared memory service type from environment variables
     static std::string get_shm_service_type_from_env();
 

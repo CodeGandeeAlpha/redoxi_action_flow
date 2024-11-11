@@ -13,6 +13,19 @@ namespace redoxi_works
 namespace shared_memory
 {
 
+std::shared_ptr<SharedMemoryClient> SharedMemoryFactory::create_client_by_type(const std::string &service_type)
+{
+    // hold this loader permanently, you should not destroy loader before the program exits
+    static auto loader = pluginlib::ClassLoader<SharedMemoryClient>(ShmBasePackageName, ShmBaseClassName);
+
+    if (service_type == shm_service_types::Vineyard) {
+        auto client = loader.createSharedInstance(VineyardClassName);
+        return client;
+    }
+
+    return nullptr;
+}
+
 std::shared_ptr<SharedMemoryClient> SharedMemoryFactory::create_client_by_env()
 {
     auto service_type = get_shm_service_type_from_env();
@@ -34,7 +47,7 @@ std::shared_ptr<SharedMemoryClient> SharedMemoryFactory::create_client_by_env()
     try {
         if (service_type == shm_service_types::Vineyard) {
             RCUTILS_LOG_INFO("creating vineyard shared memory client");
-            auto loader = pluginlib::ClassLoader<SharedMemoryClient>(ShmBasePackageName, ShmBaseClassName);
+            static auto loader = pluginlib::ClassLoader<SharedMemoryClient>(ShmBasePackageName, ShmBaseClassName);
             auto client = loader.createSharedInstance(VineyardClassName);
             if (client->connect(region_key) == 0) {
                 RCUTILS_LOG_INFO("vineyard shared memory client created and connected");
@@ -50,12 +63,22 @@ std::shared_ptr<SharedMemoryClient> SharedMemoryFactory::create_client_by_env()
 
 std::string SharedMemoryFactory::get_shm_service_type_from_env()
 {
-    return std::getenv(env_names::ShmServiceType);
+    auto service_type = std::getenv(env_names::ShmServiceType);
+    if (service_type) {
+        return service_type;
+    }
+
+    return "";
 }
 
 std::string SharedMemoryFactory::get_shm_region_key_from_env()
 {
-    return std::getenv(env_names::RegionKey);
+    auto region_key = std::getenv(env_names::RegionKey);
+    if (region_key) {
+        return region_key;
+    }
+
+    return "";
 }
 
 } // namespace shared_memory
