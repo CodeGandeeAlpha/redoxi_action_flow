@@ -14,10 +14,7 @@ class VineyardShmClient : public SharedMemoryClient
     struct VineyardDataBlock : public detail::DefaultDataBlock {
         // you must have this to hold the tensor data
         std::shared_ptr<VineyardTensor_u8> tensor;
-        void set_data_mutable(bool is_writable)
-        {
-            m_is_writable = is_writable;
-        }
+        friend class VineyardShmClient;
     };
     struct VineyardParams : public detail::DefaultKeyValueStore {
     };
@@ -28,7 +25,14 @@ class VineyardShmClient : public SharedMemoryClient
 
     // SharedMemoryClient interface, KeyValueStore is VineyardParams object
     int connect(const std::string &region_key, const KeyValueStore *params = nullptr) override;
+
+    //! Get the region key, empty string if not set yet
+    const std::string &get_region_key() const override;
+
+    //! Check if the client is connected
     bool is_connected() const override;
+
+    //! Close the client
     int close() override;
 
     // SharedMemoryClient interface, DataBlock is VineyardDataBlock object, KeyValueStore is VineyardParams object
@@ -50,6 +54,10 @@ class VineyardShmClient : public SharedMemoryClient
     rclcpp::Node *get_parent_node() override;
     const rclcpp::Node *get_parent_node() const override;
 
+    // SharedMemoryClient interface
+    std::shared_ptr<DataBlock> create_datablock() const override;
+    std::shared_ptr<KeyValueStore> create_kvstore() const override;
+
     // --- Vineyard specific methods ---
   public:
     //! Get the underlying vineyard client
@@ -66,7 +74,9 @@ class VineyardShmClient : public SharedMemoryClient
 
   private:
     std::shared_ptr<vineyard::Client> m_client;
-    rclcpp::Node *m_node;
+    rclcpp::Node *m_node = nullptr;
+    std::string m_region_key;
+    rclcpp::Logger _get_logger() const;
 };
 
 } // namespace redoxi_works::shared_memory

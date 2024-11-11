@@ -11,11 +11,12 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(rcutils REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_library(redoxi_shared_memory src/redoxi_shared_memory.cpp)
+add_library(redoxi_shared_memory src/redoxi_shared_memory.cpp src/SharedMemoryFactory.cpp)
 add_library(redoxi_shared_memory::redoxi_shared_memory ALIAS redoxi_shared_memory)
 target_compile_features(redoxi_shared_memory PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 target_include_directories(redoxi_shared_memory PUBLIC
@@ -29,7 +30,7 @@ target_link_libraries(redoxi_shared_memory PUBLIC ${OpenCV_LIBS})
 # which is appropriate when building the dll but not consuming it.
 target_compile_definitions(redoxi_shared_memory PRIVATE "REDOXI_SHARED_MEMORY_BUILDING_LIBRARY")
 
-ament_target_dependencies(redoxi_shared_memory PUBLIC pluginlib rclcpp)
+ament_target_dependencies(redoxi_shared_memory PUBLIC pluginlib rclcpp rcutils)
 
 install(
   DIRECTORY include/

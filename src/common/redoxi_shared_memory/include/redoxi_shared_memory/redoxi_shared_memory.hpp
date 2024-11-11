@@ -2,6 +2,7 @@
 #define REDOXI_SHARED_MEMORY__REDOXI_SHARED_MEMORY_HPP_
 
 #include <redoxi_shared_memory/visibility_control.h>
+#include <atomic>
 #include <string>
 #include <map>
 #include <cstdint>
@@ -14,11 +15,12 @@ namespace redoxi_works
 
 namespace shared_memory
 {
+
 struct ObjectIdentifier {
     using RawPtr = ObjectIdentifier *;
 
-    std::optional<std::string> key;
-    std::optional<int64_t> id;
+    std::optional<int64_t> id = std::nullopt;
+    std::optional<std::string> key = std::nullopt;
 };
 
 //! Connect params for shared memory client, customize by subclass
@@ -154,6 +156,7 @@ struct DataBlock {
     virtual void from_bytes_ref(const uint8_t *data, size_t size) = 0;
 
     //! get as bytes reference, return 0 if success, -1 if failed
+    //! If data==nullptr and size==nullptr, it will only check existence of the data
     //! @note this is a reference, if the data block is created by someone else, you must ensure the datablock is alive during the data is used
     virtual int get_as_bytes_ref(uint8_t **data, size_t *size) const = 0;
 
@@ -161,11 +164,18 @@ struct DataBlock {
     virtual void from_cvmat(const cv::Mat &input) = 0;
 
     //! get as opencv mat, return 0 if success, -1 if failed
+    //! If output==nullptr, it will only check existence of the data
     //! @note this is a reference, if the data block is created by someone else, you must ensure the datablock is alive during the data is used
     virtual int get_as_cvmat(cv::Mat *output) const = 0;
 
     //! check if the data returned by the data block is mutable (writable)
     virtual bool is_data_mutable() const = 0;
+
+    //! has data stored in shared memory, but mapped to this process's address?
+    virtual bool has_remote_data() const = 0;
+
+    //! has data from this process, but not yet submitted to shared memory?
+    virtual bool has_local_data() const = 0;
 };
 
 namespace detail
@@ -176,6 +186,9 @@ struct DefaultDataBlock : public DataBlock {
     void from_bytes_ref(const uint8_t *data, size_t size) override
     {
         m_data = cv::Mat(size, 1, CV_8UC1, const_cast<uint8_t *>(data));
+        m_is_writable = true;
+        m_has_local_data = true;
+        m_has_remote_data = false;
     }
 
     int get_as_bytes_ref(uint8_t **data, size_t *size) const override
@@ -196,6 +209,9 @@ struct DefaultDataBlock : public DataBlock {
     void from_cvmat(const cv::Mat &input) override
     {
         m_data = input;
+        m_is_writable = true;
+        m_has_local_data = true;
+        m_has_remote_data = false;
     }
 
     int get_as_cvmat(cv::Mat *output) const override
@@ -214,9 +230,21 @@ struct DefaultDataBlock : public DataBlock {
         return m_is_writable;
     }
 
+    bool has_remote_data() const override
+    {
+        return m_has_remote_data;
+    }
+
+    bool has_local_data() const override
+    {
+        return m_has_local_data;
+    }
+
   protected:
     std::optional<cv::Mat> m_data;
-    bool m_is_writable = false;
+    std::atomic<bool> m_is_writable{false};
+    std::atomic<bool> m_has_remote_data{false};
+    std::atomic<bool> m_has_local_data{false};
 
     // you must subclass this class to use it
     DefaultDataBlock() = default;

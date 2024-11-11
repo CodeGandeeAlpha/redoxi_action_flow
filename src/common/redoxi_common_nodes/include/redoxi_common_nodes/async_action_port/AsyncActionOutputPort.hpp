@@ -605,8 +605,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
         _create_target_data(target_data, task.get_request());
 
         // do whatever preprocessing you need
-        if (m_cb_on_deliver_before) {
-            auto ret = m_cb_on_deliver_before(target_data, task);
+        if (m_cb_on_deliver_task_begin) {
+            auto ret = m_cb_on_deliver_task_begin(target_data, task);
             if (ret != 0) {
                 RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "on_deliver_before callback failed");
             }
@@ -619,7 +619,14 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
             // deliver to all downstreams, if any delivery succeeds, the result is regarded as success
             for (auto &ds : m_downstreams) {
-                auto ret = _deliver_data_with_retry(target_data, ds, request_delivery_policy);
+                SendResult_t result_for_ds;
+                auto ret = _deliver_data_with_retry(&result_for_ds, target_data,
+                                                    ds, request_delivery_policy);
+
+                // notify the callback
+                if (m_cb_on_deliver_to_downstream_finish) {
+                    m_cb_on_deliver_to_downstream_finish(target_data, result_for_ds, ds);
+                }
                 if (ret != 0) {
                     RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
                                  "Failed to deliver data to downstream {}",
@@ -639,8 +646,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
         }
 
         // do whatever postprocessing you need
-        if (m_cb_on_deliver_after) {
-            auto ret = m_cb_on_deliver_after(target_data, task, result);
+        if (m_cb_on_deliver_task_finish) {
+            auto ret = m_cb_on_deliver_task_finish(target_data, task, result);
             if (ret != 0) {
                 RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "on_deliver_after callback failed");
             }
@@ -650,8 +657,10 @@ class AsyncActionOutputPort : public IStartStopProtocol
     }
 
     //! delivery data to downstream, with retry logic
+    //! allow target_data to change during the process, based on different retries
     virtual int
-        _deliver_data_with_retry(const TargetData_t &target_data,
+        _deliver_data_with_retry(SendResult_t *output_result,
+                                 TargetData_t &target_data,
                                  const Downstream_t &ds,
                                  const DeliveryPolicy_t *prefer_delivery_policy = nullptr)
     {
@@ -700,6 +709,10 @@ class AsyncActionOutputPort : public IStartStopProtocol
                          attempts + 1, max_attempts, no_drop ? "true" : "false");
 
             auto result = _send_data_to_downstream(target_data, ds, timeout_each_attempt);
+            if (output_result != nullptr) {
+                *output_result = result;
+            }
+
             if (!result.goal_handle_future.valid()) {
                 RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Not sending frame to downstream {}, goal handle future is invalid",
                              boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
@@ -841,13 +854,19 @@ class AsyncActionOutputPort : public IStartStopProtocol
     //! Transform target data, (output_target_data, input_task)-> error_code
     std::function<int(TargetData_t &output,
                       const DeliveryTask_t &input)>
-        m_cb_on_deliver_before;
+        m_cb_on_deliver_task_begin;
 
     //! Clean target data, (output_target_data, input_task)-> error_code
     std::function<int(TargetData_t &output,
                       const DeliveryTask_t &input,
                       const DeliveryResult_t &result)>
-        m_cb_on_deliver_after;
+        m_cb_on_deliver_task_finish;
+
+    //! callback function when data is sent to a downstream, failure or success
+    std::function<void(TargetData_t &output,
+                       SendResult_t &result,
+                       const Downstream_t &ds)>
+        m_cb_on_deliver_to_downstream_finish;
 
   public:
     //! set the callback function when a request is enqueued
@@ -857,15 +876,21 @@ class AsyncActionOutputPort : public IStartStopProtocol
     }
 
     //! set the callback function to transform the target data before delivery to any downstream
-    void set_callback_on_deliver_before(std::function<int(TargetData_t &target_data, const DeliveryTask_t &task)> cb)
+    void set_callback_on_deliver_task_begin(std::function<int(TargetData_t &target_data, const DeliveryTask_t &task)> cb)
     {
-        m_cb_on_deliver_before = cb;
+        m_cb_on_deliver_task_begin = cb;
     }
 
-    //! set the callback function to clean the target data after (failed or succeeded) delivery to any downstream
-    void set_callback_on_deliver_after(std::function<int(TargetData_t &target_data, const DeliveryTask_t &task, const DeliveryResult_t &result)> cb)
+    //! set the callback function to clean the target data after (failed or succeeded) delivery task is finished
+    void set_callback_on_deliver_task_finish(std::function<int(TargetData_t &target_data, const DeliveryTask_t &task, const DeliveryResult_t &result)> cb)
     {
-        m_cb_on_deliver_after = cb;
+        m_cb_on_deliver_task_finish = cb;
+    }
+
+    //! set the callback function to clean the target data after (failed or succeeded) delivery to a single downstream is finished
+    void set_callback_on_deliver_to_downstream_finish(std::function<void(TargetData_t &output, SendResult_t &result, const Downstream_t &ds)> cb)
+    {
+        m_cb_on_deliver_to_downstream_finish = cb;
     }
 
   private:

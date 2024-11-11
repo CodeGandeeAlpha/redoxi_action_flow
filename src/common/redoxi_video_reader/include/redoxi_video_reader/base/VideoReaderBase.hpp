@@ -41,9 +41,14 @@ class RedoxiVideoReaderBase : public rclcpp::Node,
 
     using DeliveryGoal_t = OutputPort_t::ActionType_t::Goal;
     using DeliveryRequest_t = OutputPort_t::DeliveryRequest_t;
+    using DeliveryResult_t = OutputPort_t::DeliveryResult_t;
     using DeliveryPolicy_t = DeliveryRequest_t::DeliveryPolicy_t;
+    using DeliveryTask_t = OutputPort_t::DeliveryTask_t;
+
     using SendFrameResult_t = OutputPort_t::SendResult_t;
     using SourceData_t = OutputPort_t::SourceData_t;
+    using TargetData_t = OutputPort_t::TargetData_t;
+    using SendResult_t = OutputPort_t::SendResult_t;
 
   public:
     //! Constructor with node options and name
@@ -201,6 +206,38 @@ class RedoxiVideoReaderBase : public rclcpp::Node,
 
     //! do periodic step operation
     virtual void _step();
+
+  protected: // output port callback
+    //! callback when a delivery task is started, about to send to any downstream
+    virtual int _on_delivery_task_begin(TargetData_t &target_data,
+                                        const DeliveryRequest_t &request)
+    {
+        (void)target_data;
+        (void)request;
+        return 0;
+    };
+
+    //! callback when a delivery task is finished, after sending to all downstreams
+    virtual int _on_delivery_task_finish(TargetData_t &target_data,
+                                         const DeliveryRequest_t &request,
+                                         const DeliveryResult_t &result)
+    {
+        (void)target_data;
+        (void)request;
+        (void)result;
+        return 0;
+    };
+
+    //! callback when a frame is sent to a downstream, failure or success
+    virtual int _on_deliver_to_downstream_finish(TargetData_t &target_data,
+                                                 SendResult_t &result,
+                                                 const Downstream_t &ds)
+    {
+        (void)target_data;
+        (void)result;
+        (void)ds;
+        return 0;
+    };
 
   private:
     /**

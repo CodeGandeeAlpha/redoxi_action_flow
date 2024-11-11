@@ -12,8 +12,11 @@
   <depend>redoxi_samples_lib</depend>
   <depend>redoxi_samples_nodes</depend>
   <depend>redoxi_video_reader</depend>
+  <depend>redoxi_shared_memory</depend>
   <depend>psg_private_msgs</depend>
   <depend>spdlog_vendor</depend>
+  <depend>pluginlib</depend>
+
   
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

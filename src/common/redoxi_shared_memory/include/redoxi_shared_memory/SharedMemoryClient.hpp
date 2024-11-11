@@ -26,6 +26,9 @@ class SharedMemoryClient
      */
     virtual int connect(const std::string &region_key, const KeyValueStore *params = nullptr) = 0;
 
+    //! Get the region key, empty string if not connected
+    virtual const std::string &get_region_key() const = 0;
+
     /**
      * @brief Put data into the shared memory region.
      *
@@ -104,6 +107,22 @@ class SharedMemoryClient
      * @return The parent node.
      */
     virtual const rclcpp::Node *get_parent_node() const = 0;
+
+    /**
+     * @brief Create a local data block, which is used for uploading local data to shared memory,
+     *        or receiving data from shared memory.
+     *
+     * @return A shared pointer to the data block.
+     */
+    virtual std::shared_ptr<DataBlock> create_datablock() const = 0;
+
+    /**
+     * @brief Create a local key-value store, which is used for uploading local metadata to shared memory,
+     *        or receiving metadata from shared memory.
+     *
+     * @return A shared pointer to the key-value store.
+     */
+    virtual std::shared_ptr<KeyValueStore> create_kvstore() const = 0;
 };
 
 } // namespace shared_memory
