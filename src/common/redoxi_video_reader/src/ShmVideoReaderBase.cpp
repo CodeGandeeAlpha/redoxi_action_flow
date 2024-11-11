@@ -90,5 +90,18 @@ int ShmVideoReaderBase::_on_delivery_task_begin(TargetData_t &target_data,
     return 0;
 }
 
+int ShmVideoReaderBase::_on_delivery_task_finish(TargetData_t &target_data,
+                                                 const DeliveryRequest_t &request,
+                                                 const DeliveryResult_t &result)
+{
+    return 0;
+}
+
+std::shared_ptr<shared_memory::SharedMemoryClient> ShmVideoReaderBase::_create_shm_client(
+    const SharedMemoryConfig_t &shm_config) const
+{
+    return nullptr;
+}
+
 } // namespace video_reader
 } // namespace redoxi_works
