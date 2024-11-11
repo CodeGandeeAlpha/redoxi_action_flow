@@ -217,30 +217,8 @@ int PSGMasterNode::update_runtime_config(std::shared_ptr<RuntimeConfig_t> config
     m_runtime_config = config;
 
     //! set callback on request enqueued to resize image if needed
-    auto output_image_size = m_runtime_config->output_image_size;
-    m_primary_output_port->set_callback_on_request_enqueued([output_image_size](DeliveryRequest_t &request) {
-        // resize image if needed
-        auto original_size = request.get_source_data().get_image().size();
-        if ((output_image_size.width <= 0 && output_image_size.height <= 0) || output_image_size == original_size) {
-            return;
-        }
-
-        auto image = request.get_source_data().get_image();
-        cv::Mat resized_image;
-
-        if (output_image_size.width > 0 && output_image_size.height > 0) {
-            cv::resize(image, resized_image, output_image_size);
-        } else if (output_image_size.width > 0) {
-            int new_height = static_cast<int>(original_size.height * (static_cast<double>(output_image_size.width) / original_size.width));
-            new_height = std::max(1, new_height);
-            cv::resize(image, resized_image, cv::Size(output_image_size.width, new_height));
-        } else if (output_image_size.height > 0) {
-            int new_width = static_cast<int>(original_size.width * (static_cast<double>(output_image_size.height) / original_size.height));
-            new_width = std::max(1, new_width);
-            cv::resize(image, resized_image, cv::Size(new_width, output_image_size.height));
-        }
-
-        request.get_source_data().set_image(resized_image);
+    m_primary_output_port->set_callback_on_request_enqueued([](DeliveryRequest_t &request) {
+        // do nothing
     });
 
     //! set publish to debug topic
@@ -263,7 +241,7 @@ void PSGMasterNode::_set_status_code(int status_code)
 }
 
 PSGMasterNode::DeliveryRequest_t
-    PSGMasterNode::_create_delivery_request(const SourceData_t &source_data)
+    PSGMasterNode::_create_delivery_request(const OutputSourceData_t &source_data)
 {
     //! Create delivery request
     DeliveryRequest_t req;
@@ -280,7 +258,7 @@ std::shared_ptr<PSGMasterNode::OutputPort_t>
 {
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "create primary output port");
     auto port = std::make_shared<OutputPort_t>(this);
-    auto &port_config = m_init_config->primary_output_spec;
+    auto &port_config = m_init_config->output_port_config;
     // RDX_ASSERT_CHECK_TRUE(!port_config.get_downstream_specs().empty(),
     //                       "[{}] port_config must have at least one downstream", __func__);
     port->init(port_config);
@@ -313,18 +291,24 @@ void PSGMasterNode::_step()
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "step once");
 
     if (m_impl->m_ros_time_token->try_pop_token()) {
-        // time to get a new frame
-        SourceData_t source_data;
-        int ret = _read_frame(source_data, m_frame_number);
-        if (ret != 0) {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "Failed to read frame, ret={}", ret);
+        std::shared_ptr<InputSourceData_t> frame_data;
+        if (m_init_config->enable_blocking_mode) {
+            // wait until there is data available
+            frame_data = m_input_port->pop_source_data();
+        } else {
+            // try to get data without waiting
+            frame_data = m_input_port->try_pop_source_data();
         }
 
+        // from input source data to output source data
+        OutputSourceData_t output_source_data;
+        output_source_data.set_frame(frame_data->m_goal->frame);
+
         // create delivery request
-        auto delivery_request = _create_delivery_request(source_data);
+        auto delivery_request = _create_delivery_request(output_source_data);
 
         // this is used for logging
-        auto msg_uuid = source_data.get_uuid();
+        auto msg_uuid = output_source_data.get_uuid();
 
         // get qos, controls how to retry and drop frames
         auto &qos = m_runtime_config->frame_enqueue_policy;

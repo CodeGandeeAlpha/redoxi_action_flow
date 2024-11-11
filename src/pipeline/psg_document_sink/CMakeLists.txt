@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(psg_master_node)
+project(psg_document_sink)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -8,44 +8,35 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(redoxi_common_nodes REQUIRED)
-find_package(psg_private_msgs REQUIRED)
+find_package(psg_master_node REQUIRED)
 
-set(srcfiles
-  src/StampedDocumentPub.cpp
-  src/MasterNodeTypes.cpp
-  src/MasterNode.cpp
-)
-
-add_library(psg_master_node ${srcfiles})
-add_library(psg_master_node::psg_master_node ALIAS psg_master_node)
-
-target_include_directories(psg_master_node PUBLIC
+add_library(psg_document_sink src/psg_document_sink.cpp)
+add_library(psg_document_sink::psg_document_sink ALIAS psg_document_sink)
+target_compile_features(psg_document_sink PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_include_directories(psg_document_sink PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_compile_features(psg_master_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 ament_target_dependencies(
-  psg_master_node  PUBLIC
-  redoxi_common_nodes
-  psg_private_msgs
+  psg_document_sink
   "rclcpp"
+  "psg_master_node"
 )
+
+# Causes the visibility macros to use dllexport rather than dllimport,
+# which is appropriate when building the dll but not consuming it.
+target_compile_definitions(psg_document_sink PRIVATE "PSG_DOCUMENT_SINK_BUILDING_LIBRARY")
 
 install(
   DIRECTORY include/
   DESTINATION include
 )
-
 install(
-  TARGETS psg_master_node
+  TARGETS psg_document_sink
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
-
-# install(TARGETS psg_master_node
-#   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -63,17 +54,11 @@ ament_export_include_directories(
   include
 )
 ament_export_libraries(
+  psg_document_sink
   psg_master_node
 )
 ament_export_targets(
   export_${PROJECT_NAME}
 )
-
-# use these so that downstream packages can find the dependencies without explicitly listing them
-ament_export_dependencies(
-  rclcpp
-  redoxi_common_nodes
-  psg_private_msgs
-  )
 
 ament_package()

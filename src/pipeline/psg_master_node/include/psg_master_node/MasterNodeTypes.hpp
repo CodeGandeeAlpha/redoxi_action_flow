@@ -40,6 +40,9 @@ struct InitConfig {
     //! The downstream nodes, indexed by node name
     OutputPortSpec::InitConfig_t output_port_config;
 
+    //! Use blocking mode for the reading input port
+    bool enable_blocking_mode = false;
+
     //! create the debug publish topic for this node?
     bool create_debug_pub = true;
     int debug_pub_queue_size = 10;

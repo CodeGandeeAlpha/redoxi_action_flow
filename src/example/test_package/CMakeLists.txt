@@ -23,6 +23,8 @@ set(DEPENDENCIES
     redoxi_samples_lib
     redoxi_samples_nodes
     redoxi_shared_memory
+    psg_master_node
+    psg_document_sink
     pluginlib)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb)
@@ -55,8 +57,9 @@ option(BUILD_TEST_V2_JSON_EXAMPLES "Build test_v2_json_examples target" OFF)
 option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2 "Build test_simple_action_generator_v2 target" OFF)
 option(BUILD_TEST_V2_VIDEO_SINK "Build test_v2_video_sink target" OFF)
 option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target" OFF)
-option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" ON)
-
+option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
+option(BUILD_TEST_PSG_MASTER_NODE "Build test_psg_master_node target" ON)
+option(BUILD_TEST_V2_DOCUMENT_SINK "Build test_v2_document_sink target" ON)
 # Function to configure a target
 function(configure_target target_name)
   add_executable(${target_name} src/${target_name}.cpp)
@@ -139,6 +142,14 @@ endif()
 
 if(BUILD_TEST_TBB_TASK_MANAGEMENT)
   configure_target(test_tbb_task_management)
+endif()
+
+if(BUILD_TEST_PSG_MASTER_NODE)
+  configure_target(v2_psg_master_node)
+endif()
+
+if(BUILD_TEST_V2_DOCUMENT_SINK)
+  configure_target(v2_document_sink)
 endif()
 
 # Install targets

@@ -29,7 +29,7 @@ class PSGMasterNode : public rclcpp::Node,
 
   public:
     using InputPort_t = AsyncImageInputPort;
-    using SourceData_t = InputPort_t::SourceData_t;
+    using InputSourceData_t = InputPort_t::SourceData_t;
     using ActionDataTrait_t = InputPort_t::ActionDataTrait_t;
 
     //! Import all names from PSGMasterNodeInternalTypes
@@ -47,7 +47,7 @@ class PSGMasterNode : public rclcpp::Node,
     using DeliveryRequest_t = OutputPort_t::DeliveryRequest_t;
     using DeliveryPolicy_t = DeliveryRequest_t::DeliveryPolicy_t;
     using SendFrameResult_t = OutputPort_t::SendResult_t;
-    using SourceData_t = OutputPort_t::SourceData_t;
+    using OutputSourceData_t = OutputPort_t::SourceData_t;
 
   public:
     //! Constructor with node options and name
@@ -179,7 +179,7 @@ class PSGMasterNode : public rclcpp::Node,
      * @param source_data the source data to be filled with the read frame
      * @return the delivery request
      */
-    virtual DeliveryRequest_t _create_delivery_request(const SourceData_t &source_data);
+    virtual DeliveryRequest_t _create_delivery_request(const OutputSourceData_t &source_data);
 
     //! create primary output port
     virtual std::shared_ptr<OutputPort_t> _create_primary_output_port();
