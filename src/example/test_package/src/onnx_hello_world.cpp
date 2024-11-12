@@ -6,11 +6,19 @@
 #include <chrono>
 #include <algorithm>
 #include <numeric>
+#include <optional>
 
 // these can be set by cmake
-#define TEST_ONNX_MODEL_PATH "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx"
+// #define TEST_ONNX_MODEL_PATH "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx"
+#define TEST_ONNX_MODEL_PATH "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8m-pose-dynbatch.onnx"
 // #define TEST_ONNX_PROVIDER_NAME "TensorrtExecutionProvider"
 #define TEST_ONNX_PROVIDER_NAME "CUDAExecutionProvider"
+
+enum class OnnxExecutionProviderType {
+    CPU,
+    CUDA,
+    TensorRT
+};
 
 struct OnnxPortInfo {
     std::string name;
@@ -42,21 +50,153 @@ struct OnnxPortData {
     std::shared_ptr<Ort::MemoryInfo> memory_info;
 };
 
+struct OnnxRuntimeData {
+    std::shared_ptr<Ort::Session> session;
+    std::map<OnnxPortInfo, OnnxPortData> tensor_caches;
+    std::shared_ptr<Ort::IoBinding> io_binding;
+};
+
 std::vector<std::string>
     list_onnx_providers();
+std::shared_ptr<Ort::Session> create_onnx_session(const std::string &model_path,
+                                                  OnnxExecutionProviderType provider_type,
+                                                  Ort::Env &env);
 std::vector<OnnxPortInfo> list_onnx_model_info(const Ort::Session &session);
+std::shared_ptr<OnnxRuntimeData> create_onnx_runtime_data(
+    std::shared_ptr<Ort::Session> session, std::optional<int> num_batch = std::nullopt);
+
 std::string onnx_element_type_to_string(ONNXTensorElementDataType dtype);
 int onnx_inference_cpu();
 int onnx_inference_cuda();
 
 int main(int argc, char **argv)
 {
-    return onnx_inference_cuda();
+    const std::string ModelPath = TEST_ONNX_MODEL_PATH;
+    int num_batch = 10;
+    Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "onnx_hello_world");
+
+    auto session = create_onnx_session(ModelPath, OnnxExecutionProviderType::CUDA, env);
+    auto ports = list_onnx_model_info(*session);
+    for (const auto &port : ports) {
+        spdlog::info("Port: {}", port.to_string());
+    }
+
+    auto runtime_data = create_onnx_runtime_data(session, num_batch);
+
+    // Run the model 1000 times with randomized input
+    auto tensor_caches = runtime_data->tensor_caches;
+    try {
+        spdlog::info("Running inference 1000 times with randomized input");
+        for (int i = 0; i < 1000; ++i) {
+            for (auto &entry : tensor_caches) {
+                if (entry.first.is_input) {
+                    std::generate(entry.second.data->begin(), entry.second.data->end(), []() { return static_cast<float>(rand()) / RAND_MAX; });
+                }
+            }
+            auto start_time = std::chrono::high_resolution_clock::now();
+            session->Run(Ort::RunOptions{nullptr}, *runtime_data->io_binding);
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+            auto average_time_per_sample = elapsed / num_batch;
+            spdlog::info("\033[33mIteration {}: Inference completed in {} us (Average per sample: {} us)\033[0m", i + 1, elapsed, average_time_per_sample);
+        }
+    } catch (const Ort::Exception &e) {
+        spdlog::error("Error during inference: {}", e.what());
+        return 1;
+    }
+
+    return 0;
+}
+
+std::shared_ptr<OnnxRuntimeData> create_onnx_runtime_data(
+    std::shared_ptr<Ort::Session> session, std::optional<int> num_batch)
+{
+    spdlog::info("Creating OnnxRuntimeData object");
+    auto runtime_data = std::make_shared<OnnxRuntimeData>();
+    runtime_data->session = session;
+
+    spdlog::info("Listing all input and output ports");
+    auto ports = list_onnx_model_info(*session);
+
+    spdlog::info("Creating ONNX tensors to bind to ports");
+    for (const auto &port : ports) {
+        if (port.is_input) {
+            spdlog::info("Pre-allocating space for input port: {}", port.name);
+            int batch_size = (port.shape[0] == -1) ? num_batch.value_or(1) : port.shape[0];
+            int total_size = batch_size * std::accumulate(port.shape.begin() + 1, port.shape.end(), 1, std::multiplies<int64_t>());
+            auto input_data = std::make_shared<std::vector<float>>(total_size);
+            auto memory_info = std::make_shared<Ort::MemoryInfo>(Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault));
+
+            std::vector<int64_t> shape(port.shape.begin(), port.shape.end());
+            shape[0] = batch_size;
+
+            auto tensor = std::make_shared<Ort::Value>(Ort::Value::CreateTensor<float>(
+                *memory_info, input_data->data(), input_data->size(), shape.data(), shape.size()));
+            runtime_data->tensor_caches[port] = {input_data, tensor, memory_info};
+        } else {
+            spdlog::info("No pre-allocation for output port: {}", port.name);
+            auto memory_info = std::make_shared<Ort::MemoryInfo>(Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault));
+            runtime_data->tensor_caches[port] = {nullptr, nullptr, memory_info};
+        }
+    }
+
+    spdlog::info("Binding the tensors to the session");
+    runtime_data->io_binding = std::make_shared<Ort::IoBinding>(*session);
+    for (const auto &entry : runtime_data->tensor_caches) {
+        const auto &port = entry.first;
+        const auto &data = entry.second;
+        if (port.is_input) {
+            spdlog::info("Binding input tensor for port: {}", port.name);
+            runtime_data->io_binding->BindInput(port.name.c_str(), *(data.tensor));
+        } else {
+            spdlog::info("Binding output tensor for port: {}", port.name);
+            runtime_data->io_binding->BindOutput(port.name.c_str(), *(data.memory_info));
+        }
+    }
+    return runtime_data;
+}
+
+std::shared_ptr<Ort::Session> create_onnx_session(const std::string &model_path,
+                                                  OnnxExecutionProviderType provider_type,
+                                                  Ort::Env &env)
+{
+    //! Create an ONNX session and load the model based on the provider type
+    Ort::SessionOptions session_options;
+    session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+
+    if (provider_type == OnnxExecutionProviderType::CUDA) {
+        spdlog::info("Configuring CUDA provider options");
+        OrtCUDAProviderOptions cuda_options;
+        session_options.AppendExecutionProvider_CUDA(cuda_options);
+    } else if (provider_type == OnnxExecutionProviderType::CPU) {
+        spdlog::info("Using CPU Execution Provider");
+        // No additional configuration needed for CPU
+    } else if (provider_type == OnnxExecutionProviderType::TensorRT) {
+        //! Configuring TensorRT Execution Provider
+        spdlog::info("Configuring TensorRT Execution Provider");
+        OrtTensorRTProviderOptions trt_options;
+        trt_options.device_id = 0;
+        trt_options.trt_max_partition_iterations = 10;
+        session_options.AppendExecutionProvider_TensorRT(trt_options);
+    } else {
+        spdlog::error("Unknown provider type: {}", static_cast<int>(provider_type));
+        return nullptr;
+    }
+
+    std::shared_ptr<Ort::Session> session;
+    try {
+        spdlog::info("Creating session with model path: {}", model_path);
+        session = std::make_shared<Ort::Session>(env, model_path.c_str(), session_options);
+    } catch (const Ort::Exception &e) {
+        spdlog::error("Error creating session: {}", e.what());
+        return nullptr;
+    }
+
+    return session;
 }
 
 int onnx_inference_cuda()
 {
-    const std::string ExecutorName = TEST_ONNX_PROVIDER_NAME;
     const std::string ModelPath = TEST_ONNX_MODEL_PATH;
     int num_batch = 10;
 
