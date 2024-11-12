@@ -5,6 +5,7 @@
 #include <redoxi_samples_nodes/redoxi_samples_nodes.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncImageInputPort.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
+#include <redoxi_shared_memory/SharedMemoryClient.hpp>
 
 namespace redoxi_works
 {
@@ -83,6 +84,7 @@ class FrameRelayNode : public rclcpp::Node, public IStartStopProtocol
 
   protected:
     virtual void _step();
+    virtual int _parse_frame(cv::Mat *output, const SourceData_t &source_data);
 
   protected:
     std::shared_ptr<InputPort_t> m_input_port;
@@ -96,6 +98,7 @@ class FrameRelayNode : public rclcpp::Node, public IStartStopProtocol
     StampedImagePub m_pub_frame_rejected;
     std::shared_ptr<std::thread> m_step_thread;
     std::atomic<bool> m_running{false};
+    std::shared_ptr<shared_memory::SharedMemoryClient> m_shm_client;
 };
 
 } // namespace redoxi_works

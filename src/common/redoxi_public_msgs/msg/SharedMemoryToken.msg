@@ -12,11 +12,14 @@ string service_name
 # the key of the shared memory region, for v6d, it's the socket name, for boost, it's the name of the region
 string region_key
 
+# the size of the object in the shared memory region, in bytes
+# -1 means the object does not exist
+# if object_key or object_id is set, you should also set object_size to non-negative value
+# otherwise, the receiver may assume the object does not exist
+int64 object_size -1
+
 # the key of the object in the shared memory region, empty means the object is not identified by a key
 string object_key
 
-# the id of the object in the shared memory region, 0 means the object is not identified by an id
+# the id of the object in the shared memory region
 int64 object_id 0
-
-# the size of the object in the shared memory region, -1 means the object size is unknown
-int64 object_size -1

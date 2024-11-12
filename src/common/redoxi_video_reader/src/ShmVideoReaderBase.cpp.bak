@@ -1,0 +1,215 @@
+#include <redoxi_video_reader/base/ShmVideoReaderBase.hpp>
+#include <redoxi_shared_memory/SharedMemoryFactory.hpp>
+#include <typeinfo>
+
+namespace redoxi_works
+{
+namespace video_reader
+{
+int ShmVideoReaderBase::init(std::shared_ptr<BaseInitConfig_t> config,
+                             std::shared_ptr<BaseRuntimeConfig_t> runtime_config)
+{
+    // check data type
+    auto _runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(runtime_config);
+    if (!_runtime_config) {
+        RDX_RAISE_ERROR("[f={}()] Invalid runtime config type, expect {}, got {}", __func__,
+                        typeid(RuntimeConfig_t).name(),
+                        typeid(runtime_config.get()).name());
+        return -1;
+    }
+    return RedoxiVideoReaderBase::init(config, runtime_config);
+}
+
+int ShmVideoReaderBase::update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config)
+{
+    auto _runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(runtime_config);
+    if (!_runtime_config) {
+        RDX_RAISE_ERROR("[f={}()] Invalid runtime config type, expect {}, got {}",
+                        __func__, typeid(RuntimeConfig_t).name(),
+                        typeid(runtime_config.get()).name());
+        return -1;
+    }
+    return RedoxiVideoReaderBase::update_runtime_config(runtime_config);
+}
+
+int ShmVideoReaderBase::_open()
+{
+    // if base class open failed, return error
+    if (RedoxiVideoReaderBase::_open() != 0) {
+        return -1;
+    }
+
+    auto config = _get_runtime_config();
+
+    // create shm client
+    auto shm_client = _create_shm_client(config->shm_config);
+    if (!shm_client) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Failed to create shm client");
+        return -1;
+    }
+    m_shm_client = shm_client;
+    return 0;
+}
+
+int ShmVideoReaderBase::_close()
+{
+    // if base class close failed, return error
+    if (RedoxiVideoReaderBase::_close() != 0) {
+        return -1;
+    }
+
+    if (m_shm_client) {
+        m_shm_client->close();
+        m_shm_client.reset();
+    }
+    return 0;
+}
+
+std::shared_ptr<ShmVideoReaderBase::RuntimeConfig_t> ShmVideoReaderBase::_get_runtime_config() const
+{
+    // DO NOT call this in init() or update_runtime_config()
+    // it depends on the initialized runtime config
+
+    // if runtime config is not initialized, return nullptr
+    // otherwise, it must be a RuntimeConfig_t
+    if (!m_runtime_config) {
+        return nullptr;
+    } else {
+        auto config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+        if (!config) {
+            RDX_RAISE_ERROR("[f={}()] Invalid runtime config type, expect {}, got {}", __func__,
+                            typeid(RuntimeConfig_t).name(),
+                            typeid(m_runtime_config.get()).name());
+        }
+        return config;
+    }
+}
+
+int ShmVideoReaderBase::_on_delivery_task_begin(TargetData_t &target_data,
+                                                const DeliveryRequest_t &request)
+{
+    // ping request, do nothing
+    if (request.is_ping_request()) {
+        return 0;
+    }
+
+    // send data to shm if shm client is initialized
+    auto msg_uuid_str = boost::uuids::to_string(request.get_source_data().get_uuid());
+
+    // shm client is not initialized, do nothing
+    if (!m_shm_client) {
+        return 0;
+    }
+
+    // shm client is not connected, do nothing
+    if (!m_shm_client->is_connected()) {
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Shm client is not connected", msg_uuid_str);
+        return 0;
+    }
+
+    // write data to shm
+    const auto &img = request.get_source_data().get_image();
+    if (img.empty()) {
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Image is empty, nothing to do", msg_uuid_str);
+        return 0;
+    }
+
+    // send image to shm
+    RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] Uploading image to shm", msg_uuid_str);
+    shared_memory::ObjectIdentifier oid;
+    auto datablock = m_shm_client->create_datablock();
+    if (!datablock) {
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to create datablock", msg_uuid_str);
+        return -1;
+    }
+    datablock->from_cvmat(img);
+    bool put_ok = m_shm_client->put_data(&oid, datablock.get(), nullptr) == 0;
+    if (!put_ok) {
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to put data to shm", msg_uuid_str);
+        return -1;
+    }
+
+    // set target data
+    auto &shm_token = target_data.get_goal().frame.shm_token;
+    if (oid.id.has_value()) {
+        shm_token.object_id = oid.id.value();
+    }
+    if (oid.key.has_value()) {
+        shm_token.object_key = oid.key.value();
+    }
+    shm_token.service_name = m_shm_client->get_service_name();
+    shm_token.region_key = m_shm_client->get_region_key();
+    shm_token.object_size = img.total() * img.elemSize();
+    return 0;
+}
+
+int ShmVideoReaderBase::_on_delivery_task_finish(TargetData_t &target_data,
+                                                 const DeliveryRequest_t &request,
+                                                 const DeliveryResult_t &result)
+{
+    if (result.result_code == DeliveryResultCode::Success) {
+        // success, do nothing
+        return 0;
+    }
+    auto msg_uuid_str = boost::uuids::to_string(request.get_source_data().get_uuid());
+
+    // failed, remove shm object, if any
+    RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] Failed to send data to shm, removing object from shm", msg_uuid_str);
+    auto &shm_token = target_data.get_goal().frame.shm_token;
+    if (shm_token.object_size >= 0) {
+        shared_memory::ObjectIdentifier oid;
+        if (shm_token.object_id != 0) {
+            oid.id = shm_token.object_id;
+        }
+        if (!shm_token.object_key.empty()) {
+            oid.key = shm_token.object_key;
+        }
+        auto ret = m_shm_client->delete_object(oid);
+        if (ret != 0) {
+            RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to delete object from shm", msg_uuid_str);
+            return -1;
+        }
+        RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] Removed object from shm", msg_uuid_str);
+    }
+    return 0;
+}
+
+std::shared_ptr<shared_memory::SharedMemoryClient> ShmVideoReaderBase::_create_shm_client(
+    const SharedMemoryConfig_t &shm_config) const
+{
+    std::string service_name = shm_config.service_name;
+    std::string region_key = shm_config.region_key;
+
+    if (service_name.empty() && shm_config.read_setting_from_env) {
+        service_name = shared_memory::SharedMemoryFactory::get_shm_service_name_from_env();
+    }
+
+    if (region_key.empty() && shm_config.read_setting_from_env) {
+        region_key = shared_memory::SharedMemoryFactory::get_shm_region_key_from_env();
+    }
+
+    // now, both should be set
+    if (service_name.empty() || region_key.empty()) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Service name or region key is not set, cannot create shm client");
+        return nullptr;
+    }
+
+    auto client = shared_memory::SharedMemoryFactory::create_client_by_service_name(service_name);
+    if (!client) {
+        // RDX_INFO_DEV(this, __func__, false, "{}", "Failed to create shm client");
+        RDX_RAISE_ERROR("[f={}()] Failed to create shm client", __func__);
+        return nullptr;
+    }
+
+    // connect to shm
+    auto ret = client->connect(region_key);
+    if (ret != 0) {
+        RDX_RAISE_ERROR("[f={}()] Failed to connect to shm", __func__);
+        return nullptr;
+    }
+
+    return client;
+}
+
+} // namespace video_reader
+} // namespace redoxi_works

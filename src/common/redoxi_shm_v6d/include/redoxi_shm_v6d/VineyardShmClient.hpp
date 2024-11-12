@@ -58,6 +58,9 @@ class VineyardShmClient : public SharedMemoryClient
     std::shared_ptr<DataBlock> create_datablock() const override;
     std::shared_ptr<KeyValueStore> create_kvstore() const override;
 
+    // get the service name of this shared memory service
+    const std::string &get_service_name() const override;
+
     // --- Vineyard specific methods ---
   public:
     //! Get the underlying vineyard client

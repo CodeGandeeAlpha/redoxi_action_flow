@@ -1,6 +1,8 @@
 #include <redoxi_samples_nodes/sinks/FrameRelayNode.hpp>
+#include <redoxi_shared_memory/SharedMemoryClient.hpp>
+#include <redoxi_shared_memory/SharedMemoryFactory.hpp>
 #include <boost/uuid/uuid_io.hpp>
-
+#include <cv_bridge/cv_bridge.hpp>
 
 namespace redoxi_works
 {
@@ -100,6 +102,19 @@ int FrameRelayNode::start()
         }
     });
 
+    // create shm client
+    {
+        auto shm_config = shared_memory::SharedMemoryFactory::get_shm_config_from_node(this);
+        m_shm_client = shared_memory::SharedMemoryFactory::create_client_by_config(shm_config);
+        if (!m_shm_client) {
+            RDX_INFO_DEV(this, __func__, false, "Failed to create shm client, service name = {}, region key = {}",
+                         shm_config.service_name, shm_config.region_key);
+        } else {
+            RDX_INFO_DEV(this, __func__, false, "Created shm client, service name = {}, region key = {}",
+                         shm_config.service_name, shm_config.region_key);
+        }
+    }
+
     RDX_INFO_DEV(this, __func__, false, "{}", "step thread started");
     return 0;
 }
@@ -116,6 +131,9 @@ int FrameRelayNode::stop()
         m_step_thread->join();
     }
     RDX_INFO_DEV(this, __func__, false, "{}", "step thread stopped");
+
+    // delete shm client, disconnect from shm service
+    m_shm_client.reset();
 
     return 0;
 }
@@ -154,17 +172,78 @@ void FrameRelayNode::_step()
     const auto msg_uuid_str = boost::uuids::to_string(msg_uuid);
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] {}",
                  msg_uuid_str, "frame received and goal resolved");
-    auto &raw_image = goal_handle->get_goal()->frame.raw_image;
-    m_pub_relayed_frame.publish(raw_image);
+
+    cv::Mat frame;
+    _parse_frame(&frame, *frame_data);
+    m_pub_relayed_frame.publish(frame);
 
     // publish debug topic?
     if (get_debug_topics_enabled()) {
-        m_pub_frame_accepted.publish(raw_image, "accepted");
+        m_pub_frame_accepted.publish(frame, "accepted");
     }
 
     // at the end, terminate the goal
     auto result_msg = std::make_shared<InputPort_t::ActionResult_t>();
-    goal_handle->abort(result_msg);
+    goal_handle->succeed(result_msg);
+}
+
+int FrameRelayNode::_parse_frame(cv::Mat *output,
+                                 const SourceData_t &source_data)
+{
+    if (output == nullptr) {
+        return 0;
+    }
+
+    auto msg_uuid = ActionDataTrait_t::get_uuid(*source_data.get_goal());
+
+    // parse from shm
+    auto &shm_token = source_data.get_goal()->frame.shm_token;
+    if (shm_token.object_size >= 0 && m_shm_client && m_shm_client->is_connected()) {
+        shared_memory::ObjectIdentifier oid;
+        if (shm_token.object_id != 0) {
+            oid.id = shm_token.object_id;
+        }
+        if (!shm_token.object_key.empty()) {
+            oid.key = shm_token.object_key;
+        }
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Getting data from shm with object id {}",
+                     boost::uuids::to_string(msg_uuid), oid.id.value_or(0));
+        auto datablock = m_shm_client->get_data(oid);
+        if (!datablock) {
+            RDX_INFO_DEV(this, __func__, false,
+                         "[msg_uuid={}] Failed to get data from shm", boost::uuids::to_string(msg_uuid));
+            return -1;
+        }
+
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Data from shm parsed to cv::Mat",
+                     boost::uuids::to_string(msg_uuid));
+        cv::Mat tmp;
+        datablock->get_as_cvmat(&tmp);
+
+        // IMPORTANT: copy the data to the output, because the datablock will be released after the function returns
+        tmp.copyTo(*output);
+
+        // after reading, delete the data from shm
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Deleting data from shm",
+                     boost::uuids::to_string(msg_uuid));
+        auto delete_ok = m_shm_client->delete_object(oid) == 0;
+        if (!delete_ok) {
+            RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to delete data from shm",
+                         boost::uuids::to_string(msg_uuid));
+        }
+    } else {
+        // read raw image directly from the goal
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Reading raw image directly from the goal",
+                     boost::uuids::to_string(msg_uuid));
+
+        auto &raw_image = source_data.get_goal()->frame.raw_image;
+        if (!raw_image.data.empty()) {
+            auto img_bridge = cv_bridge::toCvCopy(raw_image, raw_image.encoding);
+            *output = img_bridge->image;
+        }
+    }
+
+    return 0;
 }
 
 } // namespace redoxi_works

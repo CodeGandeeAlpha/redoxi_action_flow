@@ -26,6 +26,11 @@ class SharedMemoryClient
      */
     virtual int connect(const std::string &region_key, const KeyValueStore *params = nullptr) = 0;
 
+    /**
+     * @brief Get the service name of the shared memory region.
+     */
+    virtual const std::string &get_service_name() const = 0;
+
     //! Get the region key, empty string if not connected
     virtual const std::string &get_region_key() const = 0;
 
@@ -56,6 +61,22 @@ class SharedMemoryClient
     virtual int get_data(DataBlock *output_data_block,
                          KeyValueStore *output_metadata,
                          const ObjectIdentifier &identifier) = 0;
+
+    /**
+     * @brief Get a data block from the shared memory region, by object identifier only.
+     *
+     * @param identifier The identifier of the data block to be fetched.
+     * @return A shared pointer to the data block, nullptr if failed.
+     */
+    virtual std::shared_ptr<DataBlock> get_data(const ObjectIdentifier &identifier)
+    {
+        auto datablock = create_datablock();
+        auto ret = get_data(datablock.get(), nullptr, identifier);
+        if (ret != 0) {
+            return nullptr;
+        }
+        return datablock;
+    }
 
     /**
      * @brief Check the connection status to the shared memory region.
