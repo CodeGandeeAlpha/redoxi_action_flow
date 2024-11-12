@@ -55,7 +55,8 @@ option(BUILD_TEST_V2_JSON_EXAMPLES "Build test_v2_json_examples target" OFF)
 option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2 "Build test_simple_action_generator_v2 target" OFF)
 option(BUILD_TEST_V2_VIDEO_SINK "Build test_v2_video_sink target" OFF)
 option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target" OFF)
-option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" ON)
+option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
+option(BUILD_ONNX_HELLO_WORLD "Build onnx_hello_world target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -139,6 +140,27 @@ endif()
 
 if(BUILD_TEST_TBB_TASK_MANAGEMENT)
   configure_target(test_tbb_task_management)
+endif()
+
+if(BUILD_ONNX_HELLO_WORLD)
+  configure_target(onnx_hello_world)
+
+  # configure for onnx runtime
+  set(onnxruntime_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/onnxruntime/onnxruntime-linux-x64-gpu-1.20.0/lib64/cmake/onnxruntime)
+  message(STATUS "onnxruntime_DIR: ${onnxruntime_DIR}")
+
+  find_package(onnxruntime REQUIRED)
+  message(STATUS "onnxruntime_FOUND: ${onnxruntime_FOUND}")
+
+  target_link_libraries(onnx_hello_world PUBLIC onnxruntime::onnxruntime)
+
+  # set(ONNXRUNTIME_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/onnxruntime/onnxruntime-linux-x64-gpu-1.20.0)
+  # message(STATUS "ONNXRUNTIME_ROOT: ${ONNXRUNTIME_ROOT}")
+  # find_library(ONNXRUNTIME_LIB NAMES onnxruntime PATHS ${ONNXRUNTIME_ROOT})
+  # message(STATUS "ONNXRUNTIME_LIB: ${ONNXRUNTIME_LIB}")
+
+  # target_include_directories(onnx_hello_world PUBLIC ${ONNXRUNTIME_ROOT}/include)
+  # target_link_libraries(onnx_hello_world PUBLIC ${ONNXRUNTIME_LIB})
 endif()
 
 # Install targets
