@@ -17,9 +17,9 @@ target_include_directories(psg_document_sink PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(
-  psg_document_sink
+  psg_document_sink PUBLIC
+  psg_master_node
   "rclcpp"
-  "psg_master_node"
 )
 
 # Causes the visibility macros to use dllexport rather than dllimport,
@@ -55,10 +55,15 @@ ament_export_include_directories(
 )
 ament_export_libraries(
   psg_document_sink
-  psg_master_node
 )
 ament_export_targets(
   export_${PROJECT_NAME}
+)
+
+# use these so that downstream packages can find the dependencies without explicitly listing them
+ament_export_dependencies(
+  rclcpp
+  psg_master_node
 )
 
 ament_package()

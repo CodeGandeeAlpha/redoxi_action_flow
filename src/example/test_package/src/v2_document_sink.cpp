@@ -1,11 +1,11 @@
 #include <psg_document_sink/AsyncDocumentInputPort.hpp>
-#include <psg_document_sink/PSGDocumentSink.hpp>
+#include <psg_document_sink/psg_document_sink.hpp>
 
 namespace rdx = redoxi_works;
 
 void print_init_config_json()
 {
-    auto init_config = std::make_shared<rdx::psg_document_sink::InitConfig>();
+    auto init_config = std::make_shared<rdx::PSGDocumentSinkInitConfig>();
     auto js_string = JS::serializeStruct(*init_config);
     std::cout << js_string << std::endl;
 }
@@ -21,7 +21,7 @@ int main(int argc, char **argv)
     auto document_sink_node = std::make_shared<rdx::PSGDocumentSink>("document_sink_node", options);
 
     //! Initialize the node with default configuration
-    auto init_config = std::make_shared<rdx::psg_document_sink::InitConfig>();
+    auto init_config = std::make_shared<rdx::PSGDocumentSinkInitConfig>();
     init_config->from_parameters(document_sink_node.get());
     document_sink_node->init(init_config);
 

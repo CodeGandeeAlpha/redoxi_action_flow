@@ -193,6 +193,7 @@ class PSGMasterNode : public rclcpp::Node,
 
     //! do periodic step operation
     virtual void _step();
+    virtual void _step2();
 
   private:
     /**

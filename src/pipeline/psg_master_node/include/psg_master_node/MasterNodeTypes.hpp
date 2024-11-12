@@ -57,6 +57,7 @@ struct InitConfig {
               JS_MEMBER(input_port_config),
               JS_MEMBER(output_port_config),
               JS_MEMBER(create_debug_pub),
+              JS_MEMBER(enable_blocking_mode),
               JS_MEMBER(debug_pub_queue_size),
               JS_MEMBER(debug_pub_task_enqueue_name),
               JS_MEMBER(debug_pub_task_drop_name));

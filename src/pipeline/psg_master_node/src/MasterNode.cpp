@@ -41,9 +41,9 @@ PSGMasterNode::~PSGMasterNode()
 
 int PSGMasterNode::start()
 {
-    //! Can only start in OPENED or STOPPED status
-    if (m_status_code != NodeStatusCode::OPENED && m_status_code != NodeStatusCode::STOPPED) {
-        RDX_RAISE_ERROR("[{}] status must be in OPENED or STOPPED, got {}", __func__, NodeStatusCodeToString(m_status_code));
+    //! Can only start in STOPPED status
+    if (m_status_code != NodeStatusCode::STOPPED) {
+        RDX_RAISE_ERROR("[{}] status must be in STOPPED, got {}", __func__, NodeStatusCodeToString(m_status_code));
         return -1;
     }
 
@@ -153,8 +153,8 @@ int PSGMasterNode::init(std::shared_ptr<InitConfig_t> config,
     //! apply or update runtime config
     update_runtime_config(runtime_config);
 
-    //! Change status to CLOSED
-    _set_status_code(NodeStatusCode::CLOSED);
+    //! Change status to STOPPED
+    _set_status_code(NodeStatusCode::STOPPED);
 
     return 0;
 }
@@ -162,9 +162,9 @@ int PSGMasterNode::init(std::shared_ptr<InitConfig_t> config,
 int PSGMasterNode::update_init_config(std::shared_ptr<InitConfig_t> config)
 {
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "update init config");
-    //! Can only update init config in BEFORE_INIT or CLOSED status
-    if (m_status_code != NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::CLOSED) {
-        RDX_RAISE_ERROR("[{}] status must be in BEFORE_INIT or CLOSED, got {}", __func__, NodeStatusCodeToString(m_status_code));
+    //! Can only update init config in BEFORE_INIT or STOPPED status
+    if (m_status_code != NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::STOPPED) {
+        RDX_RAISE_ERROR("[{}] status must be in BEFORE_INIT or STOPPED, got {}", __func__, NodeStatusCodeToString(m_status_code));
         return -1;
     }
 
@@ -282,7 +282,7 @@ int PSGMasterNode::_declare_all_parameters()
     return 0;
 }
 
-void PSGMasterNode::_step()
+void PSGMasterNode::_step2()
 {
     if (m_status_code != NodeStatusCode::STARTED) {
         return;
@@ -356,6 +356,76 @@ void PSGMasterNode::_step()
         // wait for all requests to be processed, not necessary
         m_primary_output_port->wait_for_all_requests();
     }
+}
+
+void PSGMasterNode::_step()
+{
+    if (m_status_code != NodeStatusCode::STARTED) {
+        return;
+    }
+
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "step once");
+
+    //! 随机构造input source data
+    auto frame_data = std::make_shared<InputSourceData_t>();
+    // frame_data->m_goal = std::make_shared<InputSourceData_t::Goal>();
+    // frame_data->m_goal->frame = cv::Mat(480, 640, CV_8UC3, cv::Scalar(rand()%255, rand()%255, rand()%255));
+
+    // from input source data to output source data
+    OutputSourceData_t output_source_data;
+    output_source_data.set_frame(frame_data->m_goal->frame);
+
+    // create delivery request
+    auto delivery_request = _create_delivery_request(output_source_data);
+
+    // this is used for logging
+    auto msg_uuid = output_source_data.get_uuid();
+
+    // get qos, controls how to retry and drop frames
+    auto &qos = m_runtime_config->frame_enqueue_policy;
+    auto max_attempts = qos.get_retry_policy().get_number_of_retry(true).value() + 1;
+    auto interval_between_attempts = qos.get_retry_policy().get_wait_time_between_retry(true).value();
+    auto drop_frame_strategy = qos.get_drop_strategy();
+
+    // start pushing request to output port
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                 "try to push request in {} attempts, retry interval={}ms",
+                 max_attempts, interval_between_attempts.count());
+
+    bool success = false;
+    if (drop_frame_strategy == DropStrategy::NoDrop) {
+        // Keep trying until success if no drop strategy
+        while (!m_primary_output_port->try_push_request(delivery_request)) {
+            std::this_thread::sleep_for(interval_between_attempts);
+        }
+        success = true;
+    } else if (drop_frame_strategy == DropStrategy::DropAsNeeded) {
+        // Try up to max attempts if dropping is allowed
+        for (int attempt = 0; attempt < max_attempts; ++attempt) {
+            if (m_primary_output_port->try_push_request(delivery_request)) {
+                success = true;
+                break;
+            }
+            // wait for next attempt
+            std::this_thread::sleep_for(interval_between_attempts);
+        }
+    } else {
+        RDX_RAISE_ERROR("[{}] invalid drop strategy, got {}", __func__, int(drop_frame_strategy));
+    }
+
+    if (success) {
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                     "[msg_uuid={}] success to push request",
+                     boost::uuids::to_string(msg_uuid));
+    } else {
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                     "[msg_uuid={}] failed to push request",
+                     boost::uuids::to_string(msg_uuid));
+    }
+
+    // FIXME: debug only
+    // wait for all requests to be processed, not necessary
+    m_primary_output_port->wait_for_all_requests();
 }
 
 } // namespace redoxi_works
