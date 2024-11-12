@@ -69,9 +69,8 @@ int PSGDocumentSink::init(std::shared_ptr<InitConfig_t> init_config)
 
     // create the publishers
     m_pub_relayed_document.init(this, m_init_config->publish_topic, StampedDocumentPub::DefaultQoS);
-    m_pub_document_accepted.init(this, m_init_config->debug_topic_document_accepted, StampedDocumentPub::DefaultUnreliableQoS);
-    m_pub_document_rejected.init(this, m_init_config->debug_topic_document_rejected, StampedDocumentPub::DefaultUnreliableQoS);
-
+    m_pub_debug_document_accepted.init(this, m_init_config->debug_topic_document_accepted, StampedDocumentPub::DefaultUnreliableQoS);
+    m_pub_debug_document_rejected.init(this, m_init_config->debug_topic_document_rejected, StampedDocumentPub::DefaultUnreliableQoS);
     // enable debug topics?
     set_debug_topics_enabled(m_init_config->enable_debug_topics);
 
@@ -149,7 +148,7 @@ void PSGDocumentSink::_step()
         return;
     }
 
-    // get frame and publish
+    // get document and publish
     const auto msg_uuid = ActionDataTrait_t::get_uuid(*goal_handle->get_goal());
     const auto msg_uuid_str = boost::uuids::to_string(msg_uuid);
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] {}",
@@ -157,9 +156,13 @@ void PSGDocumentSink::_step()
     auto &raw_document = goal_handle->get_goal()->document;
     m_pub_relayed_document.publish(raw_document);
 
+
+    // publish image
+    const auto &raw_image = raw_document.frame.raw_image;
+
     // publish debug topic?
     if (get_debug_topics_enabled()) {
-        m_pub_document_accepted.publish(raw_document, "accepted");
+        m_pub_debug_document_accepted.publish(raw_image, "accepted");
     }
 
     // at the end, terminate the goal

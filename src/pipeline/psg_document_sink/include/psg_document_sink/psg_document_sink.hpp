@@ -7,7 +7,7 @@
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
 #include <psg_document_sink/AsyncDocumentInputPort.hpp>
 #include <psg_master_node/StampedDocumentPub.hpp>
-
+#include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 namespace redoxi_works
 {
 class PSGDocumentSink;
@@ -32,6 +32,7 @@ struct PSGDocumentSinkInitConfig {
 
     //! The topic to publish the relayed document
     std::string publish_topic = "out/relayed_document";
+    std::string publish_topic_image = "out/relayed_image";
 
     //! debug topics
     bool enable_debug_topics = true;
@@ -94,8 +95,9 @@ class PSGDocumentSink : public rclcpp::Node, public IStartStopProtocol
 
     // publishers
     StampedDocumentPub m_pub_relayed_document;
-    StampedDocumentPub m_pub_document_accepted;
-    StampedDocumentPub m_pub_document_rejected;
+    // StampedImagePub m_pub_relayed_image;
+    StampedImagePub m_pub_debug_document_accepted;
+    StampedImagePub m_pub_debug_document_rejected;
     std::shared_ptr<std::thread> m_step_thread;
     std::atomic<bool> m_running{false};
 };

@@ -18,21 +18,21 @@ source_node_json_params = {
         "primary_output_spec": {
             "downstream_specs": [
                 {
-                    "name": "video_sink",
+                    "name": "psg_master_node",
                     "action_name": "/psg_master_node/in/action",
-                    "delivery_policy": {
-                        "retry_policy": {
-                            "number_of_retry": 5,
-                            "fallback_number_of_retry": 3,
-                            "wait_time_between_retry": 10000,
-                            "fallback_wait_time_between_retry": 5000,
-                            "wait_time_retry_response": 5000,
-                            "fallback_wait_time_retry_response": 1000000,
-                        },
-                        "precondition": "dont_care",
-                        "drop_strategy": "dont_care",
-                    },
-                    "create_debug_pub": True,
+                    # "delivery_policy": {
+                    #     "retry_policy": {
+                    #         "number_of_retry": 5,
+                    #         "fallback_number_of_retry": 3,
+                    #         "wait_time_between_retry": 10000,
+                    #         "fallback_wait_time_between_retry": 5000,
+                    #         "wait_time_retry_response": 5000,
+                    #         "fallback_wait_time_retry_response": 1000000,
+                    #     },
+                    #     "precondition": "dont_care",
+                    #     "drop_strategy": "dont_care",
+                    # },
+                    # "create_debug_pub": True,
                 }
             ],
             "num_buffer_requests": 1,
@@ -120,7 +120,7 @@ document_sink_node_json_params = {
         "_time_unit": "us(1e-6)",
         "step_interval": 500,
         "publish_topic": "out/relayed_document",
-        "enable_debug_topics": False,
+        "enable_debug_topics": True,
         "enable_blocking_mode": False,
     },
 }
@@ -149,6 +149,8 @@ video_source_node = Node(
 psg_master_node = Node(
     package="test_package",
     executable="v2_psg_master_node",
+    output='screen',  # 将输出重定向到屏幕
+    emulate_tty=True,  # 保持颜色输出
     name="psg_master_node",
     namespace="psg_master_node",
     prefix=common_prefix,
@@ -186,7 +188,7 @@ def generate_launch_description():
             "RCUTILS_CONSOLE_OUTPUT_FORMAT", "[{severity}][{time}]: {message}"
         ),
         SetEnvironmentVariable(
-            "ROS_LOG_DIR", "/soft/workspace/code/psf_ros2_ws/tmp/roslog"
+            "ROS_LOG_DIR", "/3d/chengxiao/code/psf_ros2_ws/tmp/"
         ),
         SetEnvironmentVariable("ROS_DOMAIN_ID", "0"),
     ]
@@ -195,7 +197,7 @@ def generate_launch_description():
         [
             *env_var_settings,
             log_level_arg,
-            # video_source_node,
+            video_source_node,
             psg_master_node,
             document_sink_node,
         ]

@@ -12,6 +12,7 @@
   <depend>rclcpp</depend>
   <depend>redoxi_common_nodes</depend>
   <depend>psg_private_msgs</depend>
+  <depend>redoxi_samples_lib</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

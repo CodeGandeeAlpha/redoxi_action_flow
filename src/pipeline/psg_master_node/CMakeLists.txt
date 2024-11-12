@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(redoxi_common_nodes REQUIRED)
 find_package(psg_private_msgs REQUIRED)
+find_package(redoxi_samples_lib REQUIRED)
 
 set(srcfiles
   src/StampedDocumentPub.cpp
@@ -27,6 +28,7 @@ target_compile_features(psg_master_node PUBLIC c_std_99 cxx_std_17)  # Require C
 ament_target_dependencies(
   psg_master_node  PUBLIC
   redoxi_common_nodes
+  redoxi_samples_lib
   psg_private_msgs
   "rclcpp"
 )
@@ -74,6 +76,7 @@ ament_export_dependencies(
   rclcpp
   redoxi_common_nodes
   psg_private_msgs
+  redoxi_samples_lib
   )
 
 ament_package()

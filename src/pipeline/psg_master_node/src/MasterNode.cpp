@@ -1,6 +1,7 @@
 #include <psg_master_node/MasterNodeTypes.hpp>
 #include <psg_master_node/MasterNode.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
+#include <redoxi_samples_lib/random_image.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 #include <json_struct/json_struct.h>
 
@@ -47,6 +48,11 @@ int PSGMasterNode::start()
         return -1;
     }
 
+    //! Start input port
+    RDX_INFO_DEV(this, __func__, false, "{}", "Starting psg master node");
+    m_input_port->start();
+    RDX_INFO_DEV(this, __func__, false, "{}", "input port started");
+
     //! Start primary output port
     if (m_primary_output_port) {
         auto ret = m_primary_output_port->start();
@@ -92,6 +98,12 @@ int PSGMasterNode::stop()
         RDX_RAISE_ERROR("[{}] status must be in STARTED, got {}", __func__, NodeStatusCodeToString(m_status_code));
         return -1;
     }
+
+    //! Stop input port
+    RDX_INFO_DEV(this, __func__, false, "{}", "Stopping psg master node");
+    m_input_port->stop();
+    RDX_INFO_DEV(this, __func__, false, "{}", "input port stopped");
+
 
     //! Stop primary output port
     if (m_primary_output_port) {
@@ -152,6 +164,10 @@ int PSGMasterNode::init(std::shared_ptr<InitConfig_t> config,
 
     //! apply or update runtime config
     update_runtime_config(runtime_config);
+
+    // create the input port
+    m_input_port = std::make_shared<InputPort_t>(this);
+    m_input_port->init(m_init_config->input_port_config);
 
     //! Change status to STOPPED
     _set_status_code(NodeStatusCode::STOPPED);
@@ -282,13 +298,11 @@ int PSGMasterNode::_declare_all_parameters()
     return 0;
 }
 
-void PSGMasterNode::_step2()
+void PSGMasterNode::_step()
 {
     if (m_status_code != NodeStatusCode::STARTED) {
         return;
     }
-
-    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "step once");
 
     if (m_impl->m_ros_time_token->try_pop_token()) {
         std::shared_ptr<InputSourceData_t> frame_data;
@@ -298,6 +312,10 @@ void PSGMasterNode::_step2()
         } else {
             // try to get data without waiting
             frame_data = m_input_port->try_pop_source_data();
+        }
+
+        if (!frame_data) {
+            return;
         }
 
         // from input source data to output source data
@@ -358,7 +376,7 @@ void PSGMasterNode::_step2()
     }
 }
 
-void PSGMasterNode::_step()
+void PSGMasterNode::_step2()
 {
     if (m_status_code != NodeStatusCode::STARTED) {
         return;
@@ -368,6 +386,24 @@ void PSGMasterNode::_step()
 
     //! 随机构造input source data
     auto frame_data = std::make_shared<InputSourceData_t>();
+    auto goal = std::make_shared<InputSourceData_t::ActionType_t::Goal>();
+    goal->frame = redoxi_public_msgs::msg::Frame();
+
+    //! 修改这部分代码以确保正确的图像格式
+    cv::Mat img;
+    random_image_with_shapes(img, cv::Size(640, 480));
+
+    //! 确保图像转换为正确的格式
+    auto msg = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", img).toImageMsg();
+    goal->frame.raw_image = *msg;
+
+    //! 设置其他必要的图像信息
+    goal->frame.raw_image.header.stamp = this->now();
+    goal->frame.raw_image.header.frame_id = "camera";
+
+    frame_data->set_goal(goal);
+
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "after set goal");
     // frame_data->m_goal = std::make_shared<InputSourceData_t::Goal>();
     // frame_data->m_goal->frame = cv::Mat(480, 640, CV_8UC3, cv::Scalar(rand()%255, rand()%255, rand()%255));
 
