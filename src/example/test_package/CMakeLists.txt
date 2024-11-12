@@ -145,6 +145,15 @@ endif()
 if(BUILD_ONNX_HELLO_WORLD)
   configure_target(onnx_hello_world)
 
+  # hand-crafted onnx configuration
+  # set(ONNXRUNTIME_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/onnxruntime/onnxruntime-linux-x64-gpu-1.17.3)
+  # target_include_directories(onnx_hello_world PUBLIC ${ONNXRUNTIME_ROOT}/include)
+  # target_link_libraries(onnx_hello_world PUBLIC
+  #   ${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so
+  #   ${ONNXRUNTIME_ROOT}/lib/libonnxruntime_providers_shared.so
+  #   ${ONNXRUNTIME_ROOT}/lib/libonnxruntime_providers_cuda.so
+  #   ${ONNXRUNTIME_ROOT}/lib/libonnxruntime_providers_tensorrt.so)
+
   # configure for onnx runtime
   set(onnxruntime_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/onnxruntime/onnxruntime-linux-x64-gpu-1.20.0/lib64/cmake/onnxruntime)
   message(STATUS "onnxruntime_DIR: ${onnxruntime_DIR}")

@@ -31,6 +31,8 @@ display_help() {
 PackagesToBuild="redoxi_common_nodes \
                  redoxi_shared_memory \
                  redoxi_shm_v6d \
+                 redoxi_inference \
+                 redoxi_inference_onnx \
                  test_package \
                  rosboard"
 

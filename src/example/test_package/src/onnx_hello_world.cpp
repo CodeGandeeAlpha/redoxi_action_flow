@@ -94,6 +94,7 @@ int main(int argc, char **argv)
                 }
             }
             auto start_time = std::chrono::high_resolution_clock::now();
+            runtime_data->io_binding->SynchronizeInputs();
             session->Run(Ort::RunOptions{nullptr}, *runtime_data->io_binding);
             auto end_time = std::chrono::high_resolution_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
