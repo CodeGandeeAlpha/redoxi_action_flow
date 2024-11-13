@@ -9,8 +9,8 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(OpenCV REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 add_library(redoxi_inference src/redoxi_inference.cpp)
 add_library(redoxi_inference::redoxi_inference ALIAS redoxi_inference)
@@ -24,11 +24,8 @@ ament_target_dependencies(
   "pluginlib"
 )
 
-target_include_directories(redoxi_inference PUBLIC
-  ${OpenCV_INCLUDE_DIRS}
-)
 target_link_libraries(redoxi_inference PUBLIC
-  ${OpenCV_LIBS}
+  Eigen3::Eigen
 )
 
 # Causes the visibility macros to use dllexport rather than dllimport,
@@ -60,9 +57,9 @@ if(BUILD_TESTING)
 endif()
 
 ament_export_dependencies(
-  "OpenCV"
   "pluginlib"
   "rclcpp"
+  "Eigen3"
 )
 
 ament_export_include_directories(

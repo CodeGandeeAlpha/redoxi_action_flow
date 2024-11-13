@@ -2,15 +2,14 @@
 #define REDOXI_INFERENCE__REDOXI_INFERENCE_HPP_
 
 #include "redoxi_inference/visibility_control.h"
-#include <opencv2/opencv.hpp>
+#include "redoxi_inference/redoxi_tensor_def.hpp"
 #include <optional>
+#include <array>
+#include <memory>
 
-namespace redoxi_works
+
+namespace redoxi_works::inference
 {
-
-namespace inference
-{
-
 struct KeyValueStore {
     virtual ~KeyValueStore() = default;
     using RawPtr = KeyValueStore *;
@@ -48,10 +47,6 @@ struct ModelPortInfo
     // string representation of dtype, such as "float32", "int64", "float16", ...
     // following numpy dtype string
     std::string dtype_str;
-    
-    // dtype as in opencv convention, like CV_32FC1, CV_8UC1, ...
-    // always uses 1 channel
-    int dtype_opencv = CV_32FC1;
 
     // expected shape of the tensor
     // -1 for dynamic dimension
@@ -71,18 +66,56 @@ public:
   // get information of the port
   virtual const ModelPortInfo &get_port_info() const = 0;
 
-  // convert from cv::Mat to the data type of the port
-  // it will not copy the data, so you need to ensure the data is valid during inference
-  // return 0 if success, -1 if failed
-  virtual int set_by_cvmat(const cv::Mat &img) = 0;
+  /**
+   * @brief Set data by tensor.
+   * 
+   * The shape must match the port info shape. If the data type or shape has a problem,
+   * it will throw an std::invalid_argument exception.
+   * 
+   * @param tensor A shared pointer to a Tensor_4d_f32 object.
+   * @return int Returns 0 on success, or an error code on failure.
+   * @throws std::invalid_argument if the data type or shape is incorrect.
+   */
+  virtual int set_by_tensor(std::shared_ptr<Tensor_4d_f32> tensor) = 0;
 
-  // load data from multiple cv::Mat, as a batch, they must be in the same shape
-  // return 0 if success, -1 if failed
-  virtual int set_by_cvmat(const std::vector<cv::Mat> &imgs) = 0;
+  /**
+   * @brief Set data by tensor.
+   * 
+   * The shape must match the port info shape. If the data type or shape has a problem,
+   * it will throw an std::invalid_argument exception.
+   * 
+   * @param tensor A shared pointer to a Tensor_4d_u8 object.
+   * @return int Returns 0 on success, or an error code on failure.
+   * @throws std::invalid_argument if the data type or shape is incorrect.
+   */
+  virtual int set_by_tensor(std::shared_ptr<Tensor_4d_u8> tensor) = 0;
 
-  // get the data as cv::Mat
-  // return 0 if success, -1 if failed
-  virtual std::vector<cv::Mat> get_as_cvmat() const = 0;
+  /**
+   * @brief Get the data as a tensor.
+   * 
+   * The shape must match the port info shape. If the data type or shape has a problem,
+   * it will throw an std::invalid_argument exception.
+   * 
+   * @param output_tensor A pointer to a shared pointer that will hold the Tensor_4d_f32 object.
+   * @return int Returns 0 on success, or an error code on failure.
+   * @throws std::invalid_argument if the data type or shape is incorrect.
+   */
+  virtual int get_as_tensor(std::shared_ptr<Tensor_4d_f32>* output_tensor) const = 0;
+
+  /**
+   * @brief Get the data as a tensor.
+   * 
+   * The shape must match the port info shape. If the data type or shape has a problem,
+   * it will throw an std::invalid_argument exception.
+   * 
+   * @param output_tensor A pointer to a shared pointer that will hold the Tensor_4d_u8 object.
+   * @return int Returns 0 on success, or an error code on failure.
+   * @throws std::invalid_argument if the data type or shape is incorrect.
+   */
+  virtual int get_as_tensor(std::shared_ptr<Tensor_4d_u8>* output_tensor) const = 0;
+
+  // get expected shape of the tensor given a batch size, where the dimensions that can be dynamic are -1
+  virtual std::array<int, 4> get_expected_shape_4d(std::optional<int> batch_size = std::nullopt) const = 0;
 };
 
 class RedoxiModelInference
@@ -92,16 +125,24 @@ public:
   virtual ~RedoxiModelInference() = default;
 
   // create a key value store
-  static std::shared_ptr<KeyValueStore> create_key_value_store();
+  virtual std::shared_ptr<KeyValueStore> create_key_value_store() = 0;
 
-  // load model based on metadata
-  virtual int load_model(std::shared_ptr<const KeyValueStore> metadata) = 0;
+  // create model port data, with optional batch size if the input port supports dynamic batch size
+  virtual std::shared_ptr<ModelPortData> create_model_port_data(
+    const std::string& port_name, 
+    std::optional<int> batch_size = std::nullopt) = 0;
 
-  // unload model
-  virtual int unload_model() = 0;
+  // initialize the model inference, load model and other resources
+  virtual int init(std::shared_ptr<KeyValueStore> params) = 0;
 
-  // do we have model loaded?
-  virtual bool has_loaded_model() const = 0;
+  // open the model inference, get ready for inference
+  virtual int open() = 0;
+
+  // check if the model inference is open, ready for inference
+  virtual bool is_open() const = 0;
+
+  // close the model inference, release inference resources
+  virtual int close() = 0;
 
   // get model metadata, related to the model itself
   virtual std::shared_ptr<const KeyValueStore> get_model_metadata() const = 0;
@@ -117,6 +158,9 @@ public:
 
   // set input data
   virtual int set_input_data(const std::string& port_name, std::shared_ptr<ModelPortData> data) = 0;
+
+  // get output data
+  virtual int get_output_data(ModelPortData* output_data, const std::string& port_name) = 0;
 
   // notify the model that all input data are set
   // call this before inference, after all input data are set
@@ -138,17 +182,9 @@ public:
     return data;
   }
 
-  // get output data
-  virtual int get_output_data(ModelPortData* output_data, const std::string& port_name) = 0;
 
-  // create model port data, with optional batch size if the input port supports dynamic batch size
-  static std::shared_ptr<ModelPortData> create_model_port_data(
-    const std::string& port_name, 
-    std::optional<int> batch_size = std::nullopt);
 };
 
-}  // namespace inference
-
-}  // namespace redoxi_works
+}  // namespace redoxi_works::inference
 
 #endif  // REDOXI_INFERENCE__REDOXI_INFERENCE_HPP_
