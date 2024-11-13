@@ -226,6 +226,7 @@ class RedoxiVideoReaderBase : public rclcpp::Node,
         (void)target_data;
         (void)result;
         (void)ds;
+
         return 0;
     };
 

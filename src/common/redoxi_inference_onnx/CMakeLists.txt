@@ -10,8 +10,13 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(redoxi_inference REQUIRED)
+find_package(Boost REQUIRED)
 
-add_library(redoxi_inference_onnx src/redoxi_inference_onnx.cpp)
+add_library(redoxi_inference_onnx 
+  src/redoxi_inference_onnx.cpp
+  src/OnnxModelInference.cpp
+  src/OnnxPortData.cpp
+  )
 add_library(redoxi_inference_onnx::redoxi_inference_onnx ALIAS redoxi_inference_onnx)
 target_compile_features(redoxi_inference_onnx PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 target_include_directories(redoxi_inference_onnx PUBLIC
@@ -22,6 +27,13 @@ ament_target_dependencies(
   "rclcpp"
   "redoxi_inference"
 )
+
+target_link_libraries(redoxi_inference_onnx PUBLIC Boost::boost)
+
+# configure for onnx runtime
+set(onnxruntime_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/onnxruntime/onnxruntime-linux-x64-gpu-1.20.0/lib64/cmake/onnxruntime)
+find_package(onnxruntime REQUIRED)
+target_link_libraries(redoxi_inference_onnx PUBLIC onnxruntime::onnxruntime)
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
@@ -51,13 +63,18 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+ament_export_dependencies(
+  redoxi_inference
+  Boost
+)
+
 ament_export_include_directories(
   include
 )
 ament_export_libraries(
   redoxi_inference_onnx
-  redoxi_inference
 )
+
 ament_export_targets(
   export_${PROJECT_NAME}
 )

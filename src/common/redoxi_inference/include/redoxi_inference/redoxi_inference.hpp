@@ -6,13 +6,26 @@
 #include <optional>
 #include <array>
 #include <memory>
+#include <map>
 
 
 namespace redoxi_works::inference
 {
 struct KeyValueStore {
+    using Ptr = std::shared_ptr<KeyValueStore>;
+    using ConstPtr = std::shared_ptr<const KeyValueStore>;
+
     virtual ~KeyValueStore() = default;
     using RawPtr = KeyValueStore *;
+
+    struct KeyInfo{
+      std::string key;  // key name
+      std::string dtype;  // data type, such as "string", "int64", "double", ...
+      std::string description;  // description of the key
+    };
+
+    //! Get all keys and their information
+    virtual const std::vector<KeyInfo>& get_all_keys() const = 0;
 
     //! Get a string value from the connect params
     virtual int get_string(std::string *output, const std::string &key) const = 0;
@@ -41,30 +54,46 @@ struct KeyValueStore {
 
 struct ModelPortInfo
 {
-    // name of the port, unique for each port
-    std::string name;
+    using Ptr = std::shared_ptr<ModelPortInfo>;
+    using PtrMap = std::map<std::string, Ptr>;
+    using ConstPtr = std::shared_ptr<const ModelPortInfo>;
+    using ConstPtrMap = std::map<std::string, ConstPtr>;
 
-    // string representation of dtype, such as "float32", "int64", "float16", ...
-    // following numpy dtype string
-    std::string dtype_str;
+    virtual ~ModelPortInfo() = default;
 
-    // expected shape of the tensor
-    // -1 for dynamic dimension
-    // following pytorch shape convention, [N,C,H,W]
-    std::vector<int64_t> shape;
+    //! Get the name of the port
+    virtual std::string get_name() const = 0;
 
-    // true if this is an input port, false if it is an output port
-    bool is_input = false;
+    //! Get the data type of the port
+    //! @return The data type of the port
+    virtual std::string get_dtype_str() const = 0;
+
+    //! Get the expected shape of the tensor
+    //! @return The expected shape of the tensor, -1 for dynamic dimension
+    virtual std::vector<int64_t> get_shape() const = 0;
+
+    //! Get if the port is an input port
+    //! @return True if the port is an input port, false if it is an output port
+    virtual bool is_input() const = 0;
+
+    //! Get the expected shape of the tensor given a batch size, where the dimensions that can be dynamic are -1
+    //! @param batch_size The batch size, optional
+    //! @return The expected shape of the tensor in 4d format, typically [N,C,H,W], depends on the model
+    //! If the port cannot deal with 4d tensor (e.g., required 5d tensor or more), return std::nullopt
+    virtual std::optional<std::array<int, 4>> get_shape_4d(std::optional<int> batch_size = std::nullopt) const = 0;
 };
 
 class ModelPortData
 {
 public:
+  using Ptr = std::shared_ptr<ModelPortData>;
+  using ConstPtr = std::shared_ptr<const ModelPortData>;
+
   ModelPortData() = default;
   virtual ~ModelPortData() = default;
 
   // get information of the port
-  virtual const ModelPortInfo &get_port_info() const = 0;
+  virtual ModelPortInfo::ConstPtr get_port_info() const = 0;
 
   /**
    * @brief Set data by tensor.
@@ -113,9 +142,6 @@ public:
    * @throws std::invalid_argument if the data type or shape is incorrect.
    */
   virtual int get_as_tensor(std::shared_ptr<Tensor_4d_u8>* output_tensor) const = 0;
-
-  // get expected shape of the tensor given a batch size, where the dimensions that can be dynamic are -1
-  virtual std::array<int, 4> get_expected_shape_4d(std::optional<int> batch_size = std::nullopt) const = 0;
 };
 
 class RedoxiModelInference
@@ -125,15 +151,15 @@ public:
   virtual ~RedoxiModelInference() = default;
 
   // create a key value store
-  virtual std::shared_ptr<KeyValueStore> create_key_value_store() = 0;
+  virtual KeyValueStore::Ptr create_key_value_store() = 0;
 
   // create model port data, with optional batch size if the input port supports dynamic batch size
-  virtual std::shared_ptr<ModelPortData> create_model_port_data(
+  virtual ModelPortData::Ptr create_model_port_data(
     const std::string& port_name, 
     std::optional<int> batch_size = std::nullopt) = 0;
 
   // initialize the model inference, load model and other resources
-  virtual int init(std::shared_ptr<KeyValueStore> params) = 0;
+  virtual int init(KeyValueStore::Ptr params) = 0;
 
   // open the model inference, get ready for inference
   virtual int open() = 0;
@@ -145,22 +171,19 @@ public:
   virtual int close() = 0;
 
   // get model metadata, related to the model itself
-  virtual std::shared_ptr<const KeyValueStore> get_model_metadata() const = 0;
+  virtual KeyValueStore::ConstPtr get_model_metadata() const = 0;
 
   // get inference metadata, related to the runtime environment
-  virtual std::shared_ptr<const KeyValueStore> get_inference_metadata() const = 0;
+  virtual KeyValueStore::ConstPtr get_inference_metadata() const = 0;
 
-  // get information of input ports
-  virtual std::vector<ModelPortInfo> get_input_port_infos() const = 0;
-
-  // get information of output ports
-  virtual std::vector<ModelPortInfo> get_output_port_infos() const = 0;
+  // get information of ports
+  virtual ModelPortInfo::ConstPtrMap get_port_infos() const = 0;
 
   // set input data
-  virtual int set_input_data(const std::string& port_name, std::shared_ptr<ModelPortData> data) = 0;
+  virtual int set_input_data(const std::string& port_name, ModelPortData::Ptr data) = 0;
 
   // get output data
-  virtual int get_output_data(ModelPortData* output_data, const std::string& port_name) = 0;
+  virtual int get_output_data(ModelPortData::Ptr output_data, const std::string& port_name) = 0;
 
   // notify the model that all input data are set
   // call this before inference, after all input data are set
@@ -171,10 +194,10 @@ public:
   virtual int do_inference() = 0;
 
   // get output data
-  virtual std::shared_ptr<ModelPortData> get_output_data(const std::string& port_name)
+  virtual ModelPortData::Ptr get_output_data(const std::string& port_name)
   {
     auto data = create_model_port_data(port_name);
-    auto ret = get_output_data(data.get(), port_name);
+    auto ret = get_output_data(data, port_name);
     if (ret != 0)
     {
       return nullptr;

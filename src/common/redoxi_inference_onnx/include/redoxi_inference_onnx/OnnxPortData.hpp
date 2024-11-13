@@ -5,11 +5,16 @@
 namespace redoxi_works::inference::onnx
 {
 
+class OnnxModelInference;
 class OnnxPortData : public ModelPortData
 {
+  friend class OnnxModelInference;
 public:
   OnnxPortData();
   virtual ~OnnxPortData();
+
+  // get information of the port
+  virtual ModelPortInfo::ConstPtr get_port_info() const override;
 
   //! Set data by tensor.
   //! The shape must match the port info shape. If the data type or shape has a problem,
@@ -43,10 +48,8 @@ public:
   //! @throws std::invalid_argument if the data type or shape is incorrect.
   virtual int get_as_tensor(std::shared_ptr<Tensor_4d_u8>* output_tensor) const override;
 
-  //! Get expected shape of the tensor given a batch size, where the dimensions that can be dynamic are -1
-  //! @param batch_size Optional batch size for dynamic dimensions.
-  //! @return std::array<int, 4> The expected shape of the tensor.
-  virtual std::array<int, 4> get_expected_shape_4d(std::optional<int> batch_size = std::nullopt) const override;
+private:
+  ModelPortInfo::Ptr m_port_info;
 };
 
 }  // namespace redoxi_works::inference::onnx
