@@ -5,20 +5,7 @@
 
 namespace redoxi_works::inference
 {
-template<typename ElementType>
-using Tensor_dtype = Eigen::Tensor<ElementType, Eigen::Dynamic, Eigen::RowMajor>;
-
-// dynamic tensor, row major
-using Tensor_f32 = Tensor_dtype<float>;
-using Tensor_f16 = Tensor_dtype<Eigen::half>;
-using Tensor_i32 = Tensor_dtype<int32_t>;
-using Tensor_u8 = Tensor_dtype<uint8_t>;
-using TensorView_f32 = Eigen::TensorMap<Tensor_f32>;
-using TensorView_f16 = Eigen::TensorMap<Tensor_f16>;
-using TensorView_i32 = Eigen::TensorMap<Tensor_i32>;
-using TensorView_u8 = Eigen::TensorMap<Tensor_u8>;
-
-template<int Ndim, typename ElementType>
+template <int Ndim, typename ElementType>
 using Tensor_nd_dtype = Eigen::Tensor<ElementType, Ndim, Eigen::RowMajor>;
 
 // fixed tensor, row major
@@ -68,4 +55,4 @@ using TensorView_4d_u8 = Eigen::TensorMap<Tensor_4d_u8>;
 using TensorView_3d_u8 = Eigen::TensorMap<Tensor_3d_u8>;
 using TensorView_2d_u8 = Eigen::TensorMap<Tensor_2d_u8>;
 using TensorView_1d_u8 = Eigen::TensorMap<Tensor_1d_u8>;
-}
+} // namespace redoxi_works::inference

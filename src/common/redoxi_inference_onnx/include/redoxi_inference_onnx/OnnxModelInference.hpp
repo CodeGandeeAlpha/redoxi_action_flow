@@ -34,14 +34,6 @@ class OnnxModelInference : public RedoxiModelInference
     //! Create a key value store
     virtual KeyValueStore::Ptr create_init_params() override;
 
-    //! Configure an input port, set the shape of the port
-    //! For dynamic dimensions, set the dimension to -1, or a specific value if it is static
-    //! @note this will invalidate the data in the corresponding input port, it may be destroyed and recreated
-    //! @return 0 if success, -1 if failed (the model does not support this shape)
-    virtual int configure_input_port(
-        const std::string &port_name,
-        std::vector<int64_t> shape) override;
-
     //! Get the data of an input port
     virtual ModelPortData::Ptr get_input_port_data(const std::string &port_name) override;
 
@@ -60,11 +52,6 @@ class OnnxModelInference : public RedoxiModelInference
     //! Get information of output ports
     virtual ModelPortInfo::ConstPtrMap get_output_port_infos() const override;
 
-    //! Notify the model that all input data are set
-    //! Call this before inference, after all input data are set
-    //! If you don't call this, the input data might not be up-to-date
-    virtual int notify_input_ready() override;
-
     //! Inference
     virtual int do_inference() override;
 
@@ -80,6 +67,12 @@ class OnnxModelInference : public RedoxiModelInference
     //! Close the model inference, release inference resources
     virtual int close() override;
 
+  public:
+    auto get_onnx_session() const
+    {
+        return m_session;
+    }
+
   private:
     //! Initialize the port information
     void _init_all_ports();
@@ -88,9 +81,8 @@ class OnnxModelInference : public RedoxiModelInference
     std::shared_ptr<Ort::Session> m_session;
     std::shared_ptr<Ort::Env> m_env;
     std::shared_ptr<OnnxModelConfig> m_config;
-    std::shared_ptr<Ort::IoBinding> m_io_binding;
-    std::map<std::string, InferencePort> m_input_ports;
-    std::map<std::string, InferencePort> m_output_ports;
+    OnnxModelPortInfo::PtrMap m_input_ports;
+    OnnxModelPortInfo::PtrMap m_output_ports;
 
   private:
     /**

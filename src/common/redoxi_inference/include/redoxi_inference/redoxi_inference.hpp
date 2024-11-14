@@ -11,6 +11,45 @@
 
 namespace redoxi_works::inference
 {
+
+//! Check if a specific shape is compatible with a general shape.
+//! Specific shape set fixed dimensions for dynamic dimensions in the general shape, but not the other way around
+//! - if general_shape[k]>0, then specific_shape[k]==general_shape[k]
+//! - if general_shape[k]==-1, then specific_shape[k] can be -1 or positive
+//! - in any case, specific_shape[k]!=0
+//! @param specific_shape The shape to check
+//! @param general_shape The general shape to compare against, where -1 means dynamic dimension
+//! @return True if the specific shape is compatible with the general shape, false otherwise
+inline bool is_shape_compatible(const std::vector<int64_t> &specific_shape,
+                                const std::vector<int64_t> &general_shape)
+{
+    if (specific_shape.size() != general_shape.size()) {
+        return false;
+    }
+
+    // check each dimension
+    for (size_t i = 0; i < specific_shape.size(); ++i) {
+        if (general_shape[i] > 0) {
+            // specific shape must match general shape, if general shape is fixed
+            bool ok = specific_shape[i] == general_shape[i];
+            if (!ok) {
+                return false;
+            }
+        } else if (general_shape[i] == -1) {
+            // specific shape can be dynamic or match general shape, if general shape is dynamic
+            bool ok = specific_shape[i] == -1 || specific_shape[i] > 0;
+            if (!ok) {
+                return false;
+            }
+        } else {
+            return false; // general_shape[i] should not be 0 or negative other than -1
+        }
+    }
+
+    // all dimensions are compatible
+    return true;
+}
+
 struct KeyValueStore {
     using Ptr = std::shared_ptr<KeyValueStore>;
     using ConstPtr = std::shared_ptr<const KeyValueStore>;
@@ -114,56 +153,40 @@ class ModelPortData
     ModelPortData() = default;
     virtual ~ModelPortData() = default;
 
-    // get information of the port
+    // get information of the port, note that there may be dynamic shape for the data
+    // so you need to use get_shape() to get the actual shape of the data
     virtual ModelPortInfo::ConstPtr get_port_info() const = 0;
 
-    /**
-     * @brief Set data by tensor.
-     *
-     * The shape must match the port info shape. If the data type or shape has a problem,
-     * it will throw an std::invalid_argument exception.
-     *
-     * @param tensor A shared pointer to a Tensor_4d_f32 object.
-     * @return int Returns 0 on success, or an error code on failure.
-     * @throws std::invalid_argument if the data type or shape is incorrect.
-     */
-    virtual int set_by_tensor(std::shared_ptr<Tensor_4d_f32> tensor) = 0;
+    //! Set data by tensor, for float type. Data will be copied into the tensor
+    virtual int set_tensor_data(const float *data, std::vector<int64_t> shape) = 0;
 
-    /**
-     * @brief Set data by tensor.
-     *
-     * The shape must match the port info shape. If the data type or shape has a problem,
-     * it will throw an std::invalid_argument exception.
-     *
-     * @param tensor A shared pointer to a Tensor_4d_u8 object.
-     * @return int Returns 0 on success, or an error code on failure.
-     * @throws std::invalid_argument if the data type or shape is incorrect.
-     */
-    virtual int set_by_tensor(std::shared_ptr<Tensor_4d_u8> tensor) = 0;
+    //! Set data by tensor, for uint8_t type. Data will be copied into the tensor
+    virtual int set_tensor_data(const uint8_t *data, std::vector<int64_t> shape) = 0;
 
-    /**
-     * @brief Get the data as a tensor.
-     *
-     * The shape must match the port info shape. If the data type or shape has a problem,
-     * it will throw an std::invalid_argument exception.
-     *
-     * @param output_tensor A pointer to a shared pointer that will hold the Tensor_4d_f32 object.
-     * @return int Returns 0 on success, or an error code on failure.
-     * @throws std::invalid_argument if the data type or shape is incorrect.
-     */
-    virtual int get_as_tensor(std::shared_ptr<Tensor_4d_f32> *output_tensor) const = 0;
+    //! Get the shape of the tensor, you need this to interpret the data you get from get_as_tensor()
+    //! @return The shape of the tensor
+    virtual std::vector<int64_t> get_shape() const = 0;
 
-    /**
-     * @brief Get the data as a tensor.
-     *
-     * The shape must match the port info shape. If the data type or shape has a problem,
-     * it will throw an std::invalid_argument exception.
-     *
-     * @param output_tensor A pointer to a shared pointer that will hold the Tensor_4d_u8 object.
-     * @return int Returns 0 on success, or an error code on failure.
-     * @throws std::invalid_argument if the data type or shape is incorrect.
-     */
-    virtual int get_as_tensor(std::shared_ptr<Tensor_4d_u8> *output_tensor) const = 0;
+    //! Get the data type of the tensor, you need this to interpret the data you get from get_tensor_data()
+    //! @return The data type of the tensor
+    virtual std::string get_dtype_str() const = 0;
+
+    //! Get the raw data pointer of the tensor, then you can interpret the data by its shape
+    virtual int get_tensor_data(const float **output_tensor) const = 0;
+
+    //! Get the raw data pointer of the tensor, then you can interpret the data by its shape
+    //! you can also modify the data by this pointer
+    //! @return 0 if success, -1 if failed
+    virtual int get_tensor_data(float **output_tensor) = 0;
+
+    //! Get the raw data pointer of the tensor, then you can interpret the data by its shape
+    //! @return 0 if success, -1 if failed
+    virtual int get_tensor_data(const uint8_t **output_tensor) const = 0;
+
+    //! Get the raw data pointer of the tensor, then you can interpret the data by its shape
+    //! you can also modify the data by this pointer
+    //! @return 0 if success, -1 if failed
+    virtual int get_tensor_data(uint8_t **output_tensor) = 0;
 };
 
 //! A class to hold the input and output data of a model inference, like onnx io_binding

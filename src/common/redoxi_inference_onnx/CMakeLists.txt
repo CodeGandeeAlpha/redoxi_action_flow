@@ -18,6 +18,7 @@ add_library(redoxi_inference_onnx
   src/redoxi_inference_onnx.cpp
   src/OnnxModelInference.cpp
   src/OnnxPortData.cpp
+  src/OnnxInferenceInOutData.cpp
   )
 add_library(redoxi_inference_onnx::redoxi_inference_onnx ALIAS redoxi_inference_onnx)
 target_compile_features(redoxi_inference_onnx PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
