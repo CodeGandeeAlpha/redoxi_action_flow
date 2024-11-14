@@ -34,7 +34,16 @@ PackagesToBuild="redoxi_common_nodes \
                  test_package \
                  rosboard \
                  psg_master_node \
-                 psg_document_sink"
+                 psg_document_sink \
+                 psg_detector
+                 "
+# PackagesToBuild="redoxi_common_nodes \
+#                  redoxi_shared_memory \
+#                  redoxi_shm_v6d \
+#                  test_package \
+#                  rosboard \
+#                  psg_detector
+#                  "
 
 # Check if --help flag is provided
 if [[ "$*" == *"--help"* ]]; then

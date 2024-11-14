@@ -279,6 +279,17 @@ std::shared_ptr<PSGMasterNode::OutputPort_t>
     //                       "[{}] port_config must have at least one downstream", __func__);
     port->init(port_config);
 
+    // // register callbacks
+    // port->set_callback_on_deliver_task_begin([this](TargetData_t &target_data, const DeliveryTask_t &task) {
+    //     return _on_delivery_task_begin(target_data, task.get_request());
+    // });
+    // port->set_callback_on_deliver_task_finish([this](TargetData_t &target_data, const DeliveryTask_t &task, const DeliveryResult_t &result) {
+    //     return _on_delivery_task_finish(target_data, task.get_request(), result);
+    // });
+    // port->set_callback_on_deliver_to_downstream_finish([this](TargetData_t &target_data, SendResult_t &result, const Downstream_t &ds) {
+    //     return _on_deliver_to_downstream_finish(target_data, result, ds);
+    // });
+
     return port;
 }
 
@@ -320,7 +331,9 @@ void PSGMasterNode::_step()
 
         // from input source data to output source data
         OutputSourceData_t output_source_data;
-        output_source_data.set_frame(frame_data->m_goal->frame);
+        OutputSourceData_t::DeliverySourceData::PublishMessageType_t msg;
+        msg.frame = frame_data->m_goal->frame;
+        output_source_data.set_document(msg);
 
         // create delivery request
         auto delivery_request = _create_delivery_request(output_source_data);
@@ -409,7 +422,9 @@ void PSGMasterNode::_step2()
 
     // from input source data to output source data
     OutputSourceData_t output_source_data;
-    output_source_data.set_frame(frame_data->m_goal->frame);
+    OutputSourceData_t::DeliverySourceData::PublishMessageType_t doc_msg;
+    doc_msg.frame = frame_data->m_goal->frame;
+    output_source_data.set_document(doc_msg);
 
     // create delivery request
     auto delivery_request = _create_delivery_request(output_source_data);

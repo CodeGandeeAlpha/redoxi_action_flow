@@ -1,7 +1,7 @@
 #pragma once
 
 #include <redoxi_common_nodes/async_action_port/AsyncImageInputPort.hpp>
-#include <redoxi_common_nodes/async_action_port/AsyncActionOutputPort.hpp>
+#include <psg_master_node/AsyncDocumentOutputPort.hpp>
 #include <psg_master_node/DocumentOutputSpec.hpp>
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
 #include <redoxi_common_cpp/redoxi_json_struct_conversion.hpp>
@@ -14,8 +14,8 @@ class PSGMasterNode;
 namespace psg_master_node
 {
 using InputPortType = AsyncImageInputPort;
-using OutputPortSpec = async_action_document_output_port::PSGDocumentOutputPortSpec;
-using OutputPortType = AsyncActionOutputPort<OutputPortSpec>;
+using OutputPortType = AsyncDocumentOutputPort;
+using OutputPortSpec = OutputPortType::MasterSpec_t;
 
 //! The delivery policy for making frame delivery request
 using RequestPolicy = OutputPortSpec::DeliveryPolicy_t;

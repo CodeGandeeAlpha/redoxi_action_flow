@@ -27,6 +27,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/SharedMemoryToken.msg"
   "action/ProcessFrame.action"
   "action/ProcessDetections.action"
+  "action/ProcessDetectionsByFrame.action"
   "action/ProcessBodyPoses.action"
 
   DEPENDENCIES geometry_msgs std_msgs unique_identifier_msgs sensor_msgs

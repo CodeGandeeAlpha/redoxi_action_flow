@@ -2,23 +2,23 @@
 
 #include <any>
 #include <boost/uuid/uuid_generators.hpp>
-#include <sensor_msgs/msg/image.hpp>
 #include <cv_bridge/cv_bridge.hpp>
-
+#include <std_msgs/msg/string.hpp>
+#include <psg_private_msgs/msg/psg_document.hpp>
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
+#include <psg_detector/StampedStrPub.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
-#include <psg_private_msgs/action/process_psg_document.hpp>
-#include <psg_master_node/StampedDocumentPub.hpp>
+#include <redoxi_public_msgs/action/process_detections_by_frame.hpp>
 
 
 namespace redoxi_works
 {
 
-namespace async_action_document_output_port
+namespace async_action_get_detections_output_port
 {
 using TimeUnit = DefaultTimeUnit_t;
-using DeliveryActionType = psg_private_msgs::action::ProcessPsgDocument;
+using DeliveryActionType = redoxi_public_msgs::action::ProcessDetectionsByFrame;
 static_assert(RedoxiActionConcept<DeliveryActionType>, "DeliveryActionType must satisfy RedoxiActionConcept");
 
 namespace Defaults
@@ -40,29 +40,28 @@ class RetryPolicy : public output_port_types::DefaultRetryPolicy<TimeUnit>
     }
 };
 
-//! Source data type for document output port
+//! Source data type for image output port
 //! This type must satisfy the DeliverySourceDataConcept
 class DeliverySourceData
 {
   public:
-    using PublishMessageType_t = psg_private_msgs::msg::PsgDocument;
+    using PublishMessageType_t = std_msgs::msg::String;
+    inline static constexpr const char *DefaultEncoding = "bgr8";
 
     DeliverySourceData()
     {
         static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>, "DeliverySourceData must satisfy DeliverySourceDataConcept");
-        m_uuid = boost::uuids::random_generator()();
     }
     virtual ~DeliverySourceData() = default;
 
-
-    //! Get the image
-    virtual const PublishMessageType_t &get_document() const
+    //! Get the frame
+    virtual const psg_private_msgs::msg::PsgDocument &get_document() const
     {
         return m_document;
     }
 
-    //! Set the image
-    virtual void set_document(const PublishMessageType_t &document)
+    //! Set the document
+    virtual void set_document(const psg_private_msgs::msg::PsgDocument &document)
     {
         m_document = document;
     }
@@ -70,35 +69,30 @@ class DeliverySourceData
     //! Convert the source data to a ROS message for publishing
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        msg = m_document;
-        std::copy(m_uuid.begin(), m_uuid.end(), msg.uuid.uuid.begin());
+        msg.data = to_boost_uuid_string(m_document.x_uid.uuid);
         return 0;
     }
 
     //! Get the UUID associated with this source data
     virtual boost::uuids::uuid get_uuid() const
     {
-        return m_uuid;
-    }
-
-    //! Set the UUID associated with this source data
-    virtual void set_uuid(const boost::uuids::uuid &uuid)
-    {
-        m_uuid = uuid;
+        return to_boost_uuid(m_document.x_uid.uuid);
     }
 
     // auxiliary data for easy extension without inheritance
     std::any auxiliary_data;
 
   protected:
-    boost::uuids::uuid m_uuid;
     psg_private_msgs::msg::PsgDocument m_document;
 };
 
 
 //! Delivery target data type for image output port
+using DeliveryTargetDataPublishMessageType_t = sensor_msgs::msg::Image;
 using DeliveryTargetDataBase =
-    output_port_types::DefaultTargetData<DeliveryActionType, RedoxiActionDataTrait<DeliveryActionType>, DeliverySourceData::PublishMessageType_t>;
+    output_port_types::DefaultTargetData<DeliveryActionType,
+                                         RedoxiActionDataTrait<DeliveryActionType>,
+                                         DeliveryTargetDataPublishMessageType_t>;
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
   public:
@@ -113,7 +107,7 @@ class DeliveryTargetData : public DeliveryTargetDataBase
 
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        msg = this->m_goal.document;
+        msg = get_goal().frame.raw_image;
         return 0;
     }
 
@@ -147,9 +141,7 @@ class DeliveryRequest : public DeliveryRequestBase
 
         // fill payload
         auto document = this->m_source_data.get_document();
-
-        // convert frame to document
-        goal.document = document;
+        goal.frame = document.frame;
 
         // set additional information into the goal
         using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
@@ -177,43 +169,41 @@ static_assert(output_port_types::DeliveryRequestConcept<DeliveryRequest>, "Deliv
 using DeliveryTask = output_port_types::DefaultDeliveryTask<DeliveryRequest, DeliveryTargetData, RetryPolicy>;
 static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>, "DeliveryTask must satisfy DeliveryTaskConcept");
 
-//! Downstream debug publisher type for image output port
-class DownstreamDebugPublisher
+//! Source data debug publisher type for image output port
+class SourceDataDebugPublisher
 {
   public:
-    using MessageType_t = psg_private_msgs::msg::PsgDocument;
-    using Publisher_t = StampedDocumentPub;
-    inline static const cv::Scalar DefaultHeaderColor{255, 0, 0};
-    inline static constexpr double DefaultHeaderScale = 1.0;
+    using MessageType_t = std_msgs::msg::String;
+    using Publisher_t = redoxi_works::StampedStrPub;
     inline static const rclcpp::QoS DefaultQoS = DefaultParams::DebugPublisherQoS;
 
-    //! Constructor for DownstreamDebugPublisher with concept assert
-    DownstreamDebugPublisher()
+    //! Constructor for SourceDataDebugPublisher with concept assert
+    SourceDataDebugPublisher()
     {
-        static_assert(RosPublisherConcept<DownstreamDebugPublisher>,
-                      "DownstreamDebugPublisher must satisfy RosPublisherConcept");
+        static_assert(RosPublisherConcept<SourceDataDebugPublisher>,
+                      "SourceDataDebugPublisher must satisfy RosPublisherConcept");
     }
-    virtual ~DownstreamDebugPublisher() = default;
+    virtual ~SourceDataDebugPublisher() = default;
 
-    //! Initialize the DownstreamDebugPublisher with a shared pointer to a publisher
+    //! Initialize the SourceDataDebugPublisher with a shared pointer to a publisher
     virtual void init(std::shared_ptr<Publisher_t> pub)
     {
         m_pub = pub;
     }
 
-    //! Set the publisher for the DownstreamDebugPublisher
+    //! Set the publisher for the SourceDataDebugPublisher
     virtual void set_publisher(std::shared_ptr<Publisher_t> pub)
     {
         m_pub = pub;
     }
 
-    //! Get the current publisher of the DownstreamDebugPublisher
+    //! Get the current publisher of the SourceDataDebugPublisher
     virtual std::shared_ptr<Publisher_t> get_publisher() const
     {
         return m_pub;
     }
 
-    //! Publish an image with the DownstreamDebugPublisher
+    //! Publish an msg with the SourceDataDebugPublisher
     virtual int publish(const MessageType_t &msg)
     {
         return m_pub->publish(msg);
@@ -229,12 +219,70 @@ class DownstreamDebugPublisher
     std::shared_ptr<Publisher_t> m_pub;
 };
 
+//! Target data debug publisher type for image output port
+class TargetDataDebugPublisher
+{
+  public:
+    using MessageType_t = sensor_msgs::msg::Image;
+    using Publisher_t = redoxi_works::StampedImagePub;
+    inline static const cv::Scalar DefaultHeaderColor{255, 0, 0};
+    inline static constexpr double DefaultHeaderScale = 1.0;
+    inline static const rclcpp::QoS DefaultQoS = DefaultParams::DebugPublisherQoS;
+
+    //! Constructor for TargetDataDebugPublisher with concept assert
+    TargetDataDebugPublisher()
+    {
+        static_assert(RosPublisherConcept<TargetDataDebugPublisher>,
+                      "TargetDataDebugPublisher must satisfy RosPublisherConcept");
+    }
+    virtual ~TargetDataDebugPublisher() = default;
+
+    //! Initialize the TargetDataDebugPublisher with a shared pointer to a publisher
+    virtual void init(std::shared_ptr<Publisher_t> pub,
+                      std::optional<cv::Scalar> header_color = std::nullopt,
+                      std::optional<double> header_scale = std::nullopt)
+    {
+        m_pub = pub;
+        m_header_color = header_color.value_or(DefaultHeaderColor);
+        m_header_scale = header_scale.value_or(DefaultHeaderScale);
+    }
+
+    //! Set the publisher for the TargetDataDebugPublisher
+    virtual void set_publisher(std::shared_ptr<Publisher_t> pub)
+    {
+        m_pub = pub;
+    }
+
+    //! Get the current publisher of the TargetDataDebugPublisher
+    virtual std::shared_ptr<Publisher_t> get_publisher() const
+    {
+        return m_pub;
+    }
+
+    //! Publish an msg with the TargetDataDebugPublisher
+    virtual int publish(const MessageType_t &msg)
+    {
+        return m_pub->publish(msg);
+    }
+
+    virtual int publish(const MessageType_t &msg,
+                        const std::string &header_text)
+    {
+        return m_pub->publish(msg, header_text, m_header_color, m_header_scale);
+    }
+
+  protected:
+    std::shared_ptr<Publisher_t> m_pub;
+    cv::Scalar m_header_color{DefaultHeaderColor};
+    double m_header_scale = DefaultHeaderScale;
+};
+
 //! Downstream spec type for image output port
 using DownstreamSpec = output_port_types::DefaultDownstreamSpec<
     DeliveryActionType,
     DeliveryPolicy,
-    DownstreamDebugPublisher,
-    DownstreamDebugPublisher>;
+    SourceDataDebugPublisher,
+    TargetDataDebugPublisher>;
 static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
               "DownstreamSpec must satisfy DefaultDownstreamSpecConcept");
 
@@ -266,7 +314,7 @@ class Downstream : public DownstreamBase
         {
             auto topic = spec.get_debug_topic_source_data_failed();
             if (topic.has_value()) {
-                m_debug_pub_source_data_failed = std::make_shared<DownstreamDebugPublisher>();
+                m_debug_pub_source_data_failed = std::make_shared<SourceDataDebugPublisher>();
                 auto pub = std::make_shared<SourceInnerPublisherType>(node, topic.value(), qos_source);
                 m_debug_pub_source_data_failed->init(pub);
             }
@@ -275,7 +323,7 @@ class Downstream : public DownstreamBase
         {
             auto topic = spec.get_debug_topic_source_data_sending();
             if (topic.has_value()) {
-                m_debug_pub_source_data_sending = std::make_shared<DownstreamDebugPublisher>();
+                m_debug_pub_source_data_sending = std::make_shared<SourceDataDebugPublisher>();
                 auto pub = std::make_shared<SourceInnerPublisherType>(node, topic.value(), qos_source);
                 m_debug_pub_source_data_sending->init(pub);
             }
@@ -284,7 +332,7 @@ class Downstream : public DownstreamBase
         {
             auto topic = spec.get_debug_topic_source_data_succeeded();
             if (topic.has_value()) {
-                m_debug_pub_source_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
+                m_debug_pub_source_data_succeeded = std::make_shared<SourceDataDebugPublisher>();
                 auto pub = std::make_shared<SourceInnerPublisherType>(node, topic.value(), qos_source);
                 m_debug_pub_source_data_succeeded->init(pub);
             }
@@ -293,7 +341,7 @@ class Downstream : public DownstreamBase
         {
             auto topic = spec.get_debug_topic_target_data_sending();
             if (topic.has_value()) {
-                m_debug_pub_target_data_sending = std::make_shared<DownstreamDebugPublisher>();
+                m_debug_pub_target_data_sending = std::make_shared<TargetDataDebugPublisher>();
                 auto pub = std::make_shared<TargetInnerPublisherType>(node, topic.value(), qos_target);
                 m_debug_pub_target_data_sending->init(pub);
             }
@@ -302,7 +350,7 @@ class Downstream : public DownstreamBase
         {
             auto topic = spec.get_debug_topic_target_data_succeeded();
             if (topic.has_value()) {
-                m_debug_pub_target_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
+                m_debug_pub_target_data_succeeded = std::make_shared<TargetDataDebugPublisher>();
                 auto pub = std::make_shared<TargetInnerPublisherType>(node, topic.value(), qos_target);
                 m_debug_pub_target_data_succeeded->init(pub);
             }
@@ -311,7 +359,7 @@ class Downstream : public DownstreamBase
         {
             auto topic = spec.get_debug_topic_target_data_failed();
             if (topic.has_value()) {
-                m_debug_pub_target_data_failed = std::make_shared<DownstreamDebugPublisher>();
+                m_debug_pub_target_data_failed = std::make_shared<TargetDataDebugPublisher>();
                 auto pub = std::make_shared<TargetInnerPublisherType>(node, topic.value(), qos_target);
                 m_debug_pub_target_data_failed->init(pub);
             }
@@ -321,14 +369,14 @@ class Downstream : public DownstreamBase
     }
 };
 
-//! document output port spec
+//! PSG get detections output port spec
 //! This type must satisfy the AsyncActionOutputPortSpecConcept
 //! Any async output port can use this spec as a template argument
-struct PSGDocumentOutputPortSpec {
-    PSGDocumentOutputPortSpec()
+struct PSGGetDetectionsOutputPortSpec {
+    PSGGetDetectionsOutputPortSpec()
     {
-        static_assert(output_port_types::AsyncActionOutputPortSpecConcept<PSGDocumentOutputPortSpec>,
-                      "PSGDocumentOutputPortSpec must satisfy AsyncActionOutputPortSpecConcept");
+        static_assert(output_port_types::AsyncActionOutputPortSpecConcept<PSGGetDetectionsOutputPortSpec>,
+                      "PSGGetDetectionsOutputPortSpec must satisfy AsyncActionOutputPortSpecConcept");
     }
     //! Action type and related types
     using ActionType_t = DeliveryActionType;
@@ -352,7 +400,7 @@ struct PSGDocumentOutputPortSpec {
     using SourcePublishMessageType_t = typename DeliverySourceData_t::PublishMessageType_t;
 
     //! Source data publisher type
-    using SourcePublisherType_t = DownstreamDebugPublisher;
+    using SourcePublisherType_t = SourceDataDebugPublisher;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
@@ -361,7 +409,7 @@ struct PSGDocumentOutputPortSpec {
     using TargetPublishMessageType_t = typename DeliveryTargetData_t::PublishMessageType_t;
 
     //! Target data publisher type
-    using TargetPublisherType_t = DownstreamDebugPublisher;
+    using TargetPublisherType_t = TargetDataDebugPublisher;
 
     //! Stamp type
     using DeliveryStamp_t = output_port_types::DefaultStampData;
@@ -385,6 +433,6 @@ struct PSGDocumentOutputPortSpec {
     using Downstream_t = Downstream;
 };
 
-} // namespace async_action_document_output_port
+} // namespace async_action_get_detections_output_port
 
 } // namespace redoxi_works

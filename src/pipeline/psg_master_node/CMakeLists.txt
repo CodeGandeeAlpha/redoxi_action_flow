@@ -7,6 +7,7 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(redoxi_common_nodes REQUIRED)
 find_package(psg_private_msgs REQUIRED)
@@ -25,6 +26,11 @@ target_include_directories(psg_master_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 target_compile_features(psg_master_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
+# Causes the visibility macros to use dllexport rather than dllimport,
+# which is appropriate when building the dll but not consuming it.
+target_compile_definitions(psg_master_node PRIVATE "PSG_MASTER_NODE_BUILDING_LIBRARY")
+
 ament_target_dependencies(
   psg_master_node  PUBLIC
   redoxi_common_nodes
