@@ -23,6 +23,8 @@ class VineyardShmClient : public SharedMemoryClient
     VineyardShmClient();
     virtual ~VineyardShmClient();
 
+    using SharedMemoryClient::get_data;
+
     // SharedMemoryClient interface, KeyValueStore is VineyardParams object
     int connect(const std::string &region_key, const KeyValueStore *params = nullptr) override;
 

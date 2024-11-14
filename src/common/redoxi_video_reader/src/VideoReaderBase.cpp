@@ -453,9 +453,13 @@ std::shared_ptr<RedoxiVideoReaderBase::OutputPort_t>
     port->set_callback_on_deliver_task_finish([this](TargetData_t &target_data, const DeliveryTask_t &task, const DeliveryResult_t &result) {
         return _on_delivery_task_finish(target_data, task.get_request(), result);
     });
-    port->set_callback_on_deliver_to_downstream_finish([this](TargetData_t &target_data, SendResult_t &result, const Downstream_t &ds) {
-        return _on_deliver_to_downstream_finish(target_data, result, ds);
-    });
+    port->set_callback_on_deliver_to_downstream_finish(
+        [this](TargetData_t &target_data,
+               SendResult_t &result,
+               const DeliveryRequest_t &request,
+               const Downstream_t &ds) {
+            return _on_deliver_to_downstream_finish(target_data, result, request, ds);
+        });
 
     return port;
 }

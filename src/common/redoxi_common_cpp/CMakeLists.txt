@@ -10,7 +10,6 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 
 # cpp libraries
-find_package(vineyard REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(fmt REQUIRED)
@@ -25,12 +24,12 @@ find_package(cv_bridge REQUIRED)
 find_package(json_struct REQUIRED)
 
 set(source_files
-    src/redoxi_common_cpp.cpp src/redoxi_v6d.cpp src/redoxi_ros_util.cpp
+    src/redoxi_common_cpp.cpp src/redoxi_ros_util.cpp
     src/image_proc/ImageStamper.cpp src/ros_utils/StampedImagePub.cpp)
 
-set(required_dependencies ${VINEYARD_LIBRARIES} ${OpenCV_LIBS} fmt::fmt
+set(required_dependencies ${OpenCV_LIBS} fmt::fmt
                           nlohmann_json::nlohmann_json TBB::tbb json_struct::json_struct)
-set(required_includes ${OpenCV_INCLUDE_DIRS} ${VINEYARD_INCLUDE_DIRS})
+set(required_includes ${OpenCV_INCLUDE_DIRS})
 
 add_library(redoxi_common_cpp ${source_files})
 add_library(redoxi_common_cpp::redoxi_common_cpp ALIAS redoxi_common_cpp)
@@ -92,7 +91,6 @@ ament_export_dependencies(
   TBB
   nlohmann_json
   fmt
-  vineyard
   OpenCV
   json_struct)
 

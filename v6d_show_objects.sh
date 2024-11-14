@@ -1,6 +1,6 @@
 #!/bin/bash
 
-v6d_console="./tmp/vineyardctl-v0.24.2-linux-amd64"
+v6d_console="./tmp/vineyardctl"
 ipc_socket="/soft/data/vineyard.sock"
 
 # Default limit value

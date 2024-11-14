@@ -221,11 +221,14 @@ class RedoxiVideoReaderBase : public rclcpp::Node,
     //! callback when a frame is sent to a downstream, failure or success
     virtual int _on_deliver_to_downstream_finish(TargetData_t &target_data,
                                                  SendResult_t &result,
+                                                 const DeliveryRequest_t &request,
                                                  const Downstream_t &ds)
     {
         (void)target_data;
         (void)result;
+        (void)request;
         (void)ds;
+
         return 0;
     };
 
