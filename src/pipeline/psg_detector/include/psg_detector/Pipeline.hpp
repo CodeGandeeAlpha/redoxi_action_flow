@@ -210,9 +210,11 @@ class PSGDetectorNode : public rclcpp::Node,
     //! callback when a frame is sent to a downstream, failure or success
     virtual int _on_deliver_to_downstream_finish(TargetDataPipeline_t &target_data,
                                                  SendResultPipeline_t &result,
+                                                 const DeliveryRequestPipeline_t &request,
                                                  const DownstreamPipeline_t &ds);
     virtual int _on_deliver_to_downstream_finish(TargetDataModel_t &target_data,
                                                  SendResultModel_t &result,
+                                                 const DeliveryRequestModel_t &request,
                                                  const DownstreamModel_t &ds);
 
   private:

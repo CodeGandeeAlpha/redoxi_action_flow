@@ -21,6 +21,7 @@ struct PSGDetectorImpl {
     struct OutputModelResult {
         std::shared_ptr<ModelResultPromise> promise;
         ModelResultFuture future;
+        std::shared_ptr<PSGDetectorNode::OutputSourceDataModel_t> source_data;
     };
 
     //! ros time token
@@ -379,8 +380,11 @@ std::shared_ptr<PSGDetectorNode::OutputPortPipeline_t>
     port->set_callback_on_deliver_task_finish([this](TargetDataPipeline_t &target_data, const DeliveryTaskPipeline_t &task, const DeliveryResultPipeline_t &result) {
         return _on_delivery_task_finish(target_data, task.get_request(), result);
     });
-    port->set_callback_on_deliver_to_downstream_finish([this](TargetDataPipeline_t &target_data, SendResultPipeline_t &result, const DownstreamPipeline_t &ds) {
-        return _on_deliver_to_downstream_finish(target_data, result, ds);
+    port->set_callback_on_deliver_to_downstream_finish([this](TargetDataPipeline_t &target_data,
+                                                              SendResultPipeline_t &result,
+                                                              const DeliveryRequestPipeline_t &request,
+                                                              const DownstreamPipeline_t &ds) {
+        return _on_deliver_to_downstream_finish(target_data, result, request, ds);
     });
 
     return port;
@@ -404,8 +408,11 @@ std::shared_ptr<PSGDetectorNode::OutputPortModel_t>
     port->set_callback_on_deliver_task_finish([this](TargetDataModel_t &target_data, const DeliveryTaskModel_t &task, const DeliveryResultModel_t &result) {
         return _on_delivery_task_finish(target_data, task.get_request(), result);
     });
-    port->set_callback_on_deliver_to_downstream_finish([this](TargetDataModel_t &target_data, SendResultModel_t &result, const DownstreamModel_t &ds) {
-        return _on_deliver_to_downstream_finish(target_data, result, ds);
+    port->set_callback_on_deliver_to_downstream_finish([this](TargetDataModel_t &target_data,
+                                                              SendResultModel_t &result,
+                                                              const DeliveryRequestModel_t &request,
+                                                              const DownstreamModel_t &ds) {
+        return _on_deliver_to_downstream_finish(target_data, result, request, ds);
     });
 
     return port;
@@ -510,6 +517,7 @@ void PSGDetectorNode::_step()
 
 int PSGDetectorNode::_on_deliver_to_downstream_finish(TargetDataModel_t &target_data,
                                                       SendResultModel_t &result,
+                                                      const DeliveryRequestModel_t &request,
                                                       const DownstreamModel_t &ds)
 {
     // 1. 创建modelresult
@@ -518,18 +526,24 @@ int PSGDetectorNode::_on_deliver_to_downstream_finish(TargetDataModel_t &target_
     // 2. 绑定promise和future
     output_model_result.promise = std::make_shared<ModelResultPromise>();
     output_model_result.future = output_model_result.promise->get_future().share();
+    output_model_result.source_data = std::make_shared<OutputSourceDataModel_t>(request.get_source_data());
 
     // 3. 将output_model_result推送到buffer中
     m_impl->m_model_result_buffer.push(output_model_result);
 
     // 4. 创建task 在tbb run中将结果写入promise
-    m_impl->m_model_result_task_group.run([&ds, &result, &output_model_result]() {
+    auto promise = output_model_result.promise;
+    m_impl->m_model_result_task_group.run([&ds, &result, promise]() {
         auto goal_handle = result.goal_handle_future.get();
         if (goal_handle) {
-            auto result = ds.get_action_client()->async_get_result(goal_handle).get().result;
-            output_model_result.promise->set_value(std::make_shared<PSGDetectorNode::OutputModelResult_t>(result));
+            auto action_result = ds.get_action_client()->async_get_result(goal_handle).get().result;
+            // 将action result写入promise
+            auto output_model_result = std::make_shared<PSGDetectorNode::OutputModelResult_t>();
+            output_model_result->detections = action_result->detections;
+            output_model_result->x_return = action_result->x_return;
+            promise->set_value(output_model_result);
         } else {
-            output_model_result.promise->set_value(nullptr);
+            promise->set_value(nullptr);
         }
     });
 
@@ -546,11 +560,60 @@ void PSGDetectorNode::_get_model_result()
     if (result) {
         // create output source data
         OutputSourceDataPipeline_t output_pipeline_source_data;
-        output_pipeline_source_data.set_detections(result->detections);
-        // create delivery request
+        auto document = output_model_result.source_data->get_document();
+        document.detections = result->detections;
+        output_pipeline_source_data.set_document(document);
+        // create pipeline delivery request
         auto delivery_request = _create_delivery_request(output_pipeline_source_data);
         // push to output port pipeline
-        m_primary_output_port_pipeline->push_request(delivery_request);
+        // this is used for logging
+        auto msg_uuid = output_pipeline_source_data.get_uuid();
+
+        // get qos, controls how to retry and drop frames
+        auto &qos = m_runtime_config->model_enqueue_policy;
+        auto max_attempts = qos.get_retry_policy().get_number_of_retry(true).value() + 1;
+        auto interval_between_attempts = qos.get_retry_policy().get_wait_time_between_retry(true).value();
+        auto drop_frame_strategy = qos.get_drop_strategy();
+
+        // start pushing request to output port
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                     "try to push request in {} attempts, retry interval={}ms",
+                     max_attempts, interval_between_attempts.count());
+
+        bool success = false;
+        if (drop_frame_strategy == DropStrategy::NoDrop) {
+            // Keep trying until success if no drop strategy
+            while (!m_primary_output_port_pipeline->try_push_request(delivery_request)) {
+                std::this_thread::sleep_for(interval_between_attempts);
+            }
+            success = true;
+        } else if (drop_frame_strategy == DropStrategy::DropAsNeeded) {
+            // Try up to max attempts if dropping is allowed
+            for (int attempt = 0; attempt < max_attempts; ++attempt) {
+                if (m_primary_output_port_pipeline->try_push_request(delivery_request)) {
+                    success = true;
+                    break;
+                }
+                // wait for next attempt
+                std::this_thread::sleep_for(interval_between_attempts);
+            }
+        } else {
+            RDX_RAISE_ERROR("[{}] invalid drop strategy, got {}", __func__, int(drop_frame_strategy));
+        }
+
+        if (success) {
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                         "[msg_uuid={}] success to push request",
+                         boost::uuids::to_string(msg_uuid));
+        } else {
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                         "[msg_uuid={}] failed to push request",
+                         boost::uuids::to_string(msg_uuid));
+        }
+
+        // // FIXME: debug only
+        // // wait for all requests to be processed, not necessary
+        // m_primary_output_port_pipeline->wait_for_all_requests();
     }
 }
 

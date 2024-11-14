@@ -12,6 +12,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(unique_identifier_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+# find_package(rclpy REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/BodyPose.msg"

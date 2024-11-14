@@ -8,7 +8,10 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
+find_package(ament_cmake_python REQUIRED)
+find_package(rclpy REQUIRED)
 find_package(psg_document_sink REQUIRED)
+find_package(psg_common REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -34,6 +37,8 @@ target_compile_definitions(psg_detector PRIVATE "PSG_DETECTOR_BUILDING_LIBRARY")
 ament_target_dependencies(
   psg_detector  PUBLIC
   psg_document_sink
+  psg_common
+  rclpy
 )
 
 install(
@@ -46,6 +51,13 @@ install(
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
+)
+
+ament_python_install_package(${PROJECT_NAME})
+# Install Python executables
+install(PROGRAMS
+  ${PROJECT_NAME}/ddq_detector_node.py
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
@@ -66,6 +78,7 @@ ament_export_include_directories(
 ament_export_libraries(
   psg_detector
   psg_document_sink
+  psg_common
 )
 
 ament_export_targets(

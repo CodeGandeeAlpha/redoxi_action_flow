@@ -1,62 +1,49 @@
 #!/usr/bin/env python3
 import threading
-import time
+
+# import time
 import queue
 import uuid as pyuuid
 import numpy as np
-import asyncio
+
+# import asyncio
 from uuid import uuid4
-import yappi
+
+# import yappi
 
 # for easy test visualization
 import cv2
 
 import rclpy
-from rclpy.action import ActionServer, ActionClient
+from rclpy.action import ActionServer, GoalResponse
 from rclpy.node import Node
 from unique_identifier_msgs.msg import UUID as UUIDMsg
 from attr import field, define
 
-from psg_actions.action import ProcessDetections, ProcessFrame
-from psg_public_msgs.msg import Frame
-from psg_public_msgs.msg import Detections, Detection
+from redoxi_public_msgs.action import ProcessDetectionsByFrame
+from redoxi_public_msgs.msg import Detections, Detection, Frame
+
 from psg_common.interfaces import IOpenCloseProtocol
 from psg_common.constants import (
     NodeStatusCode,
     ReturnCode,
     SignalCode,
-    DefaultWaitForGoalDoneIntervalMs,
-    DefaultStreamWorkerGetTimeoutSec,
 )
 from psg_common.utilities import create_v6d_client, get_img_by_v6d_id
 from psg_common.pub_sub import StreamWorker
 
-from detector.ddq_detector import DdqDetrDetector
-from detector.yolov8_head_detector import YOLOv8HeadDetector
-from detector.base_detector import BaseDetector
+from psg_detector.ddq_detector import DdqDetrDetector
+from psg_detector.yolov8_head_detector import YOLOv8HeadDetector
+from psg_detector.base_detector import BaseDetector
 
 
 class DetectorNode(Node, IOpenCloseProtocol):
-    @define(kw_only=True)
-    class Downstream:
-        handler: ActionClient = field(default=None)
-
-    @define(kw_only=True)
-    class DSTask_Detections:
-        detections_goal: ProcessDetections.Goal = field()
-        downstream: "DetectorNode.Downstream" = field()
-        retry_times: int = field(default=0)
-
-    @define(kw_only=True)
-    class ModelDownstreamNode:
-        action_name: str = field()
-
     @define(kw_only=True)
     class RuntimeConfig:
         step_interval_ms: int = field(default=-1)
         pred_score_thr: float = field(default=0.3)
 
-        send_goal_retry: bool = field(default=False)  # retry when send goal failed
+        # send_goal_retry: bool = field(default=False)  # retry when send goal failed
         buffer_size: int = field(
             default=1
         )  # buffer size for sending task to downstream
@@ -70,7 +57,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
     @define(kw_only=True)
     class InitConfig:
-        downstreams: dict[str, "DetectorNode.Downstream"] = field(factory=dict)
+        # downstreams: dict[str, "DetectorNode.Downstream"] = field(factory=dict)
         process_frame_action: str = field()
 
         # add multiple model_groups support
@@ -142,23 +129,19 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self.m_init_config: self.InitConfig = None
         self.m_runtime_config: self.RuntimeConfig = None
         self.m_action: ActionServer = None
-        self.m_downstreams: dict[str, ActionClient] = {}
+        # self.m_downstreams: dict[str, ActionClient] = {}
         self.m_logger = self.get_logger()
 
-        self.m_merge_workers = []
+        # self.m_merge_workers = []
 
         self.m_model_groups_data: dict[str, DetectorNode.ModelGroup] = (
             {}
         )  # key: model_name, value: ModelGroup
-        self.m_detections_task_waiting: queue.Queue[DetectorNode.DSTask_Detections] = (
-            queue.Queue()
-        )
+        # self.m_detections_task_waiting: queue.Queue[DetectorNode.DSTask_Detections] = (
+        #     queue.Queue()
+        # )
 
         self.m_num_in_process = 0
-
-        self.m_step_running = False
-        self.m_step_thread: threading.Thread = None
-        self._log = self.get_logger().info
 
         # test only
         self._visualize_flag = True
@@ -172,13 +155,6 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self._start_time = None
         self._end_time = None
         self._time_test = False
-
-    def _func_step(self):
-        while rclpy.ok() and self.m_step_running:
-            self._step()
-            t = self.m_runtime_config.step_interval_ms / 1000.0
-            if t > 0:
-                time.sleep(t)
 
     def update_init_config(self, init_config: InitConfig) -> int:
         assert (
@@ -231,13 +207,10 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self._init_model_groups_data()
 
         # create v6d client
-        self.m_v6d_client = create_v6d_client()
+        # self.m_v6d_client = create_v6d_client()
 
         # setup upstreams
         self._create_action_server()
-
-        # setup downstreams
-        self._connect_to_downstreams()
 
         self.m_logger.info("init() done")
         self.m_status_code = NodeStatusCode.INITIALIZED
@@ -251,7 +224,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
             self.m_status_code == NodeStatusCode.INITIALIZED
             or self.m_status_code == NodeStatusCode.CLOSED
         ), "cannot open because status code is not INITIALIZED or CLOSED"
-        assert self.m_v6d_client is not None, "v6d_client is nullptr"
+        # assert self.m_v6d_client is not None, "v6d_client is nullptr"
 
         status_code_before = self.m_status_code
         self.m_status_code = NodeStatusCode.OPENED
@@ -289,48 +262,6 @@ class DetectorNode(Node, IOpenCloseProtocol):
             for worker in model_group_data.workers:
                 worker.stop()
 
-    def _result_processing_worker_step(
-        self, input_data: ModelGroupOutputData, source: StreamWorker
-    ) -> list[DSTask_Detections]:
-        """
-        这个函数作为streamworker的worker_function_one_step，等待所有结果中的event都被set后，合并所有结果，然后发送给下游
-
-        parameters
-        ------------
-            input_data: ModelGroupOutputData
-                一个ModelGroupOutputData对象，表示所有模型的输出，key是model_group_name，value是ModelGroupSingleOutput
-
-            source: StreamWorker
-                worker_function_one_step要求的参数，表示调用这个函数的streamworker，用于获取一些streamworker中的信息比如user_data
-
-        returns
-        ------------
-            bool: 表示输出的data是否是valid的，如果是True，即使它是none，
-            这个data会被write到out（若有output_function则以output_function实现为主，反之写入output_queue）
-
-            list[DSTask_Detections]: DSTask_Detections的列表，每个元素表示一个发送给下游的任务
-        """
-        # wait for all models to finish
-        # FIXME: 这里的event.wait()会阻塞，如果有一个模型出现问题，会导致整个流程阻塞
-        for group_name, output in input_data.output_per_group.items():
-            output.event.wait()
-
-        # merge the results from all models
-        merge_dets = self._merge_detections(input_data)
-        # self.m_logger.info(
-        #     f"_result_processing_worker_step(): frame {merge_dets.frame.frame_num} merged detections"
-        # )
-
-        outputs = []
-        goal_msg = ProcessDetections.Goal()
-        goal_msg.detections = merge_dets
-        for ds_name, ds_client in self.m_downstreams.items():
-            task = DetectorNode.DSTask_Detections(
-                detections_goal=goal_msg, downstream=ds_client
-            )
-            outputs.append(task)
-        return True, outputs
-
     def _create_task(
         self, outputs: list[DSTask_Detections], source: StreamWorker
     ) -> bool:
@@ -365,22 +296,6 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 # )
                 break
 
-        for i in range(self.m_init_config.merge_worker_num):
-            # create stream_worker for this model
-            merge_worker = StreamWorker(
-                input_queue=output_queue,
-                output_queue=self.m_detections_task_waiting,
-                worker_function_one_step=self._result_processing_worker_step,
-                output_function=self._create_task,
-            )
-            merge_worker.start()
-            # self.m_logger.info(f"start_merge_worker(): merge worker {i} started")
-            self.m_merge_workers.append(merge_worker)
-
-    def stop_merge_worker(self):
-        for worker in self.m_merge_workers:
-            worker.stop()
-
     def start(self) -> int:
         # the node must be opened
         assert (
@@ -389,13 +304,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         self.start_model_workers()
 
-        self.start_merge_worker()
-
-        # create step thread
-        self.m_step_running = True
-
-        self.m_step_thread = threading.Thread(target=self._func_step)
-        self.m_step_thread.start()
+        # self.start_merge_worker()
 
         status_code_before = self.m_status_code
         self.m_status_code = NodeStatusCode.STARTED
@@ -410,20 +319,9 @@ class DetectorNode(Node, IOpenCloseProtocol):
             self.m_status_code == NodeStatusCode.STARTED
         ), "cannot stop because status code is not STARTED"
 
-        # if self.frame_timer is not None:
-        #     self.frame_timer.cancel()
-        #     self.frame_timer = None
-
-        # terminate step thread
-        self.m_step_running = False
-
-        if self.m_step_thread is not None:
-            self.m_step_thread.join()
-            self.m_logger.debug("stop(): step thread stopped")
-
         self.stop_model_workers()
 
-        self.stop_merge_worker()
+        # self.stop_merge_worker()
 
         if self.m_model_groups_data:
             for model_group_name, model_group_data in self.m_model_groups_data.items():
@@ -468,44 +366,14 @@ class DetectorNode(Node, IOpenCloseProtocol):
         assert self.m_init_config is not None, "m_init_config is None"
         self.m_action = ActionServer(
             self,
-            ProcessFrame,
+            ProcessDetectionsByFrame,
             self.m_init_config.process_frame_action,
             self._accept_frame_accepted_callback,
+            goal_callback=self._goal_callback,
         )
         self.m_logger.info(
             f"_create_action_server(): created ActionServer for {self.m_init_config.process_frame_action}"
         )
-
-    def _connect_to_downstreams(self):
-        assert self.m_init_config is not None, "m_init_config is None"
-
-        self.m_downstreams.clear()
-        for ds_name, ds_node in self.m_init_config.downstreams.items():
-            # 创建accept_frame_client
-            name = ds_node.action_name
-            client = ActionClient(self, ProcessDetections, name)
-            self.m_logger.debug(
-                f"_connect_to_downstreams(): created ActionClient for {ds_name}"
-            )
-            self.m_downstreams[ds_name] = client
-
-    def _ping(self, ds_client):
-        goal_msg = ProcessDetections.Goal()
-        goal_msg.x_control.code = 1  # ping
-        goal_msg.x_control.text_msg = "ping"
-
-        res = ds_client.send_goal_async(
-            goal_msg, feedback_callback=self._goal_feedback_callback
-        )
-
-        # 等待goal被accept
-        while not res.done():
-            time.sleep(DefaultWaitForGoalDoneIntervalMs / 1000)
-
-        goal_handle = res.result()
-        if not goal_handle.accepted:
-            return False
-        return True
 
     def _init_model_groups_data(self):
         shared_output_queue = queue.Queue()
@@ -531,11 +399,19 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
             self.m_model_groups_data[model_group_name] = model_group_data
 
-    def _process_frame_create_model_tasks(self, frame_msg, uuid):
+    def _process_frame_create_model_tasks(self, frame_msg: Frame, uuid):
         # get the image from Vineyard
+        # img = (
+        #     self._get_frame_from_v6d(frame_msg)
+        #     if frame_msg.signal_code == SignalCode.RUN
+        #     else None
+        # )
+        raw_img = frame_msg.raw_image
         img = (
-            self._get_frame_from_v6d(frame_msg)
-            if frame_msg.signal_code == SignalCode.RUN
+            np.frombuffer(raw_img.data, dtype=np.uint8).reshape(
+                raw_img.height, raw_img.width, -1
+            )
+            if raw_img is not None
             else None
         )
         if img is not None:
@@ -558,14 +434,25 @@ class DetectorNode(Node, IOpenCloseProtocol):
         }
 
         for model_group_name, model_group_data in self.m_model_groups_data.items():
-            # put result to main group model out queue
-            if model_group_name == self.m_init_config.main_group_name:
-                model_group_data.out_queue.put(input_data.output)
+            # # put result to main group model out queue
+            # if model_group_name == self.m_init_config.main_group_name:
+            #     model_group_data.out_queue.put(input_data.output)
 
             model_group_data.in_queue.put(input_data)
             # self.m_logger.info(
             #     f"_process_frame_create_model_tasks(): frame {frame_msg.frame_num} added to model {model_group_name} task queue"
             # )
+
+        # 等待所有模型处理完
+        # wait for all models to finish
+        # FIXME: 这里的event.wait()会阻塞，如果有一个模型出现问题，会导致整个流程阻塞
+        for group_name, output in input_data.output.output_per_group.items():
+            output.event.wait()
+
+        # merge the results from all models
+        merge_dets_msg = self._merge_detections(input_data.output)
+
+        return merge_dets_msg
 
     def _get_frame_from_v6d(self, frame_msg):
         if not frame_msg.cache.has_int_id:
@@ -622,28 +509,25 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         return detections
 
+    def _goal_callback(self, goal_request):
+        # if buffer is full, reject the frame
+        self.m_logger.info(
+            f"frame {goal_request.frame.frame_num} in_queue size {self.m_num_in_process}"
+        )
+        if self.m_num_in_process >= self.m_runtime_config.buffer_size:
+            return GoalResponse.REJECT
+
+        self.m_num_in_process += 1
+        return GoalResponse.ACCEPT
+
     def _accept_frame_accepted_callback(self, goal_handle):
         # just accept the frame and add it to buffer, no processing
         x_control = goal_handle.request.x_control
 
-        # if buffer is full, reject the frame
-        self.m_logger.info(
-            f"frame {goal_handle.request.frame.frame_num} in_queue size {self.m_num_in_process}"
-        )
-        if (
-            not self.m_runtime_config.send_goal_retry
-        ) and self.m_num_in_process >= self.m_runtime_config.buffer_size:
-            self.m_logger.info(f"frame {goal_handle.request.frame.frame_num} REJECTED")
-            goal_handle.abort()
-            result = ProcessFrame.Result()
-            result.return_msg = "Buffer is full"
-            result.return_code = ReturnCode.REJECTED
-            return result
-
         # ping
         if x_control.code == 1:
             goal_handle.succeed()
-            result = ProcessFrame.Result()
+            result = ProcessDetectionsByFrame.Result()
             result.return_msg = "Ping accepted"
             result.return_code = ReturnCode.SUCCESS
             return result
@@ -655,102 +539,16 @@ class DetectorNode(Node, IOpenCloseProtocol):
         uuid = goal_handle.request.x_uid
         # self.m_logger.info(f'_accept_frame_accepted_callback(): frame_num: {frame.frame_num}, x_uid: {pyuuid.UUID(bytes=bytes(uuid.uuid))}')
 
-        # # add to frame buffer
-        # self._add_frame_to_buffer(frame, uuid)
-
-        self.m_num_in_process += 1
-
-        # add it to every model task queue
-        self._process_frame_create_model_tasks(frame, uuid)
+        # add it to every model task queue and get detections msg (wait for all models to finish)
+        detections_msg = self._process_frame_create_model_tasks(frame, uuid)
 
         goal_handle.succeed()
 
-        result = ProcessFrame.Result()
+        result = ProcessDetectionsByFrame.Result()
         result.return_msg = "Accepted frame"
         result.return_code = ReturnCode.SUCCESS
+        result.detections = detections_msg
         return result
-
-    def _goal_feedback_callback(self, feedback_msg):
-        self.m_logger.debug(
-            "_goal_feedback_callback(): {0}".format(feedback_msg.feedback.feedback_msg)
-        )
-
-    async def _send_goal_async(self, callback_func):
-        try:
-            detections_task = self.m_detections_task_waiting.get(
-                timeout=DefaultStreamWorkerGetTimeoutSec
-            )
-        except queue.Empty:
-            # self.m_logger.warn("_send_goal_async(): no detections task in queue")
-            return
-
-        # # 如果是最后一帧且队列里还有别的帧，放回队列
-        # if (
-        #     detections_task.detections_goal.detections.frame.signal_code
-        #     != SignalCode.RUN
-        #     and not self.m_detections_task_waiting.empty()
-        # ):
-        #     self.m_detections_task_waiting.put(detections_task)
-        #     self.m_logger.info(
-        #         f"_send_goal_async(): frame {detections_task.detections_goal.detections.frame.frame_num} put back to queue"
-        #     )
-        #     return
-
-        ds_client = detections_task.downstream
-
-        while True:
-            if (
-                (not self.m_runtime_config.send_goal_retry)
-                and detections_task.detections_goal.detections.frame.signal_code
-                == SignalCode.RUN
-            ):
-                if not self._ping(ds_client):
-                    continue  # FIXME: need sleep
-
-            self.m_logger.info(
-                f"---TIME LOG: framenum {detections_task.detections_goal.detections.frame.frame_num} node ddq_detector_node type OUT time {self.get_clock().now().nanoseconds / 1000000}"
-            )
-
-            if ds_client is None:
-                break
-            self._send_goal_future = ds_client.send_goal_async(
-                detections_task.detections_goal,
-                feedback_callback=self._goal_feedback_callback,
-            )
-            goal_handle = await self._send_goal_future
-
-            # 等待goal被accept
-            self.m_logger.debug("_send_goal(): waiting for response...")
-
-            if not goal_handle.accepted:
-                self.m_logger.info(
-                    f"_send_goal(): Goal {detections_task.detections_goal.detections.frame.frame_num} rejected :("
-                )
-                if (
-                    (not self.m_runtime_config.send_goal_retry)
-                    and detections_task.detections_goal.detections.frame.signal_code
-                    == SignalCode.RUN
-                ):  # not retry
-                    self.m_num_in_process -= 1
-                    break
-                else:  # retry
-                    detections_task.retry_times += 1
-                    continue
-            else:
-                self.m_logger.info(
-                    f"_send_goal(): Goal {detections_task.detections_goal.detections.frame.frame_num} accepted :)"
-                )
-
-                # 等待最终结果
-                result = (
-                    goal_handle.get_result().result
-                )  # get_result is sync method, get_result_async is async method
-                self.m_logger.info(
-                    f"_send_goal(): {detections_task.detections_goal.detections.frame.frame_num} Result: {result.return_msg}"
-                )
-                self.m_num_in_process -= 1
-                break
-        callback_func()
 
     def _visualize(self, goal: ProcessDetections.Goal):
         detections = goal.detections
@@ -787,17 +585,6 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 merged_detections.detections.extend(output.detections.detections)
 
         return merged_detections
-
-    def _step(self):
-        # check status
-        if self.m_status_code != NodeStatusCode.STARTED:
-            # nothing to do if not started
-            return
-
-        # time1 = time.time()
-        asyncio.run(self._send_goal_async(lambda: None))
-        # time2 = time.time()
-        # self.m_logger.info(f"_step(): send goal time {time2 - time1}")
 
     def _model_step(
         self, input_data: ModelGroupInputData, source: StreamWorker
@@ -928,17 +715,11 @@ def main(args=None):
         init_config.model_groups["head"].append(yolo_model)
         ddq_detector_node.get_logger().info(f"head model {i} initialized")
 
-    downstream = DetectorNode.ModelDownstreamNode(
-        action_name="detector_pipeline_process_model_results_action"
-    )
-    init_config.downstreams["detector_pipeline"] = downstream
-
     # runtime config
     runtime_config = DetectorNode.RuntimeConfig()
     runtime_config.pred_score_thr = 0.3
     runtime_config.step_interval_ms = 10
     runtime_config.buffer_size = 5
-    runtime_config.send_goal_retry = True
 
     ddq_detector_node.init(init_config, runtime_config)
 
