@@ -10,6 +10,8 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(redoxi_inference REQUIRED)
+find_package(redoxi_common_cpp REQUIRED)
+
 find_package(Boost REQUIRED)
 
 add_library(redoxi_inference_onnx 
@@ -26,6 +28,7 @@ ament_target_dependencies(
   redoxi_inference_onnx PUBLIC
   "rclcpp"
   "redoxi_inference"
+  "redoxi_common_cpp"
 )
 
 target_link_libraries(redoxi_inference_onnx PUBLIC Boost::boost)
@@ -65,6 +68,7 @@ endif()
 
 ament_export_dependencies(
   redoxi_inference
+  redoxi_common_cpp
   Boost
 )
 

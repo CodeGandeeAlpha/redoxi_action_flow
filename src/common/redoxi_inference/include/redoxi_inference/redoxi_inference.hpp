@@ -80,7 +80,7 @@ struct ModelPortInfo
     //! @param batch_size The batch size, optional
     //! @return The expected shape of the tensor in 4d format, typically [N,C,H,W], depends on the model
     //! If the port cannot deal with 4d tensor (e.g., required 5d tensor or more), return std::nullopt
-    virtual std::optional<std::array<int, 4>> get_shape_4d(std::optional<int> batch_size = std::nullopt) const = 0;
+    // virtual std::optional<std::array<int, 4>> get_shape_4d(std::optional<int> batch_size = std::nullopt) const = 0;
 };
 
 class ModelPortData
@@ -150,13 +150,34 @@ public:
   RedoxiModelInference() = default;
   virtual ~RedoxiModelInference() = default;
 
-  // create a key value store
-  virtual KeyValueStore::Ptr create_key_value_store() = 0;
+  // create a key value store for initialization parameters
+  virtual KeyValueStore::Ptr create_init_params() = 0;
 
   // create model port data, with optional batch size if the input port supports dynamic batch size
   virtual ModelPortData::Ptr create_model_port_data(
     const std::string& port_name, 
     std::optional<int> batch_size = std::nullopt) = 0;
+
+  // configure an input port, set the shape of the port
+  // for dynamic dimensions, set the dimension to -1, or a specific value if it is static
+  // @return 0 if success, -1 if failed (the model does not support this shape)
+  virtual int configure_input_port(
+    const std::string& port_name,
+    std::vector<int64_t> shape) = 0;
+
+  // get the data of an input port
+  // the data must be filled before inference, and call notify_input_ready() after all input data are set
+  virtual ModelPortData::Ptr get_input_port_data(const std::string& port_name) = 0;
+
+  // get the information of all input ports
+  virtual ModelPortInfo::ConstPtrMap get_input_port_infos() const = 0;
+
+  // get the data of an output port
+  // the data is filled by the model after inference
+  virtual ModelPortData::Ptr get_output_port_data(const std::string& port_name) = 0;
+
+  // get the information of all output ports
+  virtual ModelPortInfo::ConstPtrMap get_output_port_infos() const = 0;
 
   // initialize the model inference, load model and other resources
   virtual int init(KeyValueStore::Ptr params) = 0;
@@ -176,15 +197,6 @@ public:
   // get inference metadata, related to the runtime environment
   virtual KeyValueStore::ConstPtr get_inference_metadata() const = 0;
 
-  // get information of ports
-  virtual ModelPortInfo::ConstPtrMap get_port_infos() const = 0;
-
-  // set input data
-  virtual int set_input_data(const std::string& port_name, ModelPortData::Ptr data) = 0;
-
-  // get output data
-  virtual int get_output_data(ModelPortData::Ptr output_data, const std::string& port_name) = 0;
-
   // notify the model that all input data are set
   // call this before inference, after all input data are set
   // if you don't call this, the input data might not up-to-date
@@ -192,20 +204,6 @@ public:
 
   // inference
   virtual int do_inference() = 0;
-
-  // get output data
-  virtual ModelPortData::Ptr get_output_data(const std::string& port_name)
-  {
-    auto data = create_model_port_data(port_name);
-    auto ret = get_output_data(data, port_name);
-    if (ret != 0)
-    {
-      return nullptr;
-    }
-    return data;
-  }
-
-
 };
 
 }  // namespace redoxi_works::inference

@@ -10,16 +10,33 @@ namespace redoxi_works::inference::onnx
 class OnnxModelInference : public RedoxiModelInference
 {
 public:
+  //! A struct to hold the information of an inference port
+  struct InferencePort{
+    // original port info
+    ModelPortInfo::Ptr original_info;
+
+    // data for input/output port, with shapes matched to the configured shape
+    ModelPortData::Ptr data;
+
+    // memory info for io binding
+    std::shared_ptr<Ort::MemoryInfo> ort_memory_info;
+
+    // whether the port has been bound to an io binding
+    bool has_io_binding = false;
+  };
+
   OnnxModelInference();
   virtual ~OnnxModelInference() = default;
 
   //! Create a key value store
-  virtual KeyValueStore::Ptr create_key_value_store() override;
+  virtual KeyValueStore::Ptr create_init_params() override;
 
-  //! Create model port data, with optional batch size if the input port supports dynamic batch size
-  virtual ModelPortData::Ptr create_model_port_data(
-    const std::string& port_name, 
-    std::optional<int> batch_size = std::nullopt) override;
+  //! Configure an input port, set the shape of the port
+  //! For dynamic dimensions, set the dimension to -1, or a specific value if it is static
+  //! @return 0 if success, -1 if failed (the model does not support this shape)
+  virtual int configure_input_port(
+    const std::string& port_name,
+    std::vector<int64_t> shape) override;
 
   //! Get model metadata, related to the model itself
   virtual KeyValueStore::ConstPtr get_model_metadata() const override;
@@ -28,13 +45,10 @@ public:
   virtual KeyValueStore::ConstPtr get_inference_metadata() const override;
 
   //! Get information of ports
-  virtual ModelPortInfo::ConstPtrMap get_port_infos() const override;
+  virtual ModelPortInfo::ConstPtrMap get_input_port_infos() const override;
 
-  //! Set input data
-  virtual int set_input_data(const std::string& port_name, ModelPortData::Ptr data) override;
-
-  //! Get output data
-  virtual int get_output_data(ModelPortData::Ptr output_data, const std::string& port_name) override;
+  //! Get information of output ports
+  virtual ModelPortInfo::ConstPtrMap get_output_port_infos() const override;
 
   //! Notify the model that all input data are set
   //! Call this before inference, after all input data are set
@@ -43,9 +57,6 @@ public:
 
   //! Inference
   virtual int do_inference() override;
-
-  //! Get output data
-  virtual ModelPortData::Ptr get_output_data(const std::string& port_name) override;
 
   //! Initialize the model inference, load model and other resources
   virtual int init(KeyValueStore::Ptr params) override;
@@ -63,12 +74,16 @@ private:
   std::shared_ptr<Ort::Session> m_session;
   std::shared_ptr<Ort::Env> m_env;
   std::shared_ptr<OnnxModelConfig> m_config;
-  ModelPortInfo::PtrMap m_port_infos;
+  std::shared_ptr<Ort::IoBinding> m_io_binding;
+  std::map<std::string, InferencePort> m_inference_ports;
 
 private:
   static std::shared_ptr<Ort::Session> create_onnx_session(
     const std::string &model_path,
     const std::string &provider_type,
     Ort::Env &env);
+
+  static ModelPortInfo::PtrMap get_model_port_infos(
+    const std::shared_ptr<Ort::Session> &session);
 };
 }  // namespace redoxi_works::inference::onnx

@@ -625,7 +625,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
                 // notify the callback
                 if (m_cb_on_deliver_to_downstream_finish) {
-                    m_cb_on_deliver_to_downstream_finish(target_data, result_for_ds, ds);
+                    m_cb_on_deliver_to_downstream_finish(target_data, result_for_ds, task.get_request(), ds);
                 }
                 if (ret != 0) {
                     RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
@@ -865,6 +865,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
     //! callback function when data is sent to a downstream, failure or success
     std::function<void(TargetData_t &output,
                        SendResult_t &result,
+                       const DeliveryRequest_t& request,
                        const Downstream_t &ds)>
         m_cb_on_deliver_to_downstream_finish;
 
@@ -888,7 +889,11 @@ class AsyncActionOutputPort : public IStartStopProtocol
     }
 
     //! set the callback function to clean the target data after (failed or succeeded) delivery to a single downstream is finished
-    void set_callback_on_deliver_to_downstream_finish(std::function<void(TargetData_t &output, SendResult_t &result, const Downstream_t &ds)> cb)
+    void set_callback_on_deliver_to_downstream_finish(
+        std::function<void(TargetData_t &output,
+                           SendResult_t &result,
+                           const DeliveryRequest_t& request,
+                           const Downstream_t &ds)> cb)
     {
         m_cb_on_deliver_to_downstream_finish = cb;
     }
