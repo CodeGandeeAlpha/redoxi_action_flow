@@ -91,11 +91,30 @@ int OnnxModelInference::do_inference(InferenceInOutData::Ptr inout_data)
 
         // perform inference
         io_binding->SynchronizeInputs();
+
+        //! Print first element of each input port
+        RDX_INFO_DEV(nullptr, __func__, false, "{}", "Printing first element of each input port before inference");
+        for (const auto &[port_name, port_data] : onnx_inout_data->m_input_ports) {
+            float *data_ptr = nullptr;
+            port_data->get_tensor_data(&data_ptr);
+            if (data_ptr) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Input port {}, first element: {}", port_name, data_ptr[0]);
+            }
+        }
         m_session->Run(Ort::RunOptions{nullptr}, *io_binding);
         io_binding->SynchronizeOutputs();
 
         auto output_names = io_binding->GetOutputNames();
         auto output_values = io_binding->GetOutputValues();
+
+        //! Print first element of each output value
+        RDX_INFO_DEV(nullptr, __func__, false, "{}", "Printing first element of each output value after inference");
+        for (size_t i = 0; i < output_values.size(); ++i) {
+            const float *data = output_values[i].GetTensorData<float>();
+            if (data) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Output port {}, first element: {}", output_names[i], data[0]);
+            }
+        }
 
         for (size_t i = 0; i < output_names.size(); ++i) {
             auto port_name = output_names[i];
@@ -104,19 +123,19 @@ int OnnxModelInference::do_inference(InferenceInOutData::Ptr inout_data)
 
             // check if the data is owned by io binding
             // if the port data has tensor data inside, it means the data is NOT owned by io binding
-            bool has_external_data = port_data->has_tensor_data();
-            if (has_external_data) {
-                RDX_INFO_DEV(nullptr, __func__, false, "Output port {}'s data is external, should have been ready", port_name);
-                continue;
-            }
+            // bool has_external_data = port_data->has_tensor_data();
+            // if (has_external_data) {
+            //     RDX_INFO_DEV(nullptr, __func__, false, "Output port {}'s data is external, should have been ready", port_name);
+            //     continue;
+            // }
 
             // if the io_binding owns the data, we need to copy it to the port data
             RDX_INFO_DEV(nullptr, __func__, false, "Output port {}'s data is owned by io binding, copying data to port", port_name);
             auto shape = output_values[i].GetTensorTypeAndShapeInfo().GetShape();
             if (port_dtype == "float32") {
-                port_data->set_tensor_data(output_values[i].GetTensorMutableData<float>(), shape);
+                port_data->set_tensor_data(output_values[i].GetTensorData<float>(), shape);
             } else if (port_dtype == "uint8") {
-                port_data->set_tensor_data(output_values[i].GetTensorMutableData<uint8_t>(), shape);
+                port_data->set_tensor_data(output_values[i].GetTensorData<uint8_t>(), shape);
             } else {
                 RDX_RAISE_ERROR("[f={}] Unsupported output data type: {}", __func__, port_dtype);
                 return -1;

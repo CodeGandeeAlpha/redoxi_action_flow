@@ -16,6 +16,7 @@ const RedoxiModelInference *OnnxInferenceInOutData::get_owner() const
 
 void OnnxInferenceInOutData::_update_port_configuration()
 {
+    // just do not bind
     if (!m_port_configuration_dirty) {
         // no need to update
         return;
@@ -76,9 +77,16 @@ void OnnxInferenceInOutData::_update_port_configuration()
             if (tensor_data_f32.has_data()) {
                 RDX_INFO_DEV(nullptr, __func__, "Binding output port: {} (float32) with tensor", port_name);
                 m_io_binding->BindOutput(port_name.c_str(), *tensor_data_f32.onnx_tensor);
+                // Ort::Value output_tensor = Ort::Value::CreateTensor<float>(
+                //     *tensor_data_f32.onnx_memory_info,
+                //     tensor_data_f32.data->data(), tensor_data_f32.data->size(),
+                //     tensor_data_f32.shape.data(), tensor_data_f32.shape.size());
+                // m_io_binding->BindOutput(port_name.c_str(), std::move(output_tensor));
             } else {
                 RDX_INFO_DEV(nullptr, __func__, "Binding output port: {} (float32) with memory info", port_name);
                 m_io_binding->BindOutput(port_name.c_str(), *tensor_data_f32.onnx_memory_info);
+                // Ort::MemoryInfo memory_info("Cuda", OrtAllocatorType::OrtDeviceAllocator, 0, OrtMemType::OrtMemTypeDefault);
+                // m_io_binding->BindOutput(port_name.c_str(), memory_info);
             }
         } else if (dtype_str == "uint8") {
             auto &tensor_data_u8 = std::get<MappedTensorData_u8>(port_data->m_tensor_data);
@@ -140,7 +148,7 @@ void OnnxInferenceInOutData::init(OnnxModelInference *model_inference)
         // because io binding will be recreated every time when the shape is changed
 
         // add callback function to notify when the shape is changed
-        port_data->on_shape_changed = shape_changed_callback;
+        // port_data->on_shape_changed = shape_changed_callback;
     }
 
     // set the flag to indicate the input configuration is dirty

@@ -19,8 +19,11 @@ OnnxUrl="https://github.com/microsoft/onnxruntime/releases/download/v1.20.0/${On
 OnnxPackageName_TensorRT="onnxruntime-linux-x64-gpu-cuda12-1.17.3"
 OnnxUrl_TensorRT="https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/${OnnxPackageName_TensorRT}.tgz"
 
-OnnxTargetUrl="${OnnxUrl_TensorRT}"
-OnnxTargetPackageName="${OnnxPackageName_TensorRT}"
+# OnnxTargetUrl="${OnnxUrl_TensorRT}"
+# OnnxTargetPackageName="${OnnxPackageName_TensorRT}"
+
+OnnxTargetUrl="${OnnxUrl}"
+OnnxTargetPackageName="${OnnxPackageName}"
 
 # Parse arguments
 for arg in "$@"; do

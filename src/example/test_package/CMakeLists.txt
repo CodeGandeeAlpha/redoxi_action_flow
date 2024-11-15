@@ -50,14 +50,17 @@ option(BUILD_TEST_TBB_TASK_MANAGEMENT "Build test_tbb_task_management target"
 option(BUILD_TEST_VIDEO_READER_RANDOM "Build test_video_reader_random target"
        OFF)
 option(BUILD_TEST_VIDEO_SINK "Build test_video_sink target" OFF)
-option(BUILD_TEST_SIMPLE_ACTION_GENERATOR "Build test_simple_action_generator target" OFF)
+option(BUILD_TEST_SIMPLE_ACTION_GENERATOR
+       "Build test_simple_action_generator target" OFF)
 option(BUILD_TEST_UUID_CONVERSION "Build test_uuid_conversion target" OFF)
 option(BUILD_TEST_V2_JSON_EXAMPLES "Build test_v2_json_examples target" OFF)
-option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2 "Build test_simple_action_generator_v2 target" OFF)
+option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2
+       "Build test_simple_action_generator_v2 target" OFF)
 option(BUILD_TEST_V2_VIDEO_SINK "Build test_v2_video_sink target" OFF)
-option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target" OFF)
+option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target"
+       OFF)
 option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
-option(BUILD_ONNX_HELLO_WORLD "Build onnx_hello_world target" OFF)
+option(BUILD_ONNX_HELLO_WORLD "Build onnx_hello_world target" ON)
 option(BUILD_ONNX_INFERENCE_API "Build onnx_inference_api target" ON)
 # Function to configure a target
 function(configure_target target_name)
@@ -70,10 +73,10 @@ function(configure_target target_name)
     ${target_name} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                           $<INSTALL_INTERFACE:include>)
 
-
   # global directories defined using macro
-  target_compile_definitions(${target_name} PUBLIC
-    -DTEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/models")
+  target_compile_definitions(
+    ${target_name}
+    PUBLIC -DTEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/models")
 
   set(ALL_TEST_TARGETS
       ${ALL_TEST_TARGETS} ${target_name}
@@ -153,7 +156,9 @@ if(BUILD_ONNX_HELLO_WORLD)
   configure_target(onnx_hello_world)
 
   # configure for onnx runtime
-  set(onnxruntime_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/onnxruntime/onnxruntime-linux-x64-gpu-1.20.0/lib64/cmake/onnxruntime)
+  set(onnxruntime_DIR
+      ${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/onnxruntime/onnxruntime-linux-x64-gpu-1.20.0/lib64/cmake/onnxruntime
+  )
   message(STATUS "onnxruntime_DIR: ${onnxruntime_DIR}")
 
   find_package(onnxruntime REQUIRED)

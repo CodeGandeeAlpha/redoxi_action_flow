@@ -63,6 +63,8 @@ struct MappedTensorData {
         this->onnx_tensor = std::make_shared<Ort::Value>(Ort::Value::CreateTensor<T>(
             *onnx_memory_info, data->data(), data->size(),
             shape.data(), shape.size()));
+        RDX_INFO_DEV(nullptr, __func__, false, "Tensor data initialized, shape={}, num_elements={}",
+                     fmt::join(shape, ", "), num_elements);
     }
 };
 
@@ -108,7 +110,13 @@ class OnnxPortData : public ModelPortData
             //! Not holding float data
             return -1;
         } else {
-            std::get<MappedTensorData_f32>(m_tensor_data).data->assign(data, data + num_elements);
+            auto &tensor_data_f32 = std::get<MappedTensorData_f32>(m_tensor_data);
+            tensor_data_f32.data->assign(data, data + num_elements);
+            //! Print first element for debugging
+            if (!tensor_data_f32.data->empty()) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Port name={}, first element: {}",
+                             m_port_info->get_name(), tensor_data_f32.data->front());
+            }
             return 0;
         }
     }

@@ -141,8 +141,9 @@ int main(int argc, char **argv)
             spdlog::info("Input data dtype: {}", dtype_str);
         }
         {
-            for (int ith_run = 0; ith_run < 10; ++ith_run) {
-                spdlog::info("Testing inference, run {}/{}", ith_run + 1, 10);
+            int num_runs = 5;
+            for (int ith_run = 0; ith_run < num_runs; ++ith_run) {
+                spdlog::info("Testing inference, run {}/{}", ith_run + 1, num_runs);
 
                 auto inp_images = inout_data->get_input_port_data("images");
 
@@ -158,7 +159,9 @@ int main(int argc, char **argv)
                     inp_images_data->get_tensor_data(&pixel_data);
 
                     cv::Mat tmp(1, num_elements, CV_32FC1, pixel_data);
-                    cv::randu(tmp, 0.0f, 1.0f);
+                    cv::randu(tmp, 0, 255.0);
+
+                    spdlog::info("Input data randomized, mean={}", cv::mean(tmp)[0]);
                 }
 
                 spdlog::info("Input data randomized");

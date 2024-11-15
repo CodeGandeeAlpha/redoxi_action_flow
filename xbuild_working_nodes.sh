@@ -84,3 +84,6 @@ colcon build --packages-up-to $PackagesToBuild \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
     -DJSON_STRUCT_OPT_INSTALL=ON
 source install/setup.bash
+
+# select gpu 0, because windows docker has issues with multiple gpus
+export CUDA_VISIBLE_DEVICES=0
