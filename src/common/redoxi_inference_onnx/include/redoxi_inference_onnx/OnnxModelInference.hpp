@@ -29,17 +29,20 @@ class OnnxModelInference : public RedoxiModelInference
     //! Get information of ports
     virtual ModelPortInfo::ConstPtrMap get_input_port_infos() const override;
 
+    //! Get information of input ports
+    virtual ModelPortInfo::PtrMap _get_input_port_infos();
+
     //! Get information of output ports
     virtual ModelPortInfo::ConstPtrMap get_output_port_infos() const override;
+
+    //! Get information of output ports
+    virtual ModelPortInfo::PtrMap _get_output_port_infos();
 
     //! Inference
     virtual int do_inference(InferenceInOutData::Ptr inout_data) override;
 
     //! Initialize the model inference, load model and other resources
-    virtual int init(KeyValueStore::Ptr params) override;
-
-    //! Open the model inference, get ready for inference
-    virtual int open() override;
+    virtual int open(KeyValueStore::Ptr params) override;
 
     //! Check if the model inference is open, ready for inference
     virtual bool is_open() const override;

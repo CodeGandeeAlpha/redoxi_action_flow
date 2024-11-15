@@ -148,6 +148,10 @@ class ModelPortInfo
     ModelPortInfo() = default;
 
     std::string m_name;
+
+    //! The data type of the port, following numpy dtype string convention, "<type><number of bits>"
+    //! such as "float32", "uint8", ...
+    //! @note do not accept dtype without bit information, such as "float", "int", ...
     std::string m_dtype_str;
     std::vector<int64_t> m_shape;
     bool m_is_input{false};
@@ -232,10 +236,6 @@ class InferenceInOutData
     // get the data of a configured output port, the data is filled by the model after inference
     virtual ModelPortData::Ptr get_output_port_data(const std::string &port_name) = 0;
 
-    // notify the inferencer that all input port configuration and data are updated
-    // call this before inference, otherwise input data may not be used
-    virtual void notify_input_update() = 0;
-
     // get the inferencer that this inout data belongs to
     virtual RedoxiModelInference *get_owner() = 0;
 
@@ -262,10 +262,7 @@ class RedoxiModelInference
     virtual ModelPortInfo::ConstPtrMap get_output_port_infos() const = 0;
 
     // initialize the model inference, load model and other resources
-    virtual int init(KeyValueStore::Ptr params) = 0;
-
-    // open the model inference, get ready for inference
-    virtual int open() = 0;
+    virtual int open(KeyValueStore::Ptr params) = 0;
 
     // check if the model inference is open, ready for inference
     virtual bool is_open() const = 0;

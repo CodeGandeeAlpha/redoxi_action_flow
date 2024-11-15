@@ -14,15 +14,16 @@ const RedoxiModelInference *OnnxInferenceInOutData::get_owner() const
     return m_model_inference;
 }
 
-void OnnxInferenceInOutData::notify_input_data_update()
+void OnnxInferenceInOutData::_update_port_configuration()
 {
-    if (m_io_binding) {
-        m_io_binding->SynchronizeInputs();
+    if (!m_port_configuration_dirty) {
+        // no need to update
+        return;
     }
-}
 
-void OnnxInferenceInOutData::notify_input_configure_update()
-{
+    // reset the flag, and then proceed to update the port configuration
+    m_port_configuration_dirty = false;
+
     if (!m_io_binding) {
         RDX_INFO_DEV(nullptr, __func__, "{}", "IO binding not found, creating io binding");
 
@@ -61,6 +62,29 @@ void OnnxInferenceInOutData::notify_input_configure_update()
         }
     }
 
+    // FIXME: do not use output binding for now, it may have problem
+    // bind all outputs, if it has fixed shape, bind the tensor directly, otherwise bind the memory info
+    RDX_INFO_DEV(nullptr, __func__, "{}", "Binding all output ports");
+    for (auto &[port_name, port_data] : m_output_ports) {
+        RDX_INFO_DEV(nullptr, __func__, "Binding output port: {}", port_name);
+        auto dtype_str = port_data->get_dtype_str();
+        if (dtype_str == "float32") {
+            auto &tensor_data_f32 = std::get<MappedTensorData_f32>(port_data->m_tensor_data);
+            if (tensor_data_f32.has_data()) {
+                m_io_binding->BindOutput(port_name.c_str(), *tensor_data_f32.onnx_tensor);
+            } else {
+                m_io_binding->BindOutput(port_name.c_str(), *tensor_data_f32.onnx_memory_info);
+            }
+        } else if (dtype_str == "uint8") {
+            auto &tensor_data_u8 = std::get<MappedTensorData_u8>(port_data->m_tensor_data);
+            if (tensor_data_u8.has_data()) {
+                m_io_binding->BindOutput(port_name.c_str(), *tensor_data_u8.onnx_tensor);
+            } else {
+                m_io_binding->BindOutput(port_name.c_str(), *tensor_data_u8.onnx_memory_info);
+            }
+        }
+    }
+
     if (!ok) {
         // failed to bind, just delete io binding
         RDX_INFO_DEV(nullptr, __func__, "{}", "Failed to bind input ports, deleting io binding");
@@ -74,8 +98,14 @@ void OnnxInferenceInOutData::init(OnnxModelInference *model_inference)
     m_input_ports.clear();
     m_output_ports.clear();
 
+    // let this class know when the port shape is changed
+    // so that it can check and bind the ports accordingly
+    auto shape_changed_callback = [this](const std::vector<int64_t> &, const std::vector<int64_t> &) {
+        m_port_configuration_dirty = true;
+    };
+
     // initialize all ports
-    auto input_port_infos = model_inference->get_input_port_infos();
+    auto input_port_infos = model_inference->_get_input_port_infos();
     for (auto &[port_name, port_info] : input_port_infos) {
         auto port_data = std::make_shared<OnnxPortData>();
         auto _port_info = std::dynamic_pointer_cast<OnnxModelPortInfo>(port_info);
@@ -84,9 +114,12 @@ void OnnxInferenceInOutData::init(OnnxModelInference *model_inference)
         }
         port_data->init(_port_info);
         m_input_ports[port_name] = port_data;
+
+        // add callback function to notify when the shape is changed
+        port_data->on_shape_changed = shape_changed_callback;
     }
 
-    auto output_port_infos = model_inference->get_output_port_infos();
+    auto output_port_infos = model_inference->_get_output_port_infos();
     for (auto &[port_name, port_info] : output_port_infos) {
         auto port_data = std::make_shared<OnnxPortData>();
         auto _port_info = std::dynamic_pointer_cast<OnnxModelPortInfo>(port_info);
@@ -95,10 +128,49 @@ void OnnxInferenceInOutData::init(OnnxModelInference *model_inference)
         }
         port_data->init(_port_info);
         m_output_ports[port_name] = port_data;
+
+        // add callback function to notify when the shape is changed
+        port_data->on_shape_changed = shape_changed_callback;
     }
 
-    // notify the model inference to update the io binding, if possible
-    notify_input_configure_update();
+    // set the flag to indicate the input configuration is dirty
+    m_port_configuration_dirty = true;
+}
+
+ModelPortData::Ptr OnnxInferenceInOutData::get_input_port_data(const std::string &port_name)
+{
+    auto it = m_input_ports.find(port_name);
+    if (it != m_input_ports.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+ModelPortData::Ptr OnnxInferenceInOutData::get_output_port_data(const std::string &port_name)
+{
+    auto it = m_output_ports.find(port_name);
+    if (it != m_output_ports.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+ModelPortInfo::ConstPtr OnnxInferenceInOutData::get_input_port_info(const std::string &port_name) const
+{
+    auto it = m_input_ports.find(port_name);
+    if (it != m_input_ports.end()) {
+        return it->second->get_port_info();
+    }
+    return nullptr;
+}
+
+ModelPortInfo::ConstPtr OnnxInferenceInOutData::get_output_port_info(const std::string &port_name) const
+{
+    auto it = m_output_ports.find(port_name);
+    if (it != m_output_ports.end()) {
+        return it->second->get_port_info();
+    }
+    return nullptr;
 }
 
 } // namespace redoxi_works::inference::onnx

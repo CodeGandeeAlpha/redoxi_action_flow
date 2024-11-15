@@ -94,9 +94,16 @@ class OnnxPortData : public ModelPortData
 
     virtual int set_tensor_data(const float *data, std::vector<int64_t> shape) override
     {
-        if (shape != m_shape) {
-            //! Shape mismatch error
+        // check dtype compatibility first
+        if (m_port_info->get_dtype_str() != "float32") {
+            // dtype mismatch
             return -1;
+        }
+
+        // set shape and allocate data
+        auto ret = _set_shape_and_allocate_data(shape);
+        if (ret != 0) {
+            return ret;
         }
 
         if (!std::holds_alternative<MappedTensorData_f32>(m_tensor_data)) {
@@ -107,11 +114,19 @@ class OnnxPortData : public ModelPortData
             return 0;
         }
     }
+
     virtual int set_tensor_data(const uint8_t *data, std::vector<int64_t> shape) override
     {
-        if (shape != m_shape) {
-            //! Shape mismatch error
+        // check dtype compatibility first
+        if (m_port_info->get_dtype_str() != "uint8") {
+            // dtype mismatch
             return -1;
+        }
+
+        // set shape and allocate data
+        auto ret = _set_shape_and_allocate_data(shape);
+        if (ret != 0) {
+            return ret;
         }
 
         if (!std::holds_alternative<MappedTensorData_u8>(m_tensor_data)) {
@@ -180,12 +195,33 @@ class OnnxPortData : public ModelPortData
         return "";
     }
 
+
+    //! Set the port info and shape, the shape should be more specific than the port shape
+    //! If shape is provided, it will check if the shape is compatible with the port shape
+    //! If not, it will raise an error
+    virtual int init(OnnxModelPortInfo::Ptr port_info,
+                     std::optional<std::vector<int64_t>> shape = std::nullopt)
+    {
+        m_port_info = port_info;
+        if (shape.has_value()) {
+            return _set_shape_and_allocate_data(shape.value());
+        } else {
+            return _set_shape_and_allocate_data(port_info->get_shape());
+        }
+    }
+
+  protected:
     //! Set the shape
     //! If the shape is not compatible with the port shape, it will raise an error
     //! If the shape is compatible, it will allocate the data
     //! Note that if dynamic dimensions are present in shape, it is considered ok, but data will not be allocated
-    virtual int set_shape(const std::vector<int64_t> &shape)
+    virtual int _set_shape_and_allocate_data(const std::vector<int64_t> &shape)
     {
+        if (shape == m_shape) {
+            // shape is the same, no need to set shape
+            return 0;
+        }
+
         // you must have port info to set the shape
         if (!m_port_info) {
             RDX_RAISE_ERROR("[f={}] Port info not set", __func__);
@@ -203,6 +239,7 @@ class OnnxPortData : public ModelPortData
         }
 
         // set the shape
+        auto old_shape = m_shape;
         m_shape = shape;
 
         // allocate data
@@ -214,24 +251,12 @@ class OnnxPortData : public ModelPortData
             }
         }
 
+        if (on_shape_changed) {
+            on_shape_changed(shape, old_shape);
+        }
+
         return 0;
     }
-
-    //! Set the port info and shape, the shape should be more specific than the port shape
-    //! If shape is provided, it will check if the shape is compatible with the port shape
-    //! If not, it will raise an error
-    virtual int init(OnnxModelPortInfo::Ptr port_info,
-                     std::optional<std::vector<int64_t>> shape = std::nullopt)
-    {
-        m_port_info = port_info;
-        if (shape.has_value()) {
-            return set_shape(shape.value());
-        } else {
-            return set_shape(port_info->get_shape());
-        }
-    }
-
-  protected:
     //! Initialize all internals based on the port info and shape
     //! If you change the shape, you need to call this function again
     virtual int _allocate_data()
@@ -268,6 +293,11 @@ class OnnxPortData : public ModelPortData
                  MappedTensorData_u8>
         m_tensor_data;
     std::vector<int64_t> m_shape;
+
+  public:
+    // callback function to notify shape changed
+    // will be called after the shape is changed and data is allocated
+    std::function<void(const std::vector<int64_t> &new_shape, const std::vector<int64_t> &old_shape)> on_shape_changed;
 };
 
 } // namespace redoxi_works::inference::onnx

@@ -4,6 +4,7 @@
 #include <redoxi_inference_onnx/OnnxPortInfo.hpp>
 #include <onnxruntime_cxx_api.h>
 #include <map>
+#include <atomic>
 
 namespace redoxi_works::inference::onnx
 {
@@ -20,18 +21,11 @@ class OnnxInferenceInOutData : public InferenceInOutData
     OnnxInferenceInOutData() = default;
     virtual ~OnnxInferenceInOutData() = default;
 
-    virtual int configure_input_port(
-        const std::string &port_name,
-        std::vector<int64_t> shape) override;
-
     virtual ModelPortInfo::ConstPtr get_input_port_info(const std::string &port_name) const override;
     virtual ModelPortInfo::ConstPtr get_output_port_info(const std::string &port_name) const override;
 
     virtual ModelPortData::Ptr get_input_port_data(const std::string &port_name) override;
     virtual ModelPortData::Ptr get_output_port_data(const std::string &port_name) override;
-
-    virtual void notify_input_data_update();
-    virtual void notify_input_configure_update();
 
     virtual RedoxiModelInference *get_owner() override;
     virtual const RedoxiModelInference *get_owner() const override;
@@ -40,6 +34,10 @@ class OnnxInferenceInOutData : public InferenceInOutData
     void init(OnnxModelInference *model_inference);
 
   protected:
+    //! Do something when the port configuration is updated
+    //! for example, re-bind the ports when shape is changed
+    virtual void _update_port_configuration();
+
     OnnxModelInference *m_model_inference = nullptr;
 
     // io binding for this inout data, including all ports
@@ -48,5 +46,8 @@ class OnnxInferenceInOutData : public InferenceInOutData
     // port data indexed by port name
     std::map<std::string, OnnxPortData::Ptr> m_input_ports;
     std::map<std::string, OnnxPortData::Ptr> m_output_ports;
+
+    // flag to indicate if the port configuration is dirty
+    std::atomic_bool m_port_configuration_dirty{false};
 };
 } // namespace redoxi_works::inference::onnx
