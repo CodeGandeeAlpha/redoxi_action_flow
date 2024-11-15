@@ -163,6 +163,7 @@ void PSGDocumentSink::_step()
     // publish debug topic?
     if (get_debug_topics_enabled()) {
         m_pub_debug_document_accepted.publish(raw_image, "accepted");
+        RDX_INFO_DEV(this, __func__, false, "{}", "published debug document accepted");
     }
 
     // at the end, terminate the goal
