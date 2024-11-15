@@ -91,6 +91,7 @@ int main(int argc, char **argv)
             for (auto &entry : tensor_caches) {
                 if (entry.first.is_input) {
                     std::generate(entry.second.data->begin(), entry.second.data->end(), []() { return static_cast<float>(rand()) / RAND_MAX; });
+                    runtime_data->io_binding->BindInput(entry.first.name.c_str(), *(entry.second.tensor));
                 }
             }
             auto start_time = std::chrono::high_resolution_clock::now();
@@ -157,9 +158,6 @@ std::shared_ptr<OnnxRuntimeData> create_onnx_runtime_data(
             spdlog::info("No pre-allocation for output port: {}", port.name);
             auto memory_info = std::make_shared<Ort::MemoryInfo>(
                 Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault));
-            //! Create CUDA memory info for output tensors
-            // auto memory_info = std::make_shared<Ort::MemoryInfo>(
-            //     "Cuda", OrtDeviceAllocator, 0, OrtMemTypeDefault);
             runtime_data->tensor_caches[port] = {nullptr, nullptr, memory_info};
         }
     }
