@@ -3,6 +3,7 @@
 #include <redoxi_inference_onnx/redoxi_inference_onnx.hpp>
 #include <redoxi_inference_onnx/OnnxModelConfig.hpp>
 #include <redoxi_inference_onnx/OnnxPortInfo.hpp>
+#include <redoxi_inference_onnx/OnnxInferenceInOutData.hpp>
 #include <onnxruntime_cxx_api.h>
 
 namespace redoxi_works::inference::onnx
@@ -10,35 +11,14 @@ namespace redoxi_works::inference::onnx
 class OnnxModelInference : public RedoxiModelInference
 {
   public:
-    //! A struct to hold the information of an inference port
-    struct InferencePort {
-        // original port info
-        OnnxModelPortInfo::Ptr info_original;
-
-        // configured port info, where some dynamic properties are set
-        OnnxModelPortInfo::Ptr info_configured;
-
-        // data for input/output port, with shapes matched to the configured shape
-        ModelPortData::Ptr data;
-
-        // memory info for io binding
-        std::shared_ptr<Ort::MemoryInfo> ort_memory_info;
-
-        // whether the port has been bound to an io binding
-        bool has_io_binding = false;
-    };
-
     OnnxModelInference();
     virtual ~OnnxModelInference() = default;
 
     //! Create a key value store
     virtual KeyValueStore::Ptr create_init_params() override;
 
-    //! Get the data of an input port
-    virtual ModelPortData::Ptr get_input_port_data(const std::string &port_name) override;
-
-    //! Get the data of an output port
-    virtual ModelPortData::Ptr get_output_port_data(const std::string &port_name) override;
+    //! Create an inference inout data object
+    virtual InferenceInOutData::Ptr create_inference_inout_data() override;
 
     //! Get model metadata, related to the model itself
     virtual KeyValueStore::ConstPtr get_model_metadata() const override;
@@ -53,7 +33,7 @@ class OnnxModelInference : public RedoxiModelInference
     virtual ModelPortInfo::ConstPtrMap get_output_port_infos() const override;
 
     //! Inference
-    virtual int do_inference() override;
+    virtual int do_inference(InferenceInOutData::Ptr inout_data) override;
 
     //! Initialize the model inference, load model and other resources
     virtual int init(KeyValueStore::Ptr params) override;
@@ -106,7 +86,7 @@ class OnnxModelInference : public RedoxiModelInference
      * @return A map of input port names to their corresponding OnnxModelPortInfo pointers.
      */
     static OnnxModelPortInfo::PtrMap get_input_port_infos(
-        const std::shared_ptr<Ort::Session> &session);
+        const Ort::Session &session);
 
     /**
      * @brief Get information about the output ports of the ONNX model.
@@ -115,7 +95,7 @@ class OnnxModelInference : public RedoxiModelInference
      * @return A map of output port names to their corresponding OnnxModelPortInfo pointers.
      */
     static OnnxModelPortInfo::PtrMap get_output_port_infos(
-        const std::shared_ptr<Ort::Session> &session);
+        const Ort::Session &session);
 
     /**
      * @brief Convert an ONNX tensor element data type to its string representation.

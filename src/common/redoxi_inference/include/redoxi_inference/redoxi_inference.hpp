@@ -3,10 +3,9 @@
 
 #include "redoxi_inference/visibility_control.h"
 #include "redoxi_inference/redoxi_tensor_def.hpp"
-#include <optional>
-#include <array>
 #include <memory>
 #include <map>
+#include <sstream>
 
 
 namespace redoxi_works::inference
@@ -128,11 +127,21 @@ class ModelPortInfo
         return m_is_input;
     }
 
-    //! Get the expected shape of the tensor given a batch size, where the dimensions that can be dynamic are -1
-    //! @param batch_size The batch size, optional
-    //! @return The expected shape of the tensor in 4d format, typically [N,C,H,W], depends on the model
-    //! If the port cannot deal with 4d tensor (e.g., required 5d tensor or more), return std::nullopt
-    // virtual std::optional<std::array<int, 4>> get_shape_4d(std::optional<int> batch_size = std::nullopt) const = 0;
+    //! Get the description of the port, for printing
+    virtual std::string to_description() const
+    {
+        std::stringstream ss;
+        ss << "name=" << m_name << ", shape=(";
+        for (size_t i = 0; i < m_shape.size(); ++i) {
+            ss << m_shape[i];
+            if (i < m_shape.size() - 1) {
+                ss << ",";
+            }
+        }
+        ss << "), dtype=" << m_dtype_str;
+        return ss.str();
+    }
+
   protected:
     // this class is intended to be subclassed
     // do not create it directly
