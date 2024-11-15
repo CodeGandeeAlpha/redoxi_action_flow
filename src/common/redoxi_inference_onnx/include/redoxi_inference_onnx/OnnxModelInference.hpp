@@ -8,6 +8,12 @@
 
 namespace redoxi_works::inference::onnx
 {
+
+// FIXME: deal with the case when input and output shape changes frequently
+
+//! ONNX model inference
+//! IMPORTANT: the current implementation assumes input and output shape do not change frequently
+//! otherwise the performance will be very slow because io binding will be recreated every time when the shape is changed
 class OnnxModelInference : public RedoxiModelInference
 {
   public:

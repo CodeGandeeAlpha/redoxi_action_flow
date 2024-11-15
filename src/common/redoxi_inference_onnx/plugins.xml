@@ -1,0 +1,32 @@
+<library path="redoxi_inference_onnx">
+    <class type="redoxi_works::inference::onnx::OnnxModelInference" 
+           base_class_type="redoxi_works::inference::RedoxiModelInference">
+        <description>
+            ONNX model inference plugin for Redoxi framework
+        </description>
+    </class>
+    <class type="redoxi_works::inference::onnx::OnnxModelConfig" 
+           base_class_type="redoxi_works::inference::KeyValueStore">
+        <description>
+            ONNX model configuration for Redoxi framework
+        </description>
+    </class>
+    <class type="redoxi_works::inference::onnx::OnnxPortData" 
+           base_class_type="redoxi_works::inference::ModelPortData">
+        <description>
+            ONNX port data for Redoxi framework
+        </description>
+    </class>
+    <class type="redoxi_works::inference::onnx::OnnxModelPortInfo" 
+           base_class_type="redoxi_works::inference::ModelPortInfo">
+        <description>
+            ONNX model port information for Redoxi framework
+        </description>
+    </class>
+    <class type="redoxi_works::inference::onnx::OnnxInferenceInOutData" 
+           base_class_type="redoxi_works::inference::InferenceInOutData">
+        <description>
+            ONNX inference input/output data for Redoxi framework
+        </description>
+    </class>
+</library>

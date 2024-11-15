@@ -13,6 +13,7 @@
   <depend>redoxi_samples_nodes</depend>
   <depend>redoxi_video_reader</depend>
   <depend>redoxi_shared_memory</depend>
+  <depend>redoxi_inference</depend>
   <depend>psg_private_msgs</depend>  
   <depend>pluginlib</depend>
 

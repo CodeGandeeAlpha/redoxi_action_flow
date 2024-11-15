@@ -83,9 +83,6 @@ class OnnxPortData : public ModelPortData
     using ConstPtr = std::shared_ptr<const OnnxPortData>;
 
   public:
-    OnnxPortData();
-    virtual ~OnnxPortData();
-
     // get information of the port
     virtual ModelPortInfo::ConstPtr get_port_info() const override
     {
@@ -106,11 +103,12 @@ class OnnxPortData : public ModelPortData
             return ret;
         }
 
+        auto num_elements = std::accumulate(m_shape.begin(), m_shape.end(), 1, std::multiplies<int64_t>());
         if (!std::holds_alternative<MappedTensorData_f32>(m_tensor_data)) {
             //! Not holding float data
             return -1;
         } else {
-            std::get<MappedTensorData_f32>(m_tensor_data).data->assign(data, data + m_shape.size());
+            std::get<MappedTensorData_f32>(m_tensor_data).data->assign(data, data + num_elements);
             return 0;
         }
     }
@@ -129,11 +127,12 @@ class OnnxPortData : public ModelPortData
             return ret;
         }
 
+        auto num_elements = std::accumulate(m_shape.begin(), m_shape.end(), 1, std::multiplies<int64_t>());
         if (!std::holds_alternative<MappedTensorData_u8>(m_tensor_data)) {
             //! Not holding uint8_t data
             return -1;
         } else {
-            std::get<MappedTensorData_u8>(m_tensor_data).data->assign(data, data + m_shape.size());
+            std::get<MappedTensorData_u8>(m_tensor_data).data->assign(data, data + num_elements);
             return 0;
         }
     }
@@ -185,6 +184,18 @@ class OnnxPortData : public ModelPortData
     virtual std::vector<int64_t> get_shape() const override
     {
         return m_shape;
+    }
+
+    virtual bool has_tensor_data() const override
+    {
+        if (m_shape.empty()) {
+            // no shape, no data
+            return false;
+        }
+
+        // if the shape has no dynamic dimensions, then data is available
+        bool has_dynamic_dims = std::any_of(m_shape.begin(), m_shape.end(), [](int64_t dim) { return dim < 0; });
+        return !has_dynamic_dims;
     }
 
     virtual std::string get_dtype_str() const override

@@ -2,7 +2,8 @@
 #define REDOXI_INFERENCE__REDOXI_INFERENCE_HPP_
 
 #include "redoxi_inference/visibility_control.h"
-#include "redoxi_inference/redoxi_tensor_def.hpp"
+// #include "redoxi_inference/redoxi_tensor_def.hpp"
+#include <vector>
 #include <memory>
 #include <map>
 #include <sstream>
@@ -57,7 +58,7 @@ struct KeyValueStore {
     using RawPtr = KeyValueStore *;
 
     struct KeyInfo {
-        std::string key;         // key name
+        std::string name;        // key name
         std::string dtype;       // data type, such as "string", "int64", "double", ...
         std::string description; // description of the key
     };
@@ -131,6 +132,7 @@ class ModelPortInfo
     virtual std::string to_description() const
     {
         std::stringstream ss;
+        ss << (m_is_input ? "Input: " : "Output: ");
         ss << "name=" << m_name << ", shape=(";
         for (size_t i = 0; i < m_shape.size(); ++i) {
             ss << m_shape[i];
@@ -200,6 +202,9 @@ class ModelPortData
     //! you can also modify the data by this pointer
     //! @return 0 if success, -1 if failed
     virtual int get_tensor_data(uint8_t **output_tensor) = 0;
+
+    //! Check if the tensor data is set
+    virtual bool has_tensor_data() const = 0;
 };
 
 //! A class to hold the input and output data of a model inference, like onnx io_binding
@@ -214,13 +219,6 @@ class InferenceInOutData
 
     InferenceInOutData() = default;
     virtual ~InferenceInOutData() = default;
-
-    // configure an input port, set the shape of the port
-    // for dynamic dimensions, set the dimension to -1, or a specific value if it is static
-    // @return 0 if success, -1 if failed (the model does not support this shape)
-    virtual int configure_input_port(
-        const std::string &port_name,
-        std::vector<int64_t> shape) = 0;
 
     // get the information of a configured input port
     virtual ModelPortInfo::ConstPtr get_input_port_info(const std::string &port_name) const = 0;

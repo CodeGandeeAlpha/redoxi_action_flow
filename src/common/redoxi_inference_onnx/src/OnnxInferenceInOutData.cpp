@@ -21,6 +21,9 @@ void OnnxInferenceInOutData::_update_port_configuration()
         return;
     }
 
+    // FIXME: should be able to explicitly disable io binding
+    // otherwise, if shape of input changes frequently, it will be very slow
+
     // reset the flag, and then proceed to update the port configuration
     m_port_configuration_dirty = false;
 
@@ -71,15 +74,19 @@ void OnnxInferenceInOutData::_update_port_configuration()
         if (dtype_str == "float32") {
             auto &tensor_data_f32 = std::get<MappedTensorData_f32>(port_data->m_tensor_data);
             if (tensor_data_f32.has_data()) {
+                RDX_INFO_DEV(nullptr, __func__, "Binding output port: {} (float32) with tensor", port_name);
                 m_io_binding->BindOutput(port_name.c_str(), *tensor_data_f32.onnx_tensor);
             } else {
+                RDX_INFO_DEV(nullptr, __func__, "Binding output port: {} (float32) with memory info", port_name);
                 m_io_binding->BindOutput(port_name.c_str(), *tensor_data_f32.onnx_memory_info);
             }
         } else if (dtype_str == "uint8") {
             auto &tensor_data_u8 = std::get<MappedTensorData_u8>(port_data->m_tensor_data);
             if (tensor_data_u8.has_data()) {
+                RDX_INFO_DEV(nullptr, __func__, "Binding output port: {} (uint8) with tensor", port_name);
                 m_io_binding->BindOutput(port_name.c_str(), *tensor_data_u8.onnx_tensor);
             } else {
+                RDX_INFO_DEV(nullptr, __func__, "Binding output port: {} (uint8) with memory info", port_name);
                 m_io_binding->BindOutput(port_name.c_str(), *tensor_data_u8.onnx_memory_info);
             }
         }
@@ -128,6 +135,9 @@ void OnnxInferenceInOutData::init(OnnxModelInference *model_inference)
         }
         port_data->init(_port_info);
         m_output_ports[port_name] = port_data;
+
+        // FIXME: output port's shape should not change frequently, otherwise it will be slow
+        // because io binding will be recreated every time when the shape is changed
 
         // add callback function to notify when the shape is changed
         port_data->on_shape_changed = shape_changed_callback;

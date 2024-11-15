@@ -23,6 +23,7 @@ set(DEPENDENCIES
     redoxi_samples_lib
     redoxi_samples_nodes
     redoxi_shared_memory
+    redoxi_inference
     pluginlib)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb)
@@ -56,8 +57,8 @@ option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2 "Build test_simple_action_generator
 option(BUILD_TEST_V2_VIDEO_SINK "Build test_v2_video_sink target" OFF)
 option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target" OFF)
 option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
-option(BUILD_ONNX_HELLO_WORLD "Build onnx_hello_world target" ON)
-
+option(BUILD_ONNX_HELLO_WORLD "Build onnx_hello_world target" OFF)
+option(BUILD_ONNX_INFERENCE_API "Build onnx_inference_api target" ON)
 # Function to configure a target
 function(configure_target target_name)
   add_executable(${target_name} src/${target_name}.cpp)
@@ -68,6 +69,12 @@ function(configure_target target_name)
   target_include_directories(
     ${target_name} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                           $<INSTALL_INTERFACE:include>)
+
+
+  # global directories defined using macro
+  target_compile_definitions(${target_name} PUBLIC
+    -DTEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/models")
+
   set(ALL_TEST_TARGETS
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
@@ -145,15 +152,6 @@ endif()
 if(BUILD_ONNX_HELLO_WORLD)
   configure_target(onnx_hello_world)
 
-  # hand-crafted onnx configuration
-  # set(ONNXRUNTIME_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/onnxruntime/onnxruntime-linux-x64-gpu-1.17.3)
-  # target_include_directories(onnx_hello_world PUBLIC ${ONNXRUNTIME_ROOT}/include)
-  # target_link_libraries(onnx_hello_world PUBLIC
-  #   ${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so
-  #   ${ONNXRUNTIME_ROOT}/lib/libonnxruntime_providers_shared.so
-  #   ${ONNXRUNTIME_ROOT}/lib/libonnxruntime_providers_cuda.so
-  #   ${ONNXRUNTIME_ROOT}/lib/libonnxruntime_providers_tensorrt.so)
-
   # configure for onnx runtime
   set(onnxruntime_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/onnxruntime/onnxruntime-linux-x64-gpu-1.20.0/lib64/cmake/onnxruntime)
   message(STATUS "onnxruntime_DIR: ${onnxruntime_DIR}")
@@ -162,14 +160,10 @@ if(BUILD_ONNX_HELLO_WORLD)
   message(STATUS "onnxruntime_FOUND: ${onnxruntime_FOUND}")
 
   target_link_libraries(onnx_hello_world PUBLIC onnxruntime::onnxruntime)
+endif()
 
-  # set(ONNXRUNTIME_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/onnxruntime/onnxruntime-linux-x64-gpu-1.20.0)
-  # message(STATUS "ONNXRUNTIME_ROOT: ${ONNXRUNTIME_ROOT}")
-  # find_library(ONNXRUNTIME_LIB NAMES onnxruntime PATHS ${ONNXRUNTIME_ROOT})
-  # message(STATUS "ONNXRUNTIME_LIB: ${ONNXRUNTIME_LIB}")
-
-  # target_include_directories(onnx_hello_world PUBLIC ${ONNXRUNTIME_ROOT}/include)
-  # target_link_libraries(onnx_hello_world PUBLIC ${ONNXRUNTIME_LIB})
+if(BUILD_ONNX_INFERENCE_API)
+  configure_target(onnx_inference_api)
 endif()
 
 # Install targets

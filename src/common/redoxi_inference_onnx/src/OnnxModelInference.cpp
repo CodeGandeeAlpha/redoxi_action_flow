@@ -1,6 +1,7 @@
 #include <redoxi_inference_onnx/OnnxModelInference.hpp>
 #include <redoxi_inference_onnx/OnnxPortData.hpp>
 #include <redoxi_inference_onnx/OnnxInferenceInOutData.hpp>
+#include <redoxi_inference_onnx/OnnxPortInfo.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <filesystem>
 
@@ -35,10 +36,28 @@ ModelPortInfo::ConstPtrMap OnnxModelInference::get_input_port_infos() const
     return ret;
 }
 
+ModelPortInfo::PtrMap OnnxModelInference::_get_input_port_infos()
+{
+    ModelPortInfo::PtrMap ret;
+    for (auto &[port_name, port_info] : m_input_ports) {
+        ret[port_name] = port_info;
+    }
+    return ret;
+}
+
 ModelPortInfo::ConstPtrMap OnnxModelInference::get_output_port_infos() const
 {
     ModelPortInfo::ConstPtrMap ret;
     for (const auto &[port_name, port_info] : m_output_ports) {
+        ret[port_name] = port_info;
+    }
+    return ret;
+}
+
+ModelPortInfo::PtrMap OnnxModelInference::_get_output_port_infos()
+{
+    ModelPortInfo::PtrMap ret;
+    for (auto &[port_name, port_info] : m_output_ports) {
         ret[port_name] = port_info;
     }
     return ret;
@@ -59,8 +78,14 @@ int OnnxModelInference::do_inference(InferenceInOutData::Ptr inout_data)
 
     // do we have io binding?
     auto onnx_inout_data = std::dynamic_pointer_cast<OnnxInferenceInOutData>(inout_data);
+
+    // make sure the port configuration update is applied
+    // re-bind the ports if input or output shape is changed
+    // FIXME: this is not efficient, find a better way to handle this
+    onnx_inout_data->_update_port_configuration();
+
     auto io_binding = onnx_inout_data->m_io_binding;
-    if (io_binding != nullptr) {
+    if (io_binding) {
         // has io binding, notify the inout data to update the io binding
         RDX_INFO_DEV(nullptr, __func__, false, "{}", "IO binding found, performing inference");
 
@@ -68,6 +93,38 @@ int OnnxModelInference::do_inference(InferenceInOutData::Ptr inout_data)
         io_binding->SynchronizeInputs();
         m_session->Run(Ort::RunOptions{nullptr}, *io_binding);
         io_binding->SynchronizeOutputs();
+
+        auto output_names = io_binding->GetOutputNames();
+        auto output_values = io_binding->GetOutputValues();
+
+        for (size_t i = 0; i < output_names.size(); ++i) {
+            auto port_name = output_names[i];
+            auto port_data = onnx_inout_data->m_output_ports[port_name];
+            auto port_dtype = port_data->get_dtype_str();
+
+            // check if the data is owned by io binding
+            // if the port data has tensor data inside, it means the data is NOT owned by io binding
+            bool has_external_data = port_data->has_tensor_data();
+            if (has_external_data) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Output port {}'s data is external, should have been ready", port_name);
+                continue;
+            }
+
+            // if the io_binding owns the data, we need to copy it to the port data
+            RDX_INFO_DEV(nullptr, __func__, false, "Output port {}'s data is owned by io binding, copying data to port", port_name);
+            auto shape = output_values[i].GetTensorTypeAndShapeInfo().GetShape();
+            if (port_dtype == "float32") {
+                port_data->set_tensor_data(output_values[i].GetTensorMutableData<float>(), shape);
+            } else if (port_dtype == "uint8") {
+                port_data->set_tensor_data(output_values[i].GetTensorMutableData<uint8_t>(), shape);
+            } else {
+                RDX_RAISE_ERROR("[f={}] Unsupported output data type: {}", __func__, port_dtype);
+                return -1;
+            }
+
+            bool is_dirty = onnx_inout_data->m_port_configuration_dirty;
+            RDX_INFO_DEV(nullptr, __func__, false, "After processing output port {}, configuration is dirty: {}", port_name, is_dirty);
+        }
     } else {
         RDX_INFO_DEV(nullptr, __func__, false, "{}", "No IO binding found, performing inference without IO binding");
 
@@ -80,13 +137,19 @@ int OnnxModelInference::do_inference(InferenceInOutData::Ptr inout_data)
             auto shape = port_data->get_shape();
             input_names.push_back(port_name.c_str());
 
-            // get all ort values
+            // create ort value for the input port
             if (std::holds_alternative<MappedTensorData_f32>(port_data->m_tensor_data)) {
-                auto v = std::get<MappedTensorData_f32>(port_data->m_tensor_data).onnx_tensor;
-                ort_values.push_back(*v);
+                auto &v = std::get<MappedTensorData_f32>(port_data->m_tensor_data);
+                Ort::Value ort_value = Ort::Value::CreateTensor<float>(
+                    *v.onnx_memory_info, v.data->data(), v.data->size(),
+                    v.shape.data(), v.shape.size());
+                ort_values.push_back(std::move(ort_value));
             } else if (std::holds_alternative<MappedTensorData_u8>(port_data->m_tensor_data)) {
-                auto v = std::get<MappedTensorData_u8>(port_data->m_tensor_data).onnx_tensor;
-                ort_values.push_back(*v);
+                auto &v = std::get<MappedTensorData_u8>(port_data->m_tensor_data);
+                Ort::Value ort_value = Ort::Value::CreateTensor<uint8_t>(
+                    *v.onnx_memory_info, v.data->data(), v.data->size(),
+                    v.shape.data(), v.shape.size());
+                ort_values.push_back(std::move(ort_value));
             } else {
                 RDX_RAISE_ERROR("[f={}] Cannot find suitable onnx tensor for port: {}", __func__, port_name);
                 return -1;
@@ -105,7 +168,7 @@ int OnnxModelInference::do_inference(InferenceInOutData::Ptr inout_data)
         }
 
         // perform inference
-        RDX_INFO_DEV(nullptr, __func__, false, "{}", "Performing inference");
+        RDX_INFO_DEV(nullptr, __func__, false, "{}", "Calling session run");
         auto ort_outputs = m_session->Run(Ort::RunOptions{nullptr},
                                           input_names.data(), ort_values.data(), ort_values.size(),
                                           output_names.data(), output_names.size());
@@ -167,7 +230,7 @@ int OnnxModelInference::open(KeyValueStore::Ptr params)
     }
 
     // create the environment and session
-    m_env = std::make_shared<Ort::Env>(logging_level, config->log_id.c_str());
+    m_env = std::make_shared<Ort::Env>((OrtLoggingLevel)logging_level, config->log_id.c_str());
     m_session = create_onnx_session(model_path, provider_type, *m_env);
 
     // get all input and output port infos
@@ -334,3 +397,24 @@ std::string OnnxModelInference::onnx_element_type_to_string(ONNXTensorElementDat
 }
 
 } // namespace redoxi_works::inference::onnx
+
+#include <pluginlib/class_list_macros.hpp>
+PLUGINLIB_EXPORT_CLASS(
+    redoxi_works::inference::onnx::OnnxModelInference,
+    redoxi_works::inference::RedoxiModelInference)
+
+PLUGINLIB_EXPORT_CLASS(
+    redoxi_works::inference::onnx::OnnxModelConfig,
+    redoxi_works::inference::KeyValueStore)
+
+PLUGINLIB_EXPORT_CLASS(
+    redoxi_works::inference::onnx::OnnxPortData,
+    redoxi_works::inference::ModelPortData)
+
+PLUGINLIB_EXPORT_CLASS(
+    redoxi_works::inference::onnx::OnnxModelPortInfo,
+    redoxi_works::inference::ModelPortInfo)
+
+PLUGINLIB_EXPORT_CLASS(
+    redoxi_works::inference::onnx::OnnxInferenceInOutData,
+    redoxi_works::inference::InferenceInOutData)
