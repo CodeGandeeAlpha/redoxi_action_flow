@@ -156,7 +156,7 @@ std::shared_ptr<OnnxRuntimeData> create_onnx_runtime_data(
         } else {
             spdlog::info("No pre-allocation for output port: {}", port.name);
             auto memory_info = std::make_shared<Ort::MemoryInfo>(
-                Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault));
+                Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault));
             //! Create CUDA memory info for output tensors
             // auto memory_info = std::make_shared<Ort::MemoryInfo>(
             //     "Cuda", OrtDeviceAllocator, 0, OrtMemTypeDefault);
