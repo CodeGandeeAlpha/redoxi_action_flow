@@ -81,13 +81,25 @@ int OnnxModelInference::do_inference(InferenceInOutData::Ptr inout_data)
 
     // make sure the port configuration update is applied
     // re-bind the ports if input or output shape is changed
-    // FIXME: this is not efficient, find a better way to handle this
-    onnx_inout_data->_update_port_configuration();
+    std::shared_ptr<Ort::IoBinding> io_binding = nullptr;
 
-    auto io_binding = onnx_inout_data->m_io_binding;
+    // if io binding is requested, we need to update the io binding
+    if (onnx_inout_data->m_use_io_binding) {
+        bool input_binding_updated = onnx_inout_data->_update_io_binding_input();
+        if (input_binding_updated) {
+            RDX_INFO_DEV(nullptr, __func__, false, "{}", "Input binding updated");
+        }
+        bool output_binding_updated = onnx_inout_data->_update_io_binding_output();
+        if (output_binding_updated) {
+            RDX_INFO_DEV(nullptr, __func__, false, "{}", "Output binding updated");
+        }
+
+        io_binding = onnx_inout_data->m_io_binding;
+    }
+
     if (io_binding) {
         // has io binding, notify the inout data to update the io binding
-        RDX_INFO_DEV(nullptr, __func__, false, "{}", "IO binding found, performing inference");
+        RDX_INFO_DEV(nullptr, __func__, false, "{}", "Do inference with IO binding");
 
         // perform inference
         io_binding->SynchronizeInputs();
@@ -121,16 +133,16 @@ int OnnxModelInference::do_inference(InferenceInOutData::Ptr inout_data)
             auto port_data = onnx_inout_data->m_output_ports[port_name];
             auto port_dtype = port_data->get_dtype_str();
 
-            // check if the data is owned by io binding
-            // if the port data has tensor data inside, it means the data is NOT owned by io binding
-            // bool has_external_data = port_data->has_tensor_data();
-            // if (has_external_data) {
-            //     RDX_INFO_DEV(nullptr, __func__, false, "Output port {}'s data is external, should have been ready", port_name);
-            //     continue;
-            // }
+            auto need_copy_data = !onnx_inout_data->m_output_port_bound_by_tensor[port_name];
+            if (!need_copy_data) {
+                RDX_INFO_DEV(nullptr, __func__, false,
+                             "Output port {}'s data is external, no need to copy", port_name);
+                continue;
+            }
 
             // if the io_binding owns the data, we need to copy it to the port data
-            RDX_INFO_DEV(nullptr, __func__, false, "Output port {}'s data is owned by io binding, copying data to port", port_name);
+            RDX_INFO_DEV(nullptr, __func__, false,
+                         "Output port {}'s data is owned by io binding, copying data to port", port_name);
             auto shape = output_values[i].GetTensorTypeAndShapeInfo().GetShape();
             if (port_dtype == "float32") {
                 port_data->set_tensor_data(output_values[i].GetTensorData<float>(), shape);
@@ -140,9 +152,6 @@ int OnnxModelInference::do_inference(InferenceInOutData::Ptr inout_data)
                 RDX_RAISE_ERROR("[f={}] Unsupported output data type: {}", __func__, port_dtype);
                 return -1;
             }
-
-            bool is_dirty = onnx_inout_data->m_port_configuration_dirty;
-            RDX_INFO_DEV(nullptr, __func__, false, "After processing output port {}, configuration is dirty: {}", port_name, is_dirty);
         }
     } else {
         RDX_INFO_DEV(nullptr, __func__, false, "{}", "No IO binding found, performing inference without IO binding");

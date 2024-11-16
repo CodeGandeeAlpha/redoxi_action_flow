@@ -9,6 +9,9 @@
 namespace redoxi_works::inference::onnx
 {
 class OnnxModelInference;
+
+// InOut data for inference
+// @note: this class is not thread safe, only use it in a single thread
 class OnnxInferenceInOutData : public InferenceInOutData
 {
     friend class OnnxModelInference;
@@ -34,9 +37,13 @@ class OnnxInferenceInOutData : public InferenceInOutData
     void init(OnnxModelInference *model_inference);
 
   protected:
-    //! Do something when the port configuration is updated
-    //! for example, re-bind the ports when shape is changed
-    virtual void _update_port_configuration();
+    // update the io binding for input ports
+    // return true if the io binding is updated, false otherwise
+    virtual bool _update_io_binding_input();
+
+    // update the io binding for output ports
+    // return true if the io binding is updated, false otherwise
+    virtual bool _update_io_binding_output();
 
     OnnxModelInference *m_model_inference = nullptr;
 
@@ -47,7 +54,20 @@ class OnnxInferenceInOutData : public InferenceInOutData
     std::map<std::string, OnnxPortData::Ptr> m_input_ports;
     std::map<std::string, OnnxPortData::Ptr> m_output_ports;
 
-    // flag to indicate if the port configuration is dirty
-    std::atomic_bool m_port_configuration_dirty{false};
+    // flag to indicate if the port configuration has been changed
+    std::atomic_bool m_input_port_configuration_dirty{false};
+    std::atomic_bool m_output_port_configuration_dirty{false};
+
+    // whenever possible, use io binding to do inference?
+    std::atomic_bool m_use_io_binding{true};
+
+    // in io-binding, should we bind to output tensor whenever possible?
+    // if false, we will always bind to memory info instead
+    std::atomic_bool m_prefer_bind_output_tensor{true};
+
+    // flag to indicate if the output port is bound by tensor
+    // if false, the port is bound by memory info
+    std::map<std::string, bool> m_output_port_bound_by_tensor;
 };
+
 } // namespace redoxi_works::inference::onnx

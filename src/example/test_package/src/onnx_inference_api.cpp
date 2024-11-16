@@ -149,8 +149,6 @@ int main(int argc, char **argv)
 
                 // Randomize the input data
                 {
-                    // TODO: why the output does not change, even if the input is changed?
-                    // BUG: the output does not change, why?
                     auto inp_images_data = inout_data->get_input_port_data("images");
                     auto port_info = inp_images_data->get_port_info();
                     auto real_shape = inp_images_data->get_shape();
