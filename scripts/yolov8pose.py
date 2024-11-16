@@ -236,6 +236,37 @@ class YOLOv8pose:
 
         # Run inference using the preprocessed image data
         outputs = session.run(None, {model_inputs[0].name: img_data})
+        
+#         Let me explain the expected shape of `outputs` in YOLOv8 pose estimation:
+
+# For YOLOv8 pose ONNX model, the output shape is:
+
+# ```
+# outputs[0].shape = (1, 56, num_boxes)
+# ```
+
+# Where:
+# - `1` is the batch size
+# - `56` is the number of values per detection:
+#   - First 4 values: bounding box (x, y, width, height)
+#   - 1 value: confidence score
+#   - 51 values: keypoints (17 keypoints × 3 values per keypoint)
+#     - Each keypoint has (x, y, confidence)
+# - `num_boxes` is the number of candidate detections (varies by model size, typically 8400 for 640x640 input)
+
+# This is why in your code, when processing the output:
+# ```python:scripts/yolov8pose.py
+# # ... existing code ...
+# outputs = np.transpose(np.squeeze(output[0]))  # Shape becomes (num_boxes, 56)
+
+# # Then each row is processed:
+# x, y, w, h = outputs[i][0:4]      # bbox coordinates
+# score = outputs[i][4]             # confidence score
+# pose = outputs[i][5:].reshape(-1, 3)  # reshape keypoints to (17, 3)
+# # ... existing code ...
+# ```
+
+# The `squeeze` removes the batch dimension, and `transpose` makes it easier to iterate over each detection.
 
         # Perform post-processing on the outputs to obtain output image.
         return self.postprocess(self.img, outputs)  # output image
