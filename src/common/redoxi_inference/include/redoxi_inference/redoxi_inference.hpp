@@ -143,7 +143,8 @@ class ModelPortInfo
     }
 
     //! Get the data type of the port
-    //! @return The data type of the port
+    //! @return The data type of the port, the format is "<type><number of bits>", such as "float32", "uint8", ...
+    //! @note do not accept dtype without bit information, such as "float", "int", "double", ...
     virtual std::string get_dtype_str() const
     {
         return m_dtype_str;
