@@ -15,8 +15,8 @@ namespace fs = std::filesystem;
 namespace rdx_inf = redoxi_works::inference;
 const auto fn_model = fs::path(TEST_MODEL_DIR) / "yolov8n-pose-dynbatch.onnx";
 
-const char *EpCPU = "CPUExecutionProvider";
-const char *EpCUDA = "CUDAExecutionProvider";
+namespace cmdev = rdx_inf::common_device_types;
+namespace cmkeys = rdx_inf::common_config_keys;
 
 int main(int argc, char **argv)
 {
@@ -36,8 +36,8 @@ int main(int argc, char **argv)
         for (const auto &key : all_keys) {
             spdlog::info("key: name={}, description={}", key.name, key.description);
         }
-        params->set_string("model_path", fn_model.string());
-        params->set_string("execution_provider", EpCUDA);
+        params->set_string(cmkeys::ModelPath, fn_model.string());
+        params->set_string(cmkeys::DeviceType, cmdev::CPU);
 
         spdlog::info("open model");
         inference->open(params);

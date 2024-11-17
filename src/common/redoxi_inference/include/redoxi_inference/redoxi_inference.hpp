@@ -12,6 +12,41 @@
 namespace redoxi_works::inference
 {
 
+namespace common_device_types
+{
+constexpr const char *CUDA = "cuda";   // nvidia cuda
+constexpr const char *CPU = "cpu";     // cpu
+constexpr const char *RKNPU = "rknpu"; // rockchip npu
+constexpr const char *MPS = "mps";     // apple metal
+} // namespace common_device_types
+
+// represent the keys in the initialization parameters
+namespace common_config_keys
+{
+// represent the path to the model file
+constexpr const char *ModelPath = "model_path";
+
+// represent the device type
+constexpr const char *DeviceType = "device_type";
+
+// represent the device serial number
+constexpr const char *DeviceSerialNumber = "device_serial_number";
+
+// represent the device index
+constexpr const char *DeviceIndex = "device_index";
+} // namespace common_config_keys
+
+struct DeviceInfo {
+    // the type of the device, such as "cuda", "cpu", "rknpu", "mps", ...
+    std::string device_type;
+
+    // if the device has serial number, it will be saved here
+    std::string serial_number;
+
+    // if you have multiple devices of the same type, you can specify which one to use
+    int device_index = 0;
+};
+
 //! Check if a specific shape is compatible with a general shape.
 //! Specific shape set fixed dimensions for dynamic dimensions in the general shape, but not the other way around
 //! - if general_shape[k]>0, then specific_shape[k]==general_shape[k]
@@ -59,7 +94,7 @@ struct KeyValueStore {
 
     struct KeyInfo {
         std::string name;        // key name
-        std::string dtype;       // data type, such as "string", "int64", "double", ...
+        std::string dtype;       // data type, such as "string", "int64", "float64", ...
         std::string description; // description of the key
     };
 

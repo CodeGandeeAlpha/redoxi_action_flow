@@ -1,6 +1,7 @@
 #pragma once
 
 #include <redoxi_inference_onnx/redoxi_inference_onnx.hpp>
+#include <redoxi_inference/default_impl.hpp>
 #include <onnxruntime_cxx_api.h>
 #include <string>
 #include <sstream>
@@ -25,142 +26,74 @@ namespace onnx_env_keys
 constexpr const char *ExecutionProvider = "RDX_ONNX_EXECUTION_PROVIDER";
 } // namespace onnx_env_keys
 
+namespace cmkeys = redoxi_works::inference::common_config_keys;
+namespace cmdev = redoxi_works::inference::common_device_types;
+
 class OnnxModelInference;
-struct OnnxModelConfig : public KeyValueStore {
+struct OnnxModelConfig : public redoxi_works::inference::defaults::DefaultKeyValueStore {
     friend class OnnxModelInference;
 
   public:
     struct Keys {
-        inline constexpr static const char *ModelPath = "model_path";
-        inline constexpr static const char *ExecutionProvider = "execution_provider";
-        inline constexpr static const char *LoggingLevel = "logging_level";
-        inline constexpr static const char *LogId = "log_id";
-    };
+        inline static constexpr auto ModelPath = cmkeys::ModelPath;
+        inline static constexpr auto DeviceType = cmkeys::DeviceType;
+        inline static constexpr auto DeviceIndex = cmkeys::DeviceIndex;
 
-    const std::vector<KeyValueStore::KeyInfo> all_keys{
-        {Keys::ModelPath, "string", "The path of the ONNX model file"},
-        {Keys::ExecutionProvider, "string", "The execution provider for the ONNX model"},
-        {Keys::LoggingLevel, "int64", "The logging level for the ONNX model"},
-        {Keys::LogId, "string", "The log id for the ONNX model"},
-    };
+        //! Execution provider, must be compatible with the device type
+        //! If not specified, the default execution provider for that device type will be used
+        // inline static constexpr auto ExecutionProvider = "execution_provider";
 
-    const std::map<std::string, std::any> name_to_variable_addr{
-        {Keys::ModelPath, &model_path},
-        {Keys::ExecutionProvider, &execution_provider},
-        {Keys::LoggingLevel, &logging_level},
-        {Keys::LogId, &log_id},
-    };
+        //! Logging level, must be compatible with the device type
+        //! If not specified, the default logging level for that device type will be used
+        inline static constexpr auto LoggingLevel = "logging_level";
 
-  public:
+        //! Log id, must be compatible with the device type
+        //! If not specified, a random log id will be generated
+        inline static constexpr auto LogId = "log_id";
+    }; // namespace Keys
+
     OnnxModelConfig()
     {
         // generate a random log id by default
         std::stringstream ss;
         ss << "onnx_" << std::setw(4) << std::setfill('0') << (rand() % 10000);
-        std::string log_id = ss.str();
+        log_id = ss.str();
+
+        // Register all keys
+        RDX_INFO_DEV(nullptr, __func__, "Registering key {}", Keys::ModelPath);
+        register_key({Keys::ModelPath, "string", "The path of the ONNX model file"}, &model_path);
+        RDX_INFO_DEV(nullptr, __func__, "Registering key {}", Keys::DeviceType);
+        register_key({Keys::DeviceType, "string", "The device type for the ONNX model"}, &device_type);
+        RDX_INFO_DEV(nullptr, __func__, "Registering key {}", Keys::DeviceIndex);
+        register_key({Keys::DeviceIndex, "int64", "The device index for the ONNX model"}, &device_index);
+        // register_key({Keys::ExecutionProvider, "string", "The execution provider for the ONNX model"}, &execution_provider);
+        RDX_INFO_DEV(nullptr, __func__, "Registering key {}", Keys::LoggingLevel);
+        register_key({Keys::LoggingLevel, "int64", "The logging level for the ONNX model"}, &logging_level);
+        RDX_INFO_DEV(nullptr, __func__, "Registering key {}", Keys::LogId);
+        register_key({Keys::LogId, "string", "The log id for the ONNX model"}, &log_id);
     }
 
-    const std::vector<KeyValueStore::KeyInfo> &get_all_keys() const override
+    std::string get_execution_provider() const
     {
-        return all_keys;
-    }
-
-    int get_string(std::string *output, const std::string &key) const override
-    {
-        auto it = name_to_variable_addr.find(key);
-        if (it != name_to_variable_addr.end()) {
-            try {
-                auto variable_addr = std::any_cast<std::string *>(it->second);
-                if (output && variable_addr) {
-                    *output = *variable_addr;
-                    return 0;
-                }
-            } catch (const std::bad_any_cast &e) {
-                //! Handle any_cast failure
-                return -1;
-            }
+        if (device_type.empty()) {
+            return onnx_ep_names::CPU;
         }
-        return -1;
-    }
 
-    int set_string(const std::string &key, const std::string &value) override
-    {
-        auto it = name_to_variable_addr.find(key);
-        if (it != name_to_variable_addr.end()) {
-            try {
-                auto variable_addr = std::any_cast<std::string *>(it->second);
-                if (variable_addr) {
-                    *variable_addr = value;
-                    return 0;
-                }
-            } catch (const std::bad_any_cast &e) {
-                //! Handle any_cast failure
-                return -1;
-            }
+        if (device_type == cmdev::CUDA) {
+            return onnx_ep_names::CUDA;
+        } else if (device_type == cmdev::CPU) {
+            return onnx_ep_names::CPU;
+        } else {
+            throw std::invalid_argument(fmt::format("[f={}] Invalid device type: {}", __func__, device_type));
         }
-        //! Key not found
-        return -1;
-    }
-
-    int get_int(int64_t *output, const std::string &key) const override
-    {
-        auto it = name_to_variable_addr.find(key);
-        if (it != name_to_variable_addr.end()) {
-            try {
-                auto variable_addr = std::any_cast<int64_t *>(it->second);
-                if (output && variable_addr) {
-                    *output = *variable_addr;
-                    return 0;
-                }
-            } catch (const std::bad_any_cast &e) {
-                //! Handle any_cast failure
-                return -1;
-            }
-        }
-        return -1;
-    }
-    int set_int(const std::string &key, int64_t value) override
-    {
-        auto it = name_to_variable_addr.find(key);
-        if (it != name_to_variable_addr.end()) {
-            try {
-                auto variable_addr = std::any_cast<int64_t *>(it->second);
-                if (variable_addr) {
-                    *variable_addr = value;
-                    return 0;
-                }
-            } catch (const std::bad_any_cast &e) {
-                //! Handle any_cast failure
-                return -1;
-            }
-        }
-        return -1;
-    }
-
-    int get_double(double *output, const std::string &key) const override
-    {
-        (void)output;
-        (void)key;
-        return -1;
-    }
-    int set_double(const std::string &key, double value) override
-    {
-        (void)key;
-        (void)value;
-        return -1;
-    }
-
-    bool has_key(const std::string &key) const override
-    {
-        if (key == Keys::ModelPath || key == Keys::ExecutionProvider) {
-            return true;
-        }
-        return false;
     }
 
   protected:
     std::string model_path;
-    std::string execution_provider = onnx_ep_names::CPU;
+    std::string device_type;
+    int64_t device_index = 0;
+
+    // std::string execution_provider;
     int64_t logging_level = static_cast<int64_t>(OrtLoggingLevel::ORT_LOGGING_LEVEL_WARNING);
     std::string log_id;
 };

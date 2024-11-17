@@ -240,7 +240,7 @@ int OnnxModelInference::open(KeyValueStore::Ptr params)
     }
 
     auto model_path = config->model_path;
-    auto provider_type = config->execution_provider;
+    auto provider_type = config->get_execution_provider();
     auto logging_level = config->logging_level;
 
     // check if the model path is valid
