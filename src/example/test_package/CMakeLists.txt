@@ -24,6 +24,7 @@ set(DEPENDENCIES
     redoxi_samples_nodes
     redoxi_shared_memory
     redoxi_inference
+    redoxi_dnn_models
     pluginlib)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb)
@@ -60,8 +61,10 @@ option(BUILD_TEST_V2_VIDEO_SINK "Build test_v2_video_sink target" OFF)
 option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target"
        OFF)
 option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
-option(BUILD_ONNX_HELLO_WORLD "Build onnx_hello_world target" ON)
-option(BUILD_ONNX_INFERENCE_API "Build onnx_inference_api target" ON)
+option(BUILD_ONNX_HELLO_WORLD "Build onnx_hello_world target" OFF)
+option(BUILD_ONNX_INFERENCE_API "Build onnx_inference_api target" OFF)
+option(BUILD_ONNX_YOLO8POSE "Build onnx_yolo8pose target" ON)
+
 # Function to configure a target
 function(configure_target target_name)
   add_executable(${target_name} src/${target_name}.cpp)
@@ -76,12 +79,18 @@ function(configure_target target_name)
   # global directories defined using macro
   target_compile_definitions(
     ${target_name}
-    PUBLIC -DTEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/models")
+    PUBLIC -DTEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/models"
+           -DTEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../../data"
+           -DTEST_OUTPUT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/output")
 
   set(ALL_TEST_TARGETS
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_ONNX_YOLO8POSE)
+  configure_target(onnx_yolo8pose)
+endif()
 
 if(BUILD_TEST_V6D_PLUGIN)
   configure_target(test_v6d_plugin)

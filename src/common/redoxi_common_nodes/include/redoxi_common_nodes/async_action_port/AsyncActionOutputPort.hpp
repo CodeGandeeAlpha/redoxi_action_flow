@@ -58,7 +58,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
     using SyncActionSender_t = SyncActionSender<ActionType_t>;
 
     // returned by sync action sender
-    using SendResult_t = SyncActionSender_t::SendResult_t;
+    using SendResult_t = typename SyncActionSender_t::SendResult_t;
 
     //! Result of a delivery task
     struct DeliveryResult_t {
@@ -285,8 +285,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
         RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Setting node to sync mode ...");
         node.set_use_async_callback(false);
         using DeliveryTaskNode_t = async_processor::SingleBufferExecNode<DeliveryTask_t>;
-        using WorkInput_t = DeliveryTaskNode_t::InputWithTokens_t;
-        using WorkOutput_t = DeliveryTaskNode_t::OutputWithTokens_t;
+        using WorkInput_t = typename DeliveryTaskNode_t::InputWithTokens_t;
+        using WorkOutput_t = typename DeliveryTaskNode_t::OutputWithTokens_t;
 
         // setup work function, nothing to do because during work function
         // frames are out of order
@@ -865,7 +865,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
     //! callback function when data is sent to a downstream, failure or success
     std::function<void(TargetData_t &output,
                        SendResult_t &result,
-                       const DeliveryRequest_t& request,
+                       const DeliveryRequest_t &request,
                        const Downstream_t &ds)>
         m_cb_on_deliver_to_downstream_finish;
 
@@ -892,8 +892,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
     void set_callback_on_deliver_to_downstream_finish(
         std::function<void(TargetData_t &output,
                            SendResult_t &result,
-                           const DeliveryRequest_t& request,
-                           const Downstream_t &ds)> cb)
+                           const DeliveryRequest_t &request,
+                           const Downstream_t &ds)>
+            cb)
     {
         m_cb_on_deliver_to_downstream_finish = cb;
     }

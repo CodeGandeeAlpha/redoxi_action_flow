@@ -150,13 +150,14 @@ class DefaultKeyValueStore : public KeyValueStore
 
         //! Check if type T matches with dtype
         if (dtype == "string" && !std::is_same_v<T, std::string>) {
-            throw std::runtime_error("Type mismatch: expected std::string for dtype 'string'");
+            throw std::runtime_error("Type mismatch for key '" + key_info.name + "': expected std::string for dtype 'string'");
         } else if (dtype == "int64" && !std::is_same_v<T, int64_t>) {
-            throw std::runtime_error("Type mismatch: expected int64_t for dtype 'int64'");
+            throw std::runtime_error("Type mismatch for key '" + key_info.name + "': expected int64_t for dtype 'int64'");
         } else if (dtype == "float64" && !std::is_same_v<T, double>) {
-            throw std::runtime_error("Type mismatch: expected double for dtype 'float64'");
+            throw std::runtime_error("Type mismatch for key '" + key_info.name + "': expected double for dtype 'float64'");
         } else if (dtype != "string" && dtype != "int64" && dtype != "float64") {
-            throw std::runtime_error("Unsupported dtype: " + dtype);
+            throw std::runtime_error("Unsupported dtype: " + dtype + " for key: " + key_info.name +
+                                     ", dtype format is [type][number], e.g. int64, float64, string");
         }
 
         m_all_keys.push_back(key_info);

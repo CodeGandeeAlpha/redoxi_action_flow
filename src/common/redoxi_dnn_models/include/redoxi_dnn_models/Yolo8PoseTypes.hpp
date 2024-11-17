@@ -19,14 +19,14 @@ class Yolo8PoseConfig : public defaults::DefaultKeyValueStore
                              "string", "The type of the device"},
                      &m_device_type);
         register_key(KeyInfo{cmkeys::DeviceIndex,
-                             "int", "The index of the device"},
+                             "int64", "The index of the device"},
                      &m_device_index);
     }
 
   protected:
     std::string m_model_path;
     std::string m_device_type = common_device_types::CPU;
-    int m_device_index = 0;
+    int64_t m_device_index = 0;
 };
 
 } // namespace redoxi_works::inference

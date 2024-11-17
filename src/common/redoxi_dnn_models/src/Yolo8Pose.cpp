@@ -2,7 +2,9 @@
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <pluginlib/class_loader.hpp>
 #include <typeinfo>
+#include <filesystem>
 
+namespace fs = std::filesystem;
 namespace redoxi_works::inference
 {
 
@@ -17,7 +19,7 @@ struct Yolo8Pose::Impl {
 };
 
 Yolo8Pose::Yolo8Pose()
-    : m_impl(std::make_unique<Impl>())
+    : m_impl(std::make_shared<Impl>())
 {
 }
 
@@ -92,12 +94,30 @@ int Yolo8Pose::open(KeyValueStore::Ptr params)
     }
     m_model_input_info = input_ports.begin()->second;
 
+    //! check input shape is 4D (NCHW)
+    if (m_model_input_info->get_shape().size() != 4) {
+        RDX_RAISE_ERROR("Invalid input tensor shape: expected 4 dimensions (NCHW), got {}",
+                        m_model_input_info->get_shape().size());
+    }
+
     // get the model output dtype
     auto output_ports = model->get_output_port_infos();
     if (output_ports.size() != 1) {
         RDX_RAISE_ERROR("Expecting exactly one output port, got {}", output_ports.size());
     }
     m_model_output_info = output_ports.begin()->second;
+
+    //! check output shape is 3D
+    if (m_model_output_info->get_shape().size() != 3) {
+        RDX_RAISE_ERROR("Invalid output tensor shape: expected 3 dimensions, got {}",
+                        m_model_output_info->get_shape().size());
+    }
+
+    //! check output dtype is float32
+    if (m_model_output_info->get_dtype_str() != "float32") {
+        RDX_RAISE_ERROR("Invalid output tensor dtype: expected float32, got {}",
+                        m_model_output_info->get_dtype_str());
+    }
 
     // set the model pointer
     RDX_INFO_DEV(nullptr, __func__, "{}", "Model opened successfully");
@@ -163,7 +183,7 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
     }
 
     // create a 4d tensor to hold all images
-    auto [num_channels, height, width, expected_batch_size] = get_model_input_shape_nchw();
+    auto [expected_batch_size, num_channels, height, width] = get_model_input_shape_nchw();
     if (expected_batch_size > 0 && (int64_t)rgb_images.size() != expected_batch_size) {
         RDX_RAISE_ERROR("Expecting {} images, got {}", expected_batch_size, rgb_images.size());
     }
@@ -182,8 +202,17 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
             // resize the image to the model input size
             cv::Mat resized_image;
             cv::resize(rgb_images[i], resized_image, model_input_size);
-            resized_image /= 255.0f;
 
+            // convert to float and normalize to [0,1]
+            if (resized_image.channels() == 3) {
+                resized_image.convertTo(resized_image, CV_32FC3, 1.0f / 255.0f);
+            } else if (resized_image.channels() == 1) {
+                resized_image.convertTo(resized_image, CV_32FC1, 1.0f / 255.0f);
+            } else {
+                RDX_RAISE_ERROR("Unsupported number of channels: {}", resized_image.channels());
+            }
+
+            // convert to the expected number of channels
             if (num_channels == 1 && resized_image.channels() == 3) {
                 // if input is 3 channel and model is single channel, we need to convert the image to gray scale
                 cv::cvtColor(resized_image, resized_image, cv::COLOR_RGB2GRAY);
@@ -200,6 +229,23 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
             std::vector<cv::Mat> channels;
             cv::split(resized_image, channels);
 
+            if (false) {
+                //! Print max value of resized_image
+                double min_val, max_val;
+                cv::minMaxLoc(resized_image, &min_val, &max_val);
+                RDX_INFO_DEV(nullptr, __func__, "Image {} max value: {}", i, max_val);
+                const char *debug_dir = "/soft/workspace/code/psf_ros2_ws/tmp/output";
+                if (!fs::exists(debug_dir)) {
+                    fs::create_directories(debug_dir);
+                }
+                fs::path fn_debug = fs::path(debug_dir) / fs::path(fmt::format("pose-input-{}.png", i));
+                cv::Mat uint8_image;
+                resized_image.convertTo(uint8_image, CV_8UC3, 255.0);
+                cv::imwrite(fn_debug.string(), uint8_image);
+            }
+
+            // TODO: check if the tensor is correct, write it to numpy and check it with python
+            // use xtensor to do this
             // copy the channels to the tensor
             for (int64_t c = 0; c < num_channels; ++c) {
                 std::copy(channels[c].begin<float>(), channels[c].end<float>(),
@@ -251,6 +297,111 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
     }
 
     return 0;
+}
+
+std::vector<Yolo8Pose::SingleImageOutput>
+    Yolo8Pose::get_output_detections(InferenceInOutData::Ptr model_inout_data) const
+{
+    // get the output port data
+    auto output_port_name = m_model_output_info->get_name();
+    auto port_data = model_inout_data->get_output_port_data(output_port_name);
+    if (!port_data) {
+        RDX_RAISE_ERROR("Output port data not found for port: {}", output_port_name);
+    }
+    if (port_data->get_dtype_str() != "float32") {
+        RDX_RAISE_ERROR("Unsupported model output dtype: {}, required float32", port_data->get_dtype_str());
+    }
+
+    // expected output tensor (batch_size, num_objects, 4+num_keypoints*3)
+    auto tensor_shape = port_data->get_shape();
+    const float *tensor_data = nullptr;
+    port_data->get_tensor_data(&tensor_data);
+    std::vector<SingleImageOutput> outputs;
+
+    // check tensor shape
+    if (tensor_shape.size() != 3) {
+        RDX_RAISE_ERROR("Invalid output tensor shape: expected 3 dimensions, got {}", tensor_shape.size());
+    }
+    RDX_INFO_DEV(nullptr, __func__, "Output tensor shape: ({},{},{})", tensor_shape[0], tensor_shape[1], tensor_shape[2]);
+
+    // get dimensions
+    int64_t batch_size = tensor_shape[0];
+    int64_t num_objects = tensor_shape[1];
+    int64_t num_values = tensor_shape[2];
+
+    // each object has 4 bbox values (x,y,w,h) + score + keypoints (x,y,score)
+    int64_t num_keypoints = (num_values - 5) / 3;
+
+    // process each image in batch
+    outputs.resize(batch_size);
+    for (int64_t b = 0; b < batch_size; ++b) {
+        auto &output = outputs[b];
+        output.objects.reserve(num_objects);
+
+        // process each object
+        for (int64_t obj = 0; obj < num_objects; ++obj) {
+            const float *obj_data = tensor_data + (b * num_objects + obj) * num_values;
+
+            // get object score
+            float score = obj_data[4];
+
+            // skip if score is too low
+            if (score <= 0) {
+                continue;
+            }
+
+            // create detected object
+            DetectedObject det;
+            det.score = score;
+
+            // pose model only has one class: human
+            det.class_id = 0;
+
+            // get bounding box
+            for (int i = 0; i < 4; ++i) {
+                det.xywh[i] = obj_data[i];
+            }
+
+            // get keypoints
+            det.keypoints.resize(num_keypoints);
+            for (int64_t k = 0; k < num_keypoints; ++k) {
+                const float *kpt_data = obj_data + 5 + k * 3;
+                det.keypoints[k].xy[0] = kpt_data[0];
+                det.keypoints[k].xy[1] = kpt_data[1];
+                det.keypoints[k].score = kpt_data[2];
+            }
+
+            output.objects.push_back(std::move(det));
+        }
+    }
+
+    return outputs;
+}
+
+std::array<int64_t, 4> Yolo8Pose::get_model_input_shape_nchw() const
+{
+    std::array<int64_t, 4> shape{0, 0, 0, 0};
+    auto shape_vec = m_model_input_info->get_shape();
+    std::copy(shape_vec.begin(), shape_vec.end(), shape.begin());
+    return shape;
+}
+
+std::string Yolo8Pose::get_model_input_dtype() const
+{
+    return m_model_input_info->get_dtype_str();
+}
+
+std::array<int64_t, 3> Yolo8Pose::get_model_output_shape_nchw() const
+{
+    std::array<int64_t, 3> shape{0, 0, 0};
+    auto shape_vec = m_model_output_info->get_shape();
+    std::copy(shape_vec.begin(), shape_vec.end(), shape.begin());
+    return shape;
+}
+
+std::string Yolo8Pose::get_model_output_dtype() const
+{
+    return m_model_output_info->get_dtype_str();
 }
 
 } // namespace redoxi_works::inference

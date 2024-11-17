@@ -20,6 +20,7 @@ class Yolo8Pose : public RedoxiModelInference
 
     // detected object in the image
     struct DetectedObject {
+        int64_t class_id = 0;
         std::array<float, 4> xywh = {0, 0, 0, 0};
         float score = 0;
         std::vector<Keypoint> keypoints;
@@ -63,10 +64,13 @@ class Yolo8Pose : public RedoxiModelInference
     std::string get_model_input_dtype() const;
 
     // get the shape of the model output in NCHW format
-    std::array<int64_t, 4> get_model_output_shape_nchw() const;
+    std::array<int64_t, 3> get_model_output_shape_nchw() const;
     std::string get_model_output_dtype() const;
 
   protected:
+    struct Impl;
+    std::shared_ptr<Impl> m_impl;
+
     // the actual model
     std::shared_ptr<RedoxiModelInference> m_model;
 
@@ -75,8 +79,5 @@ class Yolo8Pose : public RedoxiModelInference
     ModelPortInfo::ConstPtr m_model_output_info;
 
     std::shared_ptr<InitConfig_t> m_init_params;
-
-    struct Impl;
-    std::unique_ptr<Impl> m_impl;
 };
 } // namespace redoxi_works::inference
