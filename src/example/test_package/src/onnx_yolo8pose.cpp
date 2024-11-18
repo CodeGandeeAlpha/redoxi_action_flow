@@ -71,7 +71,7 @@ int main(int argc, char **argv)
         }
 
         // convert to RGB
-        cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
+        // cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
 
         // scale image to 640x640, keeping aspect ratio
         // auto new_size = redoxi_works::image_utils::compute_resize_to_fit_and_keep_aspect_ratio(image.size(), model_input_size);
@@ -85,7 +85,7 @@ int main(int argc, char **argv)
         auto inout_data = yolo_model.create_inference_inout_data();
 
         spdlog::info("Setting input images");
-        yolo_model.set_input_images(inout_data, {resized_image});
+        yolo_model.set_input_images(inout_data, {resized_image}, "bgr");
 
         spdlog::info("Running inference");
         yolo_model.do_inference(inout_data);

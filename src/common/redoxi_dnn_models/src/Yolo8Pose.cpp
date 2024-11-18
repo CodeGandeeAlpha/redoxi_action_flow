@@ -177,19 +177,20 @@ int Yolo8Pose::do_inference(InferenceInOutData::Ptr inout_data)
 }
 
 int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
-                                const std::vector<cv::Mat> &rgb_images)
+                                const std::vector<cv::Mat> &images,
+                                const std::string &image_format)
 {
     // all images should be of the same size and same number of channels
-    for (const auto &image : rgb_images) {
+    for (const auto &image : images) {
         if (image.empty()) {
             // all images must be non-empty
             return -1;
         }
-        if (image.size() != rgb_images[0].size()) {
+        if (image.size() != images[0].size()) {
             // all images must be of the same size
             return -1;
         }
-        if (image.channels() != rgb_images[0].channels()) {
+        if (image.channels() != images[0].channels()) {
             // all images must have the same number of channels
             return -1;
         }
@@ -202,10 +203,10 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
     preprocessor.init(config);
 
     // check batch size
-    if (expected_batch_size > 0 && (int64_t)rgb_images.size() != expected_batch_size) {
-        RDX_RAISE_ERROR("Expecting {} images, got {}", expected_batch_size, rgb_images.size());
+    if (expected_batch_size > 0 && (int64_t)images.size() != expected_batch_size) {
+        RDX_RAISE_ERROR("Expecting {} images, got {}", expected_batch_size, images.size());
     }
-    int64_t batch_size = (int64_t)rgb_images.size();
+    int64_t batch_size = (int64_t)images.size();
 
     // create a 4d tensor to hold all images
     auto input_dtype = get_model_input_dtype();
@@ -218,7 +219,7 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
     std::vector<yolo8::ImagePreprocessInfo> preprocess_info(batch_size);
     for (int64_t i = 0; i < batch_size; ++i) {
         preprocessor.preprocess(tensor_data.data() + i * expected_num_channels * expected_height * expected_width,
-                                &preprocess_info[i], rgb_images[i], "rgb");
+                                &preprocess_info[i], images[i], image_format);
     }
 
     // copy the tensor to the model input
@@ -227,143 +228,6 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
 
     auto any_data = std::make_shared<std::any>(preprocess_info);
     model_inout_data->set_any_data(Impl::PreprocessInfoKey, any_data);
-
-    return 0;
-}
-
-// set the input images to the model
-// the images must be of the same size, in RGB format
-int Yolo8Pose::set_input_images_v1(InferenceInOutData::Ptr model_inout_data,
-                                   const std::vector<cv::Mat> &rgb_images)
-{
-    // all images should be of the same size and same number of channels
-    for (const auto &image : rgb_images) {
-        if (image.empty()) {
-            // all images must be non-empty
-            return -1;
-        }
-        if (image.size() != rgb_images[0].size()) {
-            // all images must be of the same size
-            return -1;
-        }
-        if (image.channels() != rgb_images[0].channels()) {
-            // all images must have the same number of channels
-            return -1;
-        }
-    }
-
-    // create a 4d tensor to hold all images
-    auto [expected_batch_size, expected_num_channels, expected_height, expected_width] = get_model_input_shape_nchw();
-    if (expected_batch_size > 0 && (int64_t)rgb_images.size() != expected_batch_size) {
-        RDX_RAISE_ERROR("Expecting {} images, got {}", expected_batch_size, rgb_images.size());
-    }
-    int64_t batch_size = rgb_images.size();
-    auto input_dtype = get_model_input_dtype();
-    cv::Size model_input_size(expected_width, expected_height);
-
-    // this will be attached to the model inout data, for post-processing after inference
-    yolo8::ImagePreprocessInfo::List preprocess_info(batch_size);
-
-    // create a tensor to hold the images
-    if (input_dtype == "float32") {
-        // FIXME: for fixed size input, we can pre-allocate the tensor, but for now, we just allocate it here
-
-        // NCHW tensor
-        auto tensor = std::vector<float>(batch_size * expected_num_channels * expected_height * expected_width, 0.0f);
-
-        // resize the images to the model input size
-        for (int64_t i = 0; i < batch_size; ++i) {
-            auto &pinfo = preprocess_info[i];
-            pinfo.source_image_size = rgb_images[i].size();
-            pinfo.roi_in_source_image = {0, 0, rgb_images[i].cols, rgb_images[i].rows};
-            pinfo.model_input_image_size = model_input_size;
-
-            // resize the image to the model input size
-            cv::Mat resized_image(model_input_size, rgb_images[i].type());
-            cv::Size dst_size = redoxi_works::image_utils::compute_resize_to_fit_and_keep_aspect_ratio(
-                rgb_images[i].size(), model_input_size);
-            {
-                // roi in the destination image where the resized image will be placed
-                cv::Rect roi(0, 0, dst_size.width, dst_size.height);
-
-                // resize the image to the destination size, filling the rest with zeros
-                cv::resize(rgb_images[i], resized_image(roi), dst_size);
-                pinfo.roi_in_model_input_image = roi;
-            }
-
-            // convert to float and normalize to [0,1]
-            if (resized_image.channels() == 3) {
-                resized_image.convertTo(resized_image, CV_32FC3, 1.0f / 255.0f);
-            } else if (resized_image.channels() == 1) {
-                resized_image.convertTo(resized_image, CV_32FC1, 1.0f / 255.0f);
-            } else {
-                RDX_RAISE_ERROR("Unsupported number of channels: {}", resized_image.channels());
-            }
-
-            // convert to the expected number of channels
-            if (expected_num_channels == 1 && resized_image.channels() == 3) {
-                // if input is 3 channel and model is single channel, we need to convert the image to gray scale
-                cv::cvtColor(resized_image, resized_image, cv::COLOR_RGB2GRAY);
-            } else if (expected_num_channels == 3 && resized_image.channels() == 1) {
-                // if input is single channel and model is 3 channel, we need to replicate the image to 3 channels
-                cv::cvtColor(resized_image, resized_image, cv::COLOR_GRAY2RGB);
-            } else if (expected_num_channels != resized_image.channels()) {
-                // if the number of channels does not match, return error
-                RDX_RAISE_ERROR("Input image channel ({}) does not match model input channel ({}), and cannot be converted",
-                                resized_image.channels(), expected_num_channels);
-            }
-
-            // split the image into channels
-            std::vector<cv::Mat> channels;
-            cv::split(resized_image, channels);
-
-#ifdef ENABLE_DEBUG_OUTPUT
-            {
-                //! Print max value of resized_image
-                double min_val, max_val;
-                cv::minMaxLoc(resized_image, &min_val, &max_val);
-                RDX_INFO_DEV(nullptr, __func__, "Image {} max value: {}", i, max_val);
-                const char *debug_dir = "/soft/workspace/code/psf_ros2_ws/tmp/output";
-                if (!fs::exists(debug_dir)) {
-                    fs::create_directories(debug_dir);
-                }
-                fs::path fn_debug = fs::path(debug_dir) / fs::path(fmt::format("pose-input-{}.png", i));
-                cv::Mat uint8_image;
-                resized_image.convertTo(uint8_image, CV_8UC3, 255.0);
-                cv::imwrite(fn_debug.string(), uint8_image);
-            }
-#endif
-
-            // copy the channels to the tensor
-            for (int64_t c = 0; c < expected_num_channels; ++c) {
-                std::copy(channels[c].begin<float>(), channels[c].end<float>(),
-                          tensor.begin() + i * expected_num_channels * expected_height * expected_width + c * expected_height * expected_width);
-            }
-
-#ifdef ENABLE_DEBUG_OUTPUT
-            {
-                // write the tensor to numpy file
-                std::array<size_t, 4> tensor_shape = {
-                    (size_t)batch_size, (size_t)expected_num_channels,
-                    (size_t)expected_height, (size_t)expected_width};
-                xt::xarray<float> tensor_xarray = xt::adapt(tensor, tensor_shape);
-                xt::dump_npy(fmt::format("/soft/workspace/code/psf_ros2_ws/tmp/output/pose-input-{}.npy", i), tensor_xarray);
-            }
-#endif
-        }
-
-        // copy the tensor to the model input
-        auto port_data = model_inout_data->get_input_port_data(m_model_input_info->get_name());
-        port_data->set_tensor_data(tensor.data(), {batch_size, expected_num_channels, expected_height, expected_width});
-
-        auto any_data = std::make_shared<std::any>(preprocess_info);
-        model_inout_data->set_any_data(Impl::PreprocessInfoKey, any_data);
-
-    } else if (input_dtype == "uint8") {
-        throw std::runtime_error("uint8 input is not supported yet");
-    } else {
-        RDX_RAISE_ERROR("Unsupported model input dtype: {}", input_dtype);
-    }
 
     return 0;
 }

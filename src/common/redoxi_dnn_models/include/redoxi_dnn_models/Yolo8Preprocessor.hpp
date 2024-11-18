@@ -34,16 +34,25 @@ class Yolo8PreprocessorConfig
 class Yolo8Preprocessor
 {
   public:
-    void init(const Yolo8PreprocessorConfig &config);
+    virtual ~Yolo8Preprocessor() = default;
+
+    virtual void init(const Yolo8PreprocessorConfig &config);
 
     // preprocess the input image to the model input image
     // the output_tensor_chw is a pointer to the tensor data, which has the shape of [num_channels, height, width]
     // where the size is the model input image size
     // image format can be "rgb" or "bgr" or "gray"
-    void preprocess(
+    virtual void preprocess(
         float *output_tensor_chw,
         ImagePreprocessInfo *output_preprocess_info,
         const cv::Mat &input_image,
+        const std::string &image_format) const;
+
+    // batch version of the preprocess function
+    virtual void preprocess(
+        float *output_tensor_nchw,
+        ImagePreprocessInfo *output_preprocess_info,
+        const std::vector<cv::Mat> &input_images,
         const std::string &image_format) const;
 
     // preprocess the input image to the model input image

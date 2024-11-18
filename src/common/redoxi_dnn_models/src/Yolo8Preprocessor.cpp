@@ -9,6 +9,46 @@ void Yolo8Preprocessor::init(const Yolo8PreprocessorConfig &config)
 }
 
 void Yolo8Preprocessor::preprocess(
+    float *output_tensor_nchw,
+    ImagePreprocessInfo *output_preprocess_info,
+    const std::vector<cv::Mat> &input_images,
+    const std::string &image_format) const
+{
+    // all images must be of the same size
+    if (input_images.empty()) {
+        throw std::runtime_error("No input images provided");
+    }
+
+    for (const auto &image : input_images) {
+        if (image.size() != input_images[0].size()) {
+            throw std::runtime_error("All input images must be of the same size");
+        }
+
+        if (image.channels() != input_images[0].channels()) {
+            throw std::runtime_error("All input images must have the same number of channels");
+        }
+    }
+
+    // just call the single image version for each image in the batch
+    ImagePreprocessInfo pinfo;
+    auto num_channels = 3;
+    auto model_width = m_config.model_input_image_size.width;
+    auto model_height = m_config.model_input_image_size.height;
+    for (size_t i = 0; i < input_images.size(); i++) {
+        float *data_ptr = output_tensor_nchw + i * num_channels * model_height * model_width;
+        preprocess(
+            data_ptr,
+            &pinfo,
+            input_images[i],
+            image_format);
+    }
+
+    if (output_preprocess_info) {
+        *output_preprocess_info = pinfo;
+    }
+}
+
+void Yolo8Preprocessor::preprocess(
     float *output_tensor_chw,
     ImagePreprocessInfo *output_preprocess_info,
     const cv::Mat &input_image,
