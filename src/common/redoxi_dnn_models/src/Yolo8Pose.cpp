@@ -1,8 +1,19 @@
-#include <redoxi_dnn_models/Yolo8Pose.hpp>
-#include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <pluginlib/class_loader.hpp>
 #include <typeinfo>
 #include <filesystem>
+
+#include <redoxi_dnn_models/Yolo8Pose.hpp>
+#include <redoxi_common_cpp/ros_utils/common.hpp>
+#include <redoxi_common_cpp/image_proc/utils.hpp>
+
+#include <redoxi_dnn_models/Yolo8Preprocessor.hpp>
+
+
+#define ENABLE_DEBUG_OUTPUT
+
+#ifdef ENABLE_DEBUG_OUTPUT
+#    include <xtensor/xnpy.hpp>
+#endif
 
 namespace fs = std::filesystem;
 namespace redoxi_works::inference
@@ -16,6 +27,8 @@ struct Yolo8Pose::Impl {
 
     // keep the loader alive during the lifetime of the class
     pluginlib::ClassLoader<RedoxiModelInference> loader;
+
+    inline static const std::string PreprocessInfoKey = "preprocess_info";
 };
 
 Yolo8Pose::Yolo8Pose()
@@ -182,6 +195,63 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
         }
     }
 
+    yolo8::Yolo8Preprocessor preprocessor;
+    yolo8::Yolo8PreprocessorConfig config;
+    auto [expected_batch_size, expected_num_channels, expected_height, expected_width] = get_model_input_shape_nchw();
+    config.model_input_image_size = cv::Size(expected_width, expected_height);
+    preprocessor.init(config);
+
+    // check batch size
+    if (expected_batch_size > 0 && (int64_t)rgb_images.size() != expected_batch_size) {
+        RDX_RAISE_ERROR("Expecting {} images, got {}", expected_batch_size, rgb_images.size());
+    }
+    int64_t batch_size = (int64_t)rgb_images.size();
+
+    // create a 4d tensor to hold all images
+    auto input_dtype = get_model_input_dtype();
+    if (input_dtype != "float32") {
+        RDX_RAISE_ERROR("Unsupported model input dtype: {}", input_dtype);
+    }
+
+    // for each image, do preprocess
+    std::vector<float> tensor_data(batch_size * expected_num_channels * expected_height * expected_width, 0.0f);
+    std::vector<yolo8::ImagePreprocessInfo> preprocess_info(batch_size);
+    for (int64_t i = 0; i < batch_size; ++i) {
+        preprocessor.preprocess(tensor_data.data() + i * expected_num_channels * expected_height * expected_width,
+                                &preprocess_info[i], rgb_images[i], "rgb");
+    }
+
+    // copy the tensor to the model input
+    auto port_data = model_inout_data->get_input_port_data(m_model_input_info->get_name());
+    port_data->set_tensor_data(tensor_data.data(), {batch_size, expected_num_channels, expected_height, expected_width});
+
+    auto any_data = std::make_shared<std::any>(preprocess_info);
+    model_inout_data->set_any_data(Impl::PreprocessInfoKey, any_data);
+
+    return 0;
+}
+
+// set the input images to the model
+// the images must be of the same size, in RGB format
+int Yolo8Pose::set_input_images_v1(InferenceInOutData::Ptr model_inout_data,
+                                   const std::vector<cv::Mat> &rgb_images)
+{
+    // all images should be of the same size and same number of channels
+    for (const auto &image : rgb_images) {
+        if (image.empty()) {
+            // all images must be non-empty
+            return -1;
+        }
+        if (image.size() != rgb_images[0].size()) {
+            // all images must be of the same size
+            return -1;
+        }
+        if (image.channels() != rgb_images[0].channels()) {
+            // all images must have the same number of channels
+            return -1;
+        }
+    }
+
     // create a 4d tensor to hold all images
     auto [expected_batch_size, expected_num_channels, expected_height, expected_width] = get_model_input_shape_nchw();
     if (expected_batch_size > 0 && (int64_t)rgb_images.size() != expected_batch_size) {
@@ -191,17 +261,35 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
     auto input_dtype = get_model_input_dtype();
     cv::Size model_input_size(expected_width, expected_height);
 
+    // this will be attached to the model inout data, for post-processing after inference
+    yolo8::ImagePreprocessInfo::List preprocess_info(batch_size);
+
     // create a tensor to hold the images
     if (input_dtype == "float32") {
         // FIXME: for fixed size input, we can pre-allocate the tensor, but for now, we just allocate it here
+
         // NCHW tensor
         auto tensor = std::vector<float>(batch_size * expected_num_channels * expected_height * expected_width, 0.0f);
 
         // resize the images to the model input size
         for (int64_t i = 0; i < batch_size; ++i) {
+            auto &pinfo = preprocess_info[i];
+            pinfo.source_image_size = rgb_images[i].size();
+            pinfo.roi_in_source_image = {0, 0, rgb_images[i].cols, rgb_images[i].rows};
+            pinfo.model_input_image_size = model_input_size;
+
             // resize the image to the model input size
-            cv::Mat resized_image;
-            cv::resize(rgb_images[i], resized_image, model_input_size);
+            cv::Mat resized_image(model_input_size, rgb_images[i].type());
+            cv::Size dst_size = redoxi_works::image_utils::compute_resize_to_fit_and_keep_aspect_ratio(
+                rgb_images[i].size(), model_input_size);
+            {
+                // roi in the destination image where the resized image will be placed
+                cv::Rect roi(0, 0, dst_size.width, dst_size.height);
+
+                // resize the image to the destination size, filling the rest with zeros
+                cv::resize(rgb_images[i], resized_image(roi), dst_size);
+                pinfo.roi_in_model_input_image = roi;
+            }
 
             // convert to float and normalize to [0,1]
             if (resized_image.channels() == 3) {
@@ -227,10 +315,10 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
 
             // split the image into channels
             std::vector<cv::Mat> channels;
-            cv::transpose(resized_image, resized_image);
             cv::split(resized_image, channels);
 
-            if (false) {
+#ifdef ENABLE_DEBUG_OUTPUT
+            {
                 //! Print max value of resized_image
                 double min_val, max_val;
                 cv::minMaxLoc(resized_image, &min_val, &max_val);
@@ -244,19 +332,33 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
                 resized_image.convertTo(uint8_image, CV_8UC3, 255.0);
                 cv::imwrite(fn_debug.string(), uint8_image);
             }
+#endif
 
-            // TODO: check if the tensor is correct, write it to numpy and check it with python
-            // use xtensor to do this
             // copy the channels to the tensor
             for (int64_t c = 0; c < expected_num_channels; ++c) {
                 std::copy(channels[c].begin<float>(), channels[c].end<float>(),
                           tensor.begin() + i * expected_num_channels * expected_height * expected_width + c * expected_height * expected_width);
             }
+
+#ifdef ENABLE_DEBUG_OUTPUT
+            {
+                // write the tensor to numpy file
+                std::array<size_t, 4> tensor_shape = {
+                    (size_t)batch_size, (size_t)expected_num_channels,
+                    (size_t)expected_height, (size_t)expected_width};
+                xt::xarray<float> tensor_xarray = xt::adapt(tensor, tensor_shape);
+                xt::dump_npy(fmt::format("/soft/workspace/code/psf_ros2_ws/tmp/output/pose-input-{}.npy", i), tensor_xarray);
+            }
+#endif
         }
 
         // copy the tensor to the model input
         auto port_data = model_inout_data->get_input_port_data(m_model_input_info->get_name());
         port_data->set_tensor_data(tensor.data(), {batch_size, expected_num_channels, expected_height, expected_width});
+
+        auto any_data = std::make_shared<std::any>(preprocess_info);
+        model_inout_data->set_any_data(Impl::PreprocessInfoKey, any_data);
+
     } else if (input_dtype == "uint8") {
         throw std::runtime_error("uint8 input is not supported yet");
     } else {
@@ -267,7 +369,9 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
 }
 
 std::vector<Yolo8Pose::SingleImageOutput>
-    Yolo8Pose::get_output_detections(InferenceInOutData::Ptr model_inout_data) const
+    Yolo8Pose::get_output_detections(
+        InferenceInOutData::Ptr model_inout_data,
+        double confidence_thres) const
 {
     // get the output port data
     auto output_port_name = m_model_output_info->get_name();
@@ -279,11 +383,10 @@ std::vector<Yolo8Pose::SingleImageOutput>
         RDX_RAISE_ERROR("Unsupported model output dtype: {}, required float32", port_data->get_dtype_str());
     }
 
-    // expected output tensor (batch_size, num_objects, 4+num_keypoints*3)
+    // expected output tensor (batch_size, 4+num_keypoints*3, num_objects)
     auto tensor_shape = port_data->get_shape();
     const float *tensor_data = nullptr;
     port_data->get_tensor_data(&tensor_data);
-    std::vector<SingleImageOutput> outputs;
 
     // check tensor shape
     if (tensor_shape.size() != 3) {
@@ -293,52 +396,91 @@ std::vector<Yolo8Pose::SingleImageOutput>
 
     // get dimensions
     int64_t batch_size = tensor_shape[0];
-    int64_t num_objects = tensor_shape[1];
-    int64_t num_values = tensor_shape[2];
+    int64_t num_values = tensor_shape[1];
+    int64_t num_objects = tensor_shape[2];
 
-    // each object has 4 bbox values (x,y,w,h) + score + keypoints (x,y,score)
+    // each object has 4 bbox values (x_center,y_center,width,height) + score + keypoints (x,y,score)
     int64_t num_keypoints = (num_values - 5) / 3;
 
-    // process each image in batch
-    outputs.resize(batch_size);
-    for (int64_t b = 0; b < batch_size; ++b) {
-        auto &output = outputs[b];
-        output.objects.reserve(num_objects);
+    // get preprocess info
+    auto any_data = model_inout_data->get_any_data(Impl::PreprocessInfoKey);
+    if (!any_data) {
+        RDX_RAISE_ERROR("Preprocess info not found");
+    }
+    auto preprocess_info = std::any_cast<yolo8::ImagePreprocessInfo::List>(*any_data);
 
-        // process each object
-        for (int64_t obj = 0; obj < num_objects; ++obj) {
-            const float *obj_data = tensor_data + (b * num_objects + obj) * num_values;
+    //! Process each image in batch
+    std::vector<SingleImageOutput> outputs(batch_size);
+    for (int64_t b = 0; b < batch_size; b++) {
+        auto &detections = outputs[b].objects;
 
-            // get object score
+        cv::Mat _object_data(
+            num_values, num_objects, CV_32FC1,
+            const_cast<float *>(tensor_data + b * num_objects * num_values));
+
+        // each row is the inference result for one object
+        // format as (x_center,y_center,width,height,score,kp1_x,kp1_y,kp1_score,kp2_x,kp2_y,kp2_score,...)
+        cv::Mat object_data;
+        cv::transpose(_object_data, object_data);
+
+        //! Process each potential object
+        for (int64_t obj = 0; obj < num_objects; obj++) {
+            //! Get row data for this object
+            const float *obj_data = object_data.ptr<float>(obj);
+
+            //! Get confidence score
             float score = obj_data[4];
 
-            // skip if score is too low
-            if (score <= 0) {
+            //! Skip if below confidence threshold
+            if (score < confidence_thres) {
                 continue;
             }
 
-            // create detected object
+            //! Extract bounding box
+            float x_center = obj_data[0];
+            float y_center = obj_data[1];
+            float width = obj_data[2];
+            float height = obj_data[3];
+
+            //! Create detection object
             DetectedObject det;
+            det.xywh = {x_center - width / 2, y_center - height / 2, width, height};
             det.score = score;
+            det.class_id = 0; // Only person class for pose model
 
-            // pose model only has one class: human
-            det.class_id = 0;
-
-            // get bounding box
-            for (int i = 0; i < 4; ++i) {
-                det.xywh[i] = obj_data[i];
-            }
-
-            // get keypoints
+            //! Extract keypoints
             det.keypoints.resize(num_keypoints);
-            for (int64_t k = 0; k < num_keypoints; ++k) {
-                const float *kpt_data = obj_data + 5 + k * 3;
-                det.keypoints[k].xy[0] = kpt_data[0];
-                det.keypoints[k].xy[1] = kpt_data[1];
-                det.keypoints[k].score = kpt_data[2];
+            for (int64_t k = 0; k < num_keypoints; k++) {
+                int64_t kp_offset = 5 + k * 3;
+                det.keypoints[k].xy = {obj_data[kp_offset], obj_data[kp_offset + 1]};
+                det.keypoints[k].score = obj_data[kp_offset + 2];
             }
 
-            output.objects.push_back(std::move(det));
+            detections.push_back(std::move(det));
+        }
+
+        {
+            // transform all coordinates from model input space to source image space
+            auto &pinfo = preprocess_info[b];
+            auto dx_model = -pinfo.roi_in_model_input_image.x;
+            auto dy_model = -pinfo.roi_in_model_input_image.y;
+            auto scale_x = pinfo.roi_in_source_image.width / (float)pinfo.roi_in_model_input_image.width;
+            auto scale_y = pinfo.roi_in_source_image.height / (float)pinfo.roi_in_model_input_image.height;
+            auto dx_source = pinfo.roi_in_source_image.x;
+            auto dy_source = pinfo.roi_in_source_image.y;
+
+            for (auto &det : detections) {
+                det.xywh[0] = (det.xywh[0] + dx_model) * scale_x + dx_source;
+                det.xywh[1] = (det.xywh[1] + dy_model) * scale_y + dy_source;
+                det.xywh[2] *= scale_x;
+                det.xywh[3] *= scale_y;
+
+                // transform keypoints
+                for (auto &kp : det.keypoints) {
+                    kp.xy[0] = (kp.xy[0] + dx_model) * scale_x + dx_source;
+                    kp.xy[1] = (kp.xy[1] + dy_model) * scale_y + dy_source;
+                }
+            }
         }
     }
 

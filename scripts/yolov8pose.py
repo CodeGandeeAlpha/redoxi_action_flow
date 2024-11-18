@@ -13,7 +13,9 @@ from ultralytics.utils.checks import check_requirements
 class YOLOv8pose:
     """YOLOv8 object detection model class for handling inference and visualization."""
 
-    def __init__(self, onnx_model, input_image, confidence_thres, iou_thres, keypoint_vis_thres):
+    def __init__(
+        self, onnx_model, input_image, confidence_thres, iou_thres, keypoint_vis_thres
+    ):
         """
         Initializes an instance of the YOLOv8 class.
 
@@ -28,32 +30,32 @@ class YOLOv8pose:
         self.confidence_thres = confidence_thres
         self.iou_thres = iou_thres
         self.keypoint_vis_thres = keypoint_vis_thres
-        
+
         # Load the class names from the COCO dataset
-        self.classes = ['person']
-        
+        self.classes = ["person"]
+
         self.skeleton = [
-            [15, 13], 
-            [13, 11], 
-            [16, 14], 
-            [14, 12], 
-            [11, 12], 
-            [5, 11],  
-            [6, 12],  
-            [5, 6],   
-            [5, 7],   
-            [6, 8],   
-            [7, 9],   
-            [8, 10],  
-            [1, 2],   
-            [0, 1],   
-            [0, 2],   
-            [1, 3],   
-            [2, 4],   
-            [3, 5],   
-            [4, 6],   
+            [15, 13],
+            [13, 11],
+            [16, 14],
+            [14, 12],
+            [11, 12],
+            [5, 11],
+            [6, 12],
+            [5, 6],
+            [5, 7],
+            [6, 8],
+            [7, 9],
+            [8, 10],
+            [1, 2],
+            [0, 1],
+            [0, 2],
+            [1, 3],
+            [2, 4],
+            [3, 5],
+            [4, 6],
         ]
-        
+
         # Generate a color palette for the classes
         self.color_palette = np.random.uniform(0, 255, size=(len(self.classes), 3))
         self.keypoint_palette = np.random.uniform(0, 255, size=(17, 3))
@@ -85,7 +87,9 @@ class YOLOv8pose:
         label = f"{self.classes[class_id]}: {score:.2f}"
 
         # Calculate the dimensions of the label text
-        (label_width, label_height), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+        (label_width, label_height), _ = cv2.getTextSize(
+            label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1
+        )
 
         # Calculate the position of the label text
         label_x = x1
@@ -93,22 +97,55 @@ class YOLOv8pose:
 
         # Draw a filled rectangle as the background for the label text
         cv2.rectangle(
-            img, (label_x, label_y - label_height), (label_x + label_width, label_y + label_height), color, cv2.FILLED
+            img,
+            (label_x, label_y - label_height),
+            (label_x + label_width, label_y + label_height),
+            color,
+            cv2.FILLED,
         )
 
         # Draw the label text on the image
-        cv2.putText(img, label, (label_x, label_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
+        cv2.putText(
+            img,
+            label,
+            (label_x, label_y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 0, 0),
+            1,
+            cv2.LINE_AA,
+        )
 
         # Draw the skeleton on the image
         for i, j in self.skeleton:
-            if pose[i][2] > self.keypoint_vis_thres and pose[j][2] > self.keypoint_vis_thres:
-                cv2.line(img, (int(pose[i][0]), int(pose[i][1])), (int(pose[j][0]), int(pose[j][1])), self.keypoint_palette[i], 2)
+            if (
+                pose[i][2] > self.keypoint_vis_thres
+                and pose[j][2] > self.keypoint_vis_thres
+            ):
+                cv2.line(
+                    img,
+                    (int(pose[i][0]), int(pose[i][1])),
+                    (int(pose[j][0]), int(pose[j][1])),
+                    self.keypoint_palette[i],
+                    2,
+                )
             if pose[i][2] > self.keypoint_vis_thres:
-                cv2.circle(img, (int(pose[i][0]), int(pose[i][1])), 5, self.keypoint_palette[i], -1)
+                cv2.circle(
+                    img,
+                    (int(pose[i][0]), int(pose[i][1])),
+                    5,
+                    self.keypoint_palette[i],
+                    -1,
+                )
             if pose[j][2] > self.keypoint_vis_thres:
-                cv2.circle(img, (int(pose[j][0]), int(pose[j][1])), 5, self.keypoint_palette[j], -1)
-            
-            
+                cv2.circle(
+                    img,
+                    (int(pose[j][0]), int(pose[j][1])),
+                    5,
+                    self.keypoint_palette[j],
+                    -1,
+                )
+
     def preprocess(self):
         """
         Preprocesses the input image before performing inference.
@@ -184,7 +221,7 @@ class YOLOv8pose:
                 top = int((y - h / 2) * y_factor)
                 width = int(w * x_factor)
                 height = int(h * y_factor)
-                
+
                 pose = outputs[i][5:].reshape(-1, 3)
                 # calculate the scaled coordinates of the keypoints
                 pose[:, 0] = pose[:, 0] * x_factor
@@ -195,7 +232,7 @@ class YOLOv8pose:
                 scores.append(score)
                 boxes.append([left, top, width, height])
                 poses.append(pose)
-                
+
         # Apply non-maximum suppression to filter out overlapping bounding boxes
         indices = cv2.dnn.NMSBoxes(boxes, scores, self.confidence_thres, self.iou_thres)
 
@@ -221,7 +258,9 @@ class YOLOv8pose:
             output_img: The output image with drawn detections.
         """
         # Create an inference session using the ONNX model and specify execution providers
-        session = ort.InferenceSession(self.onnx_model, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
+        session = ort.InferenceSession(
+            self.onnx_model, providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
+        )
 
         # Get the model inputs
         model_inputs = session.get_inputs()
@@ -236,37 +275,37 @@ class YOLOv8pose:
 
         # Run inference using the preprocessed image data
         outputs = session.run(None, {model_inputs[0].name: img_data})
-        
-#         Let me explain the expected shape of `outputs` in YOLOv8 pose estimation:
 
-# For YOLOv8 pose ONNX model, the output shape is:
+        #         Let me explain the expected shape of `outputs` in YOLOv8 pose estimation:
 
-# ```
-# outputs[0].shape = (1, 56, num_boxes)
-# ```
+        # For YOLOv8 pose ONNX model, the output shape is:
 
-# Where:
-# - `1` is the batch size
-# - `56` is the number of values per detection:
-#   - First 4 values: bounding box (x, y, width, height)
-#   - 1 value: confidence score
-#   - 51 values: keypoints (17 keypoints × 3 values per keypoint)
-#     - Each keypoint has (x, y, confidence)
-# - `num_boxes` is the number of candidate detections (varies by model size, typically 8400 for 640x640 input)
+        # ```
+        # outputs[0].shape = (1, 56, num_boxes)
+        # ```
 
-# This is why in your code, when processing the output:
-# ```python:scripts/yolov8pose.py
-# # ... existing code ...
-# outputs = np.transpose(np.squeeze(output[0]))  # Shape becomes (num_boxes, 56)
+        # Where:
+        # - `1` is the batch size
+        # - `56` is the number of values per detection:
+        #   - First 4 values: bounding box (x, y, width, height)
+        #   - 1 value: confidence score
+        #   - 51 values: keypoints (17 keypoints × 3 values per keypoint)
+        #     - Each keypoint has (x, y, confidence)
+        # - `num_boxes` is the number of candidate detections (varies by model size, typically 8400 for 640x640 input)
 
-# # Then each row is processed:
-# x, y, w, h = outputs[i][0:4]      # bbox coordinates
-# score = outputs[i][4]             # confidence score
-# pose = outputs[i][5:].reshape(-1, 3)  # reshape keypoints to (17, 3)
-# # ... existing code ...
-# ```
+        # This is why in your code, when processing the output:
+        # ```python:scripts/yolov8pose.py
+        # # ... existing code ...
+        # outputs = np.transpose(np.squeeze(output[0]))  # Shape becomes (num_boxes, 56)
 
-# The `squeeze` removes the batch dimension, and `transpose` makes it easier to iterate over each detection.
+        # # Then each row is processed:
+        # x, y, w, h = outputs[i][0:4]      # bbox coordinates
+        # score = outputs[i][4]             # confidence score
+        # pose = outputs[i][5:].reshape(-1, 3)  # reshape keypoints to (17, 3)
+        # # ... existing code ...
+        # ```
+
+        # The `squeeze` removes the batch dimension, and `transpose` makes it easier to iterate over each detection.
 
         # Perform post-processing on the outputs to obtain output image.
         return self.postprocess(self.img, outputs)  # output image
@@ -275,18 +314,38 @@ class YOLOv8pose:
 if __name__ == "__main__":
     # Create an argument parser to handle command-line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="yolov8m-pose-640.onnx", help="Input your ONNX model.")
-    parser.add_argument("--img", type=str, default="bus.jpg", help="Path to input image.")
-    parser.add_argument("--conf-thres", type=float, default=0.5, help="Confidence threshold")
-    parser.add_argument("--iou-thres", type=float, default=0.5, help="NMS IoU threshold")
-    parser.add_argument("--keypoint_vis_thres", type=float, default=0.5, help="Keypoint confidence threshold")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="yolov8m-pose-640.onnx",
+        help="Input your ONNX model.",
+    )
+    parser.add_argument(
+        "--img", type=str, default="bus.jpg", help="Path to input image."
+    )
+    parser.add_argument(
+        "--conf-thres", type=float, default=0.5, help="Confidence threshold"
+    )
+    parser.add_argument(
+        "--iou-thres", type=float, default=0.5, help="NMS IoU threshold"
+    )
+    parser.add_argument(
+        "--keypoint_vis_thres",
+        type=float,
+        default=0.5,
+        help="Keypoint confidence threshold",
+    )
     args = parser.parse_args()
 
     # Check the requirements and select the appropriate backend (CPU or GPU)
-    check_requirements("onnxruntime-gpu" if torch.cuda.is_available() else "onnxruntime")
+    check_requirements(
+        "onnxruntime-gpu" if torch.cuda.is_available() else "onnxruntime"
+    )
 
     # Create an instance of the YOLOv8 class with the specified arguments
-    detection = YOLOv8pose(args.model, args.img, args.conf_thres, args.iou_thres, args.keypoint_vis_thres)
+    detection = YOLOv8pose(
+        args.model, args.img, args.conf_thres, args.iou_thres, args.keypoint_vis_thres
+    )
 
     # Perform object detection and obtain the output image
     output_image = detection.main()

@@ -231,4 +231,33 @@ ModelPortInfo::ConstPtr OnnxInferenceInOutData::get_output_port_info(const std::
     return nullptr;
 }
 
+std::shared_ptr<std::any> OnnxInferenceInOutData::get_any_data(const std::string &key) const
+{
+    auto it = m_any_data.find(key);
+    if (it != m_any_data.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+std::map<std::string, std::shared_ptr<std::any>> OnnxInferenceInOutData::get_any_data() const
+{
+    return m_any_data;
+}
+
+void OnnxInferenceInOutData::set_any_data(const std::string &key, std::shared_ptr<std::any> value)
+{
+    m_any_data[key] = value;
+}
+
+bool OnnxInferenceInOutData::remove_any_data(const std::string &key)
+{
+    auto it = m_any_data.find(key);
+    if (it != m_any_data.end()) {
+        m_any_data.erase(it);
+        return true;
+    }
+    return false;
+}
+
 } // namespace redoxi_works::inference::onnx

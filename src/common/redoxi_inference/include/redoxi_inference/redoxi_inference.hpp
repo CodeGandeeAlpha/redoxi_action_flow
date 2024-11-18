@@ -7,6 +7,7 @@
 #include <memory>
 #include <map>
 #include <sstream>
+#include <any>
 
 
 namespace redoxi_works::inference
@@ -275,6 +276,19 @@ class InferenceInOutData
 
     // get the inferencer that this inout data belongs to, const version
     virtual const RedoxiModelInference *get_owner() const = 0;
+
+    // attach any data to the inference inout data, for custom usage without inheritance
+    virtual void set_any_data(const std::string &key, std::shared_ptr<std::any> value) = 0;
+
+    // remove any data attached to the inference inout data, for custom usage without inheritance
+    //! @return true if success, false if failed (key not found)
+    virtual bool remove_any_data(const std::string &key) = 0;
+
+    // get any data attached to the inference inout data, for custom usage without inheritance
+    virtual std::shared_ptr<std::any> get_any_data(const std::string &key) const = 0;
+
+    // get all any data attached to the inference inout data, for custom usage without inheritance
+    virtual std::map<std::string, std::shared_ptr<std::any>> get_any_data() const = 0;
 };
 
 class RedoxiModelInference

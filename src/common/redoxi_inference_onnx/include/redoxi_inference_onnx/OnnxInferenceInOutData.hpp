@@ -36,6 +36,11 @@ class OnnxInferenceInOutData : public InferenceInOutData
     // initialize the inout data
     void init(OnnxModelInference *model_inference);
 
+    virtual std::map<std::string, std::shared_ptr<std::any>> get_any_data() const override;
+    virtual std::shared_ptr<std::any> get_any_data(const std::string &key) const override;
+    virtual void set_any_data(const std::string &key, std::shared_ptr<std::any> value) override;
+    virtual bool remove_any_data(const std::string &key) override;
+
   protected:
     // update the io binding for input ports
     // return true if the io binding is updated, false otherwise
@@ -68,6 +73,9 @@ class OnnxInferenceInOutData : public InferenceInOutData
     // flag to indicate if the output port is bound by tensor
     // if false, the port is bound by memory info
     std::map<std::string, bool> m_output_port_bound_by_tensor;
+
+    // any data attached to the inference inout data, for custom usage without inheritance
+    std::map<std::string, std::shared_ptr<std::any>> m_any_data;
 };
 
 } // namespace redoxi_works::inference::onnx

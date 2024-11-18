@@ -1,4 +1,5 @@
 #include <redoxi_dnn_models/Yolo8Pose.hpp>
+#include <redoxi_common_cpp/image_proc/utils.hpp>
 // #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <opencv2/opencv.hpp>
 #include <spdlog/spdlog.h>
@@ -26,7 +27,7 @@ const auto fn_image = fs::path(TEST_DATA_DIR) / "pose-sample.jpg";
 const auto fn_pose_output = fs::path(TEST_OUTPUT_DIR) / "pose-output.jpg";
 const auto fn_tensor_output = fs::path(TEST_OUTPUT_DIR) / "test-tensor.npy";
 
-int main(int argc, char **argv)
+int _main(int argc, char **argv)
 {
     //! Load image from file
     cv::Mat image = cv::imread(fn_image.string());
@@ -41,7 +42,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
-int _main(int argc, char **argv)
+int main(int argc, char **argv)
 {
     // if output directory does not exist, create it
     if (!fs::exists(TEST_OUTPUT_DIR)) {
@@ -62,6 +63,7 @@ int _main(int argc, char **argv)
 
     // load an image and do inference
     {
+        cv::Size model_input_size(640, 640);
         cv::Mat image = cv::imread(fn_image.string());
         if (image.empty()) {
             spdlog::error("Failed to load image from {}", fn_image.string());
@@ -72,14 +74,18 @@ int _main(int argc, char **argv)
         cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
 
         // scale image to 640x640, keeping aspect ratio
-        cv::resize(image, image, cv::Size(640, 640), 0, 0, cv::INTER_AREA);
+        // auto new_size = redoxi_works::image_utils::compute_resize_to_fit_and_keep_aspect_ratio(image.size(), model_input_size);
+        // cv::Mat resized_image(model_input_size, image.type());
+        // cv::Rect roi(0, 0, new_size.width, new_size.height);
+        // cv::resize(image, resized_image(roi), new_size);
+        auto resized_image = image;
 
         // create inference inout data
         spdlog::info("Creating inference inout data");
         auto inout_data = yolo_model.create_inference_inout_data();
 
         spdlog::info("Setting input images");
-        yolo_model.set_input_images(inout_data, {image});
+        yolo_model.set_input_images(inout_data, {resized_image});
 
         spdlog::info("Running inference");
         yolo_model.do_inference(inout_data);
@@ -97,11 +103,8 @@ int _main(int argc, char **argv)
         // }
 
         // draw detections
-        cv::Mat vis_image = image.clone();
+        cv::Mat vis_image = resized_image.clone();
         for (const auto &det : detections[0].objects) {
-            if (det.score < 0.5) {
-                continue;
-            }
             cv::rectangle(vis_image,
                           cv::Rect(det.xywh[0], det.xywh[1], det.xywh[2], det.xywh[3]),
                           cv::Scalar(0, 0, 255), 2);

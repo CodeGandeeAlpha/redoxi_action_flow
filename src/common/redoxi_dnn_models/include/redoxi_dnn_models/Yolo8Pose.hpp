@@ -31,6 +31,24 @@ class Yolo8Pose : public RedoxiModelInference
         std::vector<DetectedObject> objects;
     };
 
+    // // information about how the preprocess transforms the original input image to the model input image
+    // // it selects a region of the source image (full size original image), and then transform that region to the model input image
+    // struct ImagePreprocessInfo {
+    //     using List = std::vector<ImagePreprocessInfo>;
+
+    //     // size of the original input image
+    //     cv::Size source_image_size;
+
+    //     // a box in the original input image, enclosing all the content of the model input image
+    //     cv::Rect roi_in_source_image;
+
+    //     // size of the model input image
+    //     cv::Size model_input_image_size;
+
+    //     // a box in the model input image, enclosing all the content of the original input image
+    //     cv::Rect roi_in_model_input_image;
+    // };
+
     using InitConfig_t = Yolo8PoseConfig;
 
   public:
@@ -52,12 +70,18 @@ class Yolo8Pose : public RedoxiModelInference
 
     // process the images, and set the data to the model input
     // the images must be of the same size, in RGB format
+    int set_input_images_v1(InferenceInOutData::Ptr model_inout_data,
+                            const std::vector<cv::Mat> &rgb_images);
+
+    // process the images, and set the data to the model input
+    // the images must be of the same size, in RGB format
     int set_input_images(InferenceInOutData::Ptr model_inout_data,
                          const std::vector<cv::Mat> &rgb_images);
 
     // postprocess the model output, and get the detections
     std::vector<SingleImageOutput> get_output_detections(
-        InferenceInOutData::Ptr model_inout_data) const;
+        InferenceInOutData::Ptr model_inout_data,
+        double confidence_thres = 0.5) const;
 
     // get the shape of the model input in NCHW format
     std::array<int64_t, 4> get_model_input_shape_nchw() const;

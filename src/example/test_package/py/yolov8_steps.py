@@ -1,21 +1,9 @@
-from IPython.display import Image, display
 import onnxruntime as ort
 from yolov8_example import YOLOv8pose
 import cv2
 import numpy as np
-import PIL
-
-
-def imshow(img: np.ndarray | PIL.Image.Image):
-    if isinstance(img, PIL.Image.Image):
-        display(img)
-    elif isinstance(img, np.ndarray):
-        if img.dtype == np.float32 or img.dtype == np.float64:
-            imgshow = (img * 255).astype(np.uint8)
-        else:
-            imgshow = img
-        display(PIL.Image.fromarray(imgshow))
-
+import torch
+from vis_utils import imshow
 
 fn_model = r"/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
 fn_image = r"/soft/workspace/code/psf_ros2_ws/data/pose-sample.jpg"
@@ -61,7 +49,10 @@ image_data = np.transpose(image_data, (2, 0, 1))  # Channel first
 # Expand the dimensions of the image data to match the expected input shape
 image_data = np.expand_dims(image_data, axis=0).astype(np.float32)
 
-# Run inference using the preprocessed image data
+img_hwc = torch.tensor(image_data).squeeze(0).permute(1, 2, 0).numpy()
+imshow(img_hwc)
+
+# # Run inference using the preprocessed image data
 outputs = session.run(None, {model_inputs[0].name: image_data})
 
 vis_image = model.postprocess(src_image, outputs)
