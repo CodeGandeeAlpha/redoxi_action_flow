@@ -1,5 +1,6 @@
 from ultralytics import YOLO
 from psg_detector.base_detector import BaseDetector, DetectionResult
+import torch
 
 
 class YOLOv8HeadDetector(BaseDetector):
@@ -9,7 +10,7 @@ class YOLOv8HeadDetector(BaseDetector):
 
     def infer(
         self,
-        input_data,
+        input_data_nchw: torch.Tensor,
         imgsz=800,
         max_det=1000,
         pred_threshold=0.60,
@@ -19,7 +20,7 @@ class YOLOv8HeadDetector(BaseDetector):
         augment=True,
     ):
         results = self.model(
-            source=input_data,
+            source=input_data_nchw,
             imgsz=imgsz,
             max_det=max_det,
             conf=pred_threshold,

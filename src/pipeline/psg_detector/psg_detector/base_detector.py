@@ -1,18 +1,23 @@
 from attr import define, field
 import numpy as np
+import torch
+
 
 @define(kw_only=True)
 class DetectionResult:
-    class_id : int = field()
-    class_name : str = field()
-    xyxy : np.ndarray = field()
-    score : float = field(default=0.0)
+    class_id: int = field()
+    class_name: str = field()
+    xyxy: np.ndarray = field()
+    score: float = field(default=0.0)
 
-class BaseDetector():
+
+class BaseDetector:
     def init(self, *args, **kwargs):
         raise NotImplementedError()
 
-    def infer(self, input_data, *args, **kwargs) -> list[list[DetectionResult]]:
+    def infer(
+        self, input_data_nchw: torch.Tensor, *args, **kwargs
+    ) -> list[list[DetectionResult]]:
         raise NotImplementedError()
 
     # @property

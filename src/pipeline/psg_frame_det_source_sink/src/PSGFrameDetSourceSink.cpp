@@ -420,29 +420,44 @@ int PSGFrameDetSourceSink::_on_deliver_to_downstream_finish(TargetData_t &target
                                                             const DeliveryRequest_t &request,
                                                             const Downstream_t &ds)
 {
-    // 1. 创建modelresult
+    //! 1. 创建modelresult
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "Creating model result");
     PSGFrameDetSourceSinkImpl::OutputModelResult output_model_result;
 
-    // 2. 绑定promise和future
+    //! 2. 绑定promise和future
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "Binding promise and future");
     output_model_result.promise = std::make_shared<ModelResultPromise>();
     output_model_result.future = output_model_result.promise->get_future().share();
     output_model_result.source_data = std::make_shared<SourceData_t>(request.get_source_data());
 
-    // 3. 将output_model_result推送到buffer中
+    //! 3. 将output_model_result推送到buffer中
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] Pushing model result to buffer",
+                 boost::uuids::to_string(request.get_source_data().get_uuid()));
     m_impl->m_model_result_buffer.push(output_model_result);
 
-    // 4. 创建task 在tbb run中将结果写入promise
+    //! 4. 创建task 在tbb run中将结果写入promise
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] Creating task to write result to promise",
+                 boost::uuids::to_string(request.get_source_data().get_uuid()));
     auto promise = output_model_result.promise;
-    m_impl->m_model_result_task_group.run([&ds, &result, promise]() {
+    //! 通过值捕获需要的数据
+    auto ds_copy = ds;
+    auto result_copy = result;
+    m_impl->m_model_result_task_group.run([ds = std::move(ds_copy),
+                                           result = std::move(result_copy),
+                                           promise,
+                                           this]() {
         auto goal_handle = result.goal_handle_future.get();
         if (goal_handle) {
-            auto action_result = ds.get_action_client()->async_get_result(goal_handle).get().result;
-            // 将action result写入promise
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "Got valid goal handle, getting action result");
+            auto action_result = ds.get_action_client()->async_get_result(goal_handle).get().result; // TODO: 卡在这里了，由于后面的python节点没有返回正常的结果
+            //! 将action result写入promise
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "Writing action result to promise");
             auto output_model_result = std::make_shared<PSGFrameDetSourceSink::OutputResult_t>();
             output_model_result->detections = action_result->detections;
             output_model_result->x_return = action_result->x_return;
             promise->set_value(output_model_result);
         } else {
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "Got invalid goal handle, setting promise to null");
             promise->set_value(nullptr);
         }
     });
@@ -451,13 +466,24 @@ int PSGFrameDetSourceSink::_on_deliver_to_downstream_finish(TargetData_t &target
 }
 void PSGFrameDetSourceSink::_get_model_result()
 {
-    // 1. 从buffer中取出model result, 如果buffer为空，则等待
+    //! 1. 从buffer中取出model result, 如果buffer为空，则等待
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "Start getting model result from buffer");
     PSGFrameDetSourceSinkImpl::OutputModelResult output_model_result;
     m_impl->m_model_result_buffer.pop(output_model_result);
-    // 2. 等待结果
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] Got model result from buffer",
+                 boost::uuids::to_string(output_model_result.source_data->get_uuid()));
+
+    //! 2. 等待结果
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] Waiting for model result future",
+                 boost::uuids::to_string(output_model_result.source_data->get_uuid()));
     auto result = output_model_result.future.get();
-    // 3. 如果结果不为空，则构造output source data，并推送到output port pipeline
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] Got model result future",
+                 boost::uuids::to_string(output_model_result.source_data->get_uuid()));
+
+    //! 3. 如果结果不为空，则构造output source data，并推送到output port pipeline
     if (result) {
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] Model result is valid, constructing message",
+                     boost::uuids::to_string(output_model_result.source_data->get_uuid()));
         //! 构造string消息
         std_msgs::msg::String msg;
         std::string det_str;
@@ -468,7 +494,14 @@ void PSGFrameDetSourceSink::_get_model_result()
         msg.data = det_str;
 
         //! 通过debug publisher发布
-        m_pub_task_enqueue.publish(msg);
+        if (m_init_config->create_debug_pub) {
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] Publishing detection result: {}",
+                         boost::uuids::to_string(output_model_result.source_data->get_uuid()), det_str);
+            m_pub_task_enqueue.publish(msg);
+        }
+    } else {
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] Model result is null",
+                     boost::uuids::to_string(output_model_result.source_data->get_uuid()));
     }
 }
 
@@ -480,10 +513,11 @@ int PSGFrameDetSourceSink::_read_frame(SourceData_t &data, std::atomic<int64_t> 
     }
 
     //! Generate a random frame with the UUID text
-    cv::Mat random_frame;
+    cv::Mat random_frame = cv::imread("data/ori_img.jpg");
     auto uuid = data.get_uuid();
     auto frame_text = fmt::format("{}\nFrame Number: {}", boost::uuids::to_string(uuid), frame_number.load());
-    random_image_with_text(random_frame, frame_size, frame_text);
+    // random_image_with_text(random_frame, frame_size, frame_text);
+
 
     psg_private_msgs::msg::PsgDocument doc_msg;
     // convert image to ROS message

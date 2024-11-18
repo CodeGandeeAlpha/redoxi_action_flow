@@ -2,6 +2,7 @@ from psg_detector.base_detector import BaseDetector, DetectionResult
 from mmengine.config import Config
 from mmdet.apis import DetInferencer
 import numpy as np
+import torch
 
 
 class DdqDetrDetector(BaseDetector):
@@ -56,8 +57,8 @@ class DdqDetrDetector(BaseDetector):
         else:
             self.class_names = class_names
 
-    def infer(self, input_data: np.ndarray, pred_threshold=0.3):
-        results_dict = self.model(inputs=input_data)
+    def infer(self, input_data_nchw: torch.Tensor, pred_threshold=0.3):
+        results_dict = self.model(inputs=input_data_nchw)
         results_list = []
         for predictions in results_dict["predictions"]:
             preds = []

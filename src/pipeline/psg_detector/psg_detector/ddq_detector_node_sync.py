@@ -14,12 +14,8 @@ from uuid import uuid4
 # for easy test visualization
 import cv2
 
-import torch
-
 import rclpy
-from rclpy.executors import SingleThreadedExecutor
 from rclpy.action import ActionServer, GoalResponse
-from rclpy.action.server import ServerGoalHandle
 from rclpy.node import Node
 from unique_identifier_msgs.msg import UUID as UUIDMsg
 from attr import field, define
@@ -36,28 +32,9 @@ from psg_common.constants import (
 from psg_common.utilities import create_v6d_client, get_img_by_v6d_id
 from psg_common.pub_sub import StreamWorker
 
-from concurrent.futures import ThreadPoolExecutor
 from psg_detector.ddq_detector import DdqDetrDetector
 from psg_detector.yolov8_head_detector import YOLOv8HeadDetector
-from psg_detector.base_detector import BaseDetector, DetectionResult
-
-
-@define(kw_only=True)
-class ModelResource:
-    model: BaseDetector = field()
-    category: str = field(
-        validator=lambda _, __, value: value in ["face", "body", "head"]
-    )
-    name: str = field(factory=lambda: str(uuid4()))
-
-
-# @define(kw_only=True)
-# class TaskOutput:
-#     # key: category, value: list of list of DetectionResult
-#     # values: first level is batch index, second level is detection results of one frame
-#     detections_per_category: dict[str, list[list[DetectionResult]]] = field(
-#         factory=dict
-#     )
+from psg_detector.base_detector import BaseDetector
 
 
 class DetectorNode(Node, IOpenCloseProtocol):
@@ -154,13 +131,11 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self.m_action: ActionServer = None
         # self.m_downstreams: dict[str, ActionClient] = {}
         self.m_logger = self.get_logger()
-        self.m_category_to_resource: dict[str, asyncio.Queue[ModelResource]] = {}
-
-        self._m_in_process_queue: queue.Queue = None
+        self.m_in_process_queue: queue.Queue = None
 
         # self.m_merge_workers = []
 
-        self._m_model_groups_data: dict[str, DetectorNode.ModelGroup] = (
+        self.m_model_groups_data: dict[str, DetectorNode.ModelGroup] = (
             {}
         )  # key: model_name, value: ModelGroup
         # self.m_detections_task_waiting: queue.Queue[DetectorNode.DSTask_Detections] = (
@@ -179,36 +154,6 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self._start_time = None
         self._end_time = None
         self._time_test = False
-
-    async def _do_model_inference(
-        self, category: str, input_data_nchw: torch.Tensor
-    ) -> list[list[DetectionResult]]:
-        assert input_data_nchw.shape[0] == 1, "batch size must be 1"
-        assert input_data_nchw.dtype == torch.uint8, "input data must be uint8"
-        resource_queue = self.m_category_to_resource.get(category)
-        # assert resource_queue is not None, f"no resource for category: {category}"
-        resource = await resource_queue.get()
-        self.m_logger.info(f"_do_model_inference(): after get resource")
-        # input_data_nchw = torch.randn(1, 3, 640, 640).to(
-        #     resource.model.device, dtype=torch.float32
-        # )
-        input_data_hwc = input_data_nchw.squeeze(0).permute(1, 2, 0).cpu().numpy()
-        res = resource.model.infer(
-            input_data_hwc, pred_threshold=self.m_runtime_config.pred_score_thr
-        )
-        # self.m_logger.info(f"res: {res}")
-        await resource_queue.put(resource)
-        return res
-
-    async def set_model(
-        self, model_resource: ModelResource, number_of_replicas: int = 1
-    ):
-        if model_resource.category not in self.m_category_to_resource:
-            self.m_category_to_resource[model_resource.category] = asyncio.Queue()
-        for _ in range(number_of_replicas):
-            await self.m_category_to_resource[model_resource.category].put(
-                model_resource
-            )
 
     def update_init_config(self, init_config: InitConfig) -> int:
         assert (
@@ -258,14 +203,12 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self.m_runtime_config = runtime_config
 
         # 创建一个队列，用于发放处理任务的门票
-        self._m_in_process_queue = queue.Queue(
-            maxsize=self.m_runtime_config.buffer_size
-        )
-        while not self._m_in_process_queue.full():
-            self._m_in_process_queue.put("ticket")
+        self.m_in_process_queue = queue.Queue(maxsize=self.m_runtime_config.buffer_size)
+        while not self.m_in_process_queue.full():
+            self.m_in_process_queue.put("ticket")
 
         # setup model groups data
-        # self._init_model_groups_data()
+        self._init_model_groups_data()
 
         # create v6d client
         # self.m_v6d_client = create_v6d_client()
@@ -295,7 +238,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
         return ReturnCode.SUCCESS
 
     def start_model_workers(self):
-        for model_group_name, model_group_data in self._m_model_groups_data.items():
+        for model_group_name, model_group_data in self.m_model_groups_data.items():
             for model in model_group_data.models:
                 # output_func = None
 
@@ -319,7 +262,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 stream_worker.start()
 
     def stop_model_workers(self):
-        for model_group_name, model_group_data in self._m_model_groups_data.items():
+        for model_group_name, model_group_data in self.m_model_groups_data.items():
             for worker in model_group_data.workers:
                 worker.stop()
 
@@ -329,7 +272,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
             self.m_status_code == NodeStatusCode.OPENED
         ), "cannot start because status code is not OPENED"
 
-        # self.start_model_workers()
+        self.start_model_workers()
 
         status_code_before = self.m_status_code
         self.m_status_code = NodeStatusCode.STARTED
@@ -346,8 +289,8 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         self.stop_model_workers()
 
-        if self._m_model_groups_data:
-            for model_group_name, model_group_data in self._m_model_groups_data.items():
+        if self.m_model_groups_data:
+            for model_group_name, model_group_data in self.m_model_groups_data.items():
                 for model_idx in range(len(model_group_data.models)):
                     model_group_data.models[model_idx].running_thread.join()
                     self.m_logger.debug(
@@ -391,7 +334,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
             self,
             ProcessDetectionsByFrame,
             self.m_init_config.process_frame_action,
-            self._execute_task,
+            self._accept_frame_accepted_callback,
             goal_callback=self._goal_callback,
         )
         self.m_logger.info(
@@ -401,7 +344,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
     def _init_model_groups_data(self):
         shared_output_queue = queue.Queue()
 
-        self._m_model_groups_data.clear()
+        self.m_model_groups_data.clear()
         for model_group_name, models in self.m_init_config.model_groups.items():
             assert model_group_name in [
                 "body",
@@ -420,7 +363,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
             for model in models:
                 model_group_data.models.append(model)
 
-            self._m_model_groups_data[model_group_name] = model_group_data
+            self.m_model_groups_data[model_group_name] = model_group_data
 
     async def _process_frame_create_model_tasks(self, frame_msg: Frame, uuid):
         self.m_logger.debug(
@@ -461,14 +404,14 @@ class DetectorNode(Node, IOpenCloseProtocol):
         )
         input_data.output.output_per_group = {
             group_name: DetectorNode.ModelGroupSingleOutput()
-            for group_name in self._m_model_groups_data
+            for group_name in self.m_model_groups_data
         }
 
         # Add tasks to model queues
         self.m_logger.debug(
             f"[_process_frame_create_model_tasks] Adding tasks to model queues"
         )
-        for model_group_name, model_group_data in self._m_model_groups_data.items():
+        for model_group_name, model_group_data in self.m_model_groups_data.items():
             model_group_data.in_queue.put(input_data)
             self.m_logger.debug(
                 f"[_process_frame_create_model_tasks] Added task for model group: {model_group_name}"
@@ -496,6 +439,16 @@ class DetectorNode(Node, IOpenCloseProtocol):
             f"[_process_frame_create_model_tasks] Finished processing frame {frame_msg.frame_num}"
         )
         return merge_dets_msg
+
+    def _get_frame_from_v6d(self, frame_msg):
+        if not frame_msg.cache.has_int_id:
+            raise RuntimeError("frame.cache has no int_id")
+        v6d_int_id = frame_msg.cache.id_int
+
+        # Get the blob from Vineyard
+        image = get_img_by_v6d_id(self.m_v6d_client, v6d_int_id)
+
+        return image
 
     def _to_detections_msg(self, result, frame_msg):
         """
@@ -546,97 +499,16 @@ class DetectorNode(Node, IOpenCloseProtocol):
         x_control = goal_request.x_control
         if x_control.code == 1:
             self.m_logger.info(f"frame {goal_request.frame.frame_num} ping")
-        # 如果任一类别的资源队列为空,则拒绝该帧
-        for cat in self.m_category_to_resource:
+        # if in_process_queue is empty, reject the frame
+        if self.m_in_process_queue.empty():
             self.m_logger.info(
-                f"cat {cat} resource queue size {self.m_category_to_resource[cat].qsize()}"
+                f"frame {goal_request.frame.frame_num} was rejected because in_process_queue is empty"
             )
-            if self.m_category_to_resource[cat].empty():
-                self.m_logger.info(
-                    f"frame {goal_request.frame.frame_num} was rejected because resource queue for category {cat} is empty"
-                )
-                return GoalResponse.REJECT
+            return GoalResponse.REJECT
 
         self.m_logger.info(f"frame {goal_request.frame.frame_num} ping accepted")
 
         return GoalResponse.ACCEPT
-
-    def _execute_task_v2(self, goal_handle: ServerGoalHandle):
-        return asyncio.ensure_future(self._execute_task(goal_handle))
-
-    async def _execute_task(self, goal_handle: ServerGoalHandle):
-        # just accept the frame and add it to buffer, no processing
-        x_control = goal_handle.request.x_control
-
-        # ping
-        if x_control.code == 1:
-            goal_handle.succeed()
-            result = ProcessDetectionsByFrame.Result()
-            result.x_return.message = "Ping accepted"
-            result.x_return.code = ReturnResponse.SUCCESS
-            return result
-
-        frame_msg = goal_handle.request.frame
-        self.m_logger.info(
-            f"---TIME LOG: framenum {frame_msg.frame_num} node ddq_detector_node type IN time {self.get_clock().now().nanoseconds}"
-        )
-        uuid = goal_handle.request.x_uid
-
-        raw_img = frame_msg.raw_image
-        img: np.ndarray | None = (
-            np.frombuffer(raw_img.data, dtype=np.uint8).reshape(
-                raw_img.height, raw_img.width, -1
-            )
-            if raw_img is not None
-            else None
-        )
-        if img is None:
-            goal_handle.abort()
-            result = ProcessDetectionsByFrame.Result()
-            result.x_return.message = "No image data"
-            result.x_return.code = ReturnResponse.FAILURE
-            return result
-
-        self.m_logger.debug(
-            f"[_process_frame_create_model_tasks] Frame {frame_msg.frame_num} image shape: {img.shape}"
-        )
-
-        # convert img to torch tensor
-        img_tensor = torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0)
-
-        category_to_results: dict[str, list[list[DetectionResult]]] = {}
-
-        for cat in self.m_category_to_resource:
-            self.m_logger.info(f"Creating task for category: {cat}")
-            task_res = await self._do_model_inference(cat, img_tensor)
-            # tasks.append(task)
-            category_to_results[cat] = task_res
-            # category_to_task[cat] = task
-
-        # from typing import Any
-        # category_to_task: dict[str, Any] = {}
-        # for cat in self.m_category_to_resource:
-        #     self.m_logger.info(f"Creating task for category: {cat}")
-        #     task = self._do_model_inference(cat, img_tensor)
-        #     category_to_task[cat] = task
-
-        # list_res = await asyncio.gather(*list(category_to_task.values()))
-
-        # for cat, res in zip(category_to_task.keys(), list_res):
-        #     category_to_results[cat] = res
-
-        self.m_logger.info("Awaiting all tasks")
-
-        detections_msg = self._merge_detections_by_category(
-            category_to_results, frame_msg
-        )
-
-        goal_handle.succeed()
-        result = ProcessDetectionsByFrame.Result()
-        result.x_return.message = "Accepted frame"
-        result.x_return.code = ReturnResponse.SUCCESS
-        result.detections = detections_msg
-        return result
 
     async def _accept_frame_accepted_callback(self, goal_handle):
         # just accept the frame and add it to buffer, no processing
@@ -651,7 +523,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
             return result
 
         # 获取一个处理任务的门票
-        self._m_in_process_queue.get()
+        self.m_in_process_queue.get()
 
         frame = goal_handle.request.frame
         self.m_logger.info(
@@ -669,7 +541,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         goal_handle.succeed()
         # 处理完后往in_process_queue中放一个ticket
-        self._m_in_process_queue.put("ticket")
+        self.m_in_process_queue.put("ticket")
 
         result = ProcessDetectionsByFrame.Result()
         result.x_return.message = "Accepted frame"
@@ -680,7 +552,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
     def _visualize(self, goal: ProcessDetectionsByFrame.Goal):
         detections = goal.detections
         frame = detections.frame
-        # img = self._get_frame_from_v6d(frame)
+        img = self._get_frame_from_v6d(frame)
         img = np.copy(img)  # make a copy to avoid modifying the original image
         self.m_logger.debug(
             f"_visualize(): frame {frame.frame_num} img shape {img.shape}"
@@ -710,22 +582,6 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 merged_detections = output.detections
             else:
                 merged_detections.detections.extend(output.detections.detections)
-
-        return merged_detections
-
-    def _merge_detections_by_category(
-        self,
-        category_to_results: dict[str, list[list[DetectionResult]]],
-        frame_msg: Frame,
-    ) -> Detections:
-        merged_detections = None
-        for _, results in category_to_results.items():
-            detections = self._to_detections_msg(results, frame_msg)
-
-            if merged_detections is None:
-                merged_detections = detections
-            else:
-                merged_detections.detections.extend(detections.detections)
 
         return merged_detections
 
@@ -818,19 +674,11 @@ class DetectorNode(Node, IOpenCloseProtocol):
         return True, None
 
 
-async def spin(executor: SingleThreadedExecutor):
-    while rclpy.ok():
-        executor.spin_once()
-        await asyncio.sleep(0)
+def main(args=None):
+    # init node
+    rclpy.init(args=args)
+    ddq_detector_node = DetectorNode("detector_node")
 
-
-async def ros_loop(node):
-    while rclpy.ok():
-        rclpy.spin_once(node, timeout_sec=0)
-        await asyncio.sleep(0.0001)
-
-
-async def init(ddq_detector_node):
     # init config
     init_config = DetectorNode.InitConfig(
         process_frame_action="/detector_node/model_process_frame_action",
@@ -851,11 +699,9 @@ async def init(ddq_detector_node):
             class_names=["person"],
         )
 
-        # if "body" not in init_config.model_groups:
-        #     init_config.model_groups["body"] = []
-        # init_config.model_groups["body"].append(ddq_model)
-        model_resource = ModelResource(model=ddq_model, category="body")
-        await ddq_detector_node.set_model(model_resource)
+        if "body" not in init_config.model_groups:
+            init_config.model_groups["body"] = []
+        init_config.model_groups["body"].append(ddq_model)
         ddq_detector_node.get_logger().info(f"body model {i} initialized")
 
     # init head model
@@ -868,11 +714,9 @@ async def init(ddq_detector_node):
             device=f"cuda:{i + num_body_models}",
         )
 
-        # if "head" not in init_config.model_groups:
-        #     init_config.model_groups["head"] = []
-        # init_config.model_groups["head"].append(yolo_model)
-        model_resource = ModelResource(model=yolo_model, category="head")
-        await ddq_detector_node.set_model(model_resource)
+        if "head" not in init_config.model_groups:
+            init_config.model_groups["head"] = []
+        init_config.model_groups["head"].append(yolo_model)
         ddq_detector_node.get_logger().info(f"head model {i} initialized")
 
     # runtime config
@@ -883,25 +727,10 @@ async def init(ddq_detector_node):
 
     ddq_detector_node.init(init_config, runtime_config)
 
-
-def main(args=None):
-    # init node
-    rclpy.init(args=args)
-
-    ddq_detector_node = DetectorNode("detector_node")
-
-    asyncio.run(init(ddq_detector_node))
-    # loop.run_until_complete(init(ddq_detector_node))
-
     ddq_detector_node.open()
     ddq_detector_node.start()
 
     rclpy.spin(ddq_detector_node)
-
-    ddq_detector_node.close()
-
-    # ddq_detector_node.destroy_node()
-    rclpy.shutdown()
 
 
 if __name__ == "__main__":
@@ -926,5 +755,4 @@ if __name__ == "__main__":
     # ) as file:
     #     # 调用 print_all 方法，将 out 参数设置为文件对象
     #     yappi.get_thread_stats().print_all(out=file)
-
     main()

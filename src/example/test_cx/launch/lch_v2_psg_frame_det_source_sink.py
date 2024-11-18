@@ -8,7 +8,7 @@ import json
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
     "log_level",
-    default_value="debug",
+    default_value="info",
     description="Logging level",
 )
 
@@ -27,13 +27,13 @@ psg_frame_det_source_sink_node_json_params = {
             "preserve_request_order": True,
             "fallback_delivery_precondition": "any_downstream_ready",
         },
-        "create_debug_pub": False,
+        "create_debug_pub": True,
         "_time_unit": "us(1e-6)",
         "enable_blocking_mode": False,
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
-        "step_interval": 5,
+        "step_interval": 10000000,
         "frame_interval": 0,
         "output_image_size": {"width": 640, "height": 480},
         "output_image_encoding": "bgr8",

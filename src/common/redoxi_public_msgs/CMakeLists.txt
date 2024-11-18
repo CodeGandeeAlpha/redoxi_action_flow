@@ -30,6 +30,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/ProcessDetections.action"
   "action/ProcessDetectionsByFrame.action"
   "action/ProcessBodyPoses.action"
+  "action/ProcessBodyPosesByDets.action"
 
   DEPENDENCIES geometry_msgs std_msgs unique_identifier_msgs sensor_msgs
 )
