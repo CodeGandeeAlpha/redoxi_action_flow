@@ -13,8 +13,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(TBB REQUIRED)
-find_package(pluginlib REQUIRED)
-find_package(redoxi_shared_memory REQUIRED)
+find_package(xtensor REQUIRED)
 
 # Set dependencies
 set(DEPENDENCIES
@@ -27,7 +26,7 @@ set(DEPENDENCIES
     redoxi_dnn_models
     pluginlib)
 
-set(additional_dependencies spdlog::spdlog TBB::tbb)
+set(additional_dependencies spdlog::spdlog TBB::tbb xtensor)
 
 # Find each dependency
 foreach(dependency ${DEPENDENCIES})

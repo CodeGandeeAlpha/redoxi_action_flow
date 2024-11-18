@@ -7,7 +7,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # install tbb
-apt-get install -y libtbb-dev
+apt-get install -y libtbb-dev xtensor-dev
 
 # install nuget for onnx
 # apt-get install -y nuget tensorrt-libs

@@ -3,7 +3,8 @@
 #include <opencv2/opencv.hpp>
 #include <spdlog/spdlog.h>
 #include <filesystem>
-
+#include <xtensor/xtensor.hpp>
+#include <xtensor/xnpy.hpp>
 #ifndef TEST_MODEL_DIR
 #    define TEST_MODEL_DIR "./models"
 #endif
@@ -23,8 +24,24 @@ namespace cmdev = rdx_inf::common_device_types;
 const auto fn_model = fs::path(TEST_MODEL_DIR) / "yolov8n-pose-dynbatch.onnx";
 const auto fn_image = fs::path(TEST_DATA_DIR) / "pose-sample.jpg";
 const auto fn_pose_output = fs::path(TEST_OUTPUT_DIR) / "pose-output.jpg";
+const auto fn_tensor_output = fs::path(TEST_OUTPUT_DIR) / "test-tensor.npy";
 
 int main(int argc, char **argv)
+{
+    //! Load image from file
+    cv::Mat image = cv::imread(fn_image.string());
+
+    // create a tensor from the image
+    xt::xtensor<uint8_t, 3> tensor({(size_t)image.rows, (size_t)image.cols, 3});
+    std::memcpy(tensor.data(), image.data, tensor.size() * sizeof(uint8_t));
+
+    // save the tensor to a file
+    spdlog::info("Saving tensor to {}", fn_tensor_output.string());
+    xt::dump_npy(fn_tensor_output.string(), tensor);
+    return 0;
+}
+
+int _main(int argc, char **argv)
 {
     // if output directory does not exist, create it
     if (!fs::exists(TEST_OUTPUT_DIR)) {
