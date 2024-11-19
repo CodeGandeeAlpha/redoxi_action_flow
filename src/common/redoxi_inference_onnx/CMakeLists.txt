@@ -12,13 +12,16 @@ find_package(rclcpp REQUIRED)
 find_package(redoxi_inference REQUIRED)
 find_package(redoxi_common_cpp REQUIRED)
 
-find_package(Boost REQUIRED)
+find_package(pluginlib REQUIRED)
+pluginlib_export_plugin_description_file(redoxi_inference plugins.xml)
 
 add_library(redoxi_inference_onnx 
   src/redoxi_inference_onnx.cpp
   src/OnnxModelInference.cpp
   src/OnnxPortData.cpp
+  src/OnnxInferenceInOutData.cpp
   )
+
 add_library(redoxi_inference_onnx::redoxi_inference_onnx ALIAS redoxi_inference_onnx)
 target_compile_features(redoxi_inference_onnx PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 target_include_directories(redoxi_inference_onnx PUBLIC
@@ -29,14 +32,20 @@ ament_target_dependencies(
   "rclcpp"
   "redoxi_inference"
   "redoxi_common_cpp"
+  "pluginlib"
 )
-
-target_link_libraries(redoxi_inference_onnx PUBLIC Boost::boost)
 
 # configure for onnx runtime
 set(onnxruntime_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/onnxruntime/onnxruntime-linux-x64-gpu-1.20.0/lib64/cmake/onnxruntime)
 find_package(onnxruntime REQUIRED)
 target_link_libraries(redoxi_inference_onnx PUBLIC onnxruntime::onnxruntime)
+
+install(
+  DIRECTORY ${onnxruntime_DIR}/../../
+  DESTINATION lib
+  FILES_MATCHING PATTERN "*.so*"
+)
+
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
@@ -69,7 +78,7 @@ endif()
 ament_export_dependencies(
   redoxi_inference
   redoxi_common_cpp
-  Boost
+  pluginlib
 )
 
 ament_export_include_directories(

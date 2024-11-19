@@ -13,8 +13,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(TBB REQUIRED)
-find_package(pluginlib REQUIRED)
-find_package(redoxi_shared_memory REQUIRED)
+find_package(xtensor REQUIRED)
 
 # Set dependencies
 set(DEPENDENCIES
@@ -23,11 +22,11 @@ set(DEPENDENCIES
     redoxi_samples_lib
     redoxi_samples_nodes
     redoxi_shared_memory
-    psg_master_node
-    psg_document_sink
+    redoxi_inference
+    redoxi_dnn_models
     pluginlib)
 
-set(additional_dependencies spdlog::spdlog TBB::tbb)
+set(additional_dependencies spdlog::spdlog TBB::tbb xtensor)
 
 # Find each dependency
 foreach(dependency ${DEPENDENCIES})
@@ -51,15 +50,20 @@ option(BUILD_TEST_TBB_TASK_MANAGEMENT "Build test_tbb_task_management target"
 option(BUILD_TEST_VIDEO_READER_RANDOM "Build test_video_reader_random target"
        OFF)
 option(BUILD_TEST_VIDEO_SINK "Build test_video_sink target" OFF)
-option(BUILD_TEST_SIMPLE_ACTION_GENERATOR "Build test_simple_action_generator target" OFF)
+option(BUILD_TEST_SIMPLE_ACTION_GENERATOR
+       "Build test_simple_action_generator target" OFF)
 option(BUILD_TEST_UUID_CONVERSION "Build test_uuid_conversion target" OFF)
 option(BUILD_TEST_V2_JSON_EXAMPLES "Build test_v2_json_examples target" OFF)
-option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2 "Build test_simple_action_generator_v2 target" OFF)
+option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2
+       "Build test_simple_action_generator_v2 target" OFF)
 option(BUILD_TEST_V2_VIDEO_SINK "Build test_v2_video_sink target" OFF)
-option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target" ON)
+option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target"
+       OFF)
 option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
-option(BUILD_TEST_PSG_MASTER_NODE "Build test_psg_master_node target" ON)
-option(BUILD_TEST_V2_DOCUMENT_SINK "Build test_v2_document_sink target" ON)
+option(BUILD_ONNX_HELLO_WORLD "Build onnx_hello_world target" OFF)
+option(BUILD_ONNX_INFERENCE_API "Build onnx_inference_api target" OFF)
+option(BUILD_ONNX_YOLO8POSE "Build onnx_yolo8pose target" ON)
+
 # Function to configure a target
 function(configure_target target_name)
   add_executable(${target_name} src/${target_name}.cpp)
@@ -70,10 +74,22 @@ function(configure_target target_name)
   target_include_directories(
     ${target_name} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                           $<INSTALL_INTERFACE:include>)
+
+  # global directories defined using macro
+  target_compile_definitions(
+    ${target_name}
+    PUBLIC -DTEST_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/models"
+           -DTEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../../data"
+           -DTEST_OUTPUT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/output")
+
   set(ALL_TEST_TARGETS
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_ONNX_YOLO8POSE)
+  configure_target(onnx_yolo8pose)
+endif()
 
 if(BUILD_TEST_V6D_PLUGIN)
   configure_target(test_v6d_plugin)
@@ -144,12 +160,23 @@ if(BUILD_TEST_TBB_TASK_MANAGEMENT)
   configure_target(test_tbb_task_management)
 endif()
 
-if(BUILD_TEST_PSG_MASTER_NODE)
-  configure_target(v2_psg_master_node)
+if(BUILD_ONNX_HELLO_WORLD)
+  configure_target(onnx_hello_world)
+
+  # configure for onnx runtime
+  set(onnxruntime_DIR
+      ${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/onnxruntime/onnxruntime-linux-x64-gpu-1.20.0/lib64/cmake/onnxruntime
+  )
+  message(STATUS "onnxruntime_DIR: ${onnxruntime_DIR}")
+
+  find_package(onnxruntime REQUIRED)
+  message(STATUS "onnxruntime_FOUND: ${onnxruntime_FOUND}")
+
+  target_link_libraries(onnx_hello_world PUBLIC onnxruntime::onnxruntime)
 endif()
 
-if(BUILD_TEST_V2_DOCUMENT_SINK)
-  configure_target(v2_document_sink)
+if(BUILD_ONNX_INFERENCE_API)
+  configure_target(onnx_inference_api)
 endif()
 
 # Install targets

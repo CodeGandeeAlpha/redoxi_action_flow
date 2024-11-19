@@ -29,9 +29,9 @@ display_help() {
 #                  cv_bridge"
 
 PackagesToBuild="redoxi_common_nodes \
-                 redoxi_shared_memory \
-                 redoxi_shm_v6d \
                  redoxi_inference \
+                 redoxi_inference_onnx \
+                 redoxi_dnn_models \
                  test_package \
                  rosboard \
                  psg_master_node \
@@ -94,3 +94,6 @@ colcon build --packages-up-to $PackagesToBuild \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
     -DJSON_STRUCT_OPT_INSTALL=ON
 source install/setup.bash
+
+# select gpu 0, because windows docker has issues with multiple gpus
+export CUDA_VISIBLE_DEVICES=0

@@ -91,14 +91,34 @@ int main(int argc, char **argv)
             for (auto &entry : tensor_caches) {
                 if (entry.first.is_input) {
                     std::generate(entry.second.data->begin(), entry.second.data->end(), []() { return static_cast<float>(rand()) / RAND_MAX; });
+                    runtime_data->io_binding->BindInput(entry.first.name.c_str(), *(entry.second.tensor));
                 }
             }
             auto start_time = std::chrono::high_resolution_clock::now();
+
+            //! Synchronize inputs
+            spdlog::info("Synchronizing inputs");
             runtime_data->io_binding->SynchronizeInputs();
+            //! Run the model
+            spdlog::info("Running the model");
             session->Run(Ort::RunOptions{nullptr}, *runtime_data->io_binding);
+            //! Synchronize outputs
+            spdlog::info("Synchronizing outputs");
+            runtime_data->io_binding->SynchronizeOutputs();
+
             auto end_time = std::chrono::high_resolution_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
             auto average_time_per_sample = elapsed / num_batch;
+
+            //! Print first element of each output tensor
+            spdlog::info("Getting output values");
+            auto output_values = runtime_data->io_binding->GetOutputValues();
+            auto output_names = runtime_data->io_binding->GetOutputNames();
+            for (size_t i = 0; i < output_names.size(); ++i) {
+                spdlog::info("Getting output '{}'", output_names[i]);
+                const float *data = output_values[i].GetTensorData<float>();
+                spdlog::info("Output '{}' first element: {}", output_names[i], data[0]);
+            }
             spdlog::info("\033[33mIteration {}: Inference completed in {} us (Average per sample: {} us)\033[0m", i + 1, elapsed, average_time_per_sample);
         }
     } catch (const Ort::Exception &e) {
@@ -136,7 +156,8 @@ std::shared_ptr<OnnxRuntimeData> create_onnx_runtime_data(
             runtime_data->tensor_caches[port] = {input_data, tensor, memory_info};
         } else {
             spdlog::info("No pre-allocation for output port: {}", port.name);
-            auto memory_info = std::make_shared<Ort::MemoryInfo>(Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault));
+            auto memory_info = std::make_shared<Ort::MemoryInfo>(
+                Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault));
             runtime_data->tensor_caches[port] = {nullptr, nullptr, memory_info};
         }
     }
