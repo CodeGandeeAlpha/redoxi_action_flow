@@ -1,15 +1,15 @@
-#include <redoxi_dnn_models/Yolo8Postprocessor.hpp>
+#include <redoxi_dnn_models/yolo8/Yolo8Postprocessor.hpp>
 #include <opencv2/dnn/dnn.hpp>
 
 namespace redoxi_works::inference::yolo8
 {
 
-void Yolo8Postprocessor::init(const Yolo8PostprocessorConfig &config)
+void PoseModelPostprocessor::init(const PostprocessorConfig &config)
 {
-    m_config = std::make_shared<Yolo8PostprocessorConfig>(config);
+    m_config = std::make_shared<PostprocessorConfig>(config);
 }
 
-void Yolo8Postprocessor::postprocess(
+void PoseModelPostprocessor::postprocess(
     SingleImageOutput::List *output_result,
     const float *model_output_batch_values_numboxes,
     const std::array<int64_t, 3> &model_output_shape,
@@ -43,7 +43,7 @@ void Yolo8Postprocessor::postprocess(
 }
 
 // for a single image
-void Yolo8Postprocessor::postprocess(
+void PoseModelPostprocessor::postprocess(
     SingleImageOutput *output_result,
     const float *model_output_values_numboxes,
     const std::array<int64_t, 2> &model_output_shape,
@@ -61,7 +61,7 @@ void Yolo8Postprocessor::postprocess(
 
     // config is not set?
     if (!m_config) {
-        throw std::runtime_error("Yolo8Postprocessor config is not set");
+        throw std::runtime_error("PoseModelPostprocessor config is not set");
     }
 
     // get dimensions

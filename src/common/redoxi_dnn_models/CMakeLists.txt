@@ -16,9 +16,10 @@ find_package(redoxi_inference REQUIRED)
 
 add_library(redoxi_dnn_models
   src/redoxi_dnn_models.cpp
-  src/Yolo8Pose.cpp
-  src/Yolo8Preprocessor.cpp
-  src/Yolo8Postprocessor.cpp)
+  src/yolo8/Yolo8PoseModel.cpp
+  src/yolo8/Yolo8Preprocessor.cpp
+  src/yolo8/Yolo8Postprocessor.cpp
+  src/yolo8/Yolo8DetectionModel.cpp)
   
 add_library(redoxi_dnn_models::redoxi_dnn_models ALIAS redoxi_dnn_models)
 target_compile_features(

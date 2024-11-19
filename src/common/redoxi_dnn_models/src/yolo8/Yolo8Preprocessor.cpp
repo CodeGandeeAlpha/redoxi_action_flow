@@ -1,4 +1,4 @@
-#include <redoxi_dnn_models/Yolo8Preprocessor.hpp>
+#include <redoxi_dnn_models/yolo8/Yolo8Preprocessor.hpp>
 #include <redoxi_common_cpp/image_proc/utils.hpp>
 
 namespace redoxi_works::inference::yolo8

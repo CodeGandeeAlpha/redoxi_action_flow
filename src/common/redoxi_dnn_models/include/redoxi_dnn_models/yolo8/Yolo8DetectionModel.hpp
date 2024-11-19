@@ -1,27 +1,23 @@
 #pragma once
 
 #include <redoxi_dnn_models/redoxi_dnn_models.hpp>
-#include <redoxi_dnn_models/Yolo8Postprocessor.hpp>
-#include <redoxi_dnn_models/Yolo8PoseTypes.hpp>
-#include <redoxi_inference/redoxi_inference.hpp>
-#include <opencv2/opencv.hpp>
-#include <array>
+#include <redoxi_dnn_models/yolo8/Yolo8ModelTypes.hpp>
+#include <redoxi_dnn_models/yolo8/Yolo8Postprocessor.hpp>
 
-namespace redoxi_works::inference
+namespace redoxi_works::inference::yolo8
 {
 
-class Yolo8Pose : public RedoxiModelInference
+class Yolo8DetectionModel : public RedoxiModelInference
 {
   public:
-    // output types
-    using Keypoint = yolo8::Keypoint;
-    using DetectedObject = yolo8::DetectedObject;
-    using SingleImageOutput = yolo8::SingleImageOutput;
-    using InitConfig_t = Yolo8PoseConfig;
-    using OutputConfig_t = yolo8::Yolo8PostprocessorConfig;
+    using DetectedObject = DetectedObject;
+    using SingleImageOutput = SingleImageOutput;
+    using InitConfig_t = Yolo8ModelConfig;
+    using OutputConfig_t = PostprocessorConfig;
 
   public:
-    Yolo8Pose();
+    Yolo8DetectionModel();
+
     // from RedoxiModelInference
     virtual KeyValueStore::Ptr create_init_params() override;
     virtual InferenceInOutData::Ptr create_inference_inout_data() override;
@@ -35,7 +31,7 @@ class Yolo8Pose : public RedoxiModelInference
     virtual int do_inference(InferenceInOutData::Ptr inout_data) override;
 
   public:
-    // Yolo8Pose specific
+    // Yolo8 specific
 
     // process the images, and set the data to the model input
     // image format can be "rgb" or "bgr" or "gray", all images must be of the same format
@@ -56,10 +52,6 @@ class Yolo8Pose : public RedoxiModelInference
     virtual std::array<int64_t, 3> get_model_output_shape_nchw() const;
     virtual std::string get_model_output_dtype() const;
 
-    // get the keypoint connections
-    // output[i]=(u,v) means their is a connection between keypoint[u] and keypoint[v]
-    virtual std::vector<std::pair<int, int>> get_keypoint_connections() const;
-
   protected:
     struct Impl;
     std::shared_ptr<Impl> m_impl;
@@ -73,4 +65,5 @@ class Yolo8Pose : public RedoxiModelInference
 
     std::shared_ptr<InitConfig_t> m_init_params;
 };
-} // namespace redoxi_works::inference
+
+} // namespace redoxi_works::inference::yolo8
