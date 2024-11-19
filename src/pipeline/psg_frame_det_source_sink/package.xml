@@ -1,28 +1,22 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>test_package</name>
+  <name>psg_frame_det_source_sink</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="igamenovoer@xx.com">igamenovoer</maintainer>
+  <maintainer email="740151249@qq.com">chengxiao</maintainer>
   <license>TODO: License declaration</license>
 
-  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_ros</buildtool_depend>
 
+  <depend>rclcpp</depend>
   <depend>redoxi_samples_lib</depend>
-  <depend>redoxi_samples_nodes</depend>
   <depend>redoxi_video_reader</depend>
-  <depend>redoxi_shared_memory</depend>
-  <depend>redoxi_inference</depend>
-  <depend>redoxi_dnn_models</depend>
-  <depend>psg_private_msgs</depend>
-  <depend>pluginlib</depend>
-
+  <depend>redoxi_common_nodes</depend>
+  <depend>psg_detector</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
-
-  <exec_depend>launch</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

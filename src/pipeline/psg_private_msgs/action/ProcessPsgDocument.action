@@ -1,0 +1,7 @@
+psg_private_msgs/PsgDocument document
+unique_identifier_msgs/UUID x_uid
+redoxi_public_msgs/Control x_control
+---
+redoxi_public_msgs/ReturnResponse x_return
+---
+redoxi_public_msgs/FeedbackResponse x_feedback

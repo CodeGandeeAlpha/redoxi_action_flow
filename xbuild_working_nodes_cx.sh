@@ -15,29 +15,22 @@ display_help() {
     echo "  $0 --verbose --debug"
 }
 
-# PackagesToBuild="psg_private_msgs \
-#                  redoxi_public_msgs \
-#                  redoxi_common_cpp \
-#                  redoxi_video_reader \
-#                  redoxi_common_nodes \
-#                  redoxi_samples_lib \
-#                  redoxi_samples_nodes \
-#                  test_package \
-#                  json_struct \
-#                  redoxi_extern_cpp \
-#                  rosboard \
-#                  cv_bridge"
-
 PackagesToBuild="redoxi_common_nodes \
+                 redoxi_shared_memory \
+                 redoxi_shm_v6d \
                  redoxi_inference \
-                 redoxi_inference_onnx \
-                 redoxi_dnn_models \
-                 test_package \
+                 test_cx \
                  rosboard \
+                 psg_common \
                  psg_master_node \
                  psg_document_sink \
                  psg_detector \
-                 psg_common"
+                 psg_frame_det_source_sink \
+                 psg_person_generator"
+
+# PackagesToBuild="
+#                  psg_common \
+#                  "
 # PackagesToBuild="redoxi_common_nodes \
 #                  redoxi_shared_memory \
 #                  redoxi_shm_v6d \
@@ -94,6 +87,3 @@ colcon build --packages-up-to $PackagesToBuild \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
     -DJSON_STRUCT_OPT_INSTALL=ON
 source install/setup.bash
-
-# select gpu 0, because windows docker has issues with multiple gpus
-export CUDA_VISIBLE_DEVICES=0

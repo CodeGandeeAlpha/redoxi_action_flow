@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>test_package</name>
+  <name>test_cx</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
   <maintainer email="igamenovoer@xx.com">igamenovoer</maintainer>
@@ -13,9 +13,12 @@
   <depend>redoxi_samples_nodes</depend>
   <depend>redoxi_video_reader</depend>
   <depend>redoxi_shared_memory</depend>
-  <depend>redoxi_inference</depend>
-  <depend>redoxi_dnn_models</depend>
   <depend>psg_private_msgs</depend>
+  <depend>psg_master_node</depend>
+  <depend>psg_document_sink</depend>
+  <depend>psg_detector</depend>
+  <depend>psg_frame_det_source_sink</depend>
+  <depend>spdlog_vendor</depend>
   <depend>pluginlib</depend>
 
 

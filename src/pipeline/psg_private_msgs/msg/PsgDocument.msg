@@ -1,7 +1,10 @@
-unique_identifier_msgs/UUID uuid
 unique_identifier_msgs/UUID x_uid
-unique_identifier_msgs/UUID poses_uuid
-unique_identifier_msgs/UUID trajectories_uuid
+redoxi_public_msgs/Control x_control
+
+unique_identifier_msgs/UUID uuid
+unique_identifier_msgs/UUID detections_uuid
+# unique_identifier_msgs/UUID poses_uuid
+# unique_identifier_msgs/UUID trajectories_uuid
 
 std_msgs/Header header
 Persons persons
@@ -9,4 +12,3 @@ redoxi_public_msgs/Detections detections
 PersonTrajectories trajectories
 TrajectoryEvents trajectory_events
 redoxi_public_msgs/Frame frame
-int64 signal_code
