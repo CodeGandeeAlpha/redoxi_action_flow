@@ -91,7 +91,7 @@ int main(int argc, char **argv)
         yolo_model.do_inference(inout_data);
 
         spdlog::info("Getting output detections");
-        auto detections = yolo_model.get_output_detections(inout_data, {.conf_threshold = 0.5});
+        auto detections = yolo_model.get_output_detections(inout_data, {.conf_threshold = 0.5, .iou_threshold = 0.5});
         spdlog::info("Output detections: {}", detections[0].objects.size());
 
         // print detections
@@ -103,11 +103,32 @@ int main(int argc, char **argv)
         // }
 
         // draw detections
+        auto keypoint_connections = yolo_model.get_keypoint_connections();
         cv::Mat vis_image = resized_image.clone();
         for (const auto &det : detections[0].objects) {
             cv::rectangle(vis_image,
                           cv::Rect(det.xywh[0], det.xywh[1], det.xywh[2], det.xywh[3]),
                           cv::Scalar(0, 0, 255), 2);
+            // Draw keypoints and connections
+            for (const auto &kp : det.keypoints) {
+                // Draw keypoint as a circle
+                cv::circle(vis_image,
+                           cv::Point(kp.xy[0], kp.xy[1]),
+                           3,
+                           cv::Scalar(0, 255, 0),
+                           -1);
+            }
+
+            // Draw connections between keypoints
+            for (const auto &conn : keypoint_connections) {
+                const auto &kp1 = det.keypoints[conn.first];
+                const auto &kp2 = det.keypoints[conn.second];
+                cv::line(vis_image,
+                         cv::Point(kp1.xy[0], kp1.xy[1]),
+                         cv::Point(kp2.xy[0], kp2.xy[1]),
+                         cv::Scalar(255, 0, 0),
+                         2);
+            }
         }
         cv::imwrite(fn_pose_output.string(), vis_image);
         // cv::imshow("Detections", vis_image);

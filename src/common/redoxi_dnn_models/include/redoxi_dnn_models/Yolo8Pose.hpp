@@ -56,6 +56,10 @@ class Yolo8Pose : public RedoxiModelInference
     virtual std::array<int64_t, 3> get_model_output_shape_nchw() const;
     virtual std::string get_model_output_dtype() const;
 
+    // get the keypoint connections
+    // output[i]=(u,v) means their is a connection between keypoint[u] and keypoint[v]
+    virtual std::vector<std::pair<int, int>> get_keypoint_connections() const;
+
   protected:
     struct Impl;
     std::shared_ptr<Impl> m_impl;

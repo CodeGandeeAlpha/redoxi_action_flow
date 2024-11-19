@@ -271,92 +271,6 @@ std::vector<Yolo8Pose::SingleImageOutput>
                               std::array<int64_t, 3>{tensor_shape[0], tensor_shape[1], tensor_shape[2]},
                               preprocess_info);
     return outputs;
-
-#ifndef USE_YOLOR8_POSTPROCESSOR
-    // get dimensions
-    int64_t batch_size = tensor_shape[0];
-    int64_t num_values = tensor_shape[1];
-    int64_t num_objects = tensor_shape[2];
-
-    // each object has 4 bbox values (x_center,y_center,width,height) + score + keypoints (x,y,score)
-    int64_t num_keypoints = (num_values - 5) / 3;
-
-    //! Process each image in batch
-    std::vector<SingleImageOutput> outputs(batch_size);
-    for (int64_t b = 0; b < batch_size; b++) {
-        auto &detections = outputs[b].objects;
-
-        cv::Mat _object_data(
-            num_values, num_objects, CV_32FC1,
-            const_cast<float *>(tensor_data + b * num_objects * num_values));
-
-        // each row is the inference result for one object
-        // format as (x_center,y_center,width,height,score,kp1_x,kp1_y,kp1_score,kp2_x,kp2_y,kp2_score,...)
-        cv::Mat object_data;
-        cv::transpose(_object_data, object_data);
-
-        //! Process each potential object
-        for (int64_t obj = 0; obj < num_objects; obj++) {
-            //! Get row data for this object
-            const float *obj_data = object_data.ptr<float>(obj);
-
-            //! Get confidence score
-            float score = obj_data[4];
-
-            //! Skip if below confidence threshold
-            if (score < confidence_thres) {
-                continue;
-            }
-
-            //! Extract bounding box
-            float x_center = obj_data[0];
-            float y_center = obj_data[1];
-            float width = obj_data[2];
-            float height = obj_data[3];
-
-            //! Create detection object
-            DetectedObject det;
-            det.xywh = {x_center - width / 2, y_center - height / 2, width, height};
-            det.score = score;
-            det.class_id = 0; // Only person class for pose model
-
-            //! Extract keypoints
-            det.keypoints.resize(num_keypoints);
-            for (int64_t k = 0; k < num_keypoints; k++) {
-                int64_t kp_offset = 5 + k * 3;
-                det.keypoints[k].xy = {obj_data[kp_offset], obj_data[kp_offset + 1]};
-                det.keypoints[k].score = obj_data[kp_offset + 2];
-            }
-
-            detections.push_back(std::move(det));
-        }
-
-        {
-            // transform all coordinates from model input space to source image space
-            auto &pinfo = preprocess_info[b];
-            auto dx_model = -pinfo.roi_in_model_input_image.x;
-            auto dy_model = -pinfo.roi_in_model_input_image.y;
-            auto scale_x = pinfo.roi_in_source_image.width / (float)pinfo.roi_in_model_input_image.width;
-            auto scale_y = pinfo.roi_in_source_image.height / (float)pinfo.roi_in_model_input_image.height;
-            auto dx_source = pinfo.roi_in_source_image.x;
-            auto dy_source = pinfo.roi_in_source_image.y;
-
-            for (auto &det : detections) {
-                det.xywh[0] = (det.xywh[0] + dx_model) * scale_x + dx_source;
-                det.xywh[1] = (det.xywh[1] + dy_model) * scale_y + dy_source;
-                det.xywh[2] *= scale_x;
-                det.xywh[3] *= scale_y;
-
-                // transform keypoints
-                for (auto &kp : det.keypoints) {
-                    kp.xy[0] = (kp.xy[0] + dx_model) * scale_x + dx_source;
-                    kp.xy[1] = (kp.xy[1] + dy_model) * scale_y + dy_source;
-                }
-            }
-        }
-    }
-    return outputs;
-#endif
 }
 
 std::array<int64_t, 4> Yolo8Pose::get_model_input_shape_nchw() const
@@ -383,6 +297,14 @@ std::array<int64_t, 3> Yolo8Pose::get_model_output_shape_nchw() const
 std::string Yolo8Pose::get_model_output_dtype() const
 {
     return m_model_output_info->get_dtype_str();
+}
+
+std::vector<std::pair<int, int>>
+    Yolo8Pose::get_keypoint_connections() const
+{
+    static const std::vector<std::pair<int, int>> connections = {
+        {15, 13}, {13, 11}, {16, 14}, {14, 12}, {11, 12}, {5, 11}, {6, 12}, {5, 6}, {5, 7}, {6, 8}, {7, 9}, {8, 10}, {1, 2}, {0, 1}, {0, 2}, {1, 3}, {2, 4}, {3, 5}, {4, 6}};
+    return connections;
 }
 
 } // namespace redoxi_works::inference

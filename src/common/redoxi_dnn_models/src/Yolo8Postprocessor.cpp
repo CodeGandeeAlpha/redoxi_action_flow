@@ -1,4 +1,5 @@
 #include <redoxi_dnn_models/Yolo8Postprocessor.hpp>
+#include <opencv2/dnn/dnn.hpp>
 
 namespace redoxi_works::inference::yolo8
 {
@@ -113,6 +114,39 @@ void Yolo8Postprocessor::postprocess(
         }
 
         detections.push_back(std::move(det));
+    }
+
+    {
+        auto nms_threshold = m_config->iou_threshold;
+        auto conf_threshold = m_config->conf_threshold;
+        if (conf_threshold < 0.0f) {
+            conf_threshold = 0.0f;
+        }
+
+        if (nms_threshold > 0.0f) {
+            //! Convert detections to format needed for NMS
+            std::vector<cv::Rect2d> boxes;
+            std::vector<float> scores;
+            std::vector<int> indices;
+            boxes.reserve(detections.size());
+            scores.reserve(detections.size());
+
+            for (const auto &det : detections) {
+                boxes.emplace_back(det.xywh[0], det.xywh[1], det.xywh[2], det.xywh[3]);
+                scores.push_back(det.score);
+            }
+
+            //! Apply NMS
+            cv::dnn::NMSBoxes(boxes, scores, conf_threshold, nms_threshold, indices);
+
+            //! Keep only detections that passed NMS
+            std::vector<DetectedObject> filtered_detections;
+            filtered_detections.reserve(indices.size());
+            for (int idx : indices) {
+                filtered_detections.push_back(std::move(detections[idx]));
+            }
+            detections = std::move(filtered_detections);
+        }
     }
 
     // transform all coordinates from model input space to source image space
