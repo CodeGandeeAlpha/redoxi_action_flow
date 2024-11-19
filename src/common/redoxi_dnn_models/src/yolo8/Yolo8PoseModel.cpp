@@ -2,11 +2,11 @@
 #include <typeinfo>
 #include <filesystem>
 
-#include <redoxi_dnn_models/Yolo8Pose.hpp>
+#include <redoxi_dnn_models/yolo8/Yolo8PoseModel.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <redoxi_common_cpp/image_proc/utils.hpp>
-#include <redoxi_dnn_models/Yolo8Preprocessor.hpp>
-#include <redoxi_dnn_models/Yolo8Postprocessor.hpp>
+#include <redoxi_dnn_models/yolo8/Yolo8Preprocessor.hpp>
+#include <redoxi_dnn_models/yolo8/Yolo8Postprocessor.hpp>
 
 #define ENABLE_DEBUG_OUTPUT
 #ifdef ENABLE_DEBUG_OUTPUT
@@ -15,11 +15,11 @@
 
 #define USE_YOLOR8_POSTPROCESSOR
 
-namespace fs = std::filesystem;
-namespace redoxi_works::inference
+// namespace fs = std::filesystem;
+namespace redoxi_works::inference::yolo8
 {
 
-struct Yolo8Pose::Impl {
+struct Yolo8PoseModel::Impl {
     Impl()
         : loader("redoxi_inference", "redoxi_works::inference::RedoxiModelInference")
     {
@@ -31,17 +31,17 @@ struct Yolo8Pose::Impl {
     inline static const std::string PreprocessInfoKey = "preprocess_info";
 };
 
-Yolo8Pose::Yolo8Pose()
+Yolo8PoseModel::Yolo8PoseModel()
     : m_impl(std::make_shared<Impl>())
 {
 }
 
-KeyValueStore::Ptr Yolo8Pose::create_init_params()
+KeyValueStore::Ptr Yolo8PoseModel::create_init_params()
 {
     return std::make_shared<InitConfig_t>();
 }
 
-InferenceInOutData::Ptr Yolo8Pose::create_inference_inout_data()
+InferenceInOutData::Ptr Yolo8PoseModel::create_inference_inout_data()
 {
     if (m_model) {
         return m_model->create_inference_inout_data();
@@ -49,7 +49,7 @@ InferenceInOutData::Ptr Yolo8Pose::create_inference_inout_data()
     return nullptr;
 }
 
-ModelPortInfo::ConstPtrMap Yolo8Pose::get_input_port_infos() const
+ModelPortInfo::ConstPtrMap Yolo8PoseModel::get_input_port_infos() const
 {
     if (m_model) {
         return m_model->get_input_port_infos();
@@ -57,7 +57,7 @@ ModelPortInfo::ConstPtrMap Yolo8Pose::get_input_port_infos() const
     return {};
 }
 
-ModelPortInfo::ConstPtrMap Yolo8Pose::get_output_port_infos() const
+ModelPortInfo::ConstPtrMap Yolo8PoseModel::get_output_port_infos() const
 {
     if (m_model) {
         return m_model->get_output_port_infos();
@@ -65,12 +65,12 @@ ModelPortInfo::ConstPtrMap Yolo8Pose::get_output_port_infos() const
     return {};
 }
 
-int Yolo8Pose::open(KeyValueStore::Ptr params)
+int Yolo8PoseModel::open(KeyValueStore::Ptr params)
 {
     // Open the model with provided parameters
     auto _params = std::dynamic_pointer_cast<InitConfig_t>(params);
     if (!_params) {
-        RDX_RAISE_ERROR("Invalid parameters, expected Yolo8PoseConfig, got {}",
+        RDX_RAISE_ERROR("Invalid parameters, expected Yolo8PoseModelConfig, got {}",
                         typeid(params.get()).name());
     }
 
@@ -144,31 +144,31 @@ int Yolo8Pose::open(KeyValueStore::Ptr params)
     return 0;
 }
 
-bool Yolo8Pose::is_open() const
+bool Yolo8PoseModel::is_open() const
 {
     if (!m_model)
         return false;
     return m_model->is_open();
 }
 
-int Yolo8Pose::close()
+int Yolo8PoseModel::close()
 {
     if (!m_model)
         return 0;
     return m_model->close();
 }
 
-KeyValueStore::ConstPtr Yolo8Pose::get_model_metadata() const
+KeyValueStore::ConstPtr Yolo8PoseModel::get_model_metadata() const
 {
     return m_init_params;
 }
 
-KeyValueStore::ConstPtr Yolo8Pose::get_inference_metadata() const
+KeyValueStore::ConstPtr Yolo8PoseModel::get_inference_metadata() const
 {
     return m_init_params;
 }
 
-int Yolo8Pose::do_inference(InferenceInOutData::Ptr inout_data)
+int Yolo8PoseModel::do_inference(InferenceInOutData::Ptr inout_data)
 {
     // just dispatch to the inner model
     if (!m_model)
@@ -176,9 +176,9 @@ int Yolo8Pose::do_inference(InferenceInOutData::Ptr inout_data)
     return m_model->do_inference(inout_data);
 }
 
-int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
-                                const std::vector<cv::Mat> &images,
-                                const std::string &image_format)
+int Yolo8PoseModel::set_input_images(InferenceInOutData::Ptr model_inout_data,
+                                     const std::vector<cv::Mat> &images,
+                                     const std::string &image_format)
 {
     // all images should be of the same size and same number of channels
     // for (const auto &image : images) {
@@ -230,8 +230,8 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
     return 0;
 }
 
-std::vector<Yolo8Pose::SingleImageOutput>
-    Yolo8Pose::get_output_detections(
+std::vector<Yolo8PoseModel::SingleImageOutput>
+    Yolo8PoseModel::get_output_detections(
         InferenceInOutData::Ptr model_inout_data,
         const OutputConfig_t &config) const
 {
@@ -263,7 +263,7 @@ std::vector<Yolo8Pose::SingleImageOutput>
     }
     auto preprocess_info = std::any_cast<yolo8::ImagePreprocessInfo::List>(*any_data);
 
-    yolo8::Yolo8Postprocessor postprocessor;
+    yolo8::PoseModelPostprocessor postprocessor;
     postprocessor.init(config);
 
     yolo8::SingleImageOutput::List outputs;
@@ -273,7 +273,7 @@ std::vector<Yolo8Pose::SingleImageOutput>
     return outputs;
 }
 
-std::array<int64_t, 4> Yolo8Pose::get_model_input_shape_nchw() const
+std::array<int64_t, 4> Yolo8PoseModel::get_model_input_shape_nchw() const
 {
     std::array<int64_t, 4> shape{0, 0, 0, 0};
     auto shape_vec = m_model_input_info->get_shape();
@@ -281,12 +281,12 @@ std::array<int64_t, 4> Yolo8Pose::get_model_input_shape_nchw() const
     return shape;
 }
 
-std::string Yolo8Pose::get_model_input_dtype() const
+std::string Yolo8PoseModel::get_model_input_dtype() const
 {
     return m_model_input_info->get_dtype_str();
 }
 
-std::array<int64_t, 3> Yolo8Pose::get_model_output_shape_nchw() const
+std::array<int64_t, 3> Yolo8PoseModel::get_model_output_shape_nchw() const
 {
     std::array<int64_t, 3> shape{0, 0, 0};
     auto shape_vec = m_model_output_info->get_shape();
@@ -294,17 +294,17 @@ std::array<int64_t, 3> Yolo8Pose::get_model_output_shape_nchw() const
     return shape;
 }
 
-std::string Yolo8Pose::get_model_output_dtype() const
+std::string Yolo8PoseModel::get_model_output_dtype() const
 {
     return m_model_output_info->get_dtype_str();
 }
 
 std::vector<std::pair<int, int>>
-    Yolo8Pose::get_keypoint_connections() const
+    Yolo8PoseModel::get_keypoint_connections() const
 {
     static const std::vector<std::pair<int, int>> connections = {
         {15, 13}, {13, 11}, {16, 14}, {14, 12}, {11, 12}, {5, 11}, {6, 12}, {5, 6}, {5, 7}, {6, 8}, {7, 9}, {8, 10}, {1, 2}, {0, 1}, {0, 2}, {1, 3}, {2, 4}, {3, 5}, {4, 6}};
     return connections;
 }
 
-} // namespace redoxi_works::inference
+} // namespace redoxi_works::inference::yolo8

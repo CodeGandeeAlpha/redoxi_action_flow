@@ -1,4 +1,4 @@
-#include <redoxi_dnn_models/Yolo8Pose.hpp>
+#include <redoxi_dnn_models/yolo8/Yolo8PoseModel.hpp>
 #include <redoxi_common_cpp/image_proc/utils.hpp>
 // #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <opencv2/opencv.hpp>
@@ -49,7 +49,7 @@ int main(int argc, char **argv)
         fs::create_directories(TEST_OUTPUT_DIR);
     }
 
-    rdx_inf::Yolo8Pose yolo_model;
+    rdx_inf::yolo8::Yolo8PoseModel yolo_model;
 
     // load model
     {

@@ -3,13 +3,13 @@
 #include <redoxi_dnn_models/redoxi_dnn_models.hpp>
 #include <redoxi_inference/default_impl.hpp>
 
-namespace redoxi_works::inference
+namespace redoxi_works::inference::yolo8
 {
 
-class Yolo8PoseConfig : public defaults::DefaultKeyValueStore
+class Yolo8ModelConfig : public defaults::DefaultKeyValueStore
 {
   public:
-    Yolo8PoseConfig()
+    Yolo8ModelConfig()
     {
         namespace cmkeys = common_config_keys;
         register_key(KeyInfo{cmkeys::ModelPath,
@@ -29,4 +29,4 @@ class Yolo8PoseConfig : public defaults::DefaultKeyValueStore
     int64_t m_device_index = 0;
 };
 
-} // namespace redoxi_works::inference
+} // namespace redoxi_works::inference::yolo8

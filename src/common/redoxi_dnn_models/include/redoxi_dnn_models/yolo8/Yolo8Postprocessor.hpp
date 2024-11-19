@@ -1,13 +1,14 @@
 #pragma once
 
 #include <redoxi_dnn_models/redoxi_dnn_models.hpp>
-#include <redoxi_dnn_models/Yolo8Preprocessor.hpp>
+#include <redoxi_dnn_models/yolo8/Yolo8ModelTypes.hpp>
+#include <redoxi_dnn_models/yolo8/Yolo8Preprocessor.hpp>
 #include <array>
 
 namespace redoxi_works::inference::yolo8
 {
 
-class Yolo8PostprocessorConfig
+class PostprocessorConfig
 {
   public:
     // negative value to mean no threshold
@@ -35,13 +36,13 @@ struct SingleImageOutput {
     std::vector<DetectedObject> objects;
 };
 
-class Yolo8Postprocessor
+class PoseModelPostprocessor
 {
   public:
     inline static constexpr int HumanClassId = 0;
 
-    virtual ~Yolo8Postprocessor() = default;
-    virtual void init(const Yolo8PostprocessorConfig &config);
+    virtual ~PoseModelPostprocessor() = default;
+    virtual void init(const PostprocessorConfig &config);
 
     // batch version of the postprocess function
     virtual void postprocess(
@@ -62,7 +63,7 @@ class Yolo8Postprocessor
         const ImagePreprocessInfo &preprocess_info) const;
 
   protected:
-    std::shared_ptr<Yolo8PostprocessorConfig> m_config;
+    std::shared_ptr<PostprocessorConfig> m_config;
 };
 
 } // namespace redoxi_works::inference::yolo8

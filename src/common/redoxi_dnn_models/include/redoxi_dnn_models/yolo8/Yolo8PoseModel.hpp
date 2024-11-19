@@ -1,27 +1,27 @@
 #pragma once
 
 #include <redoxi_dnn_models/redoxi_dnn_models.hpp>
-#include <redoxi_dnn_models/Yolo8Postprocessor.hpp>
-#include <redoxi_dnn_models/Yolo8PoseTypes.hpp>
+#include <redoxi_dnn_models/yolo8/Yolo8Postprocessor.hpp>
+#include <redoxi_dnn_models/yolo8/Yolo8ModelTypes.hpp>
 #include <redoxi_inference/redoxi_inference.hpp>
 #include <opencv2/opencv.hpp>
 #include <array>
 
-namespace redoxi_works::inference
+namespace redoxi_works::inference::yolo8
 {
 
-class Yolo8Pose : public RedoxiModelInference
+class Yolo8PoseModel : public RedoxiModelInference
 {
   public:
     // output types
-    using Keypoint = yolo8::Keypoint;
-    using DetectedObject = yolo8::DetectedObject;
-    using SingleImageOutput = yolo8::SingleImageOutput;
-    using InitConfig_t = Yolo8PoseConfig;
-    using OutputConfig_t = yolo8::Yolo8PostprocessorConfig;
+    using Keypoint = Keypoint;
+    using DetectedObject = DetectedObject;
+    using SingleImageOutput = SingleImageOutput;
+    using InitConfig_t = Yolo8ModelConfig;
+    using OutputConfig_t = PostprocessorConfig;
 
   public:
-    Yolo8Pose();
+    Yolo8PoseModel();
     // from RedoxiModelInference
     virtual KeyValueStore::Ptr create_init_params() override;
     virtual InferenceInOutData::Ptr create_inference_inout_data() override;
@@ -73,4 +73,4 @@ class Yolo8Pose : public RedoxiModelInference
 
     std::shared_ptr<InitConfig_t> m_init_params;
 };
-} // namespace redoxi_works::inference
+} // namespace redoxi_works::inference::yolo8
