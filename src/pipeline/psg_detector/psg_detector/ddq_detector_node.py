@@ -833,7 +833,7 @@ async def ros_loop(node):
 async def init(ddq_detector_node):
     # init config
     init_config = DetectorNode.InitConfig(
-        process_frame_action="/detector_node/model_process_frame_action",
+        process_frame_action="model_process_frame_action",
         main_group_name="body",
     )
     init_config.merge_worker_num = 1

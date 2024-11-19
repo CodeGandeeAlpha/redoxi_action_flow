@@ -533,7 +533,12 @@ int PSGDetectorNode::_on_deliver_to_downstream_finish(TargetDataModel_t &target_
 
     // 4. 创建task 在tbb run中将结果写入promise
     auto promise = output_model_result.promise;
-    m_impl->m_model_result_task_group.run([&ds, &result, promise]() {
+    //! 通过值捕获需要的数据
+    auto ds_copy = ds;
+    auto result_copy = result;
+    m_impl->m_model_result_task_group.run([ds = std::move(ds_copy),
+                                           result = std::move(result_copy),
+                                           promise]() {
         auto goal_handle = result.goal_handle_future.get();
         if (goal_handle) {
             auto action_result = ds.get_action_client()->async_get_result(goal_handle).get().result;
@@ -549,6 +554,75 @@ int PSGDetectorNode::_on_deliver_to_downstream_finish(TargetDataModel_t &target_
 
     return 0;
 }
+
+//! 将document中的raw image转换为带有检测框的debug image
+sensor_msgs::msg::Image PSGDetectorNode::_create_debug_image(const psg_private_msgs::msg::PsgDocument &document)
+{
+    //! 转换raw image到cv::Mat
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换raw image到cv::Mat", 0);
+    cv::Mat cv_image;
+    try {
+        cv_image = cv_bridge::toCvCopy(document.frame.raw_image, sensor_msgs::image_encodings::BGR8)->image;
+        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "成功转换raw image, 大小: {}x{}", cv_image.cols, cv_image.rows);
+    } catch (const cv_bridge::Exception &e) {
+        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID_IN_LOG, "cv_bridge转换失败: {}", e.what());
+        return sensor_msgs::msg::Image(); // 返回空图像
+    }
+
+    //! 为不同类别设置不同颜色
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "设置类别颜色映射", 0);
+    std::map<int, cv::Scalar> class_colors = {
+        {0, cv::Scalar(0, 255, 0)}, // 人-绿色
+        {1, cv::Scalar(0, 0, 255)}, // 头-红色
+        {2, cv::Scalar(255, 0, 0)}, // 脸-蓝色
+    };
+
+    //! 在图像上画bbox
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始在图像上绘制检测框, 共{}个检测结果", document.detections.detections.size());
+    for (const auto &detection : document.detections.detections) {
+        //! 获取bbox坐标
+        int x = static_cast<int>(detection.bbox.x);
+        int y = static_cast<int>(detection.bbox.y);
+        int width = static_cast<int>(detection.bbox.width);
+        int height = static_cast<int>(detection.bbox.height);
+
+        //! 获取类别对应的颜色
+        cv::Scalar color = class_colors[detection.category];
+
+        //! 画框
+        cv::rectangle(cv_image,
+                      cv::Point(x, y),
+                      cv::Point(x + width, y + height),
+                      color, 2);
+
+        //! 添加类别标签
+        std::string label = std::to_string(detection.category) + " " +
+                            std::to_string(detection.confidence).substr(0, 4);
+        cv::putText(cv_image, label,
+                    cv::Point(x, y - 10),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.5,
+                    color, 2);
+
+        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                      "绘制检测框 - 类别:{}, 置信度:{:.2f}, 位置:[{}, {}, {}, {}]",
+                      detection.category, detection.confidence, x, y, width, height);
+    }
+
+    //! 转回sensor_msgs/Image
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换回sensor_msgs/Image", 0);
+    sensor_msgs::msg::Image debug_image;
+    debug_image.header = document.frame.raw_image.header;
+    debug_image.height = cv_image.rows;
+    debug_image.width = cv_image.cols;
+    debug_image.encoding = "bgr8";
+    debug_image.is_bigendian = false;
+    debug_image.step = cv_image.cols * 3;
+    debug_image.data.assign(cv_image.data, cv_image.data + cv_image.total() * cv_image.elemSize());
+
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "完成debug图像创建, 大小: {}x{}", debug_image.width, debug_image.height);
+    return debug_image;
+}
+
 void PSGDetectorNode::_get_model_result()
 {
     // 1. 从buffer中取出model result, 如果buffer为空，则等待
@@ -605,6 +679,19 @@ void PSGDetectorNode::_get_model_result()
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
                          "[msg_uuid={}] success to push request",
                          boost::uuids::to_string(msg_uuid));
+
+            std::string det_str;
+            for (const auto &det : result->detections.detections) {
+                det_str += fmt::format("bbox: [{}, {}, {}, {}] ",
+                                       det.bbox.x, det.bbox.y, det.bbox.width, det.bbox.height);
+            }
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] got detection result: {}",
+                         boost::uuids::to_string(output_model_result.source_data->get_uuid()), det_str);
+
+            if (m_init_config->create_debug_pub) {
+                auto debug_image = _create_debug_image(document);
+                m_pub_model_enqueue.publish(debug_image, "");
+            }
         } else {
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
                          "[msg_uuid={}] failed to push request",

@@ -192,6 +192,9 @@ class PSGDetectorNode : public rclcpp::Node,
     //! get model result
     virtual void _get_model_result();
 
+    //! create debug image
+    virtual sensor_msgs::msg::Image _create_debug_image(const psg_private_msgs::msg::PsgDocument &document);
+
   protected: // output port callback
     //! callback when a delivery task is started, about to send to any downstream
     virtual int _on_delivery_task_begin(TargetDataPipeline_t &target_data,

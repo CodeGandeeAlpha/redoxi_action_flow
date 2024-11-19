@@ -46,7 +46,8 @@ source_node_json_params = {
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
-        "step_interval": 1000,
+        # "step_interval": 1000,
+        "step_interval": 10000000,
         "frame_interval": 0,
         "output_image_size": {"width": 640, "height": 480},
         "output_image_encoding": "bgr8",
@@ -59,8 +60,8 @@ source_node_json_params = {
             },
             # "precondition": "any_downstream_ready",
             "precondition": "dont_care",
-            "drop_strategy": "dont_care",
-            # "drop_strategy": "no_drop",
+            # "drop_strategy": "dont_care",
+            "drop_strategy": "no_drop",
         },
         "frame_enqueue_policy": {
             "retry_policy": {
@@ -106,10 +107,6 @@ psg_master_node_json_params = {
             "precondition": "any_downstream_ready",
             "drop_strategy": "no_drop",
         },
-        "frame_enqueue_policy": {
-            "precondition": "any_downstream_ready",
-            "drop_strategy": "no_drop",
-        },
     },
 }
 
@@ -131,12 +128,12 @@ psg_detector_node_pipeline_json_params = {
         "output_port_model_config": {
             "downstream_specs": [
                 {
-                    "name": "detector_node",
-                    "action_name": "/detector_node/model_process_frame_action",
+                    "name": "psg_detector",
+                    "action_name": "/psg_detector/model_process_frame_action",
                 }
             ],
         },
-        "create_debug_pub": False,
+        "create_debug_pub": True,
         "_time_unit": "us(1e-6)",
         "enable_blocking_mode": False,
     },
@@ -146,10 +143,6 @@ psg_detector_node_pipeline_json_params = {
         "frame_interval": 0,
         "publish_to_debug_topic": False,
         "frame_request_policy": {
-            "precondition": "any_downstream_ready",
-            "drop_strategy": "no_drop",
-        },
-        "frame_enqueue_policy": {
             "precondition": "any_downstream_ready",
             "drop_strategy": "no_drop",
         },
@@ -228,7 +221,7 @@ psg_detector_node = Node(
 psg_detector_node_model = Node(
     package="psg_detector",
     executable="ddq_detector_node.py",
-    name="detector_node",
+    name="psg_detector",
     namespace="psg_detector",
     prefix=common_prefix,
 )
