@@ -34,10 +34,24 @@ class Yolo8PreprocessorConfig
 class Yolo8Preprocessor
 {
   public:
-    virtual ~Yolo8Preprocessor() = default;
+    // the model always expect 3 channels
+    inline constexpr static int64_t ModelInputNumChannels = 3;
 
+    // the model always expect the input image format to be "rgb"
+    inline constexpr static const char *ModelInputImageFormat = "rgb";
+
+    virtual ~Yolo8Preprocessor() = default;
     virtual void init(const Yolo8PreprocessorConfig &config);
 
+    // batch version of the preprocess function
+    // images should have the same format, size, and number of channels
+    virtual void preprocess(
+        float *output_tensor_nchw,
+        ImagePreprocessInfo::List *output_preprocess_info,
+        const std::vector<cv::Mat> &input_images,
+        const std::string &image_format) const;
+
+  protected:
     // preprocess the input image to the model input image
     // the output_tensor_chw is a pointer to the tensor data, which has the shape of [num_channels, height, width]
     // where the size is the model input image size
@@ -47,23 +61,6 @@ class Yolo8Preprocessor
         ImagePreprocessInfo *output_preprocess_info,
         const cv::Mat &input_image,
         const std::string &image_format) const;
-
-    // batch version of the preprocess function
-    virtual void preprocess(
-        float *output_tensor_nchw,
-        ImagePreprocessInfo *output_preprocess_info,
-        const std::vector<cv::Mat> &input_images,
-        const std::string &image_format) const;
-
-    // preprocess the input image to the model input image
-    // the output_tensor_chw is a pointer to the tensor data, which has the shape of [num_channels, height, width]
-    // where the size is the model input image size
-    // image format can be "rgb" or "bgr" or "gray"
-    // void preprocess(
-    //     uint8_t *output_tensor_chw,
-    //     ImagePreprocessInfo *output_preprocess_info,
-    //     const cv::Mat &input_image,
-    //     const std::string &image_format) const;
 
   protected:
     Yolo8PreprocessorConfig m_config;

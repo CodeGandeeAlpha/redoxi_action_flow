@@ -91,7 +91,7 @@ int main(int argc, char **argv)
         yolo_model.do_inference(inout_data);
 
         spdlog::info("Getting output detections");
-        auto detections = yolo_model.get_output_detections(inout_data);
+        auto detections = yolo_model.get_output_detections(inout_data, {.conf_threshold = 0.5});
         spdlog::info("Output detections: {}", detections[0].objects.size());
 
         // print detections

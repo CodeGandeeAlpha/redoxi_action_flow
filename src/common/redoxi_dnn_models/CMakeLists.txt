@@ -14,7 +14,12 @@ find_package(redoxi_inference REQUIRED)
 # uncomment the following section in order to fill in further dependencies
 # manually. find_package(<dependency> REQUIRED)
 
-add_library(redoxi_dnn_models src/redoxi_dnn_models.cpp src/Yolo8Pose.cpp src/Yolo8Preprocessor.cpp)
+add_library(redoxi_dnn_models
+  src/redoxi_dnn_models.cpp
+  src/Yolo8Pose.cpp
+  src/Yolo8Preprocessor.cpp
+  src/Yolo8Postprocessor.cpp)
+  
 add_library(redoxi_dnn_models::redoxi_dnn_models ALIAS redoxi_dnn_models)
 target_compile_features(
   redoxi_dnn_models PUBLIC c_std_99 cxx_std_17) # Require C99 and C++17

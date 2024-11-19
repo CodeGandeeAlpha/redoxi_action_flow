@@ -5,15 +5,15 @@
 #include <redoxi_dnn_models/Yolo8Pose.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <redoxi_common_cpp/image_proc/utils.hpp>
-
 #include <redoxi_dnn_models/Yolo8Preprocessor.hpp>
-
+#include <redoxi_dnn_models/Yolo8Postprocessor.hpp>
 
 #define ENABLE_DEBUG_OUTPUT
-
 #ifdef ENABLE_DEBUG_OUTPUT
 #    include <xtensor/xnpy.hpp>
 #endif
+
+#define USE_YOLOR8_POSTPROCESSOR
 
 namespace fs = std::filesystem;
 namespace redoxi_works::inference
@@ -181,20 +181,20 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
                                 const std::string &image_format)
 {
     // all images should be of the same size and same number of channels
-    for (const auto &image : images) {
-        if (image.empty()) {
-            // all images must be non-empty
-            return -1;
-        }
-        if (image.size() != images[0].size()) {
-            // all images must be of the same size
-            return -1;
-        }
-        if (image.channels() != images[0].channels()) {
-            // all images must have the same number of channels
-            return -1;
-        }
-    }
+    // for (const auto &image : images) {
+    //     if (image.empty()) {
+    //         // all images must be non-empty
+    //         return -1;
+    //     }
+    //     if (image.size() != images[0].size()) {
+    //         // all images must be of the same size
+    //         return -1;
+    //     }
+    //     if (image.channels() != images[0].channels()) {
+    //         // all images must have the same number of channels
+    //         return -1;
+    //     }
+    // }
 
     yolo8::Yolo8Preprocessor preprocessor;
     yolo8::Yolo8PreprocessorConfig config;
@@ -202,7 +202,7 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
     config.model_input_image_size = cv::Size(expected_width, expected_height);
     preprocessor.init(config);
 
-    // check batch size
+    // the model allows for dynamic batch size? if not, check batch size
     if (expected_batch_size > 0 && (int64_t)images.size() != expected_batch_size) {
         RDX_RAISE_ERROR("Expecting {} images, got {}", expected_batch_size, images.size());
     }
@@ -216,16 +216,14 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
 
     // for each image, do preprocess
     std::vector<float> tensor_data(batch_size * expected_num_channels * expected_height * expected_width, 0.0f);
-    std::vector<yolo8::ImagePreprocessInfo> preprocess_info(batch_size);
-    for (int64_t i = 0; i < batch_size; ++i) {
-        preprocessor.preprocess(tensor_data.data() + i * expected_num_channels * expected_height * expected_width,
-                                &preprocess_info[i], images[i], image_format);
-    }
+    yolo8::ImagePreprocessInfo::List preprocess_info(batch_size);
+    preprocessor.preprocess(tensor_data.data(), &preprocess_info, images, image_format);
 
     // copy the tensor to the model input
     auto port_data = model_inout_data->get_input_port_data(m_model_input_info->get_name());
     port_data->set_tensor_data(tensor_data.data(), {batch_size, expected_num_channels, expected_height, expected_width});
 
+    // attach the preprocess info to the model input
     auto any_data = std::make_shared<std::any>(preprocess_info);
     model_inout_data->set_any_data(Impl::PreprocessInfoKey, any_data);
 
@@ -235,7 +233,7 @@ int Yolo8Pose::set_input_images(InferenceInOutData::Ptr model_inout_data,
 std::vector<Yolo8Pose::SingleImageOutput>
     Yolo8Pose::get_output_detections(
         InferenceInOutData::Ptr model_inout_data,
-        double confidence_thres) const
+        const OutputConfig_t &config) const
 {
     // get the output port data
     auto output_port_name = m_model_output_info->get_name();
@@ -258,6 +256,23 @@ std::vector<Yolo8Pose::SingleImageOutput>
     }
     RDX_INFO_DEV(nullptr, __func__, "Output tensor shape: ({},{},{})", tensor_shape[0], tensor_shape[1], tensor_shape[2]);
 
+    // get preprocess info
+    auto any_data = model_inout_data->get_any_data(Impl::PreprocessInfoKey);
+    if (!any_data) {
+        RDX_RAISE_ERROR("Preprocess info not found");
+    }
+    auto preprocess_info = std::any_cast<yolo8::ImagePreprocessInfo::List>(*any_data);
+
+    yolo8::Yolo8Postprocessor postprocessor;
+    postprocessor.init(config);
+
+    yolo8::SingleImageOutput::List outputs;
+    postprocessor.postprocess(&outputs, tensor_data,
+                              std::array<int64_t, 3>{tensor_shape[0], tensor_shape[1], tensor_shape[2]},
+                              preprocess_info);
+    return outputs;
+
+#ifndef USE_YOLOR8_POSTPROCESSOR
     // get dimensions
     int64_t batch_size = tensor_shape[0];
     int64_t num_values = tensor_shape[1];
@@ -265,13 +280,6 @@ std::vector<Yolo8Pose::SingleImageOutput>
 
     // each object has 4 bbox values (x_center,y_center,width,height) + score + keypoints (x,y,score)
     int64_t num_keypoints = (num_values - 5) / 3;
-
-    // get preprocess info
-    auto any_data = model_inout_data->get_any_data(Impl::PreprocessInfoKey);
-    if (!any_data) {
-        RDX_RAISE_ERROR("Preprocess info not found");
-    }
-    auto preprocess_info = std::any_cast<yolo8::ImagePreprocessInfo::List>(*any_data);
 
     //! Process each image in batch
     std::vector<SingleImageOutput> outputs(batch_size);
@@ -347,8 +355,8 @@ std::vector<Yolo8Pose::SingleImageOutput>
             }
         }
     }
-
     return outputs;
+#endif
 }
 
 std::array<int64_t, 4> Yolo8Pose::get_model_input_shape_nchw() const

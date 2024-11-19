@@ -1,6 +1,7 @@
 #pragma once
 
 #include <redoxi_dnn_models/redoxi_dnn_models.hpp>
+#include <redoxi_dnn_models/Yolo8Postprocessor.hpp>
 #include <redoxi_dnn_models/Yolo8PoseTypes.hpp>
 #include <redoxi_inference/redoxi_inference.hpp>
 #include <opencv2/opencv.hpp>
@@ -12,26 +13,12 @@ namespace redoxi_works::inference
 class Yolo8Pose : public RedoxiModelInference
 {
   public:
-    // keypoint in the image
-    struct Keypoint {
-        std::array<float, 2> xy = {0, 0};
-        float score = 0;
-    };
-
-    // detected object in the image
-    struct DetectedObject {
-        int64_t class_id = 0;
-        std::array<float, 4> xywh = {0, 0, 0, 0};
-        float score = 0;
-        std::vector<Keypoint> keypoints;
-    };
-
-    // output of the model for a single image
-    struct SingleImageOutput {
-        std::vector<DetectedObject> objects;
-    };
-
+    // output types
+    using Keypoint = yolo8::Keypoint;
+    using DetectedObject = yolo8::DetectedObject;
+    using SingleImageOutput = yolo8::SingleImageOutput;
     using InitConfig_t = Yolo8PoseConfig;
+    using OutputConfig_t = yolo8::Yolo8PostprocessorConfig;
 
   public:
     Yolo8Pose();
@@ -52,22 +39,22 @@ class Yolo8Pose : public RedoxiModelInference
 
     // process the images, and set the data to the model input
     // image format can be "rgb" or "bgr" or "gray", all images must be of the same format
-    int set_input_images(InferenceInOutData::Ptr model_inout_data,
-                         const std::vector<cv::Mat> &images,
-                         const std::string &image_format);
+    virtual int set_input_images(InferenceInOutData::Ptr model_inout_data,
+                                 const std::vector<cv::Mat> &images,
+                                 const std::string &image_format);
 
     // postprocess the model output, and get the detections
-    std::vector<SingleImageOutput> get_output_detections(
+    virtual std::vector<SingleImageOutput> get_output_detections(
         InferenceInOutData::Ptr model_inout_data,
-        double confidence_thres = 0.5) const;
+        const OutputConfig_t &config) const;
 
     // get the shape of the model input in NCHW format
-    std::array<int64_t, 4> get_model_input_shape_nchw() const;
-    std::string get_model_input_dtype() const;
+    virtual std::array<int64_t, 4> get_model_input_shape_nchw() const;
+    virtual std::string get_model_input_dtype() const;
 
     // get the shape of the model output in NCHW format
-    std::array<int64_t, 3> get_model_output_shape_nchw() const;
-    std::string get_model_output_dtype() const;
+    virtual std::array<int64_t, 3> get_model_output_shape_nchw() const;
+    virtual std::string get_model_output_dtype() const;
 
   protected:
     struct Impl;
