@@ -38,7 +38,8 @@ PackagesToBuild="redoxi_common_nodes \
                  psg_document_sink \
                  psg_detector \
                  psg_common \
-                 psg_frame_det_source_sink"
+                 psg_frame_det_source_sink \
+                 psg_person_generator"
 # PackagesToBuild="redoxi_common_nodes \
 #                  redoxi_shared_memory \
 #                  redoxi_shm_v6d \
