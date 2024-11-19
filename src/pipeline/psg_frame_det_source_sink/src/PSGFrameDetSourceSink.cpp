@@ -453,7 +453,9 @@ int PSGFrameDetSourceSink::_on_deliver_to_downstream_finish(TargetData_t &target
             //! 将action result写入promise
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "Writing action result to promise");
             auto output_model_result = std::make_shared<PSGFrameDetSourceSink::OutputResult_t>();
-            output_model_result->detections = action_result->detections;
+            output_model_result->body_detections = action_result->body_detections;
+            output_model_result->head_detections = action_result->head_detections;
+            output_model_result->face_detections = action_result->face_detections;
             output_model_result->x_return = action_result->x_return;
             promise->set_value(output_model_result);
         } else {
@@ -487,8 +489,16 @@ void PSGFrameDetSourceSink::_get_model_result()
         //! 构造string消息
         std_msgs::msg::String msg;
         std::string det_str;
-        for (const auto &det : result->detections.detections) {
-            det_str += fmt::format("bbox: [{}, {}, {}, {}] ",
+        for (const auto &det : result->body_detections.detections) {
+            det_str += fmt::format("body bbox: [{}, {}, {}, {}] ",
+                                   det.bbox.x, det.bbox.y, det.bbox.width, det.bbox.height);
+        }
+        for (const auto &det : result->head_detections.detections) {
+            det_str += fmt::format("head bbox: [{}, {}, {}, {}] ",
+                                   det.bbox.x, det.bbox.y, det.bbox.width, det.bbox.height);
+        }
+        for (const auto &det : result->face_detections.detections) {
+            det_str += fmt::format("face bbox: [{}, {}, {}, {}] ",
                                    det.bbox.x, det.bbox.y, det.bbox.width, det.bbox.height);
         }
         msg.data = det_str;

@@ -100,20 +100,20 @@ void convert_person_to_msg(const PassengerFlow::PersonPtr &person, const redoxi_
 
     auto person_pose = person->get_keypoints();
     if (person_pose.size() > 0) {
-        redoxi_public_msgs::msg::BodyPose msg_pose;
+        redoxi_public_msgs::msg::Keypoints msg_body_pose;
         for (auto &kp : person_pose) {
             auto kp_type = kp.first;
-            msg_pose.semantic_type.push_back(kp_type);
-            msg_pose.confidence.push_back(kp.second.m_confidence);
+            msg_body_pose.semantic_type.push_back(kp_type);
+            msg_body_pose.confidence.push_back(kp.second.m_confidence);
             // msg_pose.x.push_back(kp.second.m_point.x);
             // msg_pose.y.push_back(kp.second.m_point.y);
             geometry_msgs::msg::Point pt;
             pt.x = kp.second.m_point.x;
             pt.y = kp.second.m_point.y;
             pt.z = 0;
-            msg_pose.keypoints_2.push_back(pt);
+            msg_body_pose.keypoints_2.push_back(pt);
         }
-        msg.pose = msg_pose;
+        msg.body_pose = msg_body_pose;
     }
 
     msg.track_id = person->get_person_id();
@@ -161,13 +161,13 @@ void convert_msg_to_person(const psg_private_msgs::msg::Person &msg, PassengerFl
         person->set_face(one_det);
     }
 
-    if (msg.pose.keypoints_2.size() > 0) {
+    if (msg.body_pose.keypoints_2.size() > 0) {
         std::map<PassengerFlow::KeyPointSemanticType, PassengerFlow::Keypoint> pose;
-        for (int i = 0; i < msg.pose.confidence.size(); i++) {
-            PassengerFlow::KeyPointSemanticType pt_type = msg.pose.semantic_type[i];
+        for (int i = 0; i < msg.body_pose.confidence.size(); i++) {
+            PassengerFlow::KeyPointSemanticType pt_type = msg.body_pose.semantic_type[i];
             PassengerFlow::Keypoint kpt;
-            kpt.m_confidence = msg.pose.confidence[i];
-            auto &pt = msg.pose.keypoints_2[i];
+            kpt.m_confidence = msg.body_pose.confidence[i];
+            auto &pt = msg.body_pose.keypoints_2[i];
             kpt.m_point.x = pt.x;
             kpt.m_point.y = pt.y;
             kpt.m_semantic_id = pt_type;

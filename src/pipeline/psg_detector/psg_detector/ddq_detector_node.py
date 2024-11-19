@@ -635,7 +635,12 @@ class DetectorNode(Node, IOpenCloseProtocol):
         result = ProcessDetectionsByFrame.Result()
         result.x_return.message = "Accepted frame"
         result.x_return.code = ReturnResponse.SUCCESS
-        result.detections = detections_msg
+        if "body" in detections_msg:
+            result.body_detections = detections_msg["body"]
+        if "head" in detections_msg:
+            result.head_detections = detections_msg["head"]
+        if "face" in detections_msg:
+            result.face_detections = detections_msg["face"]
         return result
 
     async def _accept_frame_accepted_callback(self, goal_handle):
@@ -717,15 +722,15 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self,
         category_to_results: dict[str, list[list[DetectionResult]]],
         frame_msg: Frame,
-    ) -> Detections:
-        merged_detections = None
-        for _, results in category_to_results.items():
+    ) -> dict[str, Detections]:
+        merged_detections = {}
+        for cat, results in category_to_results.items():
             detections = self._to_detections_msg(results, frame_msg)
-
-            if merged_detections is None:
-                merged_detections = detections
-            else:
-                merged_detections.detections.extend(detections.detections)
+            merged_detections[cat] = detections
+            # if merged_detections is None:
+            #     merged_detections = detections
+            # else:
+            #     merged_detections.detections.extend(detections.detections)
 
         return merged_detections
 

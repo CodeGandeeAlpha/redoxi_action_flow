@@ -337,10 +337,16 @@ void PSGPersonGenerator::_step()
         psg_private_msgs::msg::PsgDocument document_msg;
         document_msg = document_in_data->m_goal->document;
 
-        std::vector<PassengerFlow::DetectionPtr> v_detections;
-        FlowRos2Pipeline::convert_msg_to_detections(document_msg.detections, v_detections);
+        std::vector<PassengerFlow::DetectionPtr> v_body_detections;
+        FlowRos2Pipeline::convert_msg_to_detections(document_msg.body_detections, v_body_detections);
+        std::vector<PassengerFlow::DetectionPtr> v_head_detections;
+        FlowRos2Pipeline::convert_msg_to_detections(document_msg.head_detections, v_head_detections);
+
+        std::vector<PassengerFlow::DetectionPtr> v_all_detections;
+        v_all_detections.insert(v_all_detections.end(), v_body_detections.begin(), v_body_detections.end());
+        v_all_detections.insert(v_all_detections.end(), v_head_detections.begin(), v_head_detections.end());
         // extract person
-        auto v_persons = m_impl->m_person_extractor.extract_persons(v_detections);
+        auto v_persons = m_impl->m_person_extractor.extract_persons(v_all_detections);
 
         // convert to msg
         psg_private_msgs::msg::Persons persons_msg;

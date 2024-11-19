@@ -1,11 +1,13 @@
-redoxi_public_msgs/Detections detections
+redoxi_public_msgs/Detections body_detections
 redoxi_public_msgs/Control x_control
 unique_identifier_msgs/UUID x_uid
 
 ---
 # string return_msg
 # int64 return_code
-redoxi_public_msgs/BodyPose[] body_poses
+redoxi_public_msgs/Keypoints[] body_poses
+redoxi_public_msgs/Keypoints[] head_poses
+redoxi_public_msgs/Keypoints[] face_poses
 redoxi_public_msgs/ReturnResponse x_return
 ---
 # string feedback_msg
