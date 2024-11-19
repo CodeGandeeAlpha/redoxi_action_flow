@@ -1,5 +1,4 @@
 #pragma once
-#include <cstddef>
 
 #include <PassengerFlow/PassengerFlow.h>
 #include <psg_private_msgs/msg/person_trajectories.hpp>

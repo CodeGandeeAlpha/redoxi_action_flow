@@ -27,6 +27,7 @@ set(DEPENDENCIES
     psg_detector
     psg_document_sink
     psg_frame_det_source_sink
+    psg_person_generator
     pluginlib)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb)
@@ -64,6 +65,7 @@ option(BUILD_TEST_PSG_MASTER_NODE "Build test_psg_master_node target" ON)
 option(BUILD_TEST_V2_DOCUMENT_SINK "Build test_v2_document_sink target" ON)
 option(BUILD_TEST_V2_PSG_DETECTOR "Build test_v2_psg_detector target" ON)
 option(BUILD_TEST_V2_PSG_FRAME_DET_SOURCE_SINK "Build test_v2_psg_frame_det_source_sink target" ON)
+option(BUILD_TEST_V2_PSG_PERSON_GENERATOR "Build test_v2_psg_person_generator target" ON)
 # Function to configure a target
 function(configure_target target_name)
   add_executable(${target_name} src/${target_name}.cpp)
@@ -162,6 +164,10 @@ endif()
 
 if(BUILD_TEST_V2_PSG_FRAME_DET_SOURCE_SINK)
   configure_target(v2_psg_frame_det_source_sink)
+endif()
+
+if(BUILD_TEST_V2_PSG_PERSON_GENERATOR)
+  configure_target(v2_psg_person_generator)
 endif()
 
 # Install targets

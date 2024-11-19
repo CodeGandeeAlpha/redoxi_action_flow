@@ -35,6 +35,8 @@ ament_target_dependencies(psg_frame_det_source_sink PUBLIC
   redoxi_video_reader
   redoxi_common_nodes
   psg_detector
+  psg_document_sink
+  psg_private_msgs
 )
 
 install(
@@ -61,13 +63,6 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_export_dependencies(
-  redoxi_samples_lib
-  redoxi_video_reader
-  redoxi_common_nodes
-  psg_detector
-)
-
 ament_export_include_directories(
   include
 )
@@ -76,6 +71,15 @@ ament_export_libraries(
 )
 ament_export_targets(
   export_${PROJECT_NAME}
+)
+
+ament_export_dependencies(
+  redoxi_samples_lib
+  redoxi_video_reader
+  redoxi_common_nodes
+  psg_detector
+  psg_document_sink
+  psg_private_msgs
 )
 
 ament_package()

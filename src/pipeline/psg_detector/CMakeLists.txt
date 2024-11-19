@@ -9,6 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(ament_cmake_python REQUIRED)
+find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(psg_document_sink REQUIRED)
 find_package(psg_common REQUIRED)
@@ -38,6 +39,7 @@ ament_target_dependencies(
   psg_detector  PUBLIC
   psg_document_sink
   psg_common
+  rclcpp
   rclpy
 )
 
@@ -77,12 +79,17 @@ ament_export_include_directories(
 )
 ament_export_libraries(
   psg_detector
-  psg_document_sink
-  psg_common
 )
 
 ament_export_targets(
   export_${PROJECT_NAME}
+)
+
+ament_export_dependencies(
+  rclcpp
+  rclpy
+  psg_document_sink
+  psg_common
 )
 
 ament_package()
