@@ -1,12 +1,12 @@
-unique_identifier_msgs/UUID uuid
+unique_identifier_msgs/UUID x_uid
+redoxi_public_msgs/Control x_control
+# same group id means the same object
+unique_identifier_msgs/UUID x_group_uid
 
 redoxi_public_msgs/Detection head
 redoxi_public_msgs/Detection body
 redoxi_public_msgs/Detection face
-redoxi_public_msgs/Keypoints body_pose
-redoxi_public_msgs/Keypoints head_pose
-redoxi_public_msgs/Keypoints face_pose
-redoxi_public_msgs/Frame frame
+redoxi_public_msgs/FrameMetadata frame_metadata
 int64 track_id
 float64 body_height
 float64 body_height_conf

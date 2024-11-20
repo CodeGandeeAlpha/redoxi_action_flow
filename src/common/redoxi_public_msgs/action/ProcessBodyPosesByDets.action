@@ -1,14 +1,15 @@
-redoxi_public_msgs/Detections body_detections
-redoxi_public_msgs/Control x_control
+# action for get body poses by detections and frame from pose detector model node
 unique_identifier_msgs/UUID x_uid
+redoxi_public_msgs/Control x_control
+redoxi_public_msgs/Detection[] detections
+redoxi_public_msgs/Frame frame
 
 ---
-# string return_msg
-# int64 return_code
-redoxi_public_msgs/Keypoints[] body_poses
-redoxi_public_msgs/Keypoints[] head_poses
-redoxi_public_msgs/Keypoints[] face_poses
 redoxi_public_msgs/ReturnResponse x_return
+redoxi_public_msgs/Keypoints[] poses
+# 0: pose[i] is matched to detections[i], no need to check x_group_uid
+# 1: matched by x_group_uid, poses[i].x_group_uid == detections[k].x_uid iff poses[i] is for detections[k]
+bool is_matched_by_uid 0
 ---
 # string feedback_msg
 # int64 feedback_code

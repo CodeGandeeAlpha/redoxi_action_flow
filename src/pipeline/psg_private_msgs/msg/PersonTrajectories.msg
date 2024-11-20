@@ -1,2 +1,0 @@
-unique_identifier_msgs/UUID uuid
-PersonTrajectory[] person_trajectories

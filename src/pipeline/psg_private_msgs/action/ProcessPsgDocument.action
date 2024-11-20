@@ -1,6 +1,6 @@
-psg_private_msgs/PsgDocument document
 unique_identifier_msgs/UUID x_uid
 redoxi_public_msgs/Control x_control
+psg_private_msgs/PsgDocument document
 ---
 redoxi_public_msgs/ReturnResponse x_return
 ---

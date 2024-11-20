@@ -1,4 +1,3 @@
-unique_identifier_msgs/UUID uuid
 float32 x
 float32 y
 float32 width -1
