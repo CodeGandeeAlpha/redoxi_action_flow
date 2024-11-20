@@ -9,6 +9,7 @@ namespace redoxi_works::inference::yolo8
 
 class Yolo8DetectionModel : public Yolo8ModelBase
 {
+  public:
     // postprocess the model output, and get the detections
     virtual std::vector<SingleImageOutput> get_output_detections(
         InferenceInOutData::Ptr model_inout_data,
