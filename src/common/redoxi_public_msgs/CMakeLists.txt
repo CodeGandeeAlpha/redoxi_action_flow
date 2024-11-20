@@ -15,7 +15,7 @@ find_package(rosidl_default_generators REQUIRED)
 # find_package(rclpy REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/BodyPose.msg"
+  "msg/Keypoints.msg"
   "msg/Box2.msg"
   "msg/CacheData.msg"
   "msg/Detection.msg"

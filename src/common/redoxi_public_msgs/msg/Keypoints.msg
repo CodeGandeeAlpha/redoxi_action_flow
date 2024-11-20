@@ -4,6 +4,10 @@
 unique_identifier_msgs/UUID uuid
 float32[] confidence
 geometry_msgs/Point[] keypoints_2
+# nx2 array representing edges between keypoints, (u1,v1,u2,v2,...)
+# u1,v1 are indices of keypoints, u2,v2 are indices of keypoints
+int64[] keypoint_edges
+
 int64[] semantic_type
 Frame frame
 Box2 bbox

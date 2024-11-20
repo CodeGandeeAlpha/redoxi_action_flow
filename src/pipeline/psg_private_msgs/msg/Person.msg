@@ -3,7 +3,9 @@ unique_identifier_msgs/UUID uuid
 redoxi_public_msgs/Detection head
 redoxi_public_msgs/Detection body
 redoxi_public_msgs/Detection face
-redoxi_public_msgs/BodyPose pose
+redoxi_public_msgs/Keypoints body_pose
+redoxi_public_msgs/Keypoints head_pose
+redoxi_public_msgs/Keypoints face_pose
 redoxi_public_msgs/Frame frame
 int64 track_id
 float64 body_height
