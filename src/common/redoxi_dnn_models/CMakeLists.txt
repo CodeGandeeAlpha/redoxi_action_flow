@@ -19,7 +19,8 @@ add_library(redoxi_dnn_models
   src/yolo8/Yolo8PoseModel.cpp
   src/yolo8/Yolo8Preprocessor.cpp
   src/yolo8/Yolo8Postprocessor.cpp
-  src/yolo8/Yolo8DetectionModel.cpp)
+  src/yolo8/Yolo8DetectionModel.cpp
+  src/yolo8/Yolo8ModelBase.cpp)
   
 add_library(redoxi_dnn_models::redoxi_dnn_models ALIAS redoxi_dnn_models)
 target_compile_features(
