@@ -6,6 +6,7 @@ void convert_detection_to_msg(PassengerFlow::Detection &det, const redoxi_public
 {
     // msg Detection {0: body, 1: head, 2: face} PassengerFlow::Detection {0: None, 1: head, 2: face, 3:body}
     std::vector<int> class_id_mapping = {-1, 1, 2, 0};
+    std::vector<std::string> category_name_mapping = {"None", "head", "face", "body"};
 
     auto bbox = det.get_bbox();
     msg.bbox.x = bbox.x;
@@ -13,8 +14,9 @@ void convert_detection_to_msg(PassengerFlow::Detection &det, const redoxi_public
     msg.bbox.width = bbox.width;
     msg.bbox.height = bbox.height;
     msg.category = class_id_mapping[det.get_type()];
+    msg.category_name = category_name_mapping[det.get_type()];
     msg.confidence = det.get_confidence();
-    msg.frame = msg_frame;
+    msg.frame_metadata = msg_frame.metadata;
     msg.is_detected_by_camera = det.detected_by_camera();
 
     if (det.get_type() == RedoxiTrack::DetectionTypes::PersonBody) {
@@ -36,7 +38,7 @@ void convert_msg_to_detection(const redoxi_public_msgs::msg::Detection &msg, Pas
     if (msg.category == 0) {
         RedoxiTrack::fVECTOR single_feature;
         single_feature.resize(128, 1);
-        for (int j = 0; j < msg.feature.size(); j++) {
+        for (size_t j = 0; j < msg.feature.size(); j++) {
             single_feature(j, 0) = msg.feature[j];
         }
         det->set_type(RedoxiTrack::DetectionTypes::PersonBody);
@@ -47,30 +49,30 @@ void convert_msg_to_detection(const redoxi_public_msgs::msg::Detection &msg, Pas
         det->set_type(RedoxiTrack::DetectionTypes::PersonHead);
     }
 
-    det->set_frame_number(msg.frame.frame_num);
+    det->set_frame_number(msg.frame_metadata.frame_num);
     det->set_detected_by_camera(msg.is_detected_by_camera);
 }
 
 
-void convert_detections_to_msg(const std::vector<PassengerFlow::DetectionPtr> &dets, const redoxi_public_msgs::msg::Frame &msg_frame, redoxi_public_msgs::msg::Detections &msg)
-{
-    for (auto &det : dets) {
-        redoxi_public_msgs::msg::Detection msg_det;
-        convert_detection_to_msg(*det, msg_frame, msg_det);
-        msg.detections.push_back(msg_det);
-        msg.frame = msg_frame;
-    }
-}
+// void convert_detections_to_msg(const std::vector<PassengerFlow::DetectionPtr> &dets, const redoxi_public_msgs::msg::Frame &msg_frame, redoxi_public_msgs::msg::Detections &msg)
+// {
+//     for (auto &det : dets) {
+//         redoxi_public_msgs::msg::Detection msg_det;
+//         convert_detection_to_msg(*det, msg_frame, msg_det);
+//         msg.detections.push_back(msg_det);
+//         msg.frame = msg_frame;
+//     }
+// }
 
 
-void convert_msg_to_detections(const redoxi_public_msgs::msg::Detections &msg, std::vector<PassengerFlow::DetectionPtr> &dets)
-{
-    for (auto &msg_det : msg.detections) {
-        PassengerFlow::DetectionPtr det = std::make_shared<PassengerFlow::Detection>();
-        convert_msg_to_detection(msg_det, det);
-        dets.push_back(det);
-    }
-}
+// void convert_msg_to_detections(const redoxi_public_msgs::msg::Detections &msg, std::vector<PassengerFlow::DetectionPtr> &dets)
+// {
+//     for (auto &msg_det : msg.detections) {
+//         PassengerFlow::DetectionPtr det = std::make_shared<PassengerFlow::Detection>();
+//         convert_msg_to_detection(msg_det, det);
+//         dets.push_back(det);
+//     }
+// }
 
 
 void convert_person_to_msg(const PassengerFlow::PersonPtr &person, const redoxi_public_msgs::msg::Frame &msg_frame, psg_private_msgs::msg::Person &msg)
@@ -113,11 +115,11 @@ void convert_person_to_msg(const PassengerFlow::PersonPtr &person, const redoxi_
             pt.z = 0;
             msg_body_pose.keypoints_2.push_back(pt);
         }
-        msg.body_pose = msg_body_pose;
+        msg.body.keypoints = msg_body_pose;
     }
 
     msg.track_id = person->get_person_id();
-    msg.frame = msg_frame;
+    msg.frame_metadata = msg_frame.metadata;
     msg.body_height = person->get_body_height().m_body_height;
     msg.body_height_conf = person->get_body_height().m_body_height_conf;
     PassengerFlow::POINT3 position;
@@ -161,13 +163,13 @@ void convert_msg_to_person(const psg_private_msgs::msg::Person &msg, PassengerFl
         person->set_face(one_det);
     }
 
-    if (msg.body_pose.keypoints_2.size() > 0) {
+    if (msg.body.keypoints.keypoints_2.size() > 0) {
         std::map<PassengerFlow::KeyPointSemanticType, PassengerFlow::Keypoint> pose;
-        for (int i = 0; i < msg.body_pose.confidence.size(); i++) {
-            PassengerFlow::KeyPointSemanticType pt_type = msg.body_pose.semantic_type[i];
+        for (size_t i = 0; i < msg.body.keypoints.confidence.size(); i++) {
+            PassengerFlow::KeyPointSemanticType pt_type = msg.body.keypoints.semantic_type[i];
             PassengerFlow::Keypoint kpt;
-            kpt.m_confidence = msg.body_pose.confidence[i];
-            auto &pt = msg.body_pose.keypoints_2[i];
+            kpt.m_confidence = msg.body.keypoints.confidence[i];
+            auto &pt = msg.body.keypoints.keypoints_2[i];
             kpt.m_point.x = pt.x;
             kpt.m_point.y = pt.y;
             kpt.m_semantic_id = pt_type;
@@ -190,30 +192,30 @@ void convert_msg_to_person(const psg_private_msgs::msg::Person &msg, PassengerFl
     }
 
     person->set_person_id(msg.track_id);
-    person->set_frame_number(msg.frame.frame_num);
+    person->set_frame_number(msg.frame_metadata.frame_num);
 }
 
 
-void convert_persons_to_msg(const std::vector<PassengerFlow::PersonPtr> &persons, const redoxi_public_msgs::msg::Frame &msg_frame, psg_private_msgs::msg::Persons &msg)
-{
-    msg.frame = msg_frame;
-    for (auto &person : persons) {
-        psg_private_msgs::msg::Person msg_person;
-        msg_person.frame = msg_frame;
-        convert_person_to_msg(person, msg_frame, msg_person);
-        msg.persons.push_back(msg_person);
-    }
-}
+// void convert_persons_to_msg(const std::vector<PassengerFlow::PersonPtr> &persons, const redoxi_public_msgs::msg::Frame &msg_frame, psg_private_msgs::msg::Persons &msg)
+// {
+//     msg.frame = msg_frame;
+//     for (auto &person : persons) {
+//         psg_private_msgs::msg::Person msg_person;
+//         msg_person.frame = msg_frame;
+//         convert_person_to_msg(person, msg_frame, msg_person);
+//         msg.persons.push_back(msg_person);
+//     }
+// }
 
 
-void convert_msg_to_persons(const psg_private_msgs::msg::Persons &msg, std::vector<PassengerFlow::PersonPtr> &persons)
-{
-    for (auto &msg_person : msg.persons) {
-        auto person_ptr = std::make_shared<PassengerFlow::Person>();
-        convert_msg_to_person(msg_person, person_ptr);
-        persons.push_back(person_ptr);
-    }
-}
+// void convert_msg_to_persons(const psg_private_msgs::msg::Persons &msg, std::vector<PassengerFlow::PersonPtr> &persons)
+// {
+//     for (auto &msg_person : msg.persons) {
+//         auto person_ptr = std::make_shared<PassengerFlow::Person>();
+//         convert_msg_to_person(msg_person, person_ptr);
+//         persons.push_back(person_ptr);
+//     }
+// }
 
 
 void convert_traj_to_msg(const PassengerFlow::PersonTrajectory &traj, psg_private_msgs::msg::PersonTrajectory &msg)
@@ -224,7 +226,7 @@ void convert_traj_to_msg(const PassengerFlow::PersonTrajectory &traj, psg_privat
     for (auto &person : traj.m_person_list) {
         psg_private_msgs::msg::Person msg_person;
         redoxi_public_msgs::msg::Frame msg_frame;
-        msg_frame.frame_num = person->get_frame_number();
+        msg_frame.metadata.frame_num = person->get_frame_number();
         convert_person_to_msg(person, msg_frame, msg_person);
         msg.persons.push_back(msg_person);
     }
@@ -242,24 +244,24 @@ void convert_msg_to_traj(const psg_private_msgs::msg::PersonTrajectory &msg, Pas
 }
 
 
-void convert_trajs_to_msg(const std::vector<PassengerFlow::PersonTrajectory> &trajs, psg_private_msgs::msg::PersonTrajectories &msg)
-{
-    for (auto &traj : trajs) {
-        psg_private_msgs::msg::PersonTrajectory msg_traj;
-        convert_traj_to_msg(traj, msg_traj);
-        msg.person_trajectories.push_back(msg_traj);
-    }
-}
+// void convert_trajs_to_msg(const std::vector<PassengerFlow::PersonTrajectory> &trajs, psg_private_msgs::msg::PersonTrajectories &msg)
+// {
+//     for (auto &traj : trajs) {
+//         psg_private_msgs::msg::PersonTrajectory msg_traj;
+//         convert_traj_to_msg(traj, msg_traj);
+//         msg.person_trajectories.push_back(msg_traj);
+//     }
+// }
 
 
-void convert_msg_to_trajs(const psg_private_msgs::msg::PersonTrajectories &msg, std::vector<PassengerFlow::PersonTrajectory> &trajs)
-{
-    for (auto &msg_traj : msg.person_trajectories) {
-        PassengerFlow::PersonTrajectory traj;
-        convert_msg_to_traj(msg_traj, traj);
-        trajs.push_back(traj);
-    }
-}
+// void convert_msg_to_trajs(const psg_private_msgs::msg::PersonTrajectories &msg, std::vector<PassengerFlow::PersonTrajectory> &trajs)
+// {
+//     for (auto &msg_traj : msg.person_trajectories) {
+//         PassengerFlow::PersonTrajectory traj;
+//         convert_msg_to_traj(msg_traj, traj);
+//         trajs.push_back(traj);
+//     }
+// }
 
 
 void convert_event_to_msg(const PassengerFlow::TrajectoryEvent &event, psg_private_msgs::msg::TrajectoryEvent &msg)
@@ -279,12 +281,12 @@ void convert_event_to_msg(const PassengerFlow::TrajectoryEvent &event, psg_priva
 }
 
 
-void convert_events_to_msg(const std::vector<PassengerFlow::TrajectoryEvent> &events, psg_private_msgs::msg::TrajectoryEvents &msg)
-{
-    for (auto &event : events) {
-        psg_private_msgs::msg::TrajectoryEvent msg_traj_event;
-        convert_event_to_msg(event, msg_traj_event);
-        msg.trajectory_events.push_back(msg_traj_event);
-    }
-}
+// void convert_events_to_msg(const std::vector<PassengerFlow::TrajectoryEvent> &events, psg_private_msgs::msg::TrajectoryEvents &msg)
+// {
+//     for (auto &event : events) {
+//         psg_private_msgs::msg::TrajectoryEvent msg_traj_event;
+//         convert_event_to_msg(event, msg_traj_event);
+//         msg.trajectory_events.push_back(msg_traj_event);
+//     }
+// }
 } // namespace FlowRos2Pipeline

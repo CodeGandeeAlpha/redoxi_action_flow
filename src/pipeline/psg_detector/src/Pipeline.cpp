@@ -544,9 +544,7 @@ int PSGDetectorNode::_on_deliver_to_downstream_finish(TargetDataModel_t &target_
             auto action_result = ds.get_action_client()->async_get_result(goal_handle).get().result;
             // 将action result写入promise
             auto output_model_result = std::make_shared<PSGDetectorNode::OutputModelResult_t>();
-            output_model_result->body_detections = action_result->body_detections;
-            output_model_result->head_detections = action_result->head_detections;
-            output_model_result->face_detections = action_result->face_detections;
+            output_model_result->detections = action_result->detections;
             output_model_result->x_return = action_result->x_return;
             promise->set_value(output_model_result);
         } else {
@@ -580,36 +578,8 @@ sensor_msgs::msg::Image PSGDetectorNode::_create_debug_image(const psg_private_m
     };
 
     //! 在图像上画bbox
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始在图像上绘制检测框, 共{}个检测结果", document.body_detections.detections.size());
-    for (const auto &detection : document.body_detections.detections) {
-        //! 获取bbox坐标
-        int x = static_cast<int>(detection.bbox.x);
-        int y = static_cast<int>(detection.bbox.y);
-        int width = static_cast<int>(detection.bbox.width);
-        int height = static_cast<int>(detection.bbox.height);
-
-        //! 获取类别对应的颜色
-        cv::Scalar color = class_colors[detection.category];
-
-        //! 画框
-        cv::rectangle(cv_image,
-                      cv::Point(x, y),
-                      cv::Point(x + width, y + height),
-                      color, 2);
-
-        //! 添加类别标签
-        std::string label = std::to_string(detection.category) + " " +
-                            std::to_string(detection.confidence).substr(0, 4);
-        cv::putText(cv_image, label,
-                    cv::Point(x, y - 10),
-                    cv::FONT_HERSHEY_SIMPLEX, 0.5,
-                    color, 2);
-
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                      "绘制检测框 - 类别:{}, 置信度:{:.2f}, 位置:[{}, {}, {}, {}]",
-                      detection.category, detection.confidence, x, y, width, height);
-    }
-    for (const auto &detection : document.head_detections.detections) {
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始在图像上绘制检测框, 共{}个检测结果", document.detections.size());
+    for (const auto &detection : document.detections) {
         //! 获取bbox坐标
         int x = static_cast<int>(detection.bbox.x);
         int y = static_cast<int>(detection.bbox.y);
@@ -665,9 +635,7 @@ void PSGDetectorNode::_get_model_result()
         // create output source data
         OutputSourceDataPipeline_t output_pipeline_source_data;
         auto document = output_model_result.source_data->get_document();
-        document.body_detections = result->body_detections;
-        document.head_detections = result->head_detections;
-        document.face_detections = result->face_detections;
+        document.detections = result->detections;
         output_pipeline_source_data.set_document(document);
         // create pipeline delivery request
         auto delivery_request = _create_delivery_request(output_pipeline_source_data);
@@ -713,16 +681,8 @@ void PSGDetectorNode::_get_model_result()
                          boost::uuids::to_string(msg_uuid));
 
             std::string det_str;
-            for (const auto &det : result->body_detections.detections) {
+            for (const auto &det : result->detections) {
                 det_str += fmt::format("body bbox: [{}, {}, {}, {}] ",
-                                       det.bbox.x, det.bbox.y, det.bbox.width, det.bbox.height);
-            }
-            for (const auto &det : result->head_detections.detections) {
-                det_str += fmt::format("head bbox: [{}, {}, {}, {}] ",
-                                       det.bbox.x, det.bbox.y, det.bbox.width, det.bbox.height);
-            }
-            for (const auto &det : result->face_detections.detections) {
-                det_str += fmt::format("face bbox: [{}, {}, {}, {}] ",
                                        det.bbox.x, det.bbox.y, det.bbox.width, det.bbox.height);
             }
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] got detection result: {}",

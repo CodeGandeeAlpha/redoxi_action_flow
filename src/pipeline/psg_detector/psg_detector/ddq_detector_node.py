@@ -25,7 +25,7 @@ from unique_identifier_msgs.msg import UUID as UUIDMsg
 from attr import field, define
 
 from redoxi_public_msgs.action import ProcessDetectionsByFrame
-from redoxi_public_msgs.msg import Detections, Detection, Frame, ReturnResponse
+from redoxi_public_msgs.msg import Detection, Frame, ReturnResponse
 
 from psg_common.interfaces import IOpenCloseProtocol
 from psg_common.constants import (
@@ -36,7 +36,6 @@ from psg_common.constants import (
 from psg_common.utilities import create_v6d_client, get_img_by_v6d_id
 from psg_common.pub_sub import StreamWorker
 
-from concurrent.futures import ThreadPoolExecutor
 from psg_detector.ddq_detector import DdqDetrDetector
 from psg_detector.yolov8_head_detector import YOLOv8HeadDetector
 from psg_detector.base_detector import BaseDetector, DetectionResult
@@ -109,42 +108,42 @@ class DetectorNode(Node, IOpenCloseProtocol):
         def from_parameters(node):
             pass
 
-    @define(kw_only=True, eq=False)
-    class ModelGroupSingleOutput:
-        event: threading.Event = field(factory=threading.Event)
-        detections: Detections = field(default=None)
+    # @define(kw_only=True, eq=False)
+    # class ModelGroupSingleOutput:
+    #     event: threading.Event = field(factory=threading.Event)
+    #     detections: Detections = field(default=None)
 
-    @define(kw_only=True, eq=False)
-    class ModelGroupOutputData:
-        output_per_group: dict[str, "DetectorNode.ModelGroupSingleOutput"] = field(
-            factory=dict
-        )
+    # @define(kw_only=True, eq=False)
+    # class ModelGroupOutputData:
+    #     output_per_group: dict[str, "DetectorNode.ModelGroupSingleOutput"] = field(
+    #         factory=dict
+    #     )
 
-    @define(kw_only=True, eq=False)
-    class ModelGroupInputData:
-        frame_msg: Frame = field()
-        img: np.ndarray = field()
-        uuid_msg: UUIDMsg = field()
+    # @define(kw_only=True, eq=False)
+    # class ModelGroupInputData:
+    #     frame_msg: Frame = field()
+    #     img: np.ndarray = field()
+    #     uuid_msg: UUIDMsg = field()
 
-        # main group is responsible for sending the result to output queue
-        main_group_name: str = field()
+    #     # main group is responsible for sending the result to output queue
+    #     main_group_name: str = field()
 
-        # write output here, for each model group
-        output: "DetectorNode.ModelGroupOutputData" = field(
-            factory=lambda: DetectorNode.ModelGroupOutputData()
-        )
+    #     # write output here, for each model group
+    #     output: "DetectorNode.ModelGroupOutputData" = field(
+    #         factory=lambda: DetectorNode.ModelGroupOutputData()
+    #     )
 
-    @define(kw_only=True)
-    class ModelGroup:
-        models: list[BaseDetector] = field(default=None)
-        workers: list[StreamWorker] = field(factory=list)
-        in_queue: queue.Queue["DetectorNode.ModelGroupInputData"] = field(
-            factory=queue.Queue
-        )
-        out_queue: queue.Queue["DetectorNode.ModelGroupOutputData"] = field(
-            factory=queue.Queue
-        )
-        name: str = field(factory=lambda: str(uuid4()))
+    # @define(kw_only=True)
+    # class ModelGroup:
+    #     models: list[BaseDetector] = field(default=None)
+    #     workers: list[StreamWorker] = field(factory=list)
+    #     in_queue: queue.Queue["DetectorNode.ModelGroupInputData"] = field(
+    #         factory=queue.Queue
+    #     )
+    #     out_queue: queue.Queue["DetectorNode.ModelGroupOutputData"] = field(
+    #         factory=queue.Queue
+    #     )
+    #     name: str = field(factory=lambda: str(uuid4()))
 
     def __init__(self, node_name):
         super().__init__(node_name)
@@ -160,9 +159,9 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         # self.m_merge_workers = []
 
-        self._m_model_groups_data: dict[str, DetectorNode.ModelGroup] = (
-            {}
-        )  # key: model_name, value: ModelGroup
+        # self._m_model_groups_data: dict[str, DetectorNode.ModelGroup] = (
+        #     {}
+        # )  # key: model_name, value: ModelGroup
         # self.m_detections_task_waiting: queue.Queue[DetectorNode.DSTask_Detections] = (
         #     queue.Queue()
         # )
@@ -294,34 +293,34 @@ class DetectorNode(Node, IOpenCloseProtocol):
         )
         return ReturnCode.SUCCESS
 
-    def start_model_workers(self):
-        for model_group_name, model_group_data in self._m_model_groups_data.items():
-            for model in model_group_data.models:
-                # output_func = None
+    # def start_model_workers(self):
+    #     for model_group_name, model_group_data in self._m_model_groups_data.items():
+    #         for model in model_group_data.models:
+    #             # output_func = None
 
-                # # only main group is responsible for sending the result to output queue
-                # # other groups will just pretend to send the result
-                # if model_group_name != self.m_init_config.main_group_name:
-                #     output_func = lambda x, y: True
+    #             # # only main group is responsible for sending the result to output queue
+    #             # # other groups will just pretend to send the result
+    #             # if model_group_name != self.m_init_config.main_group_name:
+    #             #     output_func = lambda x, y: True
 
-                # 所有的模型都不写入output_queue，因为在创建input_data时output就已经被写入output_queue了
-                output_func = lambda x, y: True
+    #             # 所有的模型都不写入output_queue，因为在创建input_data时output就已经被写入output_queue了
+    #             output_func = lambda x, y: True
 
-                # create stream_worker for this model
-                stream_worker = StreamWorker(
-                    input_queue=model_group_data.in_queue,
-                    output_queue=model_group_data.out_queue,
-                    worker_function_one_step=self._model_step,
-                    user_data={"model": model, "model_group_name": model_group_name},
-                    output_function=output_func,
-                )
-                model_group_data.workers.append(stream_worker)
-                stream_worker.start()
+    #             # create stream_worker for this model
+    #             stream_worker = StreamWorker(
+    #                 input_queue=model_group_data.in_queue,
+    #                 output_queue=model_group_data.out_queue,
+    #                 worker_function_one_step=self._model_step,
+    #                 user_data={"model": model, "model_group_name": model_group_name},
+    #                 output_function=output_func,
+    #             )
+    #             model_group_data.workers.append(stream_worker)
+    #             stream_worker.start()
 
-    def stop_model_workers(self):
-        for model_group_name, model_group_data in self._m_model_groups_data.items():
-            for worker in model_group_data.workers:
-                worker.stop()
+    # def stop_model_workers(self):
+    #     for model_group_name, model_group_data in self._m_model_groups_data.items():
+    #         for worker in model_group_data.workers:
+    #             worker.stop()
 
     def start(self) -> int:
         # the node must be opened
@@ -346,13 +345,13 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         self.stop_model_workers()
 
-        if self._m_model_groups_data:
-            for model_group_name, model_group_data in self._m_model_groups_data.items():
-                for model_idx in range(len(model_group_data.models)):
-                    model_group_data.models[model_idx].running_thread.join()
-                    self.m_logger.debug(
-                        f"stop(): model_thread of {model_group_name} stopped"
-                    )
+        # if self._m_model_groups_data:
+        #     for model_group_name, model_group_data in self._m_model_groups_data.items():
+        #         for model_idx in range(len(model_group_data.models)):
+        #             model_group_data.models[model_idx].running_thread.join()
+        #             self.m_logger.debug(
+        #                 f"stop(): model_thread of {model_group_name} stopped"
+        #             )
 
         status_code_before = self.m_status_code
         self.m_status_code = NodeStatusCode.STOPPED
@@ -398,106 +397,106 @@ class DetectorNode(Node, IOpenCloseProtocol):
             f"_create_action_server(): created ActionServer for {self.m_init_config.process_frame_action}"
         )
 
-    def _init_model_groups_data(self):
-        shared_output_queue = queue.Queue()
+    # def _init_model_groups_data(self):
+    #     shared_output_queue = queue.Queue()
 
-        self._m_model_groups_data.clear()
-        for model_group_name, models in self.m_init_config.model_groups.items():
-            assert model_group_name in [
-                "body",
-                "head",
-                "face",
-                "all",
-            ], "model group name not found"
-            model_group_data = DetectorNode.ModelGroup()
+    #     self._m_model_groups_data.clear()
+    #     for model_group_name, models in self.m_init_config.model_groups.items():
+    #         assert model_group_name in [
+    #             "body",
+    #             "head",
+    #             "face",
+    #             "all",
+    #         ], "model group name not found"
+    #         model_group_data = DetectorNode.ModelGroup()
 
-            # all models share the same output queue
-            model_group_data.out_queue = shared_output_queue
+    #         # all models share the same output queue
+    #         model_group_data.out_queue = shared_output_queue
 
-            model_group_data.name = model_group_name
+    #         model_group_data.name = model_group_name
 
-            model_group_data.models = []
-            for model in models:
-                model_group_data.models.append(model)
+    #         model_group_data.models = []
+    #         for model in models:
+    #             model_group_data.models.append(model)
 
-            self._m_model_groups_data[model_group_name] = model_group_data
+    #         self._m_model_groups_data[model_group_name] = model_group_data
 
-    async def _process_frame_create_model_tasks(self, frame_msg: Frame, uuid):
-        self.m_logger.debug(
-            f"[_process_frame_create_model_tasks] Starting to process frame {frame_msg.frame_num}"
-        )
+    # async def _process_frame_create_model_tasks(self, frame_msg: Frame, uuid):
+    #     self.m_logger.debug(
+    #         f"[_process_frame_create_model_tasks] Starting to process frame {frame_msg.frame_num}"
+    #     )
 
-        # Convert raw image data to numpy array
-        self.m_logger.debug(
-            f"[_process_frame_create_model_tasks] Converting raw image data to numpy array"
-        )
-        raw_img = frame_msg.raw_image
-        img = (
-            np.frombuffer(raw_img.data, dtype=np.uint8).reshape(
-                raw_img.height, raw_img.width, -1
-            )
-            if raw_img is not None
-            else None
-        )
-        if img is not None:
-            self.m_logger.debug(
-                f"[_process_frame_create_model_tasks] Frame {frame_msg.frame_num} image shape: {img.shape}"
-            )
+    #     # Convert raw image data to numpy array
+    #     self.m_logger.debug(
+    #         f"[_process_frame_create_model_tasks] Converting raw image data to numpy array"
+    #     )
+    #     raw_img = frame_msg.raw_image
+    #     img = (
+    #         np.frombuffer(raw_img.data, dtype=np.uint8).reshape(
+    #             raw_img.height, raw_img.width, -1
+    #         )
+    #         if raw_img is not None
+    #         else None
+    #     )
+    #     if img is not None:
+    #         self.m_logger.debug(
+    #             f"[_process_frame_create_model_tasks] Frame {frame_msg.frame_num} image shape: {img.shape}"
+    #         )
 
-        # Create input data structure
-        self.m_logger.debug(
-            f"[_process_frame_create_model_tasks] Creating input data structure"
-        )
-        input_data = DetectorNode.ModelGroupInputData(
-            frame_msg=frame_msg,
-            img=img,
-            uuid_msg=uuid,
-            main_group_name=self.m_init_config.main_group_name,
-        )
+    #     # Create input data structure
+    #     self.m_logger.debug(
+    #         f"[_process_frame_create_model_tasks] Creating input data structure"
+    #     )
+    #     input_data = DetectorNode.ModelGroupInputData(
+    #         frame_msg=frame_msg,
+    #         img=img,
+    #         uuid_msg=uuid,
+    #         main_group_name=self.m_init_config.main_group_name,
+    #     )
 
-        # Initialize output structure
-        self.m_logger.debug(
-            f"[_process_frame_create_model_tasks] Initializing output structure"
-        )
-        input_data.output.output_per_group = {
-            group_name: DetectorNode.ModelGroupSingleOutput()
-            for group_name in self._m_model_groups_data
-        }
+    #     # Initialize output structure
+    #     self.m_logger.debug(
+    #         f"[_process_frame_create_model_tasks] Initializing output structure"
+    #     )
+    #     input_data.output.output_per_group = {
+    #         group_name: DetectorNode.ModelGroupSingleOutput()
+    #         for group_name in self._m_model_groups_data
+    #     }
 
-        # Add tasks to model queues
-        self.m_logger.debug(
-            f"[_process_frame_create_model_tasks] Adding tasks to model queues"
-        )
-        for model_group_name, model_group_data in self._m_model_groups_data.items():
-            model_group_data.in_queue.put(input_data)
-            self.m_logger.debug(
-                f"[_process_frame_create_model_tasks] Added task for model group: {model_group_name}"
-            )
+    #     # Add tasks to model queues
+    #     self.m_logger.debug(
+    #         f"[_process_frame_create_model_tasks] Adding tasks to model queues"
+    #     )
+    #     for model_group_name, model_group_data in self._m_model_groups_data.items():
+    #         model_group_data.in_queue.put(input_data)
+    #         self.m_logger.debug(
+    #             f"[_process_frame_create_model_tasks] Added task for model group: {model_group_name}"
+    #         )
 
-        # Wait for all model results
-        self.m_logger.debug(
-            f"[_process_frame_create_model_tasks] Waiting for model results"
-        )
-        events = [
-            output.event for output in input_data.output.output_per_group.values()
-        ]
+    #     # Wait for all model results
+    #     self.m_logger.debug(
+    #         f"[_process_frame_create_model_tasks] Waiting for model results"
+    #     )
+    #     events = [
+    #         output.event for output in input_data.output.output_per_group.values()
+    #     ]
 
-        for event in events:
-            while not event.is_set():
-                await self.create_rate(1000).sleep()  # 1000Hz = 1ms delay
+    #     for event in events:
+    #         while not event.is_set():
+    #             await self.create_rate(1000).sleep()  # 1000Hz = 1ms delay
 
-        # Merge results
-        self.m_logger.debug(
-            f"[_process_frame_create_model_tasks] Merging detection results"
-        )
-        merge_dets_msg = self._merge_detections(input_data.output)
+    #     # Merge results
+    #     self.m_logger.debug(
+    #         f"[_process_frame_create_model_tasks] Merging detection results"
+    #     )
+    #     merge_dets_msg = self._merge_detections(input_data.output)
 
-        self.m_logger.debug(
-            f"[_process_frame_create_model_tasks] Finished processing frame {frame_msg.frame_num}"
-        )
-        return merge_dets_msg
+    #     self.m_logger.debug(
+    #         f"[_process_frame_create_model_tasks] Finished processing frame {frame_msg.frame_num}"
+    #     )
+    #     return merge_dets_msg
 
-    def _to_detections_msg(self, result, frame_msg):
+    def _to_detections_msg(self, result, frame_msg) -> list[Detection]:
         """
         [
             # image 1
@@ -518,7 +517,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
         else:
             pred_score_thr = self.m_runtime_config.pred_score_thr
 
-        detections = Detections()
+        detections = []
 
         for predictions in result:
             for pred in predictions:
@@ -529,7 +528,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
                     f"_to_detections_msg(): category {pred.class_id}, confidence {pred.score}, bbox {pred.xyxy}"
                 )
                 detection_msg = Detection()
-                detection_msg.frame = frame_msg
+                detection_msg.frame_metadata = frame_msg.metadata
                 detection_msg.category = pred.class_id
                 detection_msg.confidence = pred.score
                 detection_msg.bbox.x = pred.xyxy[0]
@@ -538,14 +537,14 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 detection_msg.bbox.height = pred.xyxy[3] - pred.xyxy[1]
                 detection_msg.is_detected_by_camera = True
 
-                detections.detections.append(detection_msg)
+                detections.append(detection_msg)
 
         return detections
 
     def _goal_callback(self, goal_request):
         x_control = goal_request.x_control
         if x_control.code == 1:
-            self.m_logger.info(f"frame {goal_request.frame.frame_num} ping")
+            self.m_logger.info(f"frame {goal_request.frame.metadata.frame_num} ping")
         # 如果任一类别的资源队列为空,则拒绝该帧
         for cat in self.m_category_to_resource:
             self.m_logger.info(
@@ -553,11 +552,13 @@ class DetectorNode(Node, IOpenCloseProtocol):
             )
             if self.m_category_to_resource[cat].empty():
                 self.m_logger.info(
-                    f"frame {goal_request.frame.frame_num} was rejected because resource queue for category {cat} is empty"
+                    f"frame {goal_request.frame.metadata.frame_num} was rejected because resource queue for category {cat} is empty"
                 )
                 return GoalResponse.REJECT
 
-        self.m_logger.info(f"frame {goal_request.frame.frame_num} ping accepted")
+        self.m_logger.info(
+            f"frame {goal_request.frame.metadata.frame_num} ping accepted"
+        )
 
         return GoalResponse.ACCEPT
 
@@ -578,7 +579,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
         frame_msg = goal_handle.request.frame
         self.m_logger.info(
-            f"---TIME LOG: framenum {frame_msg.frame_num} node ddq_detector_node type IN time {self.get_clock().now().nanoseconds}"
+            f"---TIME LOG: framenum {frame_msg.metadata.frame_num} node ddq_detector_node type IN time {self.get_clock().now().nanoseconds}"
         )
         uuid = goal_handle.request.x_uid
 
@@ -598,7 +599,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
             return result
 
         self.m_logger.debug(
-            f"[_process_frame_create_model_tasks] Frame {frame_msg.frame_num} image shape: {img.shape}"
+            f"[_process_frame_create_model_tasks] Frame {frame_msg.metadata.frame_num} image shape: {img.shape}"
         )
 
         # convert img to torch tensor
@@ -635,52 +636,47 @@ class DetectorNode(Node, IOpenCloseProtocol):
         result = ProcessDetectionsByFrame.Result()
         result.x_return.message = "Accepted frame"
         result.x_return.code = ReturnResponse.SUCCESS
-        if "body" in detections_msg:
-            result.body_detections = detections_msg["body"]
-        if "head" in detections_msg:
-            result.head_detections = detections_msg["head"]
-        if "face" in detections_msg:
-            result.face_detections = detections_msg["face"]
-        return result
-
-    async def _accept_frame_accepted_callback(self, goal_handle):
-        # just accept the frame and add it to buffer, no processing
-        x_control = goal_handle.request.x_control
-
-        # ping
-        if x_control.code == 1:
-            goal_handle.succeed()
-            result = ProcessDetectionsByFrame.Result()
-            result.x_return.message = "Ping accepted"
-            result.x_return.code = ReturnResponse.SUCCESS
-            return result
-
-        # 获取一个处理任务的门票
-        self._m_in_process_queue.get()
-
-        frame = goal_handle.request.frame
-        self.m_logger.info(
-            f"---TIME LOG: framenum {frame.frame_num} node ddq_detector_node type IN time {self.get_clock().now().nanoseconds}"
-        )
-        uuid = goal_handle.request.x_uid
-        # self.m_logger.info(f'_accept_frame_accepted_callback(): frame_num: {frame.frame_num}, x_uid: {pyuuid.UUID(bytes=bytes(uuid.uuid))}')
-
-        # add it to every model task queue and get detections msg (wait for all models to finish)
-        detections_msg = await self._process_frame_create_model_tasks(frame, uuid)
-
-        self.m_logger.info(
-            f"---TIME LOG: framenum {frame.frame_num} detections_msg {detections_msg}"
-        )
-
-        goal_handle.succeed()
-        # 处理完后往in_process_queue中放一个ticket
-        self._m_in_process_queue.put("ticket")
-
-        result = ProcessDetectionsByFrame.Result()
-        result.x_return.message = "Accepted frame"
-        result.x_return.code = ReturnResponse.SUCCESS
         result.detections = detections_msg
         return result
+
+    # async def _accept_frame_accepted_callback(self, goal_handle):
+    #     # just accept the frame and add it to buffer, no processing
+    #     x_control = goal_handle.request.x_control
+
+    #     # ping
+    #     if x_control.code == 1:
+    #         goal_handle.succeed()
+    #         result = ProcessDetectionsByFrame.Result()
+    #         result.x_return.message = "Ping accepted"
+    #         result.x_return.code = ReturnResponse.SUCCESS
+    #         return result
+
+    #     # 获取一个处理任务的门票
+    #     self._m_in_process_queue.get()
+
+    #     frame = goal_handle.request.frame
+    #     self.m_logger.info(
+    #         f"---TIME LOG: framenum {frame.frame_num} node ddq_detector_node type IN time {self.get_clock().now().nanoseconds}"
+    #     )
+    #     uuid = goal_handle.request.x_uid
+    #     # self.m_logger.info(f'_accept_frame_accepted_callback(): frame_num: {frame.frame_num}, x_uid: {pyuuid.UUID(bytes=bytes(uuid.uuid))}')
+
+    #     # add it to every model task queue and get detections msg (wait for all models to finish)
+    #     detections_msg = await self._process_frame_create_model_tasks(frame, uuid)
+
+    #     self.m_logger.info(
+    #         f"---TIME LOG: framenum {frame.frame_num} detections_msg {detections_msg}"
+    #     )
+
+    #     goal_handle.succeed()
+    #     # 处理完后往in_process_queue中放一个ticket
+    #     self._m_in_process_queue.put("ticket")
+
+    #     result = ProcessDetectionsByFrame.Result()
+    #     result.x_return.message = "Accepted frame"
+    #     result.x_return.code = ReturnResponse.SUCCESS
+    #     result.detections = detections_msg
+    #     return result
 
     def _visualize(self, goal: ProcessDetectionsByFrame.Goal):
         detections = goal.detections
@@ -688,7 +684,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
         # img = self._get_frame_from_v6d(frame)
         img = np.copy(img)  # make a copy to avoid modifying the original image
         self.m_logger.debug(
-            f"_visualize(): frame {frame.frame_num} img shape {img.shape}"
+            f"_visualize(): frame {frame.metadata.frame_num} img shape {img.shape}"
         )
         for det in detections.detections:
             x, y, w, h = (
@@ -708,119 +704,116 @@ class DetectorNode(Node, IOpenCloseProtocol):
         #     self._out_video.release()
         #     self.m_logger.debug(f"_visualize(): test out video released")
 
-    def _merge_detections(self, input_data: ModelGroupOutputData) -> Detections:
-        merged_detections = None
-        for _, output in input_data.output_per_group.items():
-            if merged_detections is None:
-                merged_detections = output.detections
-            else:
-                merged_detections.detections.extend(output.detections.detections)
+    # def _merge_detections(self, input_data: ModelGroupOutputData) -> Detections:
+    #     merged_detections = None
+    #     for _, output in input_data.output_per_group.items():
+    #         if merged_detections is None:
+    #             merged_detections = output.detections
+    #         else:
+    #             merged_detections.detections.extend(output.detections.detections)
 
-        return merged_detections
+    #     return merged_detections
 
     def _merge_detections_by_category(
         self,
         category_to_results: dict[str, list[list[DetectionResult]]],
         frame_msg: Frame,
-    ) -> dict[str, Detections]:
-        merged_detections = {}
+    ) -> list[Detection]:
+        merged_detections = []
         for cat, results in category_to_results.items():
             detections = self._to_detections_msg(results, frame_msg)
-            merged_detections[cat] = detections
-            # if merged_detections is None:
-            #     merged_detections = detections
-            # else:
-            #     merged_detections.detections.extend(detections.detections)
+            # merged_detections[cat] = detections
+            merged_detections.extend(detections)
 
         return merged_detections
 
-    def _model_step(
-        self, input_data: ModelGroupInputData, source: StreamWorker
-    ) -> ModelGroupOutputData:
-        """
-        这个函数作为streamworker的worker_function_one_step，用于处理每个模型的任务
-        从input_data中获取img，然后送入模型中进行处理
-        处理完后，将结果转换为detections消息，然后填入output中，注意这里的output是从input_data中获取的
-        最后output被返回，这里的output不会被写入output_queue，因为这个output在创建input_data时就已经被写入output_queue了
+    # def _model_step(
+    #     self, input_data: ModelGroupInputData, source: StreamWorker
+    # ) -> ModelGroupOutputData:
+    #     """
+    #     这个函数作为streamworker的worker_function_one_step，用于处理每个模型的任务
+    #     从input_data中获取img，然后送入模型中进行处理
+    #     处理完后，将结果转换为detections消息，然后填入output中，注意这里的output是从input_data中获取的
+    #     最后output被返回，这里的output不会被写入output_queue，因为这个output在创建input_data时就已经被写入output_queue了
 
-        parameters
-        ------------
-            input_data: ModelGroupInputData
-                一个ModelGroupInputData对象，表示一个模型的输入，包括frame_msg，uuid_msg，img，output等信息
+    #     parameters
+    #     ------------
+    #         input_data: ModelGroupInputData
+    #             一个ModelGroupInputData对象，表示一个模型的输入，包括frame_msg，uuid_msg，img，output等信息
 
-            source: StreamWorker
-                worker_function_one_step要求的参数，表示调用这个函数的streamworker，用于获取一些streamworker中的信息比如user_data
+    #         source: StreamWorker
+    #             worker_function_one_step要求的参数，表示调用这个函数的streamworker，用于获取一些streamworker中的信息比如user_data
 
-        returns
-        ------------
-            bool: 表示输出的data是否是valid的，如果是True，即使它是none，
-            这个data会被write到out（若有output_function则以output_function实现为主，反之写入output_queue）
+    #     returns
+    #     ------------
+    #         bool: 表示输出的data是否是valid的，如果是True，即使它是none，
+    #         这个data会被write到out（若有output_function则以output_function实现为主，反之写入output_queue）
 
-            ModelGroupOutputData: ModelGroupOutputData对象，表示这个模型的输出，包括event和detections
-        """
-        model: BaseDetector = source.user_data["model"]
-        model_group_name: str = source.user_data["model_group_name"]
+    #         ModelGroupOutputData: ModelGroupOutputData对象，表示这个模型的输出，包括event和detections
+    #     """
+    #     model: BaseDetector = source.user_data["model"]
+    #     model_group_name: str = source.user_data["model_group_name"]
 
-        # get the first frame in the buffer dict
-        frame_msg = input_data.frame_msg
-        img = input_data.img
-        uuid = input_data.uuid_msg
-        main_group_name = input_data.main_group_name
-        output = input_data.output
+    #     # get the first frame in the buffer dict
+    #     frame_msg = input_data.frame_msg
+    #     img = input_data.img
+    #     uuid = input_data.uuid_msg
+    #     main_group_name = input_data.main_group_name
+    #     output = input_data.output
 
-        self.m_logger.info(
-            f"_model_step(): framenum {frame_msg.frame_num} uuid {pyuuid.UUID(bytes=bytes(uuid.uuid))} popped from model task queue"
-        )
+    #     self.m_logger.info(
+    #         f"_model_step(): framenum {frame_msg.frame_num} uuid {pyuuid.UUID(bytes=bytes(uuid.uuid))} popped from model task queue"
+    #     )
 
-        # # for time test
-        # if self._time_test:
-        #     if self._start_time is None:
-        #         torch.cuda.synchronize(model_idx)
-        #         self._start_time = time.time()
+    #     # # for time test
+    #     # if self._time_test:
+    #     #     if self._start_time is None:
+    #     #         torch.cuda.synchronize(model_idx)
+    #     #         self._start_time = time.time()
 
-        # if frame is FLUSH OR TERMINATE, send it to downstreams
-        if (
-            frame_msg.signal_code == SignalCode.FLUSH
-            or frame_msg.signal_code == SignalCode.TERMINATE
-        ):
-            detections = Detections()
-            detections.uuid = uuid
-            detections.frame = frame_msg
+    #     # if frame is FLUSH OR TERMINATE, send it to downstreams
+    #     if (
+    #         frame_msg.signal_code == SignalCode.FLUSH
+    #         or frame_msg.signal_code == SignalCode.TERMINATE
+    #     ):
+    #         detections = Detections()
+    #         detections.uuid = uuid
+    #         detections.frame = frame_msg
 
-        # test only
-        # img = torch.from_numpy(img).float().to(self.m_model_groups_data[model_group_name].group_models[model_idx].model.device).mean(dim=(0, 1))
-        # result = []
-        # process the image
-        else:
-            result = model.infer(
-                img, pred_threshold=self.m_runtime_config.pred_score_thr
-            )
+    #     # test only
+    #     # img = torch.from_numpy(img).float().to(self.m_model_groups_data[model_group_name].group_models[model_idx].model.device).mean(dim=(0, 1))
+    #     # result = []
+    #     # process the image
+    #     else:
+    #         result = model.infer(
+    #             img, pred_threshold=self.m_runtime_config.pred_score_thr
+    #         )
 
-            # convert the result to Detections msg
-            detections = self._to_detections_msg(result, frame_msg)
-            # detections = Detections()
-            detections.uuid = uuid
-            detections.frame = frame_msg
+    #         # convert the result to Detections msg
+    #         detections = self._to_detections_msg(result, frame_msg)
+    #         # detections = Detections()
+    #         detections.uuid = uuid
+    #         detections.frame = frame_msg
 
-        self.m_logger.info(
-            f"_model_step(): framenum {frame_msg.frame_num} model {model_group_name} detections {detections.detections}"
-        )
+    #     self.m_logger.info(
+    #         f"_model_step(): framenum {frame_msg.frame_num} model {model_group_name} detections {detections.detections}"
+    #     )
 
-        output.output_per_group[model_group_name].detections = detections
-        output.output_per_group[model_group_name].event.set()
+    #     output.output_per_group[model_group_name].detections = detections
+    #     output.output_per_group[model_group_name].event.set()
 
-        self.m_logger.info(
-            f"_model_step(): framenum {frame_msg.frame_num} model {model_group_name} event set"
-        )
+    #     self.m_logger.info(
+    #         f"_model_step(): framenum {frame_msg.frame_num} model {model_group_name} event set"
+    #     )
 
-        # add the Detections msg to downstreams queue
-        # self.m_logger.info(
-        #     f"_model_step(): framenum {frame_msg.frame_num} uuid {pyuuid.UUID(bytes=bytes(detections.uuid.uuid))}"
-        # )
+    #     # add the Detections msg to downstreams queue
+    #     # self.m_logger.info(
+    #     #     f"_model_step(): framenum {frame_msg.frame_num} uuid {pyuuid.UUID(bytes=bytes(detections.uuid.uuid))}"
+    #     # )
 
-        # if model_group_name == main_group_name:
-        #     return True, output
-        return True, None
+    #     # if model_group_name == main_group_name:
+    #     #     return True, output
+    #     return True, None
 
 
 async def spin(executor: SingleThreadedExecutor):

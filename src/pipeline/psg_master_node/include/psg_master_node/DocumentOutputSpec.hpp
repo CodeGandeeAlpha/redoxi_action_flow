@@ -71,7 +71,7 @@ class DeliverySourceData
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
         msg = m_document;
-        std::copy(m_uuid.begin(), m_uuid.end(), msg.uuid.uuid.begin());
+        std::copy(m_uuid.begin(), m_uuid.end(), msg.x_uid.uuid.begin());
         return 0;
     }
 

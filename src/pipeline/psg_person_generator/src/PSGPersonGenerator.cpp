@@ -337,23 +337,25 @@ void PSGPersonGenerator::_step()
         psg_private_msgs::msg::PsgDocument document_msg;
         document_msg = document_in_data->m_goal->document;
 
-        std::vector<PassengerFlow::DetectionPtr> v_body_detections;
-        FlowRos2Pipeline::convert_msg_to_detections(document_msg.body_detections, v_body_detections);
-        std::vector<PassengerFlow::DetectionPtr> v_head_detections;
-        FlowRos2Pipeline::convert_msg_to_detections(document_msg.head_detections, v_head_detections);
-
         std::vector<PassengerFlow::DetectionPtr> v_all_detections;
-        v_all_detections.insert(v_all_detections.end(), v_body_detections.begin(), v_body_detections.end());
-        v_all_detections.insert(v_all_detections.end(), v_head_detections.begin(), v_head_detections.end());
+        for (auto &msg_det : document_msg.detections) {
+            PassengerFlow::DetectionPtr det = std::make_shared<PassengerFlow::Detection>();
+            FlowRos2Pipeline::convert_msg_to_detection(msg_det, det);
+            v_all_detections.push_back(det);
+        }
         // extract person
         auto v_persons = m_impl->m_person_extractor.extract_persons(v_all_detections);
 
         // convert to msg
-        psg_private_msgs::msg::Persons persons_msg;
-        FlowRos2Pipeline::convert_persons_to_msg(v_persons, document_msg.frame, persons_msg);
+        for (auto &person : v_persons) {
+            psg_private_msgs::msg::Person msg_person;
+            msg_person.frame_metadata = document_msg.frame.metadata;
+            FlowRos2Pipeline::convert_person_to_msg(person, document_msg.frame, msg_person);
+            document_msg.persons.push_back(msg_person);
+        }
 
         // create tasks
-        document_msg.persons = persons_msg;
+        // document_msg.persons = persons_msg;
 
         // from input source data to output source data
         OutputSourceData_t output_source_data;
