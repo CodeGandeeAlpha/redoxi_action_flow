@@ -11,6 +11,10 @@ namespace redoxi_works::inference::yolo8
 class Yolo8ModelConfig : public defaults::DefaultKeyValueStore
 {
   public:
+    using Ptr = std::shared_ptr<Yolo8ModelConfig>;
+    using ConstPtr = std::shared_ptr<const Yolo8ModelConfig>;
+
+  public:
     Yolo8ModelConfig()
     {
         namespace cmkeys = common_config_keys;
@@ -23,6 +27,26 @@ class Yolo8ModelConfig : public defaults::DefaultKeyValueStore
         register_key(KeyInfo{cmkeys::DeviceIndex,
                              "int64", "The index of the device"},
                      &m_device_index);
+    }
+
+    // compare two Yolo8ModelConfig objects
+    bool operator==(const Yolo8ModelConfig &other) const
+    {
+        return m_model_path == other.m_model_path &&
+               m_device_type == other.m_device_type &&
+               m_device_index == other.m_device_index;
+    }
+
+    //! Compare operator for use in maps/sets
+    bool operator<(const Yolo8ModelConfig &other) const
+    {
+        if (m_model_path != other.m_model_path) {
+            return m_model_path < other.m_model_path;
+        }
+        if (m_device_type != other.m_device_type) {
+            return m_device_type < other.m_device_type;
+        }
+        return m_device_index < other.m_device_index;
     }
 
   protected:

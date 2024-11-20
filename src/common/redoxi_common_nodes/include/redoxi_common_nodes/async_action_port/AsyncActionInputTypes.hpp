@@ -76,8 +76,9 @@ static_assert(ReceiveSourceDataConcept<DefaultReceiveSourceData<_SampleAction>>,
               "DefaultReceiveSourceData does not satisfy ReceiveSourceDataConcept");
 
 //! The init config for the action input port
+template <TimeDurationConcept TTimeUnit>
 struct DefaultInitConfig {
-    using TimeUnit_t = DefaultTimeUnit_t;
+    using TimeUnit_t = TTimeUnit;
     inline static constexpr TimeUnit_t DefaultGoalResultExpireTime{std::chrono::milliseconds(1000)};
     virtual ~DefaultInitConfig() = default;
 
@@ -128,7 +129,7 @@ struct DefaultInitConfig {
               JS_MEMBER(action_name),
               JS_MEMBER(goal_result_expire_time));
 };
-static_assert(InitConfigConcept<DefaultInitConfig>);
+static_assert(InitConfigConcept<DefaultInitConfig<_SampleTimeUnit>>);
 
 //! for quick construction of a specification
 template <RosActionConcept TAction,
@@ -141,7 +142,7 @@ struct DefaultAsyncActionInputPortSpec {
     using TimeUnit_t = TTimeUnit;
 
     using ReceiveSourceData_t = DefaultReceiveSourceData<ActionType_t>;
-    using InitConfig_t = DefaultInitConfig;
+    using InitConfig_t = DefaultInitConfig<TTimeUnit>;
 };
 static_assert(AsyncActionInputPortSpecConcept<
               DefaultAsyncActionInputPortSpec<_SampleAction,

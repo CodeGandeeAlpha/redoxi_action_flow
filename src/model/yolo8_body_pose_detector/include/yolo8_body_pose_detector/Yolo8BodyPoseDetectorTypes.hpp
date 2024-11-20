@@ -17,12 +17,39 @@ class Yolo8BodyPoseDetector;
 
 namespace redoxi_works::model_nodes::yolo8_body_pose_detector
 {
+
+// a single inference resource, should be used by one single thread
+struct InferenceResource {
+    std::shared_ptr<inference::yolo8::Yolo8PoseModel> model;
+    inference::InferenceInOutData::Ptr inout_data;
+    inference::yolo8::Yolo8ModelConfig::Ptr model_config;
+
+    // the id of the replica
+    int replica_id = 0;
+};
+
 using TimeUnit = DefaultTimeUnit_t;
 using DetectionActionType = redoxi_public_msgs::action::ProcessDetectionsByFrame;
 using DetectionActionDataTrait = RedoxiActionDataTrait<DetectionActionType>;
 static_assert(RedoxiActionConcept<DetectionActionType>, "DetectionActionType must satisfy RedoxiActionConcept");
 
-using DetectionActionInputPortSpec = input_port_types::DefaultAsyncActionInputPortSpec<DetectionActionType, DetectionActionDataTrait, TimeUnit>;
+// the source data for the detection action input port
+// should be bound to a single inference resource
+class DetectionSourceData : public input_port_types::DefaultReceiveSourceData<DetectionActionType>
+{
+  public:
+    std::optional<InferenceResource> model_resource;
+};
+
+
+struct DetectionActionInputPortSpec {
+    using ActionType_t = DetectionActionType;
+    using ActionGoal_t = ActionType_t::Goal;
+    using ActionDataTrait_t = DetectionActionDataTrait;
+    using TimeUnit_t = TimeUnit;
+    using ReceiveSourceData_t = DetectionSourceData;
+    using InitConfig_t = input_port_types::DefaultInitConfig<TimeUnit>;
+};
 static_assert(input_port_types::AsyncActionInputPortSpecConcept<DetectionActionInputPortSpec>,
               "DetectionActionInputPortSpec must satisfy AsyncActionInputPortSpecConcept");
 
@@ -33,14 +60,16 @@ struct InitConfig {
     using ModelConfig_t = inference::yolo8::Yolo8ModelConfig;
     using InputPortConfig_t = DetectionActionInputPortSpec::InitConfig_t;
 
-    // yolo8 model configuration
-    std::shared_ptr<ModelConfig_t> model_config = std::make_shared<ModelConfig_t>();
+    // yolo8 model configurations, different model will work concurrently
+    // if the same model config is pushed multiple times, they are regarded as replicas of the same model
+    // and they will share the same model instance but using different inference inout data
+    std::vector<ModelConfig_t::Ptr> model_configs;
 
     // use shared_ptr because the port asks for it
     std::shared_ptr<InputPortConfig_t> input_port_config = std::make_shared<InputPortConfig_t>();
 
     virtual void from_parameters(const Yolo8BodyPoseDetector *node);
-    JS_OBJECT(JS_MEMBER(model_config),
+    JS_OBJECT(JS_MEMBER(model_configs),
               JS_MEMBER(input_port_config));
 };
 
