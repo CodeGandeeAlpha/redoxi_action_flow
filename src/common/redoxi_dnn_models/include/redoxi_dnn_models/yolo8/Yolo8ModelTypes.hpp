@@ -29,4 +29,32 @@ class Yolo8ModelConfig : public defaults::DefaultKeyValueStore
     int64_t m_device_index = 0;
 };
 
+class PostprocessorConfig
+{
+  public:
+    // negative value to mean no threshold
+    float conf_threshold = 0.25;
+    float iou_threshold = 0.45;
+};
+
+// keypoint in the image
+struct Keypoint {
+    std::array<float, 2> xy = {0, 0};
+    float score = 0;
+};
+
+// detected object in the image
+struct DetectedObject {
+    int64_t class_id = 0;
+    std::array<float, 4> xywh = {0, 0, 0, 0};
+    float score = 0;
+    std::vector<Keypoint> keypoints;
+};
+
+// output of the model for a single image
+struct SingleImageOutput {
+    using List = std::vector<SingleImageOutput>;
+    std::vector<DetectedObject> objects;
+};
+
 } // namespace redoxi_works::inference::yolo8
