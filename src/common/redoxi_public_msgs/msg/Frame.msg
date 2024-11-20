@@ -1,18 +1,17 @@
 # empty data: frame_num == -1
-unique_identifier_msgs/UUID uuid
+unique_identifier_msgs/UUID x_uid
 Control x_control
-std_msgs/Header header
+# same group id means the same object
+unique_identifier_msgs/UUID x_group_uid
+
+FrameMetadata metadata
 
 # cache data in external storage (such as shared memory)
-CacheData cache
 SharedMemoryToken shm_token
 
 # raw data, mainly for debugging, usually empty
 sensor_msgs/Image raw_image
 sensor_msgs/CompressedImage encoded_image
 
-# frame number, -1 for empty frame
-int64 frame_num -1
-
-# deprecated, use x_control.code instead
-int64 signal_code 0
+# any other data
+AnyData any_data

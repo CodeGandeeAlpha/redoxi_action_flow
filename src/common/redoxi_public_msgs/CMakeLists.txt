@@ -15,22 +15,23 @@ find_package(rosidl_default_generators REQUIRED)
 # find_package(rclpy REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/Keypoints.msg"
+  "msg/AnyData.msg"
   "msg/Box2.msg"
   "msg/CacheData.msg"
-  "msg/Detection.msg"
-  "msg/Detections.msg"
-  "msg/Frame.msg"
-  "msg/TrackTarget.msg"
   "msg/Control.msg"
-  "msg/ReturnResponse.msg"
+  "msg/Detection.msg"
   "msg/FeedbackResponse.msg"
+  "msg/Frame.msg"
+  "msg/FrameMetadata.msg"
+  "msg/Keypoints.msg"
+  "msg/ReturnResponse.msg"
   "msg/SharedMemoryToken.msg"
-  "action/ProcessFrame.action"
-  "action/ProcessDetections.action"
-  "action/ProcessDetectionsByFrame.action"
+  "msg/TrackTarget.msg"
   "action/ProcessBodyPoses.action"
   "action/ProcessBodyPosesByDets.action"
+  "action/ProcessDetections.action"
+  "action/ProcessDetectionsByFrame.action"
+  "action/ProcessFrame.action"
 
   DEPENDENCIES geometry_msgs std_msgs unique_identifier_msgs sensor_msgs
 )

@@ -15,12 +15,9 @@ find_package(unique_identifier_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Person.msg"
-  "msg/Persons.msg"
-  "msg/PersonTrajectories.msg"
   "msg/PersonTrajectory.msg"
-  "msg/TrajectoryEvent.msg"
-  "msg/TrajectoryEvents.msg"
   "msg/PsgDocument.msg"
+  "msg/TrajectoryEvent.msg"
   "action/ProcessPsgDocument.action"
   "action/ProcessTrackTargets.action"
 
