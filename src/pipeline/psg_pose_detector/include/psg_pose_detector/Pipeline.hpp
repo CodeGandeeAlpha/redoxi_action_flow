@@ -5,47 +5,47 @@
 #include <psg_master_node/StampedDocumentPub.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputPort.hpp>
 #include <psg_document_sink/AsyncDocumentInputPort.hpp>
-#include <psg_detector/GetDetectionsOutputSpec.hpp>
-#include <psg_detector/PipelineTypes.hpp>
+#include <psg_pose_detector/GetKeypointsOutputSpec.hpp>
+#include <psg_pose_detector/PipelineTypes.hpp>
 #include <thread>
 #include <nlohmann/json.hpp>
 
 namespace redoxi_works
 {
 
-struct PSGDetectorImpl;
+struct PSGPoseDetectorImpl;
 
 /**
- * @brief The class for PSG detector node.
+ * @brief The class for PSG pose detector node.
  * A frame is considered successfully sent if any downstream accepts it, in which case the frame is written into shared memory. Otherwise the frame is dropped.
  * @note: this is a stateful node, the status code is used to indicate the current state
  * state changes as following:
  * BEFORE_INIT -> [init()] -> CLOSED -> [open()] -> OPENED -> [start()] -> STARTED -> [stop()] -> STOPPED -> [close()] -> CLOSED
  * the action allowed at each state is shown in the comments of each function
  */
-class PSGDetectorNode : public rclcpp::Node,
-                        public IStartStopProtocol
+class PSGPoseDetectorNode : public rclcpp::Node,
+                            public IStartStopProtocol
 {
-    friend struct PSGDetectorImpl;
-    friend struct psg_detector::InitConfig;
+    friend struct PSGPoseDetectorImpl;
+    friend struct psg_pose_detector::InitConfig;
 
   public:
     using InputPort_t = AsyncDocumentInputPort;
     using InputSourceData_t = InputPort_t::SourceData_t;
     using ActionDataTrait_t = InputPort_t::ActionDataTrait_t;
 
-    //! Import all names from PSGMasterNodeInternalTypes
+    //! Import all names from PSGPoseDetectorInternalTypes
     //! @note: this is to allow subclass to override the type definitions
     // using OutputPortSpec = video_reader_base::OutputPortSpec;
-    using OutputPortPipeline_t = psg_detector::OutputPortPipelineType;
-    using OutputPortModel_t = psg_detector::OutputPortModelType;
+    using OutputPortPipeline_t = psg_pose_detector::OutputPortPipelineType;
+    using OutputPortModel_t = psg_pose_detector::OutputPortModelType;
 
-    using OutputModelSpec_t = psg_detector::OutputPortModelSpec;
+    using OutputModelSpec_t = psg_pose_detector::OutputPortModelSpec;
     using OutputModelAction_t = OutputModelSpec_t::ActionType_t;
     using OutputModelResult_t = OutputModelAction_t::Result;
 
-    using InitConfig_t = psg_detector::InitConfig;
-    using RuntimeConfig_t = psg_detector::RuntimeConfig;
+    using InitConfig_t = psg_pose_detector::InitConfig;
+    using RuntimeConfig_t = psg_pose_detector::RuntimeConfig;
 
     using DownstreamPipeline_t = OutputPortPipeline_t::Downstream_t;
     using DownstreamModel_t = OutputPortModel_t::Downstream_t;
@@ -71,10 +71,10 @@ class PSGDetectorNode : public rclcpp::Node,
 
   public:
     //! Constructor with node options and name
-    explicit PSGDetectorNode(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+    explicit PSGPoseDetectorNode(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
 
     //! Destructor
-    virtual ~PSGDetectorNode();
+    virtual ~PSGPoseDetectorNode();
 
   public:
     //! enable or disable document publishing
@@ -181,7 +181,7 @@ class PSGDetectorNode : public rclcpp::Node,
 
     //! create implementation details of this node
     //! @note this must be called before any other operations, so it cannot access any member variables
-    virtual std::shared_ptr<PSGDetectorImpl> _create_impl();
+    virtual std::shared_ptr<PSGPoseDetectorImpl> _create_impl();
 
     //! change status code
     virtual void _set_status_code(int status_code);
@@ -261,7 +261,7 @@ class PSGDetectorNode : public rclcpp::Node,
     std::atomic<bool> m_publish_to_debug_topic{false};
 
     //! implementation details of this node
-    std::shared_ptr<PSGDetectorImpl> m_impl;
+    std::shared_ptr<PSGPoseDetectorImpl> m_impl;
 
     //! json parameters read from ros parameters
     nlohmann::json m_json_parameters;

@@ -8,11 +8,20 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
+find_package(ament_cmake_python REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclpy REQUIRED)
+find_package(psg_detector REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_library(psg_pose_detector src/psg_pose_detector.cpp)
+set(pipeline_srcfiles
+  src/Pipeline.cpp
+  src/PipelineTypes.cpp
+)
+
+add_library(psg_pose_detector ${pipeline_srcfiles})
 add_library(psg_pose_detector::psg_pose_detector ALIAS psg_pose_detector)
 target_compile_features(psg_pose_detector PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 target_include_directories(psg_pose_detector PUBLIC
@@ -22,6 +31,13 @@ target_include_directories(psg_pose_detector PUBLIC
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
 target_compile_definitions(psg_pose_detector PRIVATE "PSG_POSE_DETECTOR_BUILDING_LIBRARY")
+
+ament_target_dependencies(
+  psg_pose_detector  PUBLIC
+  psg_detector
+  rclcpp
+  rclpy
+)
 
 install(
   DIRECTORY include/
@@ -33,6 +49,13 @@ install(
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
+)
+
+ament_python_install_package(${PROJECT_NAME})
+# Install Python executables
+install(PROGRAMS
+  ${PROJECT_NAME}/rtm_pose_detector_node.py
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
@@ -55,6 +78,12 @@ ament_export_libraries(
 )
 ament_export_targets(
   export_${PROJECT_NAME}
+)
+
+ament_export_dependencies(
+  rclcpp
+  rclpy
+  psg_detector
 )
 
 ament_package()

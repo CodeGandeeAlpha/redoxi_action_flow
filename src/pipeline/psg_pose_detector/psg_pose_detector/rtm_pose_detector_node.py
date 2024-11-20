@@ -11,13 +11,14 @@ from uuid import uuid4
 import cv2
 
 import rclpy
-from rclpy.action import ActionServer, ActionClient
+from rclpy.action import ActionServer, GoalResponse
+from rclpy.action.server import ServerGoalHandle
 import rclpy.logging
 from rclpy.node import Node
 from geometry_msgs.msg import Point
 
-from psg_actions.action import ProcessDetections, ProcessBodyPoses
-from psg_public_msgs.msg import BodyPose, Detections
+from redoxi_public_msgs.action import ProcessKeypointsByDets
+from redoxi_public_msgs.msg import Keypoints, ReturnResponse
 from psg_common.interfaces import IOpenCloseProtocol
 from psg_common.constants import (
     NodeStatusCode,
@@ -34,20 +35,13 @@ from psg_pose_detector.base_pose_detector import BasePoseDetector, PoseDetection
 import torch
 
 
+@define(kw_only=True)
+class ModelResource:
+    model: BasePoseDetector = field()
+    name: str = field(factory=lambda: str(uuid4()))
+
+
 class PoseDetectorNode(Node, IOpenCloseProtocol):
-    @define(kw_only=True, eq=False)
-    class Downstream:
-        handler: ActionClient = field(default=None)
-
-    @define(kw_only=True, eq=False)
-    class DSTask_BodyPoses:
-        bodyposes_goal: ProcessBodyPoses.Goal = field()
-        downstream: "PoseDetectorNode.Downstream" = field()
-        retry_times: int = field(default=0)
-
-    @define(kw_only=True, eq=False)
-    class ModelDownstreamNode:
-        action_name: str = field()
 
     @define(kw_only=True, eq=False)
     class RuntimeConfig:
@@ -92,44 +86,44 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         def from_parameters(node):
             pass
 
-    @define(kw_only=True, eq=False)
-    class ModelGroupSingleOutput:
-        event: threading.Event = field(factory=threading.Event)
-        body_poses: list[BodyPose] = field(default=None)
+    # @define(kw_only=True, eq=False)
+    # class ModelGroupSingleOutput:
+    #     event: threading.Event = field(factory=threading.Event)
+    #     body_poses: list[BodyPose] = field(default=None)
 
-    @define(kw_only=True, eq=False)
-    class ModelGroupOutputData:
-        # key: model_group_name, value: ModelGroupSingleOutput
-        # key表示model分组，value表示这个分组的输出
-        # 输出中包括event和body_poses，event用于等待该组模型处理完这张图片，body_poses是这张图片的pose结果
-        output_per_group: dict[str, "PoseDetectorNode.ModelGroupSingleOutput"] = field(
-            factory=dict
-        )
+    # @define(kw_only=True, eq=False)
+    # class ModelGroupOutputData:
+    #     # key: model_group_name, value: ModelGroupSingleOutput
+    #     # key表示model分组，value表示这个分组的输出
+    #     # 输出中包括event和body_poses，event用于等待该组模型处理完这张图片，body_poses是这张图片的pose结果
+    #     output_per_group: dict[str, "PoseDetectorNode.ModelGroupSingleOutput"] = field(
+    #         factory=dict
+    #     )
 
-    @define(kw_only=True, eq=False)
-    class ModelGroupInputData:
-        detections: Detections = field()
-        img: np.ndarray = field()
+    # @define(kw_only=True, eq=False)
+    # class ModelGroupInputData:
+    #     detections: Detections = field()
+    #     img: np.ndarray = field()
 
-        # main group is responsible for sending the result to output queue
-        main_group_name: str = field()
+    #     # main group is responsible for sending the result to output queue
+    #     main_group_name: str = field()
 
-        # write output here, for each model group
-        output: "PoseDetectorNode.ModelGroupOutputData" = field(
-            factory=lambda: PoseDetectorNode.ModelGroupOutputData()
-        )
+    #     # write output here, for each model group
+    #     output: "PoseDetectorNode.ModelGroupOutputData" = field(
+    #         factory=lambda: PoseDetectorNode.ModelGroupOutputData()
+    #     )
 
-    @define(kw_only=True)
-    class ModelGroup:
-        models: list[BasePoseDetector] = field(default=None)
-        workers: list[StreamWorker] = field(factory=list)
-        in_queue: queue.Queue["PoseDetectorNode.ModelGroupInputData"] = field(
-            factory=queue.Queue
-        )
-        out_queue: queue.Queue["PoseDetectorNode.ModelGroupOutputData"] = field(
-            factory=queue.Queue
-        )
-        name: str = field(factory=lambda: str(uuid4()))
+    # @define(kw_only=True)
+    # class ModelGroup:
+    #     models: list[BasePoseDetector] = field(default=None)
+    #     workers: list[StreamWorker] = field(factory=list)
+    #     in_queue: queue.Queue["PoseDetectorNode.ModelGroupInputData"] = field(
+    #         factory=queue.Queue
+    #     )
+    #     out_queue: queue.Queue["PoseDetectorNode.ModelGroupOutputData"] = field(
+    #         factory=queue.Queue
+    #     )
+    #     name: str = field(factory=lambda: str(uuid4()))
 
     def __init__(self, node_name):
         super().__init__(node_name)
@@ -137,20 +131,19 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         self.m_init_config: self.InitConfig = None
         self.m_runtime_config: self.RuntimeConfig = None
         self.m_action: ActionServer = None
-        self.m_downstreams: dict[str, ActionClient] = {}
+        # self.m_downstreams: dict[str, ActionClient] = {}
         self.m_logger = self.get_logger()
 
-        self.m_merge_workers = []
+        self.m_resource: asyncio.Queue[ModelResource] = None
 
-        self.m_model_groups_data: dict[str, PoseDetectorNode.ModelGroup] = (
-            {}
-        )  # key: model_name, value: ModelGroup
-        self.m_bodyposes_task_waiting: queue.Queue[
-            PoseDetectorNode.DSTask_BodyPoses
-        ] = queue.Queue()
+        # self.m_merge_workers = []
 
-        self.m_step_running = False
-        self.m_step_thread: threading.Thread = None
+        # self.m_model_groups_data: dict[str, PoseDetectorNode.ModelGroup] = (
+        #     {}
+        # )  # key: model_name, value: ModelGroup
+        # self.m_bodyposes_task_waiting: queue.Queue[
+        #     PoseDetectorNode.DSTask_BodyPoses
+        # ] = queue.Queue()
 
         # test only
         self._visualize_flag = True
@@ -162,12 +155,31 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
                 (1920, 1080),
             )
 
-    def _func_step(self):
-        while rclpy.ok() and self.m_step_running:
-            self._step()
-            t = self.m_runtime_config.step_interval_ms / 1000.0
-            if t > 0:
-                time.sleep(t)
+    async def _do_model_inference(
+        self, category: str, input_data_nchw: torch.Tensor, bboxes: list[list[float]]
+    ) -> PoseDetectionResult:
+        assert input_data_nchw.shape[0] == 1, "batch size must be 1"
+        assert input_data_nchw.dtype == torch.uint8, "input data must be uint8"
+        resource_queue = self.m_resource
+        # assert resource_queue is not None, f"no resource for category: {category}"
+        resource = await resource_queue.get()
+        self.m_logger.info(f"_do_model_inference(): after get resource")
+        # input_data_nchw = torch.randn(1, 3, 640, 640).to(
+        #     resource.model.device, dtype=torch.float32
+        # )
+        input_data_hwc = input_data_nchw.squeeze(0).permute(1, 2, 0).cpu().numpy()
+        res = resource.model.infer(input_data_hwc, bboxes)
+        # self.m_logger.info(f"res: {res}")
+        await resource_queue.put(resource)
+        return res
+
+    async def set_model(
+        self, model_resource: ModelResource, number_of_replicas: int = 1
+    ):
+        if self.m_resource is None:
+            self.m_resource = asyncio.Queue()
+        for _ in range(number_of_replicas):
+            await self.m_resource.put(model_resource)
 
     def update_init_config(self, init_config: InitConfig) -> int:
         assert (
@@ -217,16 +229,13 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         self.m_runtime_config = runtime_config
 
         # setup model groups data
-        self._init_model_groups_data()
+        # self._init_model_groups_data()
 
         # create v6d client
-        self.m_v6d_client = create_v6d_client()
+        # self.m_v6d_client = create_v6d_client()
 
         # setup upstreams
         self._create_action_server()
-
-        # setup downstreams
-        self._connect_to_downstreams()
 
         self.m_logger.info("init() done")
         self.m_status_code = NodeStatusCode.INITIALIZED
@@ -249,130 +258,130 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         )
         return ReturnCode.SUCCESS
 
-    def start_model_workers(self):
-        for model_group_name, model_group_data in self.m_model_groups_data.items():
-            for model in model_group_data.models:
-                # output_func = None
+    # def start_model_workers(self):
+    #     for model_group_name, model_group_data in self.m_model_groups_data.items():
+    #         for model in model_group_data.models:
+    #             # output_func = None
 
-                # # only main group is responsible for sending the result to output queue
-                # # other groups will just pretend to send the result
-                # if model_group_name != self.m_init_config.main_group_name:
-                #     output_func = lambda x, y: True
+    #             # # only main group is responsible for sending the result to output queue
+    #             # # other groups will just pretend to send the result
+    #             # if model_group_name != self.m_init_config.main_group_name:
+    #             #     output_func = lambda x, y: True
 
-                # 所有的模型都不写入output_queue，因为在创建input_data时output就已经被写入output_queue了
-                output_func = lambda x, y: True
+    #             # 所有的模型都不写入output_queue，因为在创建input_data时output就已经被写入output_queue了
+    #             output_func = lambda x, y: True
 
-                # create stream_worker for this model
-                stream_worker = StreamWorker(
-                    input_queue=model_group_data.in_queue,
-                    output_queue=model_group_data.out_queue,
-                    worker_function_one_step=self._model_step,
-                    user_data={"model": model, "model_group_name": model_group_name},
-                    output_function=output_func,
-                )
-                model_group_data.workers.append(stream_worker)
-                stream_worker.start()
+    #             # create stream_worker for this model
+    #             stream_worker = StreamWorker(
+    #                 input_queue=model_group_data.in_queue,
+    #                 output_queue=model_group_data.out_queue,
+    #                 worker_function_one_step=self._model_step,
+    #                 user_data={"model": model, "model_group_name": model_group_name},
+    #                 output_function=output_func,
+    #             )
+    #             model_group_data.workers.append(stream_worker)
+    #             stream_worker.start()
 
-    def stop_model_workers(self):
-        for model_group_name, model_group_data in self.m_model_groups_data.items():
-            for worker in model_group_data.workers:
-                worker.stop()
+    # def stop_model_workers(self):
+    #     for model_group_name, model_group_data in self.m_model_groups_data.items():
+    #         for worker in model_group_data.workers:
+    #             worker.stop()
 
-    def _result_processing_worker_step(
-        self, input_data: ModelGroupOutputData, source: StreamWorker
-    ) -> DSTask_BodyPoses:
-        """
-        这个函数作为streamworker的worker_function_one_step，等待所有结果中的event都被set后，合并所有结果，然后发送给下游
+    # def _result_processing_worker_step(
+    #     self, input_data: ModelGroupOutputData, source: StreamWorker
+    # ) -> DSTask_BodyPoses:
+    #     """
+    #     这个函数作为streamworker的worker_function_one_step，等待所有结果中的event都被set后，合并所有结果，然后发送给下游
 
-        parameters
-        ------------
-            input_data: ModelGroupOutputData
-                一个ModelGroupOutputData对象，表示所有模型的输出，key是model_group_name，value是ModelGroupSingleOutput
+    #     parameters
+    #     ------------
+    #         input_data: ModelGroupOutputData
+    #             一个ModelGroupOutputData对象，表示所有模型的输出，key是model_group_name，value是ModelGroupSingleOutput
 
-            source: StreamWorker
-                worker_function_one_step要求的参数，表示调用这个函数的streamworker，用于获取一些streamworker中的信息比如user_data
+    #         source: StreamWorker
+    #             worker_function_one_step要求的参数，表示调用这个函数的streamworker，用于获取一些streamworker中的信息比如user_data
 
-        returns
-        ------------
-            bool: 表示输出的data是否是valid的，如果是True，即使它是none，
-            这个data会被write到out（若有output_function则以output_function实现为主，反之写入output_queue）
+    #     returns
+    #     ------------
+    #         bool: 表示输出的data是否是valid的，如果是True，即使它是none，
+    #         这个data会被write到out（若有output_function则以output_function实现为主，反之写入output_queue）
 
-            list[DSTask_BodyPoses]: DSTask_BodyPoses的列表，每个元素表示一个发送给下游的任务
-        """
-        # wait for all models to finish
-        # FIXME: 这里的event.wait()会阻塞，如果有一个模型出现问题，会导致整个流程阻塞
-        for group_name, output in input_data.output_per_group.items():
-            output.event.wait()
+    #         list[DSTask_BodyPoses]: DSTask_BodyPoses的列表，每个元素表示一个发送给下游的任务
+    #     """
+    #     # wait for all models to finish
+    #     # FIXME: 这里的event.wait()会阻塞，如果有一个模型出现问题，会导致整个流程阻塞
+    #     for group_name, output in input_data.output_per_group.items():
+    #         output.event.wait()
 
-        # merge the results from all models
-        merge_bodyposes = self._merge_bodyposes(input_data)
-        # self.m_logger.info(f"_result_processing_worker_step(): {merge_bodyposes}")
+    #     # merge the results from all models
+    #     merge_bodyposes = self._merge_bodyposes(input_data)
+    #     # self.m_logger.info(f"_result_processing_worker_step(): {merge_bodyposes}")
 
-        outputs = []
-        for bodyposes in merge_bodyposes.values():
-            goal_msg = ProcessBodyPoses.Goal()
-            for bodypose in bodyposes:
-                goal_msg.body_poses.append(bodypose)
+    #     outputs = []
+    #     for bodyposes in merge_bodyposes.values():
+    #         goal_msg = ProcessBodyPoses.Goal()
+    #         for bodypose in bodyposes:
+    #             goal_msg.body_poses.append(bodypose)
 
-            # self.m_logger.info(f"{bodyposes}")
-            if len(bodyposes) > 0:
-                goal_msg.frame = bodyposes[0].frame
-            for ds_name, ds_client in self.m_downstreams.items():
-                task = PoseDetectorNode.DSTask_BodyPoses(
-                    bodyposes_goal=goal_msg, downstream=ds_client
-                )
-                outputs.append(task)
-        return True, outputs
+    #         # self.m_logger.info(f"{bodyposes}")
+    #         if len(bodyposes) > 0:
+    #             goal_msg.frame = bodyposes[0].frame
+    #         for ds_name, ds_client in self.m_downstreams.items():
+    #             task = PoseDetectorNode.DSTask_BodyPoses(
+    #                 bodyposes_goal=goal_msg, downstream=ds_client
+    #             )
+    #             outputs.append(task)
+    #     return True, outputs
 
-    def _create_task(
-        self, outputs: list[DSTask_BodyPoses], source: StreamWorker
-    ) -> bool:
-        """
-        这个函数作为streamworker的output_function，用于将结果发送给下游
-        原本的output_queue是直接将output写入output_queue，但是我们希望单独处理每个task，所以这里需要一个output_function
-        当output_function不为None时，streamworker会调用这个函数，且output_queue不会被使用
+    # def _create_task(
+    #     self, outputs: list[DSTask_BodyPoses], source: StreamWorker
+    # ) -> bool:
+    #     """
+    #     这个函数作为streamworker的output_function，用于将结果发送给下游
+    #     原本的output_queue是直接将output写入output_queue，但是我们希望单独处理每个task，所以这里需要一个output_function
+    #     当output_function不为None时，streamworker会调用这个函数，且output_queue不会被使用
 
-        parameters
-        ------------
-            outputs: list[DSTask_BodyPoses]
-                DSTask_BodyPoses的列表，每个元素表示一个发送给下游的任务
-            source: StreamWorker
-                output_function要求的参数，表示调用这个函数的streamworker，用于获取一些streamworker中的信息比如user_data
+    #     parameters
+    #     ------------
+    #         outputs: list[DSTask_BodyPoses]
+    #             DSTask_BodyPoses的列表，每个元素表示一个发送给下游的任务
+    #         source: StreamWorker
+    #             output_function要求的参数，表示调用这个函数的streamworker，用于获取一些streamworker中的信息比如user_data
 
-        returns
-        ------------
-            bool: True表示成功，False表示失败，如果失败了，streamworker会在下一次迭代中再次调用这个函数尝试write output
-        """
-        for task in outputs:
-            source.output_queue.put(task)
-            # self.m_logger.info(f"_create_task(): {task}")
-        return True
+    #     returns
+    #     ------------
+    #         bool: True表示成功，False表示失败，如果失败了，streamworker会在下一次迭代中再次调用这个函数尝试write output
+    #     """
+    #     for task in outputs:
+    #         source.output_queue.put(task)
+    #         # self.m_logger.info(f"_create_task(): {task}")
+    #     return True
 
-    def start_merge_worker(self):
-        output_queue = None
-        for model_group_name, model_group_data in self.m_model_groups_data.items():
-            if model_group_name == self.m_init_config.main_group_name:
-                output_queue = model_group_data.out_queue
-                # self.m_logger.info(
-                #     f"get main group output queue, name = {model_group_name}"
-                # )
-                break
+    # def start_merge_worker(self):
+    #     output_queue = None
+    #     for model_group_name, model_group_data in self.m_model_groups_data.items():
+    #         if model_group_name == self.m_init_config.main_group_name:
+    #             output_queue = model_group_data.out_queue
+    #             # self.m_logger.info(
+    #             #     f"get main group output queue, name = {model_group_name}"
+    #             # )
+    #             break
 
-        for i in range(self.m_init_config.merge_worker_num):
-            # create stream_worker for this model
-            merge_worker = StreamWorker(
-                input_queue=output_queue,
-                output_queue=self.m_bodyposes_task_waiting,
-                worker_function_one_step=self._result_processing_worker_step,
-                output_function=self._create_task,
-            )
-            merge_worker.start()
-            # self.m_logger.info(f"start_merge_worker(): merge worker {i} started")
-            self.m_merge_workers.append(merge_worker)
+    #     for i in range(self.m_init_config.merge_worker_num):
+    #         # create stream_worker for this model
+    #         merge_worker = StreamWorker(
+    #             input_queue=output_queue,
+    #             output_queue=self.m_bodyposes_task_waiting,
+    #             worker_function_one_step=self._result_processing_worker_step,
+    #             output_function=self._create_task,
+    #         )
+    #         merge_worker.start()
+    #         # self.m_logger.info(f"start_merge_worker(): merge worker {i} started")
+    #         self.m_merge_workers.append(merge_worker)
 
-    def stop_merge_worker(self):
-        for worker in self.m_merge_workers:
-            worker.stop()
+    # def stop_merge_worker(self):
+    #     for worker in self.m_merge_workers:
+    #         worker.stop()
 
     def start(self) -> int:
         # the node must be opened
@@ -380,15 +389,9 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
             self.m_status_code == NodeStatusCode.OPENED
         ), "cannot start because status code is not OPENED"
 
-        self.start_model_workers()
+        # self.start_model_workers()
 
-        self.start_merge_worker()
-
-        # create step thread
-        self.m_step_running = True
-
-        self.m_step_thread = threading.Thread(target=self._func_step)
-        self.m_step_thread.start()
+        # self.start_merge_worker()
 
         status_code_before = self.m_status_code
         self.m_status_code = NodeStatusCode.STARTED
@@ -407,23 +410,16 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         #     self.frame_timer.cancel()
         #     self.frame_timer = None
 
-        # terminate step thread
-        self.m_step_running = False
+        # self.stop_model_workers()
+        # self.stop_merge_worker()
 
-        if self.m_step_thread is not None:
-            self.m_step_thread.join()
-            self.m_logger.debug("stop(): step thread stopped")
-
-        self.stop_model_workers()
-        self.stop_merge_worker()
-
-        if self.m_model_groups_data:
-            for model_group_name, model_group_data in self.m_model_groups_data.items():
-                for model_idx in range(len(model_group_data.group_models)):
-                    model_group_data.group_models[model_idx].running_thread.join()
-                    self.m_logger.debug(
-                        f"stop(): model_thread of {model_group_name} stopped"
-                    )
+        # if self.m_model_groups_data:
+        #     for model_group_name, model_group_data in self.m_model_groups_data.items():
+        #         for model_idx in range(len(model_group_data.group_models)):
+        #             model_group_data.group_models[model_idx].running_thread.join()
+        #             self.m_logger.debug(
+        #                 f"stop(): model_thread of {model_group_name} stopped"
+        #             )
 
         status_code_before = self.m_status_code
         self.m_status_code = NodeStatusCode.STOPPED
@@ -460,107 +456,77 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         assert self.m_init_config is not None, "m_init_config is None"
         self.m_action = ActionServer(
             self,
-            ProcessDetections,
+            ProcessKeypointsByDets,
             self.m_init_config.process_detections_action,
-            self._accept_detections_accepted_callback,
+            self._execute_task,
+            goal_callback=self._goal_callback,
         )
         self.m_logger.info(
             f"_create_action_server(): created ActionServer for {self.m_init_config.process_detections_action}"
         )
 
-    def _connect_to_downstreams(self):
-        assert self.m_init_config is not None, "m_init_config is None"
+    # def _init_model_groups_data(self):
+    #     shared_output_queue = queue.Queue()
 
-        self.m_downstreams.clear()
-        for ds_name, ds_node in self.m_init_config.downstreams.items():
-            # 创建accept_frame_client
-            name = ds_node.action_name
-            client = ActionClient(self, ProcessBodyPoses, name)
-            self.m_logger.debug(
-                f"_connect_to_downstreams(): created ActionClient for {ds_name}"
-            )
-            self.m_downstreams[ds_name] = client
+    #     self.m_model_groups_data.clear()
+    #     for model_group_name, models in self.m_init_config.model_groups.items():
+    #         model_group_data = PoseDetectorNode.ModelGroup()
+    #         model_group_data.models = []
+    #         model_group_data.out_queue = shared_output_queue
+    #         model_group_data.name = model_group_name
+    #         for model in models:
+    #             model_group_data.models.append(model)
 
-    def _ping(self, ds_client):
-        goal_msg = ProcessBodyPoses.Goal()
-        goal_msg.x_control.code = 1  # ping
-        goal_msg.x_control.text_msg = "ping"
+    #         self.m_model_groups_data[model_group_name] = model_group_data
 
-        res = ds_client.send_goal_async(
-            goal_msg, feedback_callback=self._goal_feedback_callback
-        )
+    # def _process_detections_create_model_tasks(self, detections_msg):
+    #     # get the image from Vineyard
+    #     frame_msg = detections_msg.frame
+    #     img = (
+    #         self._get_frame_from_v6d(frame_msg)
+    #         if frame_msg.signal_code == SignalCode.RUN
+    #         else None
+    #     )
+    #     if img is not None:
+    #         self.m_logger.debug(
+    #             f"_process_frame_create_model_tasks(): framenum {frame_msg.frame_num} img shape {img.shape}"
+    #         )
 
-        # 等待goal被accept
-        while not res.done():
-            time.sleep(DefaultWaitForGoalDoneIntervalMs / 1000)
+    #     # add to every model task queue
+    #     input_data = PoseDetectorNode.ModelGroupInputData(
+    #         detections=detections_msg,
+    #         img=img,
+    #         main_group_name=self.m_init_config.main_group_name,
+    #     )
 
-        goal_handle = res.result()
-        if not goal_handle.accepted:
-            return False
-        return True
+    #     # create the output structure for filling output data by each model
+    #     input_data.output.output_per_group = {
+    #         group_name: PoseDetectorNode.ModelGroupSingleOutput()
+    #         for group_name in self.m_model_groups_data
+    #     }
 
-    def _init_model_groups_data(self):
-        shared_output_queue = queue.Queue()
+    #     # add to every model task queue
+    #     for model_group_name, model_group_data in self.m_model_groups_data.items():
+    #         # put result to main group model out queue
+    #         if model_group_name == self.m_init_config.main_group_name:
+    #             model_group_data.out_queue.put(input_data.output)
 
-        self.m_model_groups_data.clear()
-        for model_group_name, models in self.m_init_config.model_groups.items():
-            model_group_data = PoseDetectorNode.ModelGroup()
-            model_group_data.models = []
-            model_group_data.out_queue = shared_output_queue
-            model_group_data.name = model_group_name
-            for model in models:
-                model_group_data.models.append(model)
+    #         model_group_data.in_queue.put(input_data)
+    #         self.m_logger.debug(
+    #             f"_process_detections_create_model_tasks(): frame {detections_msg.frame.frame_num} added to model {model_group_name} task queue"
+    #         )
 
-            self.m_model_groups_data[model_group_name] = model_group_data
+    # def _get_frame_from_v6d(self, frame_msg):
+    #     if not frame_msg.cache.has_int_id:
+    #         raise RuntimeError("frame.cache has no int_id")
+    #     v6d_int_id = frame_msg.cache.id_int
 
-    def _process_detections_create_model_tasks(self, detections_msg):
-        # get the image from Vineyard
-        frame_msg = detections_msg.frame
-        img = (
-            self._get_frame_from_v6d(frame_msg)
-            if frame_msg.signal_code == SignalCode.RUN
-            else None
-        )
-        if img is not None:
-            self.m_logger.debug(
-                f"_process_frame_create_model_tasks(): framenum {frame_msg.frame_num} img shape {img.shape}"
-            )
+    #     # Get the blob from Vineyard
+    #     image = get_img_by_v6d_id(self.m_v6d_client, v6d_int_id)
 
-        # add to every model task queue
-        input_data = PoseDetectorNode.ModelGroupInputData(
-            detections=detections_msg,
-            img=img,
-            main_group_name=self.m_init_config.main_group_name,
-        )
+    #     return image
 
-        # create the output structure for filling output data by each model
-        input_data.output.output_per_group = {
-            group_name: PoseDetectorNode.ModelGroupSingleOutput()
-            for group_name in self.m_model_groups_data
-        }
-
-        # add to every model task queue
-        for model_group_name, model_group_data in self.m_model_groups_data.items():
-            # put result to main group model out queue
-            if model_group_name == self.m_init_config.main_group_name:
-                model_group_data.out_queue.put(input_data.output)
-
-            model_group_data.in_queue.put(input_data)
-            self.m_logger.debug(
-                f"_process_detections_create_model_tasks(): frame {detections_msg.frame.frame_num} added to model {model_group_name} task queue"
-            )
-
-    def _get_frame_from_v6d(self, frame_msg):
-        if not frame_msg.cache.has_int_id:
-            raise RuntimeError("frame.cache has no int_id")
-        v6d_int_id = frame_msg.cache.id_int
-
-        # Get the blob from Vineyard
-        image = get_img_by_v6d_id(self.m_v6d_client, v6d_int_id)
-
-        return image
-
-    def _to_bodyposes_msg(self, result, frame_msg, uuids, bboxes):
+    def _to_bodyposes_msg(self, result, frame_msg, uuids) -> list[Keypoints]:
         """
         PoseDetectionResult() # all persons in a PoseDetectionResult
         ...
@@ -572,7 +538,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         # self.m_logger.info(f"_to_bodyposes_msg(): frame {frame_msg.frame_num} uuids {uuids} bboxes {bboxes}")
 
         for i in range(len(keypoints)):
-            bodypose_msg = BodyPose()
+            bodypose_msg = Keypoints()
             for j in range(len(keypoints[i])):
                 kpt = Point()
                 kpt.x = keypoints[i][j][0]
@@ -581,124 +547,136 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
                 bodypose_msg.keypoints_2.append(kpt)
                 bodypose_msg.confidence.append(scores[i][j])
                 bodypose_msg.semantic_type.append(j)
-            bodypose_msg.uuid = uuids[i]
-            bodypose_msg.bbox.x = bboxes[i][0]
-            bodypose_msg.bbox.y = bboxes[i][1]
-            bodypose_msg.bbox.width = bboxes[i][2] - bboxes[i][0]
-            bodypose_msg.bbox.height = bboxes[i][3] - bboxes[i][1]
-            bodypose_msg.frame = frame_msg
+            bodypose_msg.x_group_uid = uuids[i]
+            bodypose_msg.frame_metadata = frame_msg.metadata
 
             bodyposes.append(bodypose_msg)
 
         return bodyposes
 
-    def _accept_detections_accepted_callback(self, goal_handle):
+    def _goal_callback(self, goal_request):
+        x_control = goal_request.x_control
+        if x_control.code == 1:
+            self.m_logger.info(f"frame {goal_request.frame.metadata.frame_num} ping")
+        # 如果资源队列为空,则拒绝该帧
+        if self.m_resource is None or self.m_resource.empty():
+            self.m_logger.info(
+                f"frame {goal_request.frame.metadata.frame_num} was rejected because resource is None"
+            )
+            return GoalResponse.REJECT
+
+        self.m_logger.info(
+            f"frame {goal_request.frame.metadata.frame_num} ping accepted"
+        )
+
+        return GoalResponse.ACCEPT
+
+    async def _execute_task(self, goal_handle: ServerGoalHandle):
         # just accept the frame and add it to buffer, no processing
         x_control = goal_handle.request.x_control
-
-        # # if buffer is full, reject the frame
-        # for _, model_group_data in self.m_model_groups_data.items():
-        #     if model_group_data.in_queue.qsize() >= self.m_runtime_config.buffer_size:
-        #         goal_handle.abort()
-        #         result = ProcessBodyPoses.Result()
-        #         result.return_msg = "Buffer is full"
-        #         result.return_code = ReturnCode.REJECTED
-        #         return result
 
         # ping
         if x_control.code == 1:
             goal_handle.succeed()
-            result = ProcessBodyPoses.Result()
-            result.return_msg = "Ping accepted"
-            result.return_code = ReturnCode.SUCCESS
+            result = ProcessKeypointsByDets.Result()
+            result.x_return.message = "Ping accepted"
+            result.x_return.code = ReturnResponse.SUCCESS
             return result
 
-        detections = goal_handle.request.detections
-        # self.m_logger.info(f'_accept_detections_accepted_callback(): frame_num: {detections.frame.frame_num}')
-
+        frame_msg = goal_handle.request.frame
         self.m_logger.info(
-            f"---TIME LOG: framenum {detections.frame.frame_num} node rtm_pose_detector_node type IN time {self.get_clock().now().nanoseconds}"
+            f"---TIME LOG: framenum {frame_msg.metadata.frame_num} node rtm_pose_detector_node type IN time {self.get_clock().now().nanoseconds}"
         )
 
-        # add it to every model task queue
-        self._process_detections_create_model_tasks(detections)
+        raw_img = frame_msg.raw_image
+        detections_msg = goal_handle.request.detections
+        bboxes, uuids = self._get_bboxes_and_uuids_from_detections(detections_msg)
 
-        goal_handle.succeed()
-
-        result = ProcessBodyPoses.Result()
-        result.return_msg = "Accepted frame"
-        result.return_code = ReturnCode.SUCCESS
-        return result
-
-    def _goal_feedback_callback(self, feedback_msg):
-        self.m_logger.info(
-            "_goal_feedback_callback(): {0}".format(feedback_msg.feedback.feedback_msg)
-        )
-
-    async def _send_goal_async(self, callback_func):
-        try:
-            bodyposes_task = self.m_bodyposes_task_waiting.get(
-                timeout=DefaultStreamWorkerGetTimeoutSec
-            )
-        except queue.Empty:
-            # self.m_logger.warn("_send_goal_async(): no detections task in queue")
-            return
-
-        ds_client = bodyposes_task.downstream
-
-        while True:
-            if (
-                not self.m_runtime_config.send_goal_retry
-            ) and bodyposes_task.bodyposes_goal.frame.signal_code == SignalCode.RUN:
-                if not self._ping(ds_client):
-                    continue  # FIXME: need sleep
-
+        if len(bboxes) == 0:
             self.m_logger.info(
-                f"---TIME LOG: framenum {bodyposes_task.bodyposes_goal.frame.frame_num} node rtm_pose_detector_node type OUT time {self.get_clock().now().nanoseconds / 1000000}"
+                f"_model_step(): framenum {frame_msg.frame_num} have no bboxes"
+            )
+            body_keypoints_msg_list = []
+            body_keypoints_msg = Keypoints()
+            body_keypoints_msg.frame_metadata = frame_msg.metadata
+            body_keypoints_msg_list.append(body_keypoints_msg)
+        else:
+
+            img: np.ndarray | None = (
+                np.frombuffer(raw_img.data, dtype=np.uint8).reshape(
+                    raw_img.height, raw_img.width, -1
+                )
+                if raw_img is not None
+                else None
+            )
+            if img is None:
+                goal_handle.abort()
+                result = ProcessKeypointsByDets.Result()
+                result.x_return.message = "No image data"
+                result.x_return.code = ReturnResponse.FAILURE
+                return result
+
+            self.m_logger.debug(
+                f"[_process_frame_create_model_tasks] Frame {frame_msg.metadata.frame_num} image shape: {img.shape}"
             )
 
-            if ds_client is None:
-                break
-            self._send_goal_future = ds_client.send_goal_async(
-                bodyposes_task.bodyposes_goal,
-                feedback_callback=self._goal_feedback_callback,
-            )
-            goal_handle = await self._send_goal_future
+            # convert img to torch tensor
+            img_tensor = torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0)
 
-            # 等待goal被accept
-            self.m_logger.debug("_send_goal(): waiting for response...")
+            task_res = await self._do_model_inference(img_tensor, bboxes)
 
-            if not goal_handle.accepted:
-                self.m_logger.debug(
-                    f"_send_goal(): Goal {bodyposes_task.bodyposes_goal.frame.frame_num} rejected :("
-                )
-                if (
-                    (not self.m_runtime_config.send_goal_retry)
-                    and bodyposes_task.bodyposes_goal.frame.signal_code
-                    == SignalCode.RUN
-                ):  # not retry
-                    break
-                else:  # retry
-                    bodyposes_task.retry_times += 1
-                    continue
-            else:
-                self.m_logger.info(
-                    f"_send_goal(): Goal {bodyposes_task.bodyposes_goal.frame.frame_num} accepted :)"
-                )
+            bodypose_msg_list = self._to_bodyposes_msg(task_res, frame_msg, uuids)
 
-                # 等待最终结果
-                result = (
-                    goal_handle.get_result().result
-                )  # get_result is sync method, get_result_async is async method
-                self.m_logger.debug(
-                    "_send_goal(): Result: {0}".format(result.return_msg)
-                )
-                break
-        callback_func()
+            self.m_logger.info("Awaiting all tasks")
 
-    def _visualize(self, goal: ProcessBodyPoses.Goal):
-        body_poses = goal.body_poses
-        frame = body_poses[0].frame
+            goal_handle.succeed()
+            result = ProcessKeypointsByDets.Result()
+            result.x_return.message = "Accepted frame"
+            result.x_return.code = ReturnResponse.SUCCESS
+            result.keypoints = bodypose_msg_list
+            return result
+
+    # def _accept_detections_accepted_callback(self, goal_handle):
+    #     # just accept the frame and add it to buffer, no processing
+    #     x_control = goal_handle.request.x_control
+
+    #     # # if buffer is full, reject the frame
+    #     # for _, model_group_data in self.m_model_groups_data.items():
+    #     #     if model_group_data.in_queue.qsize() >= self.m_runtime_config.buffer_size:
+    #     #         goal_handle.abort()
+    #     #         result = ProcessBodyPoses.Result()
+    #     #         result.return_msg = "Buffer is full"
+    #     #         result.return_code = ReturnCode.REJECTED
+    #     #         return result
+
+    #     # ping
+    #     if x_control.code == 1:
+    #         goal_handle.succeed()
+    #         result = ProcessBodyPoses.Result()
+    #         result.return_msg = "Ping accepted"
+    #         result.return_code = ReturnCode.SUCCESS
+    #         return result
+
+    #     detections = goal_handle.request.detections
+    #     # self.m_logger.info(f'_accept_detections_accepted_callback(): frame_num: {detections.frame.frame_num}')
+
+    #     self.m_logger.info(
+    #         f"---TIME LOG: framenum {detections.frame.frame_num} node rtm_pose_detector_node type IN time {self.get_clock().now().nanoseconds}"
+    #     )
+
+    #     # add it to every model task queue
+    #     self._process_detections_create_model_tasks(detections)
+
+    #     goal_handle.succeed()
+
+    #     result = ProcessBodyPoses.Result()
+    #     result.return_msg = "Accepted frame"
+    #     result.return_code = ReturnCode.SUCCESS
+    #     return result
+
+    def _visualize(self, goal: ProcessKeypointsByDets.Goal):
+        body_poses = goal.keypoints
+        frame = goal.frame
         img = self._get_frame_from_v6d(frame)
 
         img = np.copy(img)  # make a copy to avoid modifying the original image
@@ -726,154 +704,36 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         #     self._out_video.release()
         #     self.m_logger.debug(f"_visualize(): test out video released")
 
-    def _merge_bodyposes(
-        self, input_data: ModelGroupOutputData
-    ) -> dict[int, list[BodyPose]]:
-        """
-        对于input_data中的每一个model_group_name，将其body_poses合并到一个dict中，key是frame_num，value是BodyPose列表
+    # def _merge_bodyposes(
+    #     self, input_data: ModelGroupOutputData
+    # ) -> dict[int, list[BodyPose]]:
+    #     """
+    #     对于input_data中的每一个model_group_name，将其body_poses合并到一个dict中，key是frame_num，value是BodyPose列表
 
-        parameters
-        ------------
-            input_data: ModelGroupOutputData
-                一个ModelGroupOutputData对象，表示一组模型的输出，key是model_group_name，value是ModelGroupSingleOutput
+    #     parameters
+    #     ------------
+    #         input_data: ModelGroupOutputData
+    #             一个ModelGroupOutputData对象，表示一组模型的输出，key是model_group_name，value是ModelGroupSingleOutput
 
-        returns
-        ------------
-            dict[int, list[BodyPose]]: key是frame_num，value是BodyPose列表，每个BodyPose对象表示一个人的pose结果
-        """
-        merged_bodyposes = {}
-        for _, output in input_data.output_per_group.items():
-            framenumber = output.body_poses[0].frame.frame_num
-            if framenumber not in merged_bodyposes:
-                merged_bodyposes[framenumber] = output.body_poses
-            else:
-                merged_bodyposes[framenumber].extend(output.body_poses)
+    #     returns
+    #     ------------
+    #         dict[int, list[BodyPose]]: key是frame_num，value是BodyPose列表，每个BodyPose对象表示一个人的pose结果
+    #     """
+    #     merged_bodyposes = {}
+    #     for _, output in input_data.output_per_group.items():
+    #         framenumber = output.body_poses[0].frame.frame_num
+    #         if framenumber not in merged_bodyposes:
+    #             merged_bodyposes[framenumber] = output.body_poses
+    #         else:
+    #             merged_bodyposes[framenumber].extend(output.body_poses)
 
-        return merged_bodyposes
-
-    def _step(self):
-        # check status
-        if self.m_status_code != NodeStatusCode.STARTED:
-            # nothing to do if not started
-            return
-
-        # time1 = time.time()
-        asyncio.run(self._send_goal_async(lambda: None))
-        # time2 = time.time()
-        # self.m_logger.info(f"_step(): send goal time {time2 - time1}")
-
-    def _model_step(
-        self, input_data: ModelGroupInputData, source: StreamWorker
-    ) -> ModelGroupOutputData:
-        """
-        这个函数作为streamworker的worker_function_one_step，用于处理每个模型的任务
-        从input_data中获取detections，然后根据detections中的bbox和uuid，从img中截取出对应的人体，然后送入模型中进行处理
-        处理完后，将结果转换为BodyPose消息，然后填入output中，注意这里的output是从input_data中获取的
-        最后output被返回，这里的output不会被写入output_queue，因为这个output在创建input_data时就已经被写入output_queue了
-
-        parameters
-        ------------
-            input_data: ModelGroupInputData
-                一个ModelGroupInputData对象，表示一个模型的输入，包括detections，img，main_group_name，output等信息
-
-            source: StreamWorker
-                worker_function_one_step要求的参数，表示调用这个函数的streamworker，用于获取一些streamworker中的信息比如user_data
-
-        returns
-        ------------
-            bool: 表示输出的data是否是valid的，如果是True，即使它是none，
-            这个data会被write到out（若有output_function则以output_function实现为主，反之写入output_queue）
-
-            ModelGroupOutputData: ModelGroupOutputData对象，表示这个模型的输出，包括event和body_poses
-
-        """
-
-        model: BasePoseDetector = source.user_data["model"]
-        model_group_name: str = source.user_data["model_group_name"]
-
-        # get the first frame in the buffer dict
-        detections_msg = input_data.detections
-        frame_msg = detections_msg.frame
-        img = input_data.img
-        main_group_name = input_data.main_group_name
-        output = input_data.output
-
-        # self.m_logger.info(
-        #     f"_model_step(): framenum {frame_msg.frame_num} uuid {pyuuid.UUID(bytes=bytes(uuid.uuid))} popped from model task queue"
-        # )
-
-        # # for time test
-        # if self._time_test:
-        #     if self._start_time is None:
-        #         torch.cuda.synchronize(model_idx)
-        #         self._start_time = time.time()
-
-        # if frame is FLUSH OR TERMINATE, send it to downstreams
-        if (
-            frame_msg.signal_code == SignalCode.FLUSH
-            or frame_msg.signal_code == SignalCode.TERMINATE
-        ):
-            bodypose_msg_list = []
-            bodypose_msg = BodyPose()
-            bodypose_msg.frame = frame_msg
-            bodypose_msg_list.append(bodypose_msg)
-            self.m_logger.debug(
-                f"_model_step(): framenum {frame_msg.frame_num}"
-                + f"added to model {model_group_name} task out queue"
-            )
-
-        else:
-            bboxes, uuids = self._get_bboxes_and_uuids_from_detections(detections_msg)
-            if len(bboxes) == 0:
-                self.m_logger.info(
-                    f"_model_step(): framenum {frame_msg.frame_num} have no bboxes"
-                )
-                bodypose_msg_list = []
-                bodypose_msg = BodyPose()
-                bodypose_msg.frame = frame_msg
-                bodypose_msg_list.append(bodypose_msg)
-            else:
-                # process the image
-                result = model.infer(img, bboxes)
-
-                # no process test only
-                # img = torch.from_numpy(img).float().to(self.m_model_groups_data[model_group_name].group_models[model_idx].model.device).mean(dim=(0, 1))
-
-                # time.sleep(0.001)
-
-                # convert the result to BodyPose msgs list
-                bodypose_msg_list = self._to_bodyposes_msg(
-                    result, frame_msg, uuids, bboxes
-                )
-
-        # no process test only
-        # bodypose_msg = BodyPose()
-        # bodypose_msg.frame = frame_msg
-        # bodypose_msg_list = [bodypose_msg]
-
-        # self.m_logger.info(f"_model_step(): framenum {frame_msg.frame_num} detections {detections}")
-
-        output.output_per_group[model_group_name].body_poses = bodypose_msg_list
-        output.output_per_group[model_group_name].event.set()
-
-        self.m_logger.debug(
-            f"_model_step(): framenum {frame_msg.frame_num} "
-            + f"added to model {model_group_name} task out queue"
-        )
-
-        # self.m_logger.info(
-        #     f"_model_step(): framenum {frame_msg.frame_num} detections {detections}"
-        # )
-
-        # if model_group_name == main_group_name:
-        #     return True, output
-        return True, None
+    #     return merged_bodyposes
 
     def _get_bboxes_and_uuids_from_detections(self, detections_msg):
         # [[x1, y1, x2, y2], ...]
         bboxes = []
         uuids = []
-        for det in detections_msg.detections:
+        for det in detections_msg:
             bbox = [
                 det.bbox.x,
                 det.bbox.y,
@@ -885,10 +745,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
         return bboxes, uuids
 
 
-def main(args=None):
-    # init node
-    rclpy.init(args=args)
-    rtm_pose_detector_node = PoseDetectorNode("pose_detector_node")
+async def init(rtm_pose_detector_node):
 
     # init config
     init_config = PoseDetectorNode.InitConfig(
@@ -908,15 +765,9 @@ def main(args=None):
             onnx_model=onnx_model_path, model_input_size=(192, 256), device="cuda"
         )
 
-        if "bodypose" not in init_config.model_groups:
-            init_config.model_groups["rtm_bodypose"] = []
-        init_config.model_groups["rtm_bodypose"].append(rtm_pose_model)
+        model_resource = ModelResource(model=rtm_pose_model)
+        await rtm_pose_detector_node.set_model(model_resource)
         rtm_pose_detector_node.get_logger().info(f"model {i} initialized")
-    downstream = PoseDetectorNode.ModelDownstreamNode(
-        action_name="pose_detector_pipeline_process_bodyposes_action"
-        # action_name="pose_detector_out_process_bodyposes_action"
-    )
-    init_config.downstreams["pose_detector_pipeline"] = downstream
 
     # runtime config
     runtime_config = PoseDetectorNode.RuntimeConfig()
@@ -926,10 +777,16 @@ def main(args=None):
 
     rtm_pose_detector_node.init(init_config, runtime_config)
 
+
+def main(args=None):
+    rclpy.init(args=args)
+    rtm_pose_detector_node = PoseDetectorNode("rtm_pose_detector_node")
+    asyncio.run(init(rtm_pose_detector_node))
     rtm_pose_detector_node.open()
     rtm_pose_detector_node.start()
-
     rclpy.spin(rtm_pose_detector_node)
+    rtm_pose_detector_node.close()
+    rclpy.shutdown()
 
 
 if __name__ == "__main__":

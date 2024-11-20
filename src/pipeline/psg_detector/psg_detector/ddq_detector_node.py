@@ -155,7 +155,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self.m_logger = self.get_logger()
         self.m_category_to_resource: dict[str, asyncio.Queue[ModelResource]] = {}
 
-        self._m_in_process_queue: queue.Queue = None
+        # self._m_in_process_queue: queue.Queue = None
 
         # self.m_merge_workers = []
 
@@ -256,12 +256,12 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self.m_init_config = init_config
         self.m_runtime_config = runtime_config
 
-        # 创建一个队列，用于发放处理任务的门票
-        self._m_in_process_queue = queue.Queue(
-            maxsize=self.m_runtime_config.buffer_size
-        )
-        while not self._m_in_process_queue.full():
-            self._m_in_process_queue.put("ticket")
+        # # 创建一个队列，用于发放处理任务的门票
+        # self._m_in_process_queue = queue.Queue(
+        #     maxsize=self.m_runtime_config.buffer_size
+        # )
+        # while not self._m_in_process_queue.full():
+        #     self._m_in_process_queue.put("ticket")
 
         # setup model groups data
         # self._init_model_groups_data()
@@ -343,7 +343,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
             self.m_status_code == NodeStatusCode.STARTED
         ), "cannot stop because status code is not STARTED"
 
-        self.stop_model_workers()
+        # self.stop_model_workers()
 
         # if self._m_model_groups_data:
         #     for model_group_name, model_group_data in self._m_model_groups_data.items():

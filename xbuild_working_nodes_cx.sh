@@ -26,7 +26,8 @@ PackagesToBuild="redoxi_common_nodes \
                  psg_document_sink \
                  psg_detector \
                  psg_frame_det_source_sink \
-                 psg_person_generator"
+                 psg_person_generator \
+                 psg_pose_detector"
 
 
 # PackagesToBuild="
