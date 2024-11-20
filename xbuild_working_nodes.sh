@@ -32,7 +32,7 @@ PackagesToBuild="redoxi_common_nodes \
                  redoxi_inference \
                  redoxi_inference_onnx \
                  redoxi_dnn_models \
-                 test_package \
+                 yolo8_body_pose_detector \
                  rosboard"
 
 # Check if --help flag is provided

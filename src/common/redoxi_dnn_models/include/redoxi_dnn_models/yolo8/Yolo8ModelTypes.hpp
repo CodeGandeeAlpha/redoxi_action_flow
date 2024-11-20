@@ -2,6 +2,7 @@
 
 #include <redoxi_dnn_models/redoxi_dnn_models.hpp>
 #include <redoxi_inference/default_impl.hpp>
+#include <json_struct/json_struct.h>
 #include <optional>
 
 namespace redoxi_works::inference::yolo8
@@ -28,6 +29,11 @@ class Yolo8ModelConfig : public defaults::DefaultKeyValueStore
     std::string m_model_path;
     std::string m_device_type = common_device_types::CPU;
     int64_t m_device_index = 0;
+
+  public:
+    JS_OBJECT(JS_MEMBER_WITH_NAME(m_model_path, "model_path"),
+              JS_MEMBER_WITH_NAME(m_device_type, "device_type"),
+              JS_MEMBER_WITH_NAME(m_device_index, "device_index"));
 };
 
 class PostprocessorConfig

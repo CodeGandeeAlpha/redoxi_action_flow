@@ -34,7 +34,8 @@ class Yolo8ModelBase : public RedoxiModelInference
     // Yolo8Pose specific
 
     // process the images, and set the data to the model input
-    // image format can be "rgb" or "bgr" or "gray", all images must be of the same format
+    // image format follows the ros2 sensor_msgs::image_encodings convention
+    // can be "rgb8" or "bgr8" or "mono8", all images must be of the same format
     virtual int set_input_images(InferenceInOutData::Ptr model_inout_data,
                                  const std::vector<cv::Mat> &images,
                                  const std::string &image_format);

@@ -38,16 +38,16 @@ class AsyncActionInputPort : public IStartStopProtocol
 
     // useful types
     using MasterSpec_t = TSpec; // master specification of this port
-    using ActionType_t = TSpec::ActionType_t;
-    using ActionGoal_t = TSpec::ActionGoal_t;
-    using ActionResult_t = ActionType_t::Result;
-    using ActionFeedback_t = ActionType_t::Feedback;
-    using ActionDataTrait_t = TSpec::ActionDataTrait_t;
-    using InitConfig_t = TSpec::InitConfig_t;
-    using SourceData_t = TSpec::ReceiveSourceData_t;
-    using GoalHandle_t = SourceData_t::GoalHandle_t;
+    using ActionType_t = typename TSpec::ActionType_t;
+    using ActionGoal_t = typename TSpec::ActionGoal_t;
+    using ActionResult_t = typename ActionType_t::Result;
+    using ActionFeedback_t = typename ActionType_t::Feedback;
+    using ActionDataTrait_t = typename TSpec::ActionDataTrait_t;
+    using InitConfig_t = typename TSpec::InitConfig_t;
+    using SourceData_t = typename TSpec::ReceiveSourceData_t;
+    using GoalHandle_t = typename SourceData_t::GoalHandle_t;
     using GoalUUID_t = rclcpp_action::GoalUUID;
-    using TimeUnit_t = TSpec::TimeUnit_t;
+    using TimeUnit_t = typename TSpec::TimeUnit_t;
 
   public:
     //! Initialize the port, state transition: BEFORE_INIT -> STOPPED
@@ -443,7 +443,7 @@ class AsyncActionInputPort : public IStartStopProtocol
     std::shared_ptr<InitConfig_t> m_init_config;
 
     // the action server
-    rclcpp_action::Server<ActionType_t>::SharedPtr m_action_server;
+    typename rclcpp_action::Server<ActionType_t>::SharedPtr m_action_server;
 
 #ifdef ASYNC_INPUT_PORT_USE_TBB_HASH_MAP
     // buffer map for storing source data, unordered

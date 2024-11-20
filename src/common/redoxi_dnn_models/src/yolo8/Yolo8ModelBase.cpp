@@ -3,7 +3,7 @@
 #include <redoxi_dnn_models/yolo8/Yolo8Postprocessor.hpp>
 #include <redoxi_dnn_models/yolo8/Yolo8ModelBaseImpl.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
-
+#include <sensor_msgs/image_encodings.hpp>
 
 #define ENABLE_DEBUG_OUTPUT
 #ifdef ENABLE_DEBUG_OUTPUT

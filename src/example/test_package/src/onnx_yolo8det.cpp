@@ -1,5 +1,6 @@
 #include <redoxi_dnn_models/yolo8/Yolo8DetectionModel.hpp>
 #include <redoxi_common_cpp/image_proc/utils.hpp>
+#include <sensor_msgs/image_encodings.hpp>
 // #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <opencv2/opencv.hpp>
 #include <spdlog/spdlog.h>
@@ -70,7 +71,7 @@ int main(int argc, char **argv)
         auto inout_data = yolo_model.create_inference_inout_data();
 
         spdlog::info("Setting input images");
-        yolo_model.set_input_images(inout_data, {resized_image}, "bgr");
+        yolo_model.set_input_images(inout_data, {resized_image}, sensor_msgs::image_encodings::BGR8);
 
         spdlog::info("Running inference");
         yolo_model.do_inference(inout_data);
