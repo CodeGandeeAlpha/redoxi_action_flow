@@ -585,7 +585,7 @@ int FrameRelayPublisher::_debug_publish_accepted_goal(const FrameReceiveAction_t
         return -1;
     }
 
-    m_debug_pub_accepted_goal->publish(raw_image, fmt::format("accepted frame {}", goal.frame.frame_num), cv::Scalar(0, 255, 0));
+    m_debug_pub_accepted_goal->publish(raw_image, fmt::format("accepted frame {}", goal.frame.metadata.frame_num), cv::Scalar(0, 255, 0));
     return 0;
 }
 
@@ -607,7 +607,7 @@ int FrameRelayPublisher::_debug_publish_rejected_goal(const FrameReceiveAction_t
         return -1;
     }
 
-    m_debug_pub_rejected_goal->publish(raw_image, fmt::format("rejected frame {}", goal.frame.frame_num), cv::Scalar(0, 0, 255));
+    m_debug_pub_rejected_goal->publish(raw_image, fmt::format("rejected frame {}", goal.frame.metadata.frame_num), cv::Scalar(0, 0, 255));
     return 0;
 }
 

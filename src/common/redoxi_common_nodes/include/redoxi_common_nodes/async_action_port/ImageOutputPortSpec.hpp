@@ -183,7 +183,7 @@ class DeliveryRequest : public DeliveryRequestBase
         cv_bridge_image.image = image;
         cv_bridge_image.encoding = sensor_msgs::image_encodings::BGR8;
         cv_bridge_image.toImageMsg(goal.frame.raw_image);
-        goal.frame.frame_num = this->m_source_data.get_frame_number();
+        goal.frame.metadata.frame_num = this->m_source_data.get_frame_number();
 
         // set additional information into the goal
         using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
