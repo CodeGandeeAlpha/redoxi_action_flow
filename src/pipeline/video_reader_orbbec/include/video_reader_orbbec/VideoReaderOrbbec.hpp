@@ -21,11 +21,19 @@ struct VideoReaderOrbbecInitConfig : public RedoxiVideoReaderBase::InitConfig_t 
 struct VideoReaderOrbbecRuntimeConfig : public RedoxiVideoReaderBase::RuntimeConfig_t {
   public:
     inline static const cv::Size DEFAULT_FRAME_SIZE{1920, 1080};
+    bool rotate_180{false};
+
+    //! Load parameters from node, this will override empty existing parameters
+    void from_parameters(RedoxiVideoReaderBase *node) override;
 
     VideoReaderOrbbecRuntimeConfig()
     {
         output_image_size = DEFAULT_FRAME_SIZE;
     }
+
+    // json serialize
+    JS_OBJECT_WITH_SUPER(JS_SUPER(RedoxiVideoReaderBase::RuntimeConfig_t),
+                         JS_MEMBER(rotate_180));
 };
 
 class VideoReaderOrbbec : public RedoxiVideoReaderBase

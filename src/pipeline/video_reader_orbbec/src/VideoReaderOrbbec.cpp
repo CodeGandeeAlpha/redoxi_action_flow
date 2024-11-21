@@ -43,6 +43,26 @@ void VideoReaderOrbbecInitConfig::from_parameters(RedoxiVideoReaderBase *node)
     RDX_INFO_DEV(orbbec_node, __func__, false, "orbbec_net_device_ip: {}", this->orbbec_net_device_ip);
 }
 
+void VideoReaderOrbbecRuntimeConfig::from_parameters(RedoxiVideoReaderBase *node)
+{
+    auto orbbec_node = dynamic_cast<VideoReaderOrbbec *>(node);
+    RDX_INFO_DEV(orbbec_node, __func__, false, "{}", "load runtime config from node");
+    auto &json_params = orbbec_node->get_json_parameters();
+
+    //! Load runtime config from json parameters if exists
+    if (json_params.contains("runtime_config")) {
+        RDX_INFO_DEV(orbbec_node, __func__, false, "{}", "found runtime_config in json parameters");
+        std::string json_str = json_params["runtime_config"].dump();
+        JS::ParseContext context(json_str);
+        auto error = context.parseTo(*this);
+        if (error != JS::Error::NoError) {
+            RDX_RAISE_ERROR("[{}] Error parsing runtime_config: {}", __func__, context.makeErrorString());
+        }
+    }
+
+    RDX_INFO_DEV(orbbec_node, __func__, false, "{}", "runtime config loaded");
+}
+
 int VideoReaderOrbbec::update_init_config(std::shared_ptr<RedoxiVideoReaderBase::InitConfig_t> config)
 {
     int ret = RedoxiVideoReaderBase::update_init_config(config);
@@ -111,6 +131,15 @@ int VideoReaderOrbbec::update_runtime_config(std::shared_ptr<RedoxiVideoReaderBa
     if (ret != 0) {
         return ret;
     }
+
+    auto orbbec_config = std::dynamic_pointer_cast<VideoReaderOrbbecRuntimeConfig>(config);
+    if (!orbbec_config) {
+        RDX_RAISE_ERROR("[{}] Failed to cast config to VideoReaderOrbbecRuntimeConfig", __func__);
+        return -1;
+    }
+
+    RDX_INFO_DEV(this, __func__, false, "rotate_180: {}", orbbec_config->rotate_180);
+
     return 0;
 }
 
@@ -175,6 +204,16 @@ int VideoReaderOrbbec::_read_frame(SourceData_t &data, std::atomic<int64_t> &fra
 
     auto _color_frame = m_format_convert_filter->process(color_frame)->as<ob::ColorFrame>();
     auto frame = _orbbec_color_to_cvmat(_color_frame);
+
+    auto orbbec_config = std::dynamic_pointer_cast<VideoReaderOrbbecRuntimeConfig>(m_runtime_config);
+    if (!orbbec_config) {
+        RDX_RAISE_ERROR("[{}] Failed to cast config to VideoReaderOrbbecRuntimeConfig", __func__);
+        return -1;
+    }
+
+    if (orbbec_config->rotate_180) {
+        cv::rotate(frame, frame, cv::ROTATE_180);
+    }
 
     data.set_image(frame);
     data.set_frame_number(frame_number);
