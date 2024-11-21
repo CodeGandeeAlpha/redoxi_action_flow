@@ -27,7 +27,8 @@ PackagesToBuild="redoxi_common_nodes \
                  psg_detector \
                  psg_frame_det_source_sink \
                  psg_person_generator \
-                 psg_pose_detector"
+                 psg_pose_detector \
+                 video_reader_orbbec"
 
 
 # PackagesToBuild="
