@@ -792,8 +792,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         //! Use SyncActionSender to send the goal and wait for the response
         SyncActionSender_t sender(m_parent_node);
-        auto logging_callbacks = sender.template get_logging_callbacks<ActionDataTrait_t>(goal);
-        auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout, logging_callbacks);
+        // auto logging_callbacks = sender.template get_logging_callbacks<ActionDataTrait_t>(goal);
+        // auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout, logging_callbacks);
+        auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout);
 
         return result;
     }
