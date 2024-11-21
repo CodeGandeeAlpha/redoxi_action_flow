@@ -6,44 +6,46 @@
 namespace redoxi_works::common_nodes
 {
 
-void BaseRosNodeInitConfig::from_parameters(const BaseRosNode *node)
-{
-    RDX_INFO_DEV(node, __func__, false, "{}", "load init config from node");
-    auto &json_params = node->get_json_parameters();
+// void BaseRosNodeInitConfig::from_parameters(const BaseRosNode *node)
+// {
+//     parse_from_node_parameters(this, node);
+//     // RDX_INFO_DEV(node, __func__, false, "{}", "load init config from node");
+//     // auto &json_params = node->get_json_parameters();
 
-    //! Load init config from json parameters if exists
-    if (json_params.contains("init_config")) {
-        RDX_INFO_DEV(node, __func__, false, "{}", "found init_config in json parameters");
+//     // //! Load init config from json parameters if exists
+//     // if (json_params.contains("init_config")) {
+//     //     RDX_INFO_DEV(node, __func__, false, "{}", "found init_config in json parameters");
 
-        std::string json_str = json_params["init_config"].dump();
-        JS::ParseContext context(json_str);
-        auto error = context.parseTo(*this);
-        if (error != JS::Error::NoError) {
-            RDX_RAISE_ERROR("[{}] Error parsing init_config: {}", __func__, context.makeErrorString());
-        }
-    }
+//     //     std::string json_str = json_params["init_config"].dump();
+//     //     JS::ParseContext context(json_str);
+//     //     auto error = context.parseTo(*this);
+//     //     if (error != JS::Error::NoError) {
+//     //         RDX_RAISE_ERROR("[{}] Error parsing init_config: {}", __func__, context.makeErrorString());
+//     //     }
+//     // }
 
-    RDX_INFO_DEV(node, __func__, false, "{}", "init config loaded");
-}
+//     // RDX_INFO_DEV(node, __func__, false, "{}", "init config loaded");
+// }
 
-void BaseRosNodeRuntimeConfig::from_parameters(const BaseRosNode *node)
-{
-    RDX_INFO_DEV(node, __func__, false, "{}", "load runtime config from node");
-    auto &json_params = node->get_json_parameters();
+// void BaseRosNodeRuntimeConfig::from_parameters(const BaseRosNode *node)
+// {
+//     parse_from_node_parameters(this, node);
+//     // RDX_INFO_DEV(node, __func__, false, "{}", "load runtime config from node");
+//     // auto &json_params = node->get_json_parameters();
 
-    //! Load runtime config from json parameters if exists
-    if (json_params.contains("runtime_config")) {
-        RDX_INFO_DEV(node, __func__, false, "{}", "found runtime_config in json parameters");
-        std::string json_str = json_params["runtime_config"].dump();
-        JS::ParseContext context(json_str);
-        auto error = context.parseTo(*this);
-        if (error != JS::Error::NoError) {
-            RDX_RAISE_ERROR("[{}] Error parsing runtime_config: {}", __func__, context.makeErrorString());
-        }
-    }
+//     // //! Load runtime config from json parameters if exists
+//     // if (json_params.contains("runtime_config")) {
+//     //     RDX_INFO_DEV(node, __func__, false, "{}", "found runtime_config in json parameters");
+//     //     std::string json_str = json_params["runtime_config"].dump();
+//     //     JS::ParseContext context(json_str);
+//     //     auto error = context.parseTo(*this);
+//     //     if (error != JS::Error::NoError) {
+//     //         RDX_RAISE_ERROR("[{}] Error parsing runtime_config: {}", __func__, context.makeErrorString());
+//     //     }
+//     // }
 
-    RDX_INFO_DEV(node, __func__, false, "{}", "runtime config loaded");
-}
+//     // RDX_INFO_DEV(node, __func__, false, "{}", "runtime config loaded");
+// }
 
 BaseRosNode::BaseRosNode(const std::string &node_name, const rclcpp::NodeOptions &options)
     : rclcpp::Node(node_name, options)

@@ -2,6 +2,7 @@
 
 #include <redoxi_common_nodes/redoxi_common_nodes.hpp>
 #include <redoxi_common_cpp/common_concepts.hpp>
+#include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <nlohmann/json.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <json_struct/json_struct.h>
@@ -22,7 +23,12 @@ class BaseRosNodeInitConfig
 
   public:
     virtual ~BaseRosNodeInitConfig() = default;
-    virtual void from_parameters(const BaseRosNode *node);
+
+    //! Parse node parameters to fill this config, this is required because json_struct
+    //! does not work with virtual functions
+    template <typename T>
+    requires std::is_base_of_v<BaseRosNodeInitConfig, T>
+    static void parse_from_node_parameters(T *config, const BaseRosNode *node);
 
   public:
     JS_OBJECT(JS_MEMBER(_time_unit));
@@ -37,7 +43,12 @@ class BaseRosNodeRuntimeConfig
 
   public:
     virtual ~BaseRosNodeRuntimeConfig() = default;
-    virtual void from_parameters(const BaseRosNode *node);
+
+    //! Parse node parameters to fill this config, this is required because json_struct
+    //! does not work with virtual functions
+    template <typename T>
+    requires std::is_base_of_v<BaseRosNodeRuntimeConfig, T>
+    static void parse_from_node_parameters(T *config, const BaseRosNode *node);
 
   public:
     //! for annotation only, do not change it
@@ -90,6 +101,18 @@ class BaseRosNode : public rclcpp::Node
         _on_status_set_before(status);
         m_status = status;
         _on_status_set_after(status);
+    }
+
+    //! Get init config
+    std::shared_ptr<BaseRosNodeInitConfig> get_init_config() const
+    {
+        return m_init_config;
+    }
+
+    //! Get runtime config
+    std::shared_ptr<BaseRosNodeRuntimeConfig> get_runtime_config() const
+    {
+        return m_runtime_config;
     }
 
   protected:
@@ -149,4 +172,49 @@ class BaseRosNode : public rclcpp::Node
     void _internal_stop_step_thread();
     void _internal_start_step_thread();
 };
+
+//! Load config from node parameters
+template <typename ConfigType>
+requires std::is_base_of_v<BaseRosNodeRuntimeConfig, ConfigType>
+void BaseRosNodeRuntimeConfig::parse_from_node_parameters(ConfigType *config, const BaseRosNode *node)
+{
+    RDX_INFO_DEV(node, __func__, false, "{}", "load runtime config from node");
+    auto &json_params = node->get_json_parameters();
+
+    //! Load config from json parameters if exists
+    if (json_params.contains("runtime_config")) {
+        RDX_INFO_DEV(node, __func__, false, "{}", "found runtime_config in json parameters");
+        std::string json_str = json_params["runtime_config"].dump();
+        JS::ParseContext context(json_str);
+        auto error = context.parseTo(*config);
+        if (error != JS::Error::NoError) {
+            RDX_RAISE_ERROR("[{}] Error parsing config: {}", __func__, context.makeErrorString());
+        }
+    }
+
+    RDX_INFO_DEV(node, __func__, false, "{}", "runtime config loaded");
+}
+
+template <typename ConfigType>
+requires std::is_base_of_v<BaseRosNodeInitConfig, ConfigType>
+void BaseRosNodeInitConfig::parse_from_node_parameters(ConfigType *config, const BaseRosNode *node)
+{
+    RDX_INFO_DEV(node, __func__, false, "{}", "load init config from node");
+    auto &json_params = node->get_json_parameters();
+
+    //! Load init config from json parameters if exists
+    if (json_params.contains("init_config")) {
+        RDX_INFO_DEV(node, __func__, false, "{}", "found init_config in json parameters");
+
+        std::string json_str = json_params["init_config"].dump();
+        JS::ParseContext context(json_str);
+        auto error = context.parseTo(*config);
+        if (error != JS::Error::NoError) {
+            RDX_RAISE_ERROR("[{}] Error parsing init_config: {}", __func__, context.makeErrorString());
+        }
+    }
+
+    RDX_INFO_DEV(node, __func__, false, "{}", "init config loaded");
+}
+
 } // namespace redoxi_works::common_nodes
