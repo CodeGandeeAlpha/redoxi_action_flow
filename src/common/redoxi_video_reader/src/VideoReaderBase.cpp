@@ -493,7 +493,9 @@ void RedoxiVideoReaderBase::_step()
         SourceData_t source_data;
         int ret = _read_frame(source_data, m_frame_number);
         if (ret != 0) {
+            // failed to read frame, do nothing
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "Failed to read frame, ret={}", ret);
+            return;
         }
 
         // create delivery request

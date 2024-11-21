@@ -5,6 +5,7 @@
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
 #include <redoxi_common_cpp/redoxi_json_struct_conversion.hpp>
 #include <redoxi_video_reader/visibility_control.h>
+#include <sensor_msgs/image_encodings.hpp>
 #include <json_struct/json_struct.h>
 
 namespace redoxi_works
@@ -59,7 +60,8 @@ struct InitConfig {
 class RuntimeConfig
 {
   public:
-    inline static const std::string DEFAULT_OUTPUT_IMAGE_ENCODING = "bgr8";
+    // IMPORTANT: default output is rgb8, if you use bgr8, you need to specify it in the config
+    inline static const std::string DEFAULT_OUTPUT_IMAGE_ENCODING = sensor_msgs::image_encodings::RGB8;
     inline static const DefaultTimeUnit_t DEFAULT_STEP_INTERVAL{std::chrono::milliseconds(5)};
     inline static const DefaultTimeUnit_t DEFAULT_REQUEST_RETRY_INTERVAL{std::chrono::milliseconds(5)};
     inline static const DefaultTimeUnit_t DEFAULT_REQUEST_RETRY_RESPONSE_TIME{std::chrono::milliseconds(5)};

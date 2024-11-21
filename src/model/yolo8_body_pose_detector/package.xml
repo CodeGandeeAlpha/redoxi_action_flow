@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>redoxi_dnn_models</name>
+  <name>yolo8_body_pose_detector</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
   <maintainer email="igamenovoer@xx.com">igamenovoer</maintainer>
@@ -12,9 +12,10 @@
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
-  <depend>redoxi_common_cpp</depend>
-  <depend>sensor_msgs</depend>
   <depend>redoxi_inference</depend>
+  <depend>redoxi_dnn_models</depend>
+  <depend>redoxi_common_nodes</depend>
+  <depend>json_struct</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

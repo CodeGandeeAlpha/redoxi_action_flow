@@ -1,5 +1,6 @@
 #include <redoxi_dnn_models/yolo8/Yolo8Preprocessor.hpp>
 #include <redoxi_common_cpp/image_proc/utils.hpp>
+#include <sensor_msgs/image_encodings.hpp>
 
 namespace redoxi_works::inference::yolo8
 {
@@ -75,11 +76,11 @@ void Yolo8Preprocessor::preprocess(
 
     // handle different image formats
     std::vector<int> channel_map;
-    if (image_format == "rgb") {
+    if (image_format == sensor_msgs::image_encodings::RGB8) {
         channel_map = {0, 1, 2}; // RGB -> RGB, read the channels in the order of R, G, B
-    } else if (image_format == "bgr") {
+    } else if (image_format == sensor_msgs::image_encodings::BGR8) {
         channel_map = {2, 1, 0}; // BGR -> RGB, read the channels in the order of B, G, R
-    } else if (image_format == "gray") {
+    } else if (image_format == sensor_msgs::image_encodings::MONO8) {
         channel_map = {0, 0, 0}; // Grayscale, read the channels in the order of 0, 0, 0
     } else {
         throw std::runtime_error("Unsupported image format: " + image_format);

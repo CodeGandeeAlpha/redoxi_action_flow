@@ -1,6 +1,7 @@
 #pragma once
 
 #include <redoxi_dnn_models/redoxi_dnn_models.hpp>
+#include <sensor_msgs/image_encodings.hpp>
 #include <opencv2/opencv.hpp>
 
 namespace redoxi_works::inference::yolo8
@@ -37,8 +38,8 @@ class Yolo8Preprocessor
     // the model always expect 3 channels
     inline constexpr static int64_t ModelInputNumChannels = 3;
 
-    // the model always expect the input image format to be "rgb"
-    inline constexpr static const char *ModelInputImageFormat = "rgb";
+    // the model always expect the input image format to be "rgb8"
+    inline constexpr static const char *ModelInputImageFormat = sensor_msgs::image_encodings::RGB8;
 
     virtual ~Yolo8Preprocessor() = default;
     virtual void init(const Yolo8PreprocessorConfig &config);
@@ -55,7 +56,7 @@ class Yolo8Preprocessor
     // preprocess the input image to the model input image
     // the output_tensor_chw is a pointer to the tensor data, which has the shape of [num_channels, height, width]
     // where the size is the model input image size
-    // image format can be "rgb" or "bgr" or "gray"
+    // image format can be "rgb8" or "bgr8" or "mono8", following the ros2 sensor_msgs::image_encodings convention
     virtual void preprocess(
         float *output_tensor_chw,
         ImagePreprocessInfo *output_preprocess_info,

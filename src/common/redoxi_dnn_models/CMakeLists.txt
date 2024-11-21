@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(redoxi_common_cpp REQUIRED)
 find_package(redoxi_inference REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 # uncomment the following section in order to fill in further dependencies
 # manually. find_package(<dependency> REQUIRED)
@@ -36,7 +37,7 @@ target_compile_definitions(redoxi_dnn_models
                            PRIVATE "REDOXI_DNN_MODELS_BUILDING_LIBRARY")
 
 ament_target_dependencies(redoxi_dnn_models PUBLIC redoxi_common_cpp
-                          redoxi_inference)
+                          redoxi_inference sensor_msgs)
 
 install(DIRECTORY include/ DESTINATION include)
 install(
@@ -58,7 +59,7 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_export_dependencies(redoxi_common_cpp redoxi_inference)
+ament_export_dependencies(redoxi_common_cpp redoxi_inference sensor_msgs)
 ament_export_include_directories(include)
 ament_export_libraries(redoxi_dnn_models)
 ament_export_targets(export_${PROJECT_NAME})

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(redoxi_common_nodes)
+project(yolo8_body_pose_detector)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -8,58 +8,55 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
-find_package(redoxi_extern_cpp REQUIRED)
-find_package(redoxi_common_cpp REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(rclcpp_action REQUIRED)
-find_package(cv_bridge REQUIRED)
+
+find_package(redoxi_inference REQUIRED)
+find_package(redoxi_dnn_models REQUIRED)
+find_package(redoxi_common_nodes REQUIRED)
 find_package(json_struct REQUIRED)
+
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-set(cpp_required_to_find Boost)
-foreach(pkg ${cpp_required_to_find})
-  find_package(${pkg} REQUIRED)
-endforeach()
-
-set(cpp_required_to_link Boost::boost json_struct::json_struct)
-
-set(srcfiles
-  src/redoxi_common_nodes.cpp
-  src/AsyncActionOutputPort.cpp
-  src/AsyncActionInputPort.cpp
-  src/base_nodes/BaseRosNode.cpp
-  src/base_nodes/StartStopNode.cpp
+add_library(yolo8_body_pose_detector 
+  src/yolo8_body_pose_detector.cpp
+  src/Yolo8BodyPoseDetector.cpp
+  src/Yolo8BodyPoseDetectorTypes.cpp
 )
 
-add_library(redoxi_common_nodes ${srcfiles})
-add_library(redoxi_common_nodes::redoxi_common_nodes ALIAS redoxi_common_nodes)
-target_compile_features(redoxi_common_nodes PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-target_include_directories(redoxi_common_nodes PUBLIC
+add_library(yolo8_body_pose_detector::yolo8_body_pose_detector ALIAS yolo8_body_pose_detector)
+target_compile_features(yolo8_body_pose_detector PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_include_directories(yolo8_body_pose_detector PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
-target_link_libraries(redoxi_common_nodes PUBLIC ${cpp_required_to_link})
-
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
-target_compile_definitions(redoxi_common_nodes PRIVATE "REDOXI_COMMON_NODES_BUILDING_LIBRARY")
+target_compile_definitions(yolo8_body_pose_detector PRIVATE "YOLO8_BODY_POSE_DETECTOR_BUILDING_LIBRARY")
 
-ament_target_dependencies(redoxi_common_nodes PUBLIC
-rclcpp rclcpp_action redoxi_extern_cpp redoxi_common_cpp cv_bridge)
+ament_target_dependencies(yolo8_body_pose_detector PUBLIC 
+redoxi_inference redoxi_dnn_models redoxi_common_nodes json_struct)
 
 install(
   DIRECTORY include/
   DESTINATION include
 )
 install(
-  TARGETS redoxi_common_nodes
+  TARGETS yolo8_body_pose_detector
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
+
+add_executable(yolo8_body_pose_detector_node src/yolo8_body_pose_detector_node.cpp)
+target_include_directories(yolo8_body_pose_detector_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_link_libraries(yolo8_body_pose_detector_node yolo8_body_pose_detector)
+
+install(TARGETS yolo8_body_pose_detector_node
+  DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -74,20 +71,17 @@ if(BUILD_TESTING)
 endif()
 
 ament_export_dependencies(
-  rclcpp
-  rclcpp_action
-  redoxi_extern_cpp
-  redoxi_common_cpp
-  cv_bridge
+  redoxi_inference
+  redoxi_dnn_models
+  redoxi_common_nodes
   json_struct
-  ${cpp_required_to_find}
 )
 
 ament_export_include_directories(
   include
 )
 ament_export_libraries(
-  redoxi_common_nodes
+  yolo8_body_pose_detector
 )
 ament_export_targets(
   export_${PROJECT_NAME}

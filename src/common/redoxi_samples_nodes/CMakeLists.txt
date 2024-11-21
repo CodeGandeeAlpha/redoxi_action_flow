@@ -24,6 +24,7 @@ set(srcfiles
   src/generators/SimpleActionGenerator.cpp
   src/sinks/FrameRelayPublisher.cpp
   src/sinks/FrameRelayNode.cpp
+  src/sinks/DetectionRelayNode.cpp
 )
 
 add_library(redoxi_samples_nodes ${srcfiles})

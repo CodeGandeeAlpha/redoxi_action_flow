@@ -4,7 +4,7 @@
 #include <redoxi_common_nodes/async_action_port/input_port_concepts.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
 #include <json_struct/json_struct.h>
-
+#include <any>
 namespace redoxi_works
 {
 
@@ -20,6 +20,8 @@ struct DefaultReceiveSourceData {
     using Goal_t = typename ActionType_t::Goal;
     using GoalHandle_t = rclcpp_action::ServerGoalHandle<ActionType_t>;
     using GoalHandlePromise_t = std::promise<std::shared_ptr<GoalHandle_t>>;
+
+    virtual ~DefaultReceiveSourceData() = default;
 
     //! Get goal uuid
     virtual rclcpp_action::GoalUUID get_goal_uuid() const
@@ -66,6 +68,9 @@ struct DefaultReceiveSourceData {
         m_goal_handle_future = m_goal_handle_promise->get_future();
     }
 
+    // any other things that the user wants to store
+    std::any auxiliary_data;
+
   public:
     rclcpp_action::GoalUUID m_goal_uuid;
     std::shared_ptr<const Goal_t> m_goal;
@@ -76,8 +81,9 @@ static_assert(ReceiveSourceDataConcept<DefaultReceiveSourceData<_SampleAction>>,
               "DefaultReceiveSourceData does not satisfy ReceiveSourceDataConcept");
 
 //! The init config for the action input port
+template <TimeDurationConcept TTimeUnit>
 struct DefaultInitConfig {
-    using TimeUnit_t = DefaultTimeUnit_t;
+    using TimeUnit_t = TTimeUnit;
     inline static constexpr TimeUnit_t DefaultGoalResultExpireTime{std::chrono::milliseconds(1000)};
     virtual ~DefaultInitConfig() = default;
 
@@ -128,7 +134,7 @@ struct DefaultInitConfig {
               JS_MEMBER(action_name),
               JS_MEMBER(goal_result_expire_time));
 };
-static_assert(InitConfigConcept<DefaultInitConfig>);
+static_assert(InitConfigConcept<DefaultInitConfig<_SampleTimeUnit>>);
 
 //! for quick construction of a specification
 template <RosActionConcept TAction,
@@ -141,7 +147,7 @@ struct DefaultAsyncActionInputPortSpec {
     using TimeUnit_t = TTimeUnit;
 
     using ReceiveSourceData_t = DefaultReceiveSourceData<ActionType_t>;
-    using InitConfig_t = DefaultInitConfig;
+    using InitConfig_t = DefaultInitConfig<TTimeUnit>;
 };
 static_assert(AsyncActionInputPortSpecConcept<
               DefaultAsyncActionInputPortSpec<_SampleAction,

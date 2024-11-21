@@ -62,7 +62,8 @@ option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target"
 option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
 option(BUILD_ONNX_HELLO_WORLD "Build onnx_hello_world target" OFF)
 option(BUILD_ONNX_INFERENCE_API "Build onnx_inference_api target" OFF)
-option(BUILD_ONNX_YOLO8POSE "Build onnx_yolo8pose target" ON)
+option(BUILD_ONNX_YOLO8POSE "Build onnx_yolo8pose target" OFF)
+option(BUILD_ONNX_YOLO8DET "Build onnx_yolo8det target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -86,6 +87,10 @@ function(configure_target target_name)
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_ONNX_YOLO8DET)
+  configure_target(onnx_yolo8det)
+endif()
 
 if(BUILD_ONNX_YOLO8POSE)
   configure_target(onnx_yolo8pose)

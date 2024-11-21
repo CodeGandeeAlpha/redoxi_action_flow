@@ -1,6 +1,7 @@
-#include <redoxi_dnn_models/yolo8/Yolo8PoseModel.hpp>
+#include <redoxi_dnn_models/yolo8/Yolo8DetectionModel.hpp>
 #include <redoxi_common_cpp/image_proc/utils.hpp>
 #include <sensor_msgs/image_encodings.hpp>
+// #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <opencv2/opencv.hpp>
 #include <spdlog/spdlog.h>
 #include <filesystem>
@@ -22,25 +23,10 @@ namespace fs = std::filesystem;
 namespace rdx_inf = redoxi_works::inference;
 namespace cmkeys = rdx_inf::common_config_keys;
 namespace cmdev = rdx_inf::common_device_types;
-const auto fn_model = fs::path(TEST_MODEL_DIR) / "yolov8n-pose-dynbatch.onnx";
+const auto fn_model = fs::path(TEST_MODEL_DIR) / "head-yolo.onnx";
 const auto fn_image = fs::path(TEST_DATA_DIR) / "pose-sample.jpg";
-const auto fn_pose_output = fs::path(TEST_OUTPUT_DIR) / "pose-output.jpg";
+const auto fn_pose_output = fs::path(TEST_OUTPUT_DIR) / "detection-out.jpg";
 const auto fn_tensor_output = fs::path(TEST_OUTPUT_DIR) / "test-tensor.npy";
-
-int _main(int argc, char **argv)
-{
-    //! Load image from file
-    cv::Mat image = cv::imread(fn_image.string());
-
-    // create a tensor from the image
-    xt::xtensor<uint8_t, 3> tensor({(size_t)image.rows, (size_t)image.cols, 3});
-    std::memcpy(tensor.data(), image.data, tensor.size() * sizeof(uint8_t));
-
-    // save the tensor to a file
-    spdlog::info("Saving tensor to {}", fn_tensor_output.string());
-    xt::dump_npy(fn_tensor_output.string(), tensor);
-    return 0;
-}
 
 int main(int argc, char **argv)
 {
@@ -49,14 +35,14 @@ int main(int argc, char **argv)
         fs::create_directories(TEST_OUTPUT_DIR);
     }
 
-    rdx_inf::yolo8::Yolo8PoseModel yolo_model;
+    rdx_inf::yolo8::Yolo8DetectionModel yolo_model;
 
     // load model
     {
         spdlog::info("Loading model from {}", fn_model.string());
         auto params = yolo_model.create_init_params();
         params->set_string(cmkeys::ModelPath, fn_model.string());
-        params->set_string(cmkeys::DeviceType, cmdev::CPU);
+        params->set_string(cmkeys::DeviceType, cmdev::CUDA);
         yolo_model.open(params);
         spdlog::info("Model loaded successfully");
     }
@@ -91,50 +77,45 @@ int main(int argc, char **argv)
         yolo_model.do_inference(inout_data);
 
         spdlog::info("Getting output detections");
-        auto detections = yolo_model.get_output_detections(inout_data, {.conf_threshold = 0.5, .iou_threshold = 0.5});
+        redoxi_works::inference::yolo8::PostprocessorConfig config;
+        config.conf_threshold = 0.25;
+        config.iou_threshold = 0.45;
+
+        // just test class selection, this is optional
+        config.selected_classes = {{1, "head"}, {0, "body"}};
+
+        // run detections
+        auto detections = yolo_model.get_output_detections(inout_data, config);
+
+
         spdlog::info("Output detections: {}", detections[0].objects.size());
-
-        // print detections
-        // for (size_t i = 0; i < detections[0].objects.size(); ++i) {
-        //     const auto &det = detections[0].objects[i];
-        //     spdlog::info("Detection index = {}", i);
-        //     spdlog::info("  BBox: {} {} {} {}", det.xywh[0], det.xywh[1], det.xywh[2], det.xywh[3]);
-        //     spdlog::info("  Score: {}", det.score);
-        // }
-
         // draw detections
-        auto keypoint_connections = yolo_model.get_keypoint_connections();
         cv::Mat vis_image = resized_image.clone();
         for (const auto &det : detections[0].objects) {
+            // Generate color based on class id
+            cv::Scalar color((det.class_id * 100) % 255,
+                             (det.class_id * 50) % 255,
+                             (det.class_id * 150) % 255);
+
+            // Draw bounding box
             cv::rectangle(vis_image,
                           cv::Rect(det.xywh[0], det.xywh[1], det.xywh[2], det.xywh[3]),
-                          cv::Scalar(0, 0, 255), 2);
-            // Draw keypoints and connections
-            for (const auto &kp : det.keypoints) {
-                // Draw keypoint as a circle
-                cv::circle(vis_image,
-                           cv::Point(kp.xy[0], kp.xy[1]),
-                           3,
-                           cv::Scalar(0, 255, 0),
-                           -1);
-            }
+                          color, 2);
 
-            // Draw connections between keypoints
-            for (const auto &conn : keypoint_connections) {
-                const auto &kp1 = det.keypoints[conn.first];
-                const auto &kp2 = det.keypoints[conn.second];
-                cv::line(vis_image,
-                         cv::Point(kp1.xy[0], kp1.xy[1]),
-                         cv::Point(kp2.xy[0], kp2.xy[1]),
-                         cv::Scalar(255, 0, 0),
-                         2);
-            }
+            // Add class id and name to the image
+            cv::putText(vis_image,
+                        std::to_string(det.class_id) + ":" + det.class_name,
+                        cv::Point(det.xywh[0], det.xywh[1] - 5),
+                        cv::FONT_HERSHEY_SIMPLEX,
+                        0.5,
+                        color,
+                        2);
         }
         spdlog::info("Saving output image to {}", fn_pose_output.string());
         cv::imwrite(fn_pose_output.string(), vis_image);
-        // cv::imshow("Detections", vis_image);
-        // cv::waitKey(0);
     }
 
+    // cv::imshow("Detections", vis_image);
+    // cv::waitKey(0);
     return 0;
 }
