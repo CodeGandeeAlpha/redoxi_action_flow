@@ -24,6 +24,7 @@ set(DEPENDENCIES
     redoxi_shared_memory
     redoxi_inference
     redoxi_dnn_models
+    yolo8_body_pose_detector
     pluginlib)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb xtensor)
@@ -55,15 +56,16 @@ option(BUILD_TEST_SIMPLE_ACTION_GENERATOR
 option(BUILD_TEST_UUID_CONVERSION "Build test_uuid_conversion target" OFF)
 option(BUILD_TEST_V2_JSON_EXAMPLES "Build test_v2_json_examples target" OFF)
 option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2
-       "Build test_simple_action_generator_v2 target" OFF)
-option(BUILD_TEST_V2_VIDEO_SINK "Build test_v2_video_sink target" OFF)
+       "Build test_simple_action_generator_v2 target" ON)
+option(BUILD_TEST_V2_VIDEO_SINK "Build test_v2_video_sink target" ON)
 option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target"
-       OFF)
+       ON)
 option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
 option(BUILD_ONNX_HELLO_WORLD "Build onnx_hello_world target" OFF)
 option(BUILD_ONNX_INFERENCE_API "Build onnx_inference_api target" OFF)
 option(BUILD_ONNX_YOLO8POSE "Build onnx_yolo8pose target" OFF)
-option(BUILD_ONNX_YOLO8DET "Build onnx_yolo8det target" ON)
+option(BUILD_ONNX_YOLO8DET "Build onnx_yolo8det target" OFF)
+option(BUILD_TEST_YOLO_DETECTOR_NODE "Build test_yolo_detector_node target" OFF)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -87,6 +89,10 @@ function(configure_target target_name)
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_TEST_YOLO_DETECTOR_NODE)
+  configure_target(test_yolo_detector_node)
+endif()
 
 if(BUILD_ONNX_YOLO8DET)
   configure_target(onnx_yolo8det)

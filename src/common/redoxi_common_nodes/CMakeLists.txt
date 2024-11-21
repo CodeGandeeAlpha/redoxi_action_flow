@@ -31,6 +31,7 @@ set(srcfiles
   src/AsyncActionInputPort.cpp
   src/base_nodes/BaseRosNode.cpp
   src/base_nodes/StartStopNode.cpp
+  src/base_nodes/OpenCloseNode.cpp
 )
 
 add_library(redoxi_common_nodes ${srcfiles})

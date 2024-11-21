@@ -19,7 +19,7 @@ class Yolo8PoseModel : public Yolo8ModelBase
 
     // get the keypoint connections
     // output[i]=(u,v) means their is a connection between keypoint[u] and keypoint[v]
-    virtual std::vector<std::pair<int, int>> get_keypoint_connections() const;
+    static const std::vector<std::pair<int, int>> &get_keypoint_connections();
 };
 
 class PoseModelPostprocessor : public Postprocessor

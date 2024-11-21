@@ -32,7 +32,7 @@ class Yolo8BodyPoseDetector : public redoxi_works::common_nodes::StartStopNode
     using SourceData_t = ActionInputPort_t::SourceData_t;
     using InferenceResource_t = yolo8_body_pose_detector::InferenceResource;
     using InferenceModel_t = inference::yolo8::Yolo8PoseModel;
-
+    using DetectionResult_t = InferenceModel_t::SingleImageOutput;
 
   public:
     explicit Yolo8BodyPoseDetector(const std::string &node_name,
@@ -45,11 +45,15 @@ class Yolo8BodyPoseDetector : public redoxi_works::common_nodes::StartStopNode
     int _stop() override;
     void _step() override;
     int _update_init_config(std::shared_ptr<BaseInitConfig_t> init_config) override;
-    // int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config) override;
+    int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config) override;
 
   protected:
     // from this class
     int _extract_image(cv::Mat *output, const std::shared_ptr<ActionInputPort_t::SourceData_t> &source_data);
+
+    //! Draw visualization on canvas
+    void _draw_visualization(cv::Mat &canvas,
+                             const DetectionResult_t &detections);
 
     //! create a new inference resource, and push it to the concurrent queue
     //! @param replicas: number of replicas to create, replicated resource will share the same model but with different inout data

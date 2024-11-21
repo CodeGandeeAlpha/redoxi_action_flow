@@ -61,7 +61,7 @@ constexpr DefaultTimeUnit_t MaxTimeout = std::chrono::seconds(30);
 constexpr DefaultTimeUnit_t PingActionRetryInterval = std::chrono::milliseconds(5);
 
 //! goal handle timeout
-constexpr DefaultTimeUnit_t GoalHandleTimeout = std::chrono::milliseconds(500);
+constexpr DefaultTimeUnit_t GoalHandleTimeout = std::chrono::milliseconds(3000);
 
 } // namespace DefaultParams
 

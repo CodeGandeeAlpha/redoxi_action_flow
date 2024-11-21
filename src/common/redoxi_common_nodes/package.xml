@@ -3,7 +3,7 @@
 <package format="3">
   <name>redoxi_common_nodes</name>
   <version>0.0.0</version>
-  <description>Common nodes for Redoxi Video Processing Library</description>
+  <description>Common node utilities for Redoxi Video Processing Library</description>
   <maintainer email="igamenovoer@xx.com">igamenovoer</maintainer>
   <license>MIT License</license>
 

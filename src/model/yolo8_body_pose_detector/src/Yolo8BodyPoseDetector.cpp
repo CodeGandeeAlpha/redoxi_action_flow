@@ -9,6 +9,7 @@
 #include <redoxi_public_msgs/msg/detection.hpp>
 #include <geometry_msgs/msg/point.hpp>
 #include <cv_bridge/cv_bridge.hpp>
+#include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 
 using DetectionMessage_t = redoxi_public_msgs::msg::Detection;
 using PointMessage_t = geometry_msgs::msg::Point;
@@ -20,6 +21,9 @@ struct Yolo8BodyPoseDetector::Impl {
     // tbb::concurrent_queue<InferenceResource_t> inference_resources;
     tbb::concurrent_bounded_queue<InferenceResource_t> inference_resource_pool;
     boost::synchronized_value<std::map<GoalUUID_t, InferenceResource_t>> goal_to_inference_resource;
+
+    // visualization publisher
+    std::shared_ptr<StampedImagePub> pub_visualization;
 };
 
 Yolo8BodyPoseDetector::Yolo8BodyPoseDetector(const std::string &node_name,
@@ -149,6 +153,12 @@ int Yolo8BodyPoseDetector::_stop()
     return 0;
 }
 
+int Yolo8BodyPoseDetector::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config)
+{
+    (void)runtime_config;
+    return 0;
+}
+
 int Yolo8BodyPoseDetector::_update_init_config(std::shared_ptr<BaseInitConfig_t> init_config)
 {
     auto config = std::dynamic_pointer_cast<InitConfig_t>(init_config);
@@ -173,7 +183,47 @@ int Yolo8BodyPoseDetector::_update_init_config(std::shared_ptr<BaseInitConfig_t>
         }
     }
 
+    // create visualization publisher
+    if (!config->visualization_topic.empty()) {
+        m_impl->pub_visualization = std::make_shared<StampedImagePub>(this, config->visualization_topic);
+    }
+
     return 0;
+}
+
+void Yolo8BodyPoseDetector::_draw_visualization(cv::Mat &canvas,
+                                                const DetectionResult_t &detections)
+{
+    const auto &keypoint_connections = InferenceModel_t::get_keypoint_connections();
+    for (const auto &obj : detections.objects) {
+        //! Draw bounding box
+        cv::rectangle(canvas,
+                      cv::Point(obj.xywh[0], obj.xywh[1]),
+                      cv::Point(obj.xywh[0] + obj.xywh[2], obj.xywh[1] + obj.xywh[3]),
+                      cv::Scalar(0, 255, 0), 2);
+
+        //! Draw keypoints
+        for (size_t i = 0; i < obj.keypoints.size(); i++) {
+            const auto &kp = obj.keypoints[i];
+            if (kp.score > 0) { // Only draw if keypoint is detected
+                cv::circle(canvas,
+                           cv::Point(kp.xy[0], kp.xy[1]),
+                           3, cv::Scalar(255, 0, 0), -1);
+            }
+        }
+
+        //! Draw connections between keypoints to form skeleton
+        for (const auto &connection : keypoint_connections) {
+            const auto &kp1 = obj.keypoints[connection.first];
+            const auto &kp2 = obj.keypoints[connection.second];
+            if (kp1.score > 0 && kp2.score > 0) {
+                cv::line(canvas,
+                         cv::Point(kp1.xy[0], kp1.xy[1]),
+                         cv::Point(kp2.xy[0], kp2.xy[1]),
+                         cv::Scalar(0, 0, 255), 2);
+            }
+        }
+    }
 }
 
 void Yolo8BodyPoseDetector::_step()
@@ -295,6 +345,13 @@ void Yolo8BodyPoseDetector::_step()
             goal_reply->detections.push_back(detection_msg);
         }
         goal_handle->succeed(goal_reply);
+
+        // visualize?
+        if (m_impl->pub_visualization && config->enable_visualization) {
+            cv::Mat vis_canvas = image.clone();
+            _draw_visualization(vis_canvas, output_detections[0]);
+            m_impl->pub_visualization->publish(vis_canvas);
+        }
 
         // we can return the resource now
         RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Returning the resource", msg_uuid_str);
