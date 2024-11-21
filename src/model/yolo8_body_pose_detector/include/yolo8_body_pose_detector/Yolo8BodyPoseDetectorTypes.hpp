@@ -4,10 +4,8 @@
 #include <json_struct/json_struct.h>
 
 #include <yolo8_body_pose_detector/yolo8_body_pose_detector.hpp>
-#include <redoxi_public_msgs/action/process_detections_by_frame.hpp>
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
-#include <redoxi_common_nodes/async_action_port/AsyncActionInputTypes.hpp>
-#include <redoxi_common_nodes/async_action_port/AsyncActionInputPort.hpp>
+#include <redoxi_common_nodes/detection_ports/DetectionActionInputPort.hpp>
 #include <redoxi_dnn_models/yolo8/Yolo8PoseModel.hpp>
 
 namespace redoxi_works::model_nodes
@@ -17,48 +15,29 @@ class Yolo8BodyPoseDetector;
 
 namespace redoxi_works::model_nodes::yolo8_body_pose_detector
 {
+using YoloModel_t = inference::yolo8::Yolo8PoseModel;
+using YoloModelConfig_t = inference::yolo8::Yolo8ModelConfig;
+using YoloModelOutputConfig_t = YoloModel_t::OutputConfig_t;
 
 // a single inference resource, should be used by one single thread
 struct InferenceResource {
-    std::shared_ptr<inference::yolo8::Yolo8PoseModel> model;
+    std::shared_ptr<YoloModel_t> model;
     inference::InferenceInOutData::Ptr inout_data;
     inference::yolo8::Yolo8ModelConfig::Ptr model_config;
 
     // the id of the replica
     int replica_id = 0;
+
+    // index of this resource in the pool
+    int index_in_pool = 0;
 };
 
-using TimeUnit = DefaultTimeUnit_t;
-using DetectionActionType = redoxi_public_msgs::action::ProcessDetectionsByFrame;
-using DetectionActionDataTrait = RedoxiActionDataTrait<DetectionActionType>;
-static_assert(RedoxiActionConcept<DetectionActionType>, "DetectionActionType must satisfy RedoxiActionConcept");
-
-// the source data for the detection action input port
-// should be bound to a single inference resource
-class DetectionSourceData : public input_port_types::DefaultReceiveSourceData<DetectionActionType>
-{
-  public:
-    std::optional<InferenceResource> model_resource;
-};
-
-
-struct DetectionActionInputPortSpec {
-    using ActionType_t = DetectionActionType;
-    using ActionGoal_t = ActionType_t::Goal;
-    using ActionDataTrait_t = DetectionActionDataTrait;
-    using TimeUnit_t = TimeUnit;
-    using ReceiveSourceData_t = DetectionSourceData;
-    using InitConfig_t = input_port_types::DefaultInitConfig<TimeUnit>;
-};
-static_assert(input_port_types::AsyncActionInputPortSpecConcept<DetectionActionInputPortSpec>,
-              "DetectionActionInputPortSpec must satisfy AsyncActionInputPortSpecConcept");
-
-using DetectionActionInputPort = AsyncActionInputPort<DetectionActionInputPortSpec>;
+using DetectionActionInputPort = detection_ports::DetectionActionInputPort;
 
 struct InitConfig {
     virtual ~InitConfig() = default;
-    using ModelConfig_t = inference::yolo8::Yolo8ModelConfig;
-    using InputPortConfig_t = DetectionActionInputPortSpec::InitConfig_t;
+    using ModelConfig_t = YoloModelConfig_t;
+    using InputPortConfig_t = DetectionActionInputPort::InitConfig_t;
 
     // yolo8 model configurations, different model will work concurrently
     // if the same model config is pushed multiple times, they are regarded as replicas of the same model
@@ -74,6 +53,10 @@ struct InitConfig {
 };
 
 struct RuntimeConfig {
+    using TimeUnit = DetectionActionInputPort::TimeUnit_t;
+    virtual ~RuntimeConfig() = default;
+    using ModelOutputConfig_t = YoloModelOutputConfig_t;
+
     // nothing yet
     inline static const TimeUnit DefaultStepInterval{std::chrono::milliseconds(10)};
 
@@ -86,9 +69,13 @@ struct RuntimeConfig {
     // enable blocking mode when reading data from input port
     bool enable_blocking_mode = false;
 
+    // the default model output configurations
+    ModelOutputConfig_t model_output_config;
+
     virtual void from_parameters(const Yolo8BodyPoseDetector *node);
     JS_OBJECT(JS_MEMBER(_time_unit),
               JS_MEMBER(step_interval),
-              JS_MEMBER(enable_blocking_mode));
+              JS_MEMBER(enable_blocking_mode),
+              JS_MEMBER(member_model_output_config));
 };
 } // namespace redoxi_works::model_nodes::yolo8_body_pose_detector

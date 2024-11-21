@@ -5,13 +5,20 @@
 #include <tbb/concurrent_queue.h>
 #include <tbb/task_group.h>
 #include <boost/thread/synchronized_value.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <redoxi_public_msgs/msg/detection.hpp>
+#include <geometry_msgs/msg/point.hpp>
+#include <cv_bridge/cv_bridge.hpp>
 
+using DetectionMessage_t = redoxi_public_msgs::msg::Detection;
+using PointMessage_t = geometry_msgs::msg::Point;
 namespace redoxi_works::model_nodes
 {
 
 struct Yolo8BodyPoseDetector::Impl {
     tbb::task_group inference_task_group;
-    tbb::concurrent_queue<InferenceResource_t> inference_resources;
+    // tbb::concurrent_queue<InferenceResource_t> inference_resources;
+    tbb::concurrent_bounded_queue<InferenceResource_t> inference_resource_pool;
     boost::synchronized_value<std::map<GoalUUID_t, InferenceResource_t>> goal_to_inference_resource;
 };
 
@@ -33,6 +40,11 @@ Yolo8BodyPoseDetector::Yolo8BodyPoseDetector(const std::string &node_name,
 Yolo8BodyPoseDetector::~Yolo8BodyPoseDetector() noexcept
 {
     // do not call stop() here, because it will NOT call the subclass's stop()
+    m_status = NodeStatusCode::STOPPED;
+
+    if (m_step_thread && m_step_thread->joinable()) {
+        m_step_thread->join();
+    }
 
     // let all inference tasks finish
     m_impl->inference_task_group.wait();
@@ -43,8 +55,157 @@ int Yolo8BodyPoseDetector::init(std::shared_ptr<InitConfig_t> init_config,
 {
     RDX_INFO_DEV(this, __func__, false, "{}", "initializing");
 
+    //! must be in before init state
+    if (m_status != NodeStatusCode::BEFORE_INIT) {
+        RDX_RAISE_ERROR("Node status must be BEFORE_INIT, but got {}", m_status);
+        return -1;
+    }
+
     _update_init_config(init_config);
     _update_runtime_config(runtime_config);
+
+    // done, state change to STOPPED
+    m_status = NodeStatusCode::STOPPED;
+
+    return 0;
+}
+
+#ifdef BIND_RESOURCE_TO_SOURCE_DATA
+void Yolo8BodyPoseDetector::_register_input_port_callbacks(std::shared_ptr<ActionInputPort_t> input_port)
+{
+    // resource booking callback
+    input_port->set_on_goal_received_callback(
+        [this](const auto &goal_uuid, const auto &) {
+            // try to book a resource for the goal
+            InferenceResource_t inference_resource;
+            bool booked = m_impl->inference_resource_pool.try_pop(inference_resource);
+            if (booked) {
+                // book the resource, and accept the goal
+                m_impl->goal_to_inference_resource->insert({goal_uuid, inference_resource});
+                return 0;
+            }
+            // no resource available, reject the goal
+            return -1;
+        });
+
+    // bind the resource to the source data on accept
+    input_port->set_on_goal_enqueued_callback(
+        [this](std::shared_ptr<SourceData_t> source_data) {
+            // lock the goal to inference resource
+            auto lock = m_impl->goal_to_inference_resource.synchronize();
+
+            // get the booked resource
+            auto inference_resource = lock->find(source_data->get_goal_uuid());
+
+            // should not happen, the resource should be booked before enqueued
+            if (inference_resource == lock->end()) {
+                RDX_RAISE_ERROR("No booked resource found for goal uuid: {}", to_boost_uuid_string(source_data->get_goal_uuid()));
+            }
+
+            // bind the resource to the source data
+            source_data->auxiliary_data = inference_resource;
+
+            // release the book keeping entry
+            lock->erase(source_data->get_goal_uuid());
+
+            return 0;
+        });
+
+    // remove booked resource if goal is rejected or canceled
+    input_port->set_on_goal_rejected_callback(
+        [this](const auto &goal_uuid, auto) {
+            auto lock = m_impl->goal_to_inference_resource.synchronize();
+            auto it = lock->find(goal_uuid);
+            if (it != lock->end()) {
+                // return resource to pool
+                m_impl->inference_resource_pool.push(it->second);
+                // remove from book keeping
+                lock->erase(it);
+            }
+            return 0;
+        });
+
+    input_port->set_on_goal_cancel_request_callback(
+        [this](auto goal_handle) {
+            auto lock = m_impl->goal_to_inference_resource.synchronize();
+            auto it = lock->find(goal_handle->get_goal_id());
+            if (it != lock->end()) {
+                // return resource to pool
+                m_impl->inference_resource_pool.push(it->second);
+                // remove from book keeping
+                lock->erase(it);
+            }
+            return 0;
+        });
+}
+#endif
+
+int Yolo8BodyPoseDetector::start()
+{
+    //! must be in stopped state before starting
+    if (m_status != NodeStatusCode::STOPPED) {
+        RDX_RAISE_ERROR("Node status must be STOPPED, but got {}", m_status);
+        return -1;
+    }
+
+    // start the input port
+    m_input_port->start();
+
+    // state change to STARTED to allow step thread to run
+    m_status = NodeStatusCode::STARTED;
+
+    // start the step thread
+    // create step thread, and run it
+    m_step_thread = std::make_shared<std::thread>([this]() {
+        while (m_status == NodeStatusCode::STARTED && rclcpp::ok()) {
+            auto start_time = std::chrono::steady_clock::now();
+            _step();
+            auto elapsed = std::chrono::steady_clock::now() - start_time;
+            if (elapsed < m_runtime_config->step_interval) {
+                std::this_thread::sleep_for(m_runtime_config->step_interval - elapsed);
+            }
+        }
+    });
+
+    return 0;
+}
+
+int Yolo8BodyPoseDetector::_extract_image(cv::Mat *output, const std::shared_ptr<ActionInputPort_t::SourceData_t> &source_data)
+{
+    if (!output) {
+        // nothing to do
+        return 0;
+    }
+
+    const auto &frame_msg = source_data->get_goal()->frame;
+
+    // TODO: only support raw image, implement shared memory image extraction later
+    const auto &raw_image = frame_msg.raw_image;
+    *output = cv_bridge::toCvCopy(raw_image)->image;
+    return 0;
+}
+
+int Yolo8BodyPoseDetector::stop()
+{
+    //! must be in started state before stopping
+    if (m_status != NodeStatusCode::STARTED) {
+        RDX_RAISE_ERROR("Node status must be STARTED, but got {}", m_status);
+        return -1;
+    }
+
+    // change state to STOPPED to stop step thread
+    m_status = NodeStatusCode::STOPPED;
+
+    // wait for step thread to finish
+    if (m_step_thread && m_step_thread->joinable()) {
+        m_step_thread->join();
+    }
+
+    // stop the input port
+    m_input_port->stop();
+
+    // wait for all inference tasks to finish
+    m_impl->inference_task_group.wait();
 
     return 0;
 }
@@ -61,81 +222,8 @@ void Yolo8BodyPoseDetector::_update_init_config(std::shared_ptr<InitConfig_t> in
     m_input_port = std::make_shared<ActionInputPort_t>(this);
     m_input_port->init(init_config->input_port_config);
 
-    // resource booking callback
-    m_input_port->set_on_goal_received_callback(
-        [this](const auto &goal_uuid, const auto &) {
-            // try to book a resource for the goal
-            InferenceResource_t inference_resource;
-            bool booked = m_impl->inference_resources.try_pop(inference_resource);
-            if (booked) {
-                // book the resource, and accept the goal
-                m_impl->goal_to_inference_resource->insert({goal_uuid, inference_resource});
-                return 0;
-            }
-            // no resource available, reject the goal
-            return -1;
-        });
-
-    // bind the resource to the source data on accept
-    m_input_port->set_on_goal_enqueued_callback(
-        [this](std::shared_ptr<SourceData_t> source_data) {
-            // lock the goal to inference resource
-            auto lock = m_impl->goal_to_inference_resource.synchronize();
-
-            // get the booked resource
-            auto inference_resource = lock->find(source_data->get_goal_uuid());
-
-            // should not happen, the resource should be booked before enqueued
-            if (inference_resource == lock->end()) {
-                RDX_RAISE_ERROR("No booked resource found for goal uuid: {}", to_boost_uuid_string(source_data->get_goal_uuid()));
-            }
-
-            // bind the resource to the source data
-            source_data->model_resource = inference_resource->second;
-
-            // release the book keeping entry
-            lock->erase(source_data->get_goal_uuid());
-
-            return 0;
-        });
-
-    // remove booked resource if goal is rejected or canceled
-    m_input_port->set_on_goal_rejected_callback(
-        [this](const auto &goal_uuid, auto) {
-            auto lock = m_impl->goal_to_inference_resource.synchronize();
-            auto it = lock->find(goal_uuid);
-            if (it != lock->end()) {
-                // return resource to pool
-                m_impl->inference_resources.push(it->second);
-                // remove from book keeping
-                lock->erase(it);
-            }
-            return 0;
-        });
-
-    m_input_port->set_on_goal_cancel_request_callback(
-        [this](auto goal_handle) {
-            auto lock = m_impl->goal_to_inference_resource.synchronize();
-            auto it = lock->find(goal_handle->get_goal_id());
-            if (it != lock->end()) {
-                // return resource to pool
-                m_impl->inference_resources.push(it->second);
-                // remove from book keeping
-                lock->erase(it);
-            }
-            return 0;
-        });
-
     // create all inference resources
-    for (const auto &model_config : init_config->model_configs) {
-        auto ret = _create_inference_resource(model_config);
-        if (ret != 0) {
-            RDX_RAISE_ERROR("Failed to create inference resource, error code: {}", ret);
-        }
-    }
-
-    // done, state change to STOPPED
-    m_status = NodeStatusCode::STOPPED;
+    _create_all_inference_resources(init_config->model_configs);
 }
 
 void Yolo8BodyPoseDetector::_update_runtime_config(std::shared_ptr<RuntimeConfig_t> runtime_config)
@@ -144,27 +232,25 @@ void Yolo8BodyPoseDetector::_update_runtime_config(std::shared_ptr<RuntimeConfig
         RDX_RAISE_ERROR("Node status must be STOPPED, but got {}", m_status);
     }
 
-    // state change to STARTED, then create step thread
+    // nothing to do, just update the runtime config
     m_runtime_config = runtime_config;
-    m_status = NodeStatusCode::STARTED;
-
-    // create step thread, and run it
-    m_step_thread = std::make_shared<std::thread>([this]() {
-        while (m_status == NodeStatusCode::STARTED && rclcpp::ok()) {
-            auto start_time = std::chrono::steady_clock::now();
-            _step();
-            auto elapsed = std::chrono::steady_clock::now() - start_time;
-            if (elapsed < m_runtime_config->step_interval) {
-                std::this_thread::sleep_for(m_runtime_config->step_interval - elapsed);
-            }
-        }
-    });
 }
 
 void Yolo8BodyPoseDetector::_step()
 {
     // do nothing if not started
     if (m_status != NodeStatusCode::STARTED) {
+        return;
+    }
+
+    // FIXME: not very efficient, you will acquire resource frequently
+    // but then just return it because no data is available
+
+    // acquire a resource first
+    InferenceResource_t inference_resource;
+    bool acquired = m_impl->inference_resource_pool.try_pop(inference_resource);
+    if (!acquired) {
+        // no resource available, do not even try to get a message from input port
         return;
     }
 
@@ -177,21 +263,103 @@ void Yolo8BodyPoseDetector::_step()
         source_data = m_input_port->try_pop_source_data();
     }
     if (!source_data) {
-        // no data, do nothing
+        // no data, return the resource
+        m_impl->inference_resource_pool.push(inference_resource);
         return;
     }
 
-    // get image
-    auto image = _extract_image(source_data);
+    // bind the resource to the source data
+    auto msg_uuid_str = boost::uuids::to_string(ActionDataTrait_t::get_uuid(*source_data->get_goal()));
+    RDX_INFO_DEV(this, __func__, false,
+                 "[msg_uid={}] Acquired a resource (index={}) and input data",
+                 msg_uuid_str,
+                 inference_resource.index_in_pool);
 
-    // find a resource and then run inference
-    m_impl->inference_task_group.run([this, source_data, image]() {
-        auto model = source_data->model_resource->model;
-        auto inout_data = source_data->model_resource->inout_data;
-        // TODO: run inference
+    // work on the image
+    m_impl->inference_task_group.run([this, source_data, inference_resource]() {
+        // reply to the goal
+        auto msg_uuid_str = boost::uuids::to_string(ActionInputPort_t::ActionDataTrait_t::get_uuid(*source_data->get_goal()));
+        auto goal_handle = source_data->get_goal_handle_future().get();
+        if (!goal_handle) {
+            // nothing to do, just return the resource
+            RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Goal handle not found, return the resource", msg_uuid_str);
+            m_impl->inference_resource_pool.push(inference_resource);
+            return;
+        }
 
-        // return the resource
-        m_impl->inference_resources.push(*source_data->model_resource);
+        // extract image
+        RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Extracting image", msg_uuid_str);
+        cv::Mat image;
+        auto ret = _extract_image(&image, source_data);
+        if (ret != 0) {
+            RDX_RAISE_ERROR("Failed to extract image");
+        }
+
+        if (image.empty()) {
+            // empty image, nothing to do
+            RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Empty image, nothing to do", msg_uuid_str);
+
+            // return the resource
+            RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Returning the resource", msg_uuid_str);
+            m_impl->inference_resource_pool.push(inference_resource);
+
+            // reply to the goal
+            RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Aborting the goal", msg_uuid_str);
+            goal_handle->abort(std::make_shared<InputAction_t::Result>());
+            return;
+        }
+
+        auto model = inference_resource.model;
+        auto inout_data = inference_resource.inout_data;
+
+        // inference
+        RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Doing inference", msg_uuid_str);
+        model->set_input_images(inout_data, {image}, RequiredImageEncoding);
+        model->do_inference(inout_data);
+
+        // get result
+        RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Getting inference result", msg_uuid_str);
+        auto output_detections = model->get_output_detections(inout_data,
+                                                              m_runtime_config->model_output_config);
+
+        // DO NOT return the resource here, although we do not need it anymore
+        // if goal reply is slower than inference (although unlikely), we will have a lot of pending reply requests
+        // m_impl->inference_resource_pool.push(inference_resource);
+
+        // reply
+        RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Replying to the goal as success", msg_uuid_str);
+        auto goal_reply = std::make_shared<InputAction_t::Result>();
+        for (size_t i = 0; i < output_detections[0].objects.size(); i++) {
+            auto &obj = output_detections[0].objects[i];
+            DetectionMessage_t detection_msg;
+            detection_msg.category = obj.class_id;
+            detection_msg.category_name = obj.class_name;
+            detection_msg.confidence = obj.score;
+            detection_msg.bbox.x = obj.xywh[0];
+            detection_msg.bbox.y = obj.xywh[1];
+            detection_msg.bbox.width = obj.xywh[2];
+            detection_msg.bbox.height = obj.xywh[3];
+            detection_msg.frame_metadata = source_data->get_goal()->frame.metadata;
+
+            // Fill keypoints
+            for (size_t k = 0; k < obj.keypoints.size(); k++) {
+                const auto &kp = obj.keypoints[k];
+                PointMessage_t point_msg;
+                point_msg.x = kp.xy[0];
+                point_msg.y = kp.xy[1];
+                detection_msg.keypoints.keypoints_2.push_back(point_msg);
+                detection_msg.keypoints.confidence.push_back(kp.score);
+                detection_msg.keypoints.semantic_type.push_back(k);
+            }
+            goal_reply->detections.push_back(detection_msg);
+        }
+        goal_handle->succeed(goal_reply);
+
+        // we can return the resource now
+        RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Returning the resource", msg_uuid_str);
+        m_impl->inference_resource_pool.push(inference_resource);
+
+        RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Inference and replay done", msg_uuid_str);
     });
 }
 
@@ -227,7 +395,8 @@ int Yolo8BodyPoseDetector::_create_inference_resource(
         inference_resource.inout_data = inference_inout_data;
         inference_resource.model_config = model_config;
         inference_resource.replica_id = i;
-        m_impl->inference_resources.push(inference_resource);
+        inference_resource.index_in_pool = m_impl->inference_resource_pool.size();
+        m_impl->inference_resource_pool.push(inference_resource);
     }
     return 0;
 }
@@ -235,6 +404,10 @@ int Yolo8BodyPoseDetector::_create_inference_resource(
 int Yolo8BodyPoseDetector::_create_all_inference_resources(
     const std::vector<InitConfig_t::ModelConfig_t::Ptr> &model_configs)
 {
+    // setup capacity of the inference resource pool
+    m_impl->inference_resource_pool.set_capacity(model_configs.size());
+
+    // now fill the pool with inference resources
     std::map<InitConfig_t::ModelConfig_t::Ptr, int> model_config_to_replicas;
 
     // count the number of replicas for each model config

@@ -4,7 +4,7 @@
 #include <redoxi_common_nodes/async_action_port/input_port_concepts.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
 #include <json_struct/json_struct.h>
-
+#include <any>
 namespace redoxi_works
 {
 
@@ -20,6 +20,8 @@ struct DefaultReceiveSourceData {
     using Goal_t = typename ActionType_t::Goal;
     using GoalHandle_t = rclcpp_action::ServerGoalHandle<ActionType_t>;
     using GoalHandlePromise_t = std::promise<std::shared_ptr<GoalHandle_t>>;
+
+    virtual ~DefaultReceiveSourceData() = default;
 
     //! Get goal uuid
     virtual rclcpp_action::GoalUUID get_goal_uuid() const
@@ -65,6 +67,9 @@ struct DefaultReceiveSourceData {
         // create the future
         m_goal_handle_future = m_goal_handle_promise->get_future();
     }
+
+    // any other things that the user wants to store
+    std::any auxiliary_data;
 
   public:
     rclcpp_action::GoalUUID m_goal_uuid;

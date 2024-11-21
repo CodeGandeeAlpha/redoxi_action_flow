@@ -31,6 +31,7 @@ model.input_height = input_shape[3]
 # read image
 src_image = cv2.imread(fn_image)
 model.img = src_image
+
 # Get the height and width of the input image
 model.img_height, model.img_width = model.img.shape[:2]
 
