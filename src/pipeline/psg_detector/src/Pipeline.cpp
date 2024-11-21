@@ -593,8 +593,8 @@ int PSGDetectorNode::_on_deliver_to_downstream_finish(TargetDataModel_t &target_
     //! 通过值捕获需要的数据
     auto ds_copy = ds;
     auto result_copy = result;
-    m_impl->m_model_result_task_group.run([ds = std::move(ds_copy),
-                                           result = std::move(result_copy),
+    m_impl->m_model_result_task_group.run([ds = ds_copy,
+                                           result = result_copy,
                                            promise]() {
         auto goal_handle = result.goal_handle_future.get();
         if (goal_handle) {
