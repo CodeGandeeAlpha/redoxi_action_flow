@@ -17,6 +17,7 @@
   <depend>psg_master_node</depend>
   <depend>psg_document_sink</depend>
   <depend>psg_detector</depend>
+  <depend>psg_pose_detector</depend>
   <depend>psg_frame_det_source_sink</depend>
   <depend>spdlog_vendor</depend>
   <depend>pluginlib</depend>

@@ -588,43 +588,70 @@ sensor_msgs::msg::Image PSGPoseDetectorNode::_create_debug_image(const psg_priva
         return sensor_msgs::msg::Image(); // 返回空图像
     }
 
-    //! 为不同类别设置不同颜色
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "设置类别颜色映射", 0);
-    std::map<int, cv::Scalar> class_colors = {
-        {0, cv::Scalar(0, 255, 0)}, // 人-绿色
-        {1, cv::Scalar(0, 0, 255)}, // 头-红色
-        {2, cv::Scalar(255, 0, 0)}, // 脸-蓝色
-    };
+    //! 为关键点设置颜色
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "设置关键点颜色", 0);
+    cv::Scalar keypoint_color(0, 255, 0); // 绿色
+    cv::Scalar line_color(255, 255, 0);   // 黄色
 
-    //! 在图像上画bbox
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始在图像上绘制检测框, 共{}个检测结果", document.detections.size());
+    //! 在图像上画关键点和骨架连接
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始在图像上绘制关键点, 共{}个检测结果", document.detections.size());
     for (const auto &detection : document.detections) {
-        //! 获取bbox坐标
-        int x = static_cast<int>(detection.bbox.x);
-        int y = static_cast<int>(detection.bbox.y);
-        int width = static_cast<int>(detection.bbox.width);
-        int height = static_cast<int>(detection.bbox.height);
+        const auto &keypoints = detection.keypoints;
 
-        //! 获取类别对应的颜色
-        cv::Scalar color = class_colors[detection.category];
+        //! 在访问数组或指针前添加检查
+        if (keypoints.keypoints_2.empty() || keypoints.confidence.empty()) {
+            continue;
+        }
 
-        //! 画框
-        cv::rectangle(cv_image,
-                      cv::Point(x, y),
-                      cv::Point(x + width, y + height),
-                      color, 2);
+        //! 画出17个关键点
+        for (size_t i = 0; i < keypoints.keypoints_2.size(); i++) {
+            if (keypoints.confidence[i] > 0.3) { // 只画置信度大于0.3的点
+                //! 记录关键点的位置和置信度
+                RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                              "绘制关键点[{}] - 位置:[{}, {}], 置信度:{}",
+                              i, keypoints.keypoints_2[i].x, keypoints.keypoints_2[i].y, keypoints.confidence[i]);
+                cv::circle(cv_image,
+                           cv::Point(keypoints.keypoints_2[i].x, keypoints.keypoints_2[i].y),
+                           3, keypoint_color, -1);
+            }
+        }
 
-        //! 添加类别标签
-        std::string label = std::to_string(detection.category) + " " +
-                            std::to_string(detection.confidence).substr(0, 4);
-        cv::putText(cv_image, label,
-                    cv::Point(x, y - 10),
-                    cv::FONT_HERSHEY_SIMPLEX, 0.5,
-                    color, 2);
+        //! 画出骨架连接
+        //! COCO数据集的17个关键点连接对
+        const std::vector<std::pair<int, int>> skeleton = {
+            {5, 7}, {7, 9}, {6, 8}, {8, 10}, // 手臂
+            {11, 13},
+            {13, 15},
+            {12, 14},
+            {14, 16}, // 腿
+            {5, 6},
+            {5, 11},
+            {6, 12},  // 躯干
+            {11, 12}, // 臀部
+            {1, 2},
+            {1, 3},
+            {2, 4},
+            {3, 5},
+            {4, 6} // 头部和肩膀
+        };
+
+        for (const auto &bone : skeleton) {
+            if (keypoints.confidence[bone.first] > 0.3 && keypoints.confidence[bone.second] > 0.3) {
+                //! 记录骨架连接的起点和终点
+                RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                              "绘制骨架连接 - 从关键点[{},{}]到关键点[{},{}]",
+                              keypoints.keypoints_2[bone.first].x, keypoints.keypoints_2[bone.first].y,
+                              keypoints.keypoints_2[bone.second].x, keypoints.keypoints_2[bone.second].y);
+                cv::line(cv_image,
+                         cv::Point(keypoints.keypoints_2[bone.first].x, keypoints.keypoints_2[bone.first].y),
+                         cv::Point(keypoints.keypoints_2[bone.second].x, keypoints.keypoints_2[bone.second].y),
+                         line_color, 2);
+            }
+        }
 
         RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                      "绘制检测框 - 类别:{}, 置信度:{:.2f}, 位置:[{}, {}, {}, {}]",
-                      detection.category, detection.confidence, x, y, width, height);
+                      "完成关键点绘制 - 检测框位置:[{}, {}, {}, {}]",
+                      detection.bbox.x, detection.bbox.y, detection.bbox.width, detection.bbox.height);
     }
 
     //! 转回sensor_msgs/Image
@@ -724,10 +751,10 @@ void PSGPoseDetectorNode::_get_model_result()
             // RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] got detection result: {}",
             //              boost::uuids::to_string(output_model_result.source_data->get_uuid()), det_str);
 
-            // if (m_init_config->create_debug_pub) {
-            //     auto debug_image = _create_debug_image(document);
-            //     m_pub_model_enqueue.publish(debug_image, "");
-            // }
+            if (m_init_config->create_debug_pub) {
+                auto debug_image = _create_debug_image(*document);
+                m_pub_model_enqueue.publish(debug_image, "");
+            }
         } else {
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
                          "[msg_uuid={}] failed to push request",

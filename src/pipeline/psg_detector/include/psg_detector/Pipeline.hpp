@@ -243,6 +243,9 @@ class PSGDetectorNode : public rclcpp::Node,
      */
     int _declare_all_parameters();
 
+    virtual int _read_frame(OutputSourceDataModel_t &source_data,
+                            std::atomic<int64_t> &frame_number);
+
   protected:
     // input port
     std::shared_ptr<InputPort_t> m_input_port;
@@ -271,6 +274,9 @@ class PSGDetectorNode : public rclcpp::Node,
     StampedImagePub m_pub_pipeline_drop;
     StampedImagePub m_pub_model_enqueue;
     StampedImagePub m_pub_model_drop;
+
+    //! frame number
+    std::atomic<int64_t> m_frame_number{0};
 
     //! thread for periodic step
     std::shared_ptr<std::thread> m_step_thread;

@@ -442,77 +442,134 @@ void PSGDetectorNode::_step()
         return;
     }
 
-    if (m_impl->m_ros_time_token->try_pop_token()) {
-        std::shared_ptr<InputSourceData_t> document_data;
-        if (m_init_config->enable_blocking_mode) {
-            // wait until there is data available
-            document_data = m_input_port->pop_source_data();
-        } else {
-            // try to get data without waiting
-            document_data = m_input_port->try_pop_source_data();
+    // if (m_impl->m_ros_time_token->try_pop_token()) {
+    //     std::shared_ptr<InputSourceData_t> document_data;
+    //     if (m_init_config->enable_blocking_mode) {
+    //         // wait until there is data available
+    //         document_data = m_input_port->pop_source_data();
+    //     } else {
+    //         // try to get data without waiting
+    //         document_data = m_input_port->try_pop_source_data();
+    //     }
+
+    //     if (!document_data) {
+    //         return;
+    //     }
+
+    //     // 创建delivery request，并推送到output port model
+    //     // from input source data to output source data
+    //     OutputSourceDataModel_t output_model_source_data;
+    //     output_model_source_data.set_document(document_data->get_goal()->document);
+
+    //     // create delivery request
+    //     auto delivery_request = _create_delivery_request(output_model_source_data);
+
+    //     // this is used for logging
+    //     auto msg_uuid = output_model_source_data.get_uuid();
+
+    //     // get qos, controls how to retry and drop frames
+    //     auto &qos = m_runtime_config->model_enqueue_policy;
+    //     auto max_attempts = qos.get_retry_policy().get_number_of_retry(true).value() + 1;
+    //     auto interval_between_attempts = qos.get_retry_policy().get_wait_time_between_retry(true).value();
+    //     auto drop_frame_strategy = qos.get_drop_strategy();
+
+    //     // start pushing request to output port
+    //     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+    //                  "try to push request in {} attempts, retry interval={}ms",
+    //                  max_attempts, interval_between_attempts.count());
+
+    //     bool success = false;
+    //     if (drop_frame_strategy == DropStrategy::NoDrop) {
+    //         // Keep trying until success if no drop strategy
+    //         while (!m_primary_output_port_model->try_push_request(delivery_request)) {
+    //             std::this_thread::sleep_for(interval_between_attempts);
+    //         }
+    //         success = true;
+    //     } else if (drop_frame_strategy == DropStrategy::DropAsNeeded) {
+    //         // Try up to max attempts if dropping is allowed
+    //         for (int attempt = 0; attempt < max_attempts; ++attempt) {
+    //             if (m_primary_output_port_model->try_push_request(delivery_request)) {
+    //                 success = true;
+    //                 break;
+    //             }
+    //             // wait for next attempt
+    //             std::this_thread::sleep_for(interval_between_attempts);
+    //         }
+    //     } else {
+    //         RDX_RAISE_ERROR("[{}] invalid drop strategy, got {}", __func__, int(drop_frame_strategy));
+    //     }
+
+    //     if (success) {
+    //         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+    //                      "[msg_uuid={}] success to push request",
+    //                      boost::uuids::to_string(msg_uuid));
+    //     } else {
+    //         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+    //                      "[msg_uuid={}] failed to push request",
+    //                      boost::uuids::to_string(msg_uuid));
+    //     }
+
+    //     // FIXME: debug only
+    //     // wait for all requests to be processed, not necessary
+    //     m_primary_output_port_model->wait_for_all_requests();
+    // }
+
+    // 自己读取图片往后发送
+    OutputSourceDataModel_t output_model_source_data;
+    _read_frame(output_model_source_data, m_frame_number);
+    m_frame_number++;
+
+    // create delivery request
+    auto delivery_request = _create_delivery_request(output_model_source_data);
+
+    // this is used for logging
+    auto msg_uuid = output_model_source_data.get_uuid();
+
+    // get qos, controls how to retry and drop frames
+    auto &qos = m_runtime_config->model_enqueue_policy;
+    auto max_attempts = qos.get_retry_policy().get_number_of_retry(true).value() + 1;
+    auto interval_between_attempts = qos.get_retry_policy().get_wait_time_between_retry(true).value();
+    auto drop_frame_strategy = qos.get_drop_strategy();
+
+    // start pushing request to output port
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                 "try to push request in {} attempts, retry interval={}ms",
+                 max_attempts, interval_between_attempts.count());
+
+    bool success = false;
+    if (drop_frame_strategy == DropStrategy::NoDrop) {
+        // Keep trying until success if no drop strategy
+        while (!m_primary_output_port_model->try_push_request(delivery_request)) {
+            std::this_thread::sleep_for(interval_between_attempts);
         }
-
-        if (!document_data) {
-            return;
-        }
-
-        // 创建delivery request，并推送到output port model
-        // from input source data to output source data
-        OutputSourceDataModel_t output_model_source_data;
-        output_model_source_data.set_document(document_data->get_goal()->document);
-
-        // create delivery request
-        auto delivery_request = _create_delivery_request(output_model_source_data);
-
-        // this is used for logging
-        auto msg_uuid = output_model_source_data.get_uuid();
-
-        // get qos, controls how to retry and drop frames
-        auto &qos = m_runtime_config->model_enqueue_policy;
-        auto max_attempts = qos.get_retry_policy().get_number_of_retry(true).value() + 1;
-        auto interval_between_attempts = qos.get_retry_policy().get_wait_time_between_retry(true).value();
-        auto drop_frame_strategy = qos.get_drop_strategy();
-
-        // start pushing request to output port
-        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                     "try to push request in {} attempts, retry interval={}ms",
-                     max_attempts, interval_between_attempts.count());
-
-        bool success = false;
-        if (drop_frame_strategy == DropStrategy::NoDrop) {
-            // Keep trying until success if no drop strategy
-            while (!m_primary_output_port_model->try_push_request(delivery_request)) {
-                std::this_thread::sleep_for(interval_between_attempts);
+        success = true;
+    } else if (drop_frame_strategy == DropStrategy::DropAsNeeded) {
+        // Try up to max attempts if dropping is allowed
+        for (int attempt = 0; attempt < max_attempts; ++attempt) {
+            if (m_primary_output_port_model->try_push_request(delivery_request)) {
+                success = true;
+                break;
             }
-            success = true;
-        } else if (drop_frame_strategy == DropStrategy::DropAsNeeded) {
-            // Try up to max attempts if dropping is allowed
-            for (int attempt = 0; attempt < max_attempts; ++attempt) {
-                if (m_primary_output_port_model->try_push_request(delivery_request)) {
-                    success = true;
-                    break;
-                }
-                // wait for next attempt
-                std::this_thread::sleep_for(interval_between_attempts);
-            }
-        } else {
-            RDX_RAISE_ERROR("[{}] invalid drop strategy, got {}", __func__, int(drop_frame_strategy));
+            // wait for next attempt
+            std::this_thread::sleep_for(interval_between_attempts);
         }
-
-        if (success) {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] success to push request",
-                         boost::uuids::to_string(msg_uuid));
-        } else {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] failed to push request",
-                         boost::uuids::to_string(msg_uuid));
-        }
-
-        // FIXME: debug only
-        // wait for all requests to be processed, not necessary
-        m_primary_output_port_model->wait_for_all_requests();
+    } else {
+        RDX_RAISE_ERROR("[{}] invalid drop strategy, got {}", __func__, int(drop_frame_strategy));
     }
+
+    if (success) {
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                     "[msg_uuid={}] success to push request",
+                     boost::uuids::to_string(msg_uuid));
+    } else {
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                     "[msg_uuid={}] failed to push request",
+                     boost::uuids::to_string(msg_uuid));
+    }
+
+    // FIXME: debug only
+    // wait for all requests to be processed, not necessary
+    m_primary_output_port_model->wait_for_all_requests();
 }
 
 int PSGDetectorNode::_on_deliver_to_downstream_finish(TargetDataModel_t &target_data,
@@ -702,6 +759,33 @@ void PSGDetectorNode::_get_model_result()
         // // wait for all requests to be processed, not necessary
         // m_primary_output_port_pipeline->wait_for_all_requests();
     }
+}
+
+int PSGDetectorNode::_read_frame(OutputSourceDataModel_t &data, std::atomic<int64_t> &frame_number)
+{
+    auto frame_size = cv::Size(1920, 1080);
+    if (frame_size.empty()) {
+        RDX_RAISE_ERROR("[{}][_read_frame()] output_image_size is not set", this->get_name());
+    }
+
+    //! Generate a random frame with the UUID text
+    cv::Mat random_frame = cv::imread("data/ori_img.jpg");
+    auto uuid = data.get_uuid();
+    auto frame_text = fmt::format("{}\nFrame Number: {}", boost::uuids::to_string(uuid), frame_number.load());
+    // random_image_with_text(random_frame, frame_size, frame_text);
+
+
+    psg_private_msgs::msg::PsgDocument doc_msg;
+    // convert image to ROS message
+    cv_bridge::CvImage cv_bridge_image;
+    cv_bridge_image.image = random_frame;
+    cv_bridge_image.encoding = sensor_msgs::image_encodings::BGR8;
+    cv_bridge_image.toImageMsg(doc_msg.frame.raw_image);
+    doc_msg.frame.metadata.frame_num = frame_number;
+    data.set_document(doc_msg);
+
+    frame_number++;
+    return 0;
 }
 
 } // namespace redoxi_works

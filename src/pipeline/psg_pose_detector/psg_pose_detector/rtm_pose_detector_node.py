@@ -156,7 +156,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
             )
 
     async def _do_model_inference(
-        self, category: str, input_data_nchw: torch.Tensor, bboxes: list[list[float]]
+        self, input_data_nchw: torch.Tensor, bboxes: list[list[float]]
     ) -> PoseDetectionResult:
         assert input_data_nchw.shape[0] == 1, "batch size must be 1"
         assert input_data_nchw.dtype == torch.uint8, "input data must be uint8"
@@ -249,7 +249,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
             self.m_status_code == NodeStatusCode.INITIALIZED
             or self.m_status_code == NodeStatusCode.CLOSED
         ), "cannot open because status code is not INITIALIZED or CLOSED"
-        assert self.m_v6d_client is not None, "v6d_client is nullptr"
+        # assert self.m_v6d_client is not None, "v6d_client is nullptr"
 
         status_code_before = self.m_status_code
         self.m_status_code = NodeStatusCode.OPENED
@@ -741,7 +741,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
                 det.bbox.y + det.bbox.height,
             ]
             bboxes.append(bbox)
-            uuids.append(det.uuid)
+            uuids.append(det.x_uid)
         return bboxes, uuids
 
 
@@ -758,7 +758,7 @@ async def init(rtm_pose_detector_node):
     for i in range(2):
         rtm_pose_model = RTMPoseDetector()
         onnx_model_path = f"/3d/chengxiao/code/psf_ros2_ws/src/flow_ros2_pipeline/pose_detector/models/rtmpose-s_simcc-body7_pt-body7_420e-256x192-acd4a1ef_20230504/end2end.onnx"
-        rclpy.logging.get_logger("pose_detector_node").info(
+        rclpy.logging.get_logger("rtm_pose_detector_node").info(
             f"model {i} loading {onnx_model_path}"
         )
         rtm_pose_model.init(
