@@ -5,6 +5,7 @@
 #include <atomic>
 #include <nlohmann/json.hpp>
 
+#include <redoxi_common_nodes/base_nodes/StartStopNode.hpp>
 #include <yolo8_body_pose_detector/yolo8_body_pose_detector.hpp>
 #include <yolo8_body_pose_detector/Yolo8BodyPoseDetectorTypes.hpp>
 #include <redoxi_dnn_models/yolo8/Yolo8PoseModel.hpp>
@@ -14,8 +15,7 @@
 namespace redoxi_works::model_nodes
 {
 
-class Yolo8BodyPoseDetector : public rclcpp::Node,
-                              public IStartStopProtocol
+class Yolo8BodyPoseDetector : public redoxi_works::common_nodes::StartStopNode
 {
   public:
     inline static constexpr const char *RequiredImageEncoding = sensor_msgs::image_encodings::RGB8;
@@ -25,7 +25,9 @@ class Yolo8BodyPoseDetector : public rclcpp::Node,
     using InputAction_t = typename ActionInputPort_t::ActionType_t;
     using ActionDataTrait_t = typename ActionInputPort_t::ActionDataTrait_t;
     using InitConfig_t = yolo8_body_pose_detector::InitConfig;
+    using BaseInitConfig_t = common_nodes::StartStopNode::InitConfig_t;
     using RuntimeConfig_t = yolo8_body_pose_detector::RuntimeConfig;
+    using BaseRuntimeConfig_t = common_nodes::StartStopNode::RuntimeConfig_t;
     using GoalUUID_t = ActionInputPort_t::GoalUUID_t;
     using SourceData_t = ActionInputPort_t::SourceData_t;
     using InferenceResource_t = yolo8_body_pose_detector::InferenceResource;
@@ -37,22 +39,16 @@ class Yolo8BodyPoseDetector : public rclcpp::Node,
                                    const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
     virtual ~Yolo8BodyPoseDetector() noexcept;
 
-    int init(std::shared_ptr<InitConfig_t> init_config,
-             std::shared_ptr<RuntimeConfig_t> runtime_config);
-
-    // IStartStopProtocol interface
-    int start();
-    int stop();
-
-    const auto &get_json_params() const
-    {
-        return m_json_params;
-    }
+  protected:
+    // from base class
+    int _start() override;
+    int _stop() override;
+    void _step() override;
+    int _update_init_config(std::shared_ptr<BaseInitConfig_t> init_config) override;
+    // int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config) override;
 
   protected:
-    virtual void _step();
-    virtual void _update_init_config(std::shared_ptr<InitConfig_t> init_config);
-    virtual void _update_runtime_config(std::shared_ptr<RuntimeConfig_t> runtime_config);
+    // from this class
     int _extract_image(cv::Mat *output, const std::shared_ptr<ActionInputPort_t::SourceData_t> &source_data);
 
     //! create a new inference resource, and push it to the concurrent queue
@@ -62,19 +58,12 @@ class Yolo8BodyPoseDetector : public rclcpp::Node,
     int _create_all_inference_resources(const std::vector<InitConfig_t::ModelConfig_t::Ptr> &model_configs);
 
     // void _register_input_port_callbacks(std::shared_ptr<ActionInputPort_t> input_port);
-
   protected:
+    std::shared_ptr<ActionInputPort_t> m_input_port;
+
+  private:
     struct Impl;
     std::shared_ptr<Impl> m_impl;
-
-    std::shared_ptr<ActionInputPort_t> m_input_port;
-    std::atomic<int> m_status = NodeStatusCode::BEFORE_INIT;
-
-    std::shared_ptr<InitConfig_t> m_init_config;
-    std::shared_ptr<RuntimeConfig_t> m_runtime_config;
-
-    std::shared_ptr<std::thread> m_step_thread;
-    nlohmann::json m_json_params;
 };
 
 } // namespace redoxi_works::model_nodes

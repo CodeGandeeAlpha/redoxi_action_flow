@@ -7,6 +7,7 @@
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
 #include <redoxi_common_nodes/detection_ports/DetectionActionInputPort.hpp>
 #include <redoxi_dnn_models/yolo8/Yolo8PoseModel.hpp>
+#include <redoxi_common_nodes/base_nodes/StartStopNode.hpp>
 
 namespace redoxi_works::model_nodes
 {
@@ -34,7 +35,7 @@ struct InferenceResource {
 
 using DetectionActionInputPort = detection_ports::DetectionActionInputPort;
 
-struct InitConfig {
+struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
     virtual ~InitConfig() = default;
     using ModelConfig_t = YoloModelConfig_t;
     using InputPortConfig_t = DetectionActionInputPort::InitConfig_t;
@@ -47,24 +48,15 @@ struct InitConfig {
     // use shared_ptr because the port asks for it
     std::shared_ptr<InputPortConfig_t> input_port_config = std::make_shared<InputPortConfig_t>();
 
-    virtual void from_parameters(const Yolo8BodyPoseDetector *node);
-    JS_OBJECT(JS_MEMBER(model_configs),
-              JS_MEMBER(input_port_config));
+    JS_OBJECT_WITH_SUPER(
+        JS_SUPER(common_nodes::StartStopNode::InitConfig_t),
+        JS_MEMBER(model_configs),
+        JS_MEMBER(input_port_config));
 };
 
-struct RuntimeConfig {
-    using TimeUnit = DetectionActionInputPort::TimeUnit_t;
+struct RuntimeConfig : public common_nodes::StartStopNode::RuntimeConfig_t {
     virtual ~RuntimeConfig() = default;
     using ModelOutputConfig_t = YoloModelOutputConfig_t;
-
-    // nothing yet
-    inline static const TimeUnit DefaultStepInterval{std::chrono::milliseconds(10)};
-
-    // for annotation only, do not change it
-    std::string _time_unit = _get_time_unit_name<TimeUnit>();
-
-    // step interval for the action server
-    TimeUnit step_interval = DefaultStepInterval;
 
     // enable blocking mode when reading data from input port
     bool enable_blocking_mode = false;
@@ -72,10 +64,11 @@ struct RuntimeConfig {
     // the default model output configurations
     ModelOutputConfig_t model_output_config;
 
-    virtual void from_parameters(const Yolo8BodyPoseDetector *node);
-    JS_OBJECT(JS_MEMBER(_time_unit),
-              JS_MEMBER(step_interval),
-              JS_MEMBER(enable_blocking_mode),
-              JS_MEMBER(member_model_output_config));
+    JS_OBJECT_WITH_SUPER(
+        JS_SUPER(common_nodes::StartStopNode::RuntimeConfig_t),
+        JS_MEMBER(_time_unit),
+        JS_MEMBER(step_interval),
+        JS_MEMBER(enable_blocking_mode),
+        JS_MEMBER(model_output_config));
 };
 } // namespace redoxi_works::model_nodes::yolo8_body_pose_detector

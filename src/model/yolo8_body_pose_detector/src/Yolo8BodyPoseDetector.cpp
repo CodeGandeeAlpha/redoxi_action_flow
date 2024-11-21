@@ -24,16 +24,8 @@ struct Yolo8BodyPoseDetector::Impl {
 
 Yolo8BodyPoseDetector::Yolo8BodyPoseDetector(const std::string &node_name,
                                              const rclcpp::NodeOptions &options)
-    : rclcpp::Node(node_name, options)
+    : redoxi_works::common_nodes::StartStopNode(node_name, options)
 {
-    auto ret = declare_default_parameters_for_node(this);
-    if (ret != 0) {
-        RDX_RAISE_ERROR("Failed to declare default parameters for node {}", node_name);
-    }
-
-    auto node = this;
-    m_json_params = RDX_GET_JSON_PARAM_FROM_NODE(node);
-
     m_impl = std::make_shared<Impl>();
 }
 
@@ -48,26 +40,6 @@ Yolo8BodyPoseDetector::~Yolo8BodyPoseDetector() noexcept
 
     // let all inference tasks finish
     m_impl->inference_task_group.wait();
-}
-
-int Yolo8BodyPoseDetector::init(std::shared_ptr<InitConfig_t> init_config,
-                                std::shared_ptr<RuntimeConfig_t> runtime_config)
-{
-    RDX_INFO_DEV(this, __func__, false, "{}", "initializing");
-
-    //! must be in before init state
-    if (m_status != NodeStatusCode::BEFORE_INIT) {
-        RDX_RAISE_ERROR("Node status must be BEFORE_INIT, but got {}", m_status);
-        return -1;
-    }
-
-    _update_init_config(init_config);
-    _update_runtime_config(runtime_config);
-
-    // done, state change to STOPPED
-    m_status = NodeStatusCode::STOPPED;
-
-    return 0;
 }
 
 #ifdef BIND_RESOURCE_TO_SOURCE_DATA
@@ -140,34 +112,10 @@ void Yolo8BodyPoseDetector::_register_input_port_callbacks(std::shared_ptr<Actio
 }
 #endif
 
-int Yolo8BodyPoseDetector::start()
+int Yolo8BodyPoseDetector::_start()
 {
-    //! must be in stopped state before starting
-    if (m_status != NodeStatusCode::STOPPED) {
-        RDX_RAISE_ERROR("Node status must be STOPPED, but got {}", m_status);
-        return -1;
-    }
-
     // start the input port
-    m_input_port->start();
-
-    // state change to STARTED to allow step thread to run
-    m_status = NodeStatusCode::STARTED;
-
-    // start the step thread
-    // create step thread, and run it
-    m_step_thread = std::make_shared<std::thread>([this]() {
-        while (m_status == NodeStatusCode::STARTED && rclcpp::ok()) {
-            auto start_time = std::chrono::steady_clock::now();
-            _step();
-            auto elapsed = std::chrono::steady_clock::now() - start_time;
-            if (elapsed < m_runtime_config->step_interval) {
-                std::this_thread::sleep_for(m_runtime_config->step_interval - elapsed);
-            }
-        }
-    });
-
-    return 0;
+    return m_input_port->start();
 }
 
 int Yolo8BodyPoseDetector::_extract_image(cv::Mat *output, const std::shared_ptr<ActionInputPort_t::SourceData_t> &source_data)
@@ -185,24 +133,15 @@ int Yolo8BodyPoseDetector::_extract_image(cv::Mat *output, const std::shared_ptr
     return 0;
 }
 
-int Yolo8BodyPoseDetector::stop()
+int Yolo8BodyPoseDetector::_stop()
 {
-    //! must be in started state before stopping
-    if (m_status != NodeStatusCode::STARTED) {
-        RDX_RAISE_ERROR("Node status must be STARTED, but got {}", m_status);
-        return -1;
+    // stop the input port from receiving new goals
+    {
+        auto ret = m_input_port->stop();
+        if (ret != 0) {
+            RDX_RAISE_ERROR("Failed to stop input port, error code: {}", ret);
+        }
     }
-
-    // change state to STOPPED to stop step thread
-    m_status = NodeStatusCode::STOPPED;
-
-    // wait for step thread to finish
-    if (m_step_thread && m_step_thread->joinable()) {
-        m_step_thread->join();
-    }
-
-    // stop the input port
-    m_input_port->stop();
 
     // wait for all inference tasks to finish
     m_impl->inference_task_group.wait();
@@ -210,30 +149,31 @@ int Yolo8BodyPoseDetector::stop()
     return 0;
 }
 
-void Yolo8BodyPoseDetector::_update_init_config(std::shared_ptr<InitConfig_t> init_config)
+int Yolo8BodyPoseDetector::_update_init_config(std::shared_ptr<BaseInitConfig_t> init_config)
 {
-    if (m_status != NodeStatusCode::BEFORE_INIT) {
-        RDX_RAISE_ERROR("Node status must be BEFORE_INIT, but got {}", m_status);
+    auto config = std::dynamic_pointer_cast<InitConfig_t>(init_config);
+    if (!config) {
+        RDX_RAISE_ERROR("[f={}] Failed to convert init config to Yolo8BodyPoseDetector::InitConfig_t", __func__);
     }
 
-    m_init_config = init_config;
-
-    // create input port
+    // create input port and init it
     m_input_port = std::make_shared<ActionInputPort_t>(this);
-    m_input_port->init(init_config->input_port_config);
+    {
+        auto ret = m_input_port->init(config->input_port_config);
+        if (ret != 0) {
+            RDX_RAISE_ERROR("[f={}] Failed to init input port, error code: {}", __func__, ret);
+        }
+    }
 
     // create all inference resources
-    _create_all_inference_resources(init_config->model_configs);
-}
-
-void Yolo8BodyPoseDetector::_update_runtime_config(std::shared_ptr<RuntimeConfig_t> runtime_config)
-{
-    if (m_status != NodeStatusCode::STOPPED) {
-        RDX_RAISE_ERROR("Node status must be STOPPED, but got {}", m_status);
+    {
+        auto ret = _create_all_inference_resources(config->model_configs);
+        if (ret != 0) {
+            RDX_RAISE_ERROR("[f={}] Failed to create all inference resources, error code: {}", __func__, ret);
+        }
     }
 
-    // nothing to do, just update the runtime config
-    m_runtime_config = runtime_config;
+    return 0;
 }
 
 void Yolo8BodyPoseDetector::_step()
@@ -255,8 +195,9 @@ void Yolo8BodyPoseDetector::_step()
     }
 
     // get a message from input port
+    auto config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+    auto use_blocking_mode = config->enable_blocking_mode;
     std::shared_ptr<ActionInputPort_t::SourceData_t> source_data;
-    auto use_blocking_mode = m_runtime_config->enable_blocking_mode;
     if (use_blocking_mode) {
         source_data = m_input_port->pop_source_data();
     } else {
@@ -276,7 +217,7 @@ void Yolo8BodyPoseDetector::_step()
                  inference_resource.index_in_pool);
 
     // work on the image
-    m_impl->inference_task_group.run([this, source_data, inference_resource]() {
+    m_impl->inference_task_group.run([this, source_data, inference_resource, config]() {
         // reply to the goal
         auto msg_uuid_str = boost::uuids::to_string(ActionInputPort_t::ActionDataTrait_t::get_uuid(*source_data->get_goal()));
         auto goal_handle = source_data->get_goal_handle_future().get();
@@ -320,7 +261,7 @@ void Yolo8BodyPoseDetector::_step()
         // get result
         RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Getting inference result", msg_uuid_str);
         auto output_detections = model->get_output_detections(inout_data,
-                                                              m_runtime_config->model_output_config);
+                                                              config->model_output_config);
 
         // DO NOT return the resource here, although we do not need it anymore
         // if goal reply is slower than inference (although unlikely), we will have a lot of pending reply requests

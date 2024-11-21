@@ -3,6 +3,7 @@
 #include <any>
 #include <boost/uuid/uuid_generators.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/image_encodings.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
@@ -45,7 +46,7 @@ class DeliverySourceData
 {
   public:
     using PublishMessageType_t = sensor_msgs::msg::Image;
-    inline static constexpr const char *DefaultEncoding = "bgr8";
+    inline static constexpr const char *DefaultEncoding = sensor_msgs::image_encodings::BGR8;
 
     DeliverySourceData()
     {
