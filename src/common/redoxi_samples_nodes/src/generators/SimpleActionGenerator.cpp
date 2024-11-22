@@ -29,7 +29,8 @@ int SimpleActionGenerator::_read_frame(SourceData_t &source_data, std::atomic<in
     // source_data.set_frame_number(frame_number);
     // frame_number++;
     // source_data.set_uuid(uuid);
-    auto frame_size = m_runtime_config->output_image_size;
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+    auto frame_size = runtime_config->output_image_size;
     if (frame_size.empty()) {
         RDX_RAISE_ERROR("[{}][_read_frame()] output_image_size is not set", this->get_name());
     }
