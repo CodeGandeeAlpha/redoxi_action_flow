@@ -32,7 +32,8 @@ int RandomFrameVideoGenerator::_update_runtime_config(std::shared_ptr<RedoxiVide
     return 0;
 }
 
-int RandomFrameVideoGenerator::_read_frame(SourceData_t &data, std::atomic<int64_t> &frame_number)
+RandomFrameVideoGenerator::ReadFrameResult
+    RandomFrameVideoGenerator::_read_frame(SourceData_t &data, std::atomic<int64_t> &frame_number)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     auto frame_size = runtime_config->output_image_size;
@@ -51,7 +52,7 @@ int RandomFrameVideoGenerator::_read_frame(SourceData_t &data, std::atomic<int64
     metadata.frame_num = _increment_frame_number_by(frame_number, 1);
     data.set_frame_metadata(metadata);
 
-    return 0;
+    return ReadFrameResult::OK;
 }
 
 } // namespace redoxi_works

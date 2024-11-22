@@ -63,8 +63,8 @@ class RuntimeConfig : public common_nodes::OpenCloseNode::RuntimeConfig_t
   public:
     // IMPORTANT: default output is rgb8, if you use bgr8, you need to specify it in the config
     inline static const std::string DefaultOutputImageEncoding = sensor_msgs::image_encodings::RGB8;
-    inline static const DefaultTimeUnit_t DefaultRequestRetryInterval{std::chrono::milliseconds(5)};
-    inline static const DefaultTimeUnit_t DefaultRequestRetryResponseTime{std::chrono::milliseconds(5)};
+    inline static const TimeUnit_t DefaultRequestRetryInterval{std::chrono::milliseconds(5)};
+    inline static const TimeUnit_t DefaultRequestRetryResponseTime{std::chrono::milliseconds(5)};
     inline static const int DefaultRequestRetryNumber{5};
 
     virtual ~RuntimeConfig() = default;
@@ -79,7 +79,7 @@ class RuntimeConfig : public common_nodes::OpenCloseNode::RuntimeConfig_t
     }
 
     //! The frame interval in ms, 0 means as fast as possible
-    OutputPortSpec::TimeUnit_t frame_interval{0};
+    TimeUnit_t frame_interval{0};
 
     //! The output image size. If input is different, resize to output_image_size.
     //! If output_image_size.width=-1 or output_image_size.height=-1, keep aspect ratio.

@@ -154,7 +154,9 @@ void FrameRelayNode::_step()
 
     // publish debug topic?
     if (get_debug_topics_enabled()) {
-        m_pub_frame_accepted.publish(frame, "accepted");
+        auto control_signal_code = ActionDataTrait_t::get_control_signal_code(*frame_data->get_goal());
+        auto label_text = fmt::format("accepted, signal = {}", control_signal_code_to_string(control_signal_code));
+        m_pub_frame_accepted.publish(frame, label_text);
     }
 
     // at the end, terminate the goal

@@ -15,8 +15,8 @@ class SimpleActionGenerator : public RedoxiVideoReaderBase
 
     //! Implement _read_frame method
     using RedoxiVideoReaderBase::_read_frame;
-    int _read_frame(SourceData_t &source_data,
-                    std::atomic<int64_t> &frame_number) override;
+    ReadFrameResult _read_frame(SourceData_t &source_data,
+                                std::atomic<int64_t> &frame_number) override;
 
 
   private:

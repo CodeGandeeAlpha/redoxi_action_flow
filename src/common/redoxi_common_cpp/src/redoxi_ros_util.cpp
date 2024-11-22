@@ -40,15 +40,19 @@ int declare_default_parameters_for_node(rclcpp::Node *node)
     //! Parse the JSON string
     nlohmann::json json_params;
     try {
-        if (!param_as_json_string.empty())
+        if (!param_as_json_string.empty()) {
+            RDX_INFO_DEV(node, __func__, false, "json parameter string is not empty, parsing: {}", param_as_json_string);
             json_params = nlohmann::json::parse(param_as_json_string);
+        }
     } catch (const nlohmann::json::parse_error &e) {
-        RCLCPP_ERROR(node->get_logger(), "[%s] Failed to parse param_as_json_string: %s", node->get_name(), e.what());
+        RDX_INFO_DEV(node, __func__, false, "[{}] Failed to parse param_as_json_string: {}", node->get_name(), e.what());
         return -1;
     }
 
-    if (json_params.empty())
+    if (json_params.empty()) {
+        RDX_INFO_DEV(node, __func__, false, "[{}] No json parameters to parse, exiting", node->get_name());
         return 0;
+    }
 
     // get the declare_params
     {

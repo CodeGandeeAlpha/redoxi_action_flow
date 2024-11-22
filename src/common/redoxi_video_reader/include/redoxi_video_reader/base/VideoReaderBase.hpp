@@ -29,6 +29,15 @@ class RedoxiVideoReaderBase : public common_nodes::OpenCloseNode
     friend struct video_reader_base::InitConfig;
 
   public:
+    //! result of read frame operation
+    enum class ReadFrameResult {
+        OK = 0,           // success
+        END_OF_VIDEO = 1, // end of video
+        NO_DATA = 2,      // this frame has no data (reading too fast?), not an error
+        ERROR = -1,       // unknown error
+    };
+
+  public:
     //! Import all names from RedoxiVideoReaderInternalTypes
     //! @note: this is to allow subclass to override the type definitions
     // using OutputPortSpec = video_reader_base::OutputPortSpec;
@@ -86,13 +95,13 @@ class RedoxiVideoReaderBase : public common_nodes::OpenCloseNode
      * @param source_data the source data to be filled with the read frame
      * @param frame_number input is the frame number of PREVIOUS frame, output is the frame number of CURRENT frame.
      *        You should update this to the CURRENT frame number.
-     * @return 0 if success, otherwise error code
+     * @return ReadFrameResult::OK if success, ReadFrameResult::END_OF_VIDEO if end of video, otherwise error code
      */
-    virtual int _read_frame(SourceData_t &source_data,
-                            std::atomic<int64_t> &frame_number) = 0;
+    virtual ReadFrameResult _read_frame(SourceData_t &source_data,
+                                        std::atomic<int64_t> &frame_number) = 0;
 
     //! read frame and update the frame number, without direct access to m_last_read_frame_number
-    int _read_frame(SourceData_t &source_data)
+    ReadFrameResult _read_frame(SourceData_t &source_data)
     {
         return _read_frame(source_data, m_last_read_frame_number);
     }
@@ -102,7 +111,9 @@ class RedoxiVideoReaderBase : public common_nodes::OpenCloseNode
      * @param source_data the source data to be filled with the read frame
      * @return the delivery request
      */
-    virtual DeliveryRequest_t _create_delivery_request(const SourceData_t &source_data);
+    virtual DeliveryRequest_t _create_delivery_request(
+        const SourceData_t &source_data,
+        ControlSignalCode control_signal_code = ControlSignalCode::Normal);
 
     //! create primary output port
     virtual std::shared_ptr<OutputPort_t> _create_primary_output_port(const InitConfig_t &init_config);

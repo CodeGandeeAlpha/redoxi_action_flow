@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 #include <redoxi_video_reader/base/VideoReaderBase.hpp>
 #include <opencv2/opencv.hpp>
 
@@ -20,8 +22,17 @@ struct InitConfig : public RedoxiVideoReaderBase::InitConfig_t {
 };
 
 struct RuntimeConfig : public RedoxiVideoReaderBase::RuntimeConfig_t {
+    // start time in default time unit, read from here
+    // this is ignored for real time video source
+    TimeUnit_t video_start_time{0};
+
+    // end time in default time unit, end here, -1 means no end time
+    TimeUnit_t video_end_time{-1};
+
     JS_OBJECT_WITH_SUPER(
-        JS_SUPER(RedoxiVideoReaderBase::RuntimeConfig_t));
+        JS_SUPER(RedoxiVideoReaderBase::RuntimeConfig_t),
+        JS_MEMBER(video_start_time),
+        JS_MEMBER(video_end_time));
 };
 
 } // namespace video_source_from_url_types
@@ -57,7 +68,7 @@ class VideoSourceFromUrl : public RedoxiVideoReaderBase
   protected:
     int _open() override;
     int _close() override;
-    int _read_frame(SourceData_t &source_data, std::atomic<int64_t> &frame_number) override;
+    ReadFrameResult _read_frame(SourceData_t &source_data, std::atomic<int64_t> &frame_number) override;
 
   protected:
     std::shared_ptr<cv::VideoCapture> m_video_capture;

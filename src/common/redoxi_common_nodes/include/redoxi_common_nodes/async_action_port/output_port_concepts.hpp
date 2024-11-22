@@ -172,9 +172,9 @@ concept DeliveryRequestConcept = requires(T t)
     {
         std::declval<const T &>().get_stamp()
         } -> std::same_as<const typename T::StampType_t &>;
-    {
-        t.is_ping_request()
-        } -> std::same_as<bool>;
+    // {
+    //     t.is_ping_request()
+    //     } -> std::same_as<bool>;
     {
         t.get_delivery_policy()
         } -> std::same_as<typename T::DeliveryPolicy_t *>;
@@ -193,6 +193,14 @@ concept DeliveryRequestConcept = requires(T t)
     {
         std::declval<const T &>().to_target_data(std::declval<typename T::TargetDataType_t &>())
         } -> std::same_as<int>;
+
+    //! Must have method to get and set control signal code
+    {
+        std::declval<const T &>().get_control_signal_code()
+        } -> std::same_as<ControlSignalCode>;
+    {
+        std::declval<T &>().set_control_signal_code(std::declval<ControlSignalCode>())
+        } -> std::same_as<void>;
 };
 
 //! A task to deliver to the downstream action

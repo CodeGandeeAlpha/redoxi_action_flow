@@ -455,18 +455,19 @@ DEFINE_RDX_LOGGING_SEVERITY_WITH_IMPORTANCE(FATAL, 4)
 
 //! Macro to get JSON parameter from node, defined as macro to avoid include nlohmann/json.hpp in this file
 //! you must include nlohmann/json.hpp in the file where you use this macro
-#define RDX_GET_JSON_PARAM_FROM_NODE(node)                                \
-    ([](const rclcpp::Node *node) -> nlohmann::json {                     \
-        rclcpp::Parameter _json_params;                                   \
-        auto pkey = redoxi_works::RosParams::ParamAsJsonString::MainKey;  \
-        if (!node->get_parameter(pkey, _json_params))                     \
-            return nlohmann::json();                                      \
-        try {                                                             \
-            return nlohmann::json::parse(_json_params.as_string());       \
-        } catch (const nlohmann::json::parse_error &e) {                  \
-            RDX_RAISE_ERROR("Failed to parse json string: {}", e.what()); \
-            return nlohmann::json();                                      \
-        }                                                                 \
+#define RDX_GET_JSON_PARAM_FROM_NODE(node)                                      \
+    ([](const rclcpp::Node *node) -> nlohmann::json {                           \
+        rclcpp::Parameter _json_params;                                         \
+        auto pkey = redoxi_works::RosParams::ParamAsJsonString::MainKey;        \
+        if (!node->get_parameter(pkey, _json_params))                           \
+            return nlohmann::json();                                            \
+        try {                                                                   \
+            auto str = _json_params.as_string();                                \
+            return str.empty() ? nlohmann::json() : nlohmann::json::parse(str); \
+        } catch (const nlohmann::json::parse_error &e) {                        \
+            RDX_RAISE_ERROR("Failed to parse json string: {}", e.what());       \
+            return nlohmann::json();                                            \
+        }                                                                       \
     })(node)
 
 

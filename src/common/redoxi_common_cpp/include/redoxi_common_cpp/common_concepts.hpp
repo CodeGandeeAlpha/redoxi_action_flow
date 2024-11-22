@@ -43,6 +43,46 @@ enum class ControlSignalCode {
     Unknown = std::numeric_limits<int32_t>::max(), //!< Unknown signal, should be ignored
 };
 
+//! Convert control signal code to string
+inline constexpr const char *control_signal_code_to_string(ControlSignalCode code)
+{
+    switch (code) {
+        case ControlSignalCode::Normal:
+            return "Normal";
+        case ControlSignalCode::Ping:
+            return "Ping";
+        case ControlSignalCode::Flush:
+            return "Flush";
+        case ControlSignalCode::Reset:
+            return "Reset";
+        case ControlSignalCode::Terminate:
+            return "Terminate";
+        case ControlSignalCode::Custom_1:
+            return "Custom_1";
+        case ControlSignalCode::Custom_2:
+            return "Custom_2";
+        case ControlSignalCode::Custom_3:
+            return "Custom_3";
+        case ControlSignalCode::Custom_4:
+            return "Custom_4";
+        case ControlSignalCode::Custom_5:
+            return "Custom_5";
+        case ControlSignalCode::Custom_6:
+            return "Custom_6";
+        case ControlSignalCode::Custom_7:
+            return "Custom_7";
+        case ControlSignalCode::Custom_8:
+            return "Custom_8";
+        case ControlSignalCode::Custom_9:
+            return "Custom_9";
+        case ControlSignalCode::Unknown:
+            return "Unknown";
+        default:
+            return "Invalid";
+    }
+}
+
+
 //! Concept to check if a type is ROS message
 template <typename T>
 concept RosMessageConcept = requires(T t)

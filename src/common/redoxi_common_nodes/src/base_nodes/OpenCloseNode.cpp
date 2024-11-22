@@ -10,6 +10,11 @@ OpenCloseNode::OpenCloseNode(const std::string &name, const rclcpp::NodeOptions 
 
 int OpenCloseNode::open()
 {
+    //! If already in OPENED state, just return
+    if (get_status() == NodeStatusCode::OPENED) {
+        RDX_INFO_DEV(this, __func__, true, "{}", "Node already in OPENED state, skipping");
+        return 0;
+    }
     //! Check if node is in CLOSED state
     if (get_status() != NodeStatusCode::CLOSED) {
         RDX_RAISE_ERROR("[f={}] Cannot open node when not in CLOSED state", __func__);
@@ -28,6 +33,12 @@ int OpenCloseNode::open()
 
 int OpenCloseNode::close()
 {
+    //! If already in CLOSED state, just return
+    if (get_status() == NodeStatusCode::CLOSED) {
+        RDX_INFO_DEV(this, __func__, true, "{}", "Node already in CLOSED state, skipping");
+        return 0;
+    }
+
     //! Check if node is in OPENED or STOPPED state
     if (get_status() != NodeStatusCode::OPENED && get_status() != NodeStatusCode::STOPPED) {
         RDX_RAISE_ERROR("[f={}] Cannot close node when not in OPENED or STOPPED state", __func__);
@@ -45,6 +56,11 @@ int OpenCloseNode::close()
 
 int OpenCloseNode::start()
 {
+    //! If already in STARTED state, just return
+    if (get_status() == NodeStatusCode::STARTED) {
+        RDX_INFO_DEV(this, __func__, true, "{}", "Node already in STARTED state, skipping");
+        return 0;
+    }
     //! Check if node is in OPENED state
     if (get_status() != NodeStatusCode::OPENED) {
         RDX_RAISE_ERROR("[f={}] Cannot start node when not in OPENED state", __func__);
@@ -65,20 +81,29 @@ int OpenCloseNode::start()
 
 int OpenCloseNode::stop()
 {
+    //! If already in STOPPED state, just return
+    if (get_status() == NodeStatusCode::STOPPED) {
+        RDX_INFO_DEV(this, __func__, true, "{}", "Node already in STOPPED state, skipping");
+        return 0;
+    }
     //! Check if node is in STARTED state
+    RDX_INFO_DEV(this, __func__, true, "{}", "Checking node status");
     if (get_status() != NodeStatusCode::STARTED) {
         RDX_RAISE_ERROR("[f={}] Cannot stop node when not in STARTED state", __func__);
     }
 
     //! Stop step thread
+    RDX_INFO_DEV(this, __func__, true, "{}", "Stopping step thread");
     _stop_step_thread();
 
     //! Call implementation
+    RDX_INFO_DEV(this, __func__, true, "{}", "Calling stop implementation");
     int ret = _stop();
     if (ret != 0) {
         RDX_RAISE_ERROR("[f={}] Failed to stop node", __func__);
     }
 
+    RDX_INFO_DEV(this, __func__, true, "{}", "Setting node status to STOPPED");
     set_status(NodeStatusCode::STOPPED);
     return 0;
 }

@@ -34,6 +34,6 @@ class RandomFrameVideoGenerator : public RedoxiVideoReaderBase
   protected:
     //! Override to update runtime configuration
     int _update_runtime_config(std::shared_ptr<RedoxiVideoReaderBase::BaseRuntimeConfig_t> config) override;
-    int _read_frame(SourceData_t &data, std::atomic<int64_t> &frame_number) override;
+    ReadFrameResult _read_frame(SourceData_t &data, std::atomic<int64_t> &frame_number) override;
 };
 } // namespace redoxi_works

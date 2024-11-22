@@ -216,9 +216,10 @@ class DeliveryRequest : public DeliveryRequestBase
         ActionTrait::set_uuid(goal, this->m_source_data.get_uuid());
 
         // set the control signal code
-        if (this->is_ping_request()) {
-            ActionTrait::mark_with_control_signal(goal, ControlSignalCode::Ping);
-        }
+        // if (this->get_control_signal_code() == ControlSignalCode::Ping) {
+        //     ActionTrait::mark_with_control_signal(goal, ControlSignalCode::Ping);
+        // }
+        ActionTrait::mark_with_control_signal(goal, this->get_control_signal_code());
 
         return 0;
     }

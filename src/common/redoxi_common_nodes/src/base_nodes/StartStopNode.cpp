@@ -11,6 +11,11 @@ StartStopNode::StartStopNode(const std::string &node_name, const rclcpp::NodeOpt
 
 int StartStopNode::start()
 {
+    //! If already in STARTED state, just return
+    if (m_status == NodeStatusCode::STARTED) {
+        RDX_INFO_DEV(this, __func__, true, "{}", "Node already in STARTED state, skipping");
+        return 0;
+    }
     //! Check state is STOPPED
     if (m_status != NodeStatusCode::STOPPED) {
         RDX_RAISE_ERROR("[f={}] Node cannot be started in state {}", __func__, m_status);
@@ -34,6 +39,11 @@ int StartStopNode::start()
 
 int StartStopNode::stop()
 {
+    //! If already in STOPPED state, just return
+    if (m_status == NodeStatusCode::STOPPED) {
+        RDX_INFO_DEV(this, __func__, true, "{}", "Node already in STOPPED state, skipping");
+        return 0;
+    }
     //! Check state is STARTED
     if (m_status != NodeStatusCode::STARTED) {
         RDX_RAISE_ERROR("[f={}] Node cannot be stopped in state {}", __func__, m_status);

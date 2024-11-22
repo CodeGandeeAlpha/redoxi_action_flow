@@ -6,6 +6,7 @@
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 #include <json_struct/json_struct.h>
+#include <tbb/task_group.h>
 
 #define PRINT_THREAD_ID_IN_LOG (true)
 
@@ -15,6 +16,7 @@ namespace redoxi_works
 struct RedoxiVideoReaderImpl {
     //! ros time token
     std::shared_ptr<RosTimeToken> m_ros_time_token;
+    tbb::task_group m_tasks;
 };
 
 RedoxiVideoReaderBase::RedoxiVideoReaderBase(const std::string &name, const rclcpp::NodeOptions &options)
@@ -308,7 +310,8 @@ std::shared_ptr<RedoxiVideoReaderImpl> RedoxiVideoReaderBase::_create_impl()
 }
 
 RedoxiVideoReaderBase::DeliveryRequest_t
-    RedoxiVideoReaderBase::_create_delivery_request(const SourceData_t &source_data)
+    RedoxiVideoReaderBase::_create_delivery_request(const SourceData_t &source_data,
+                                                    ControlSignalCode control_signal_code)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
 
@@ -318,7 +321,7 @@ RedoxiVideoReaderBase::DeliveryRequest_t
     if (runtime_config->frame_request_policy.has_value()) {
         req.set_delivery_policy(*runtime_config->frame_request_policy);
     }
-
+    req.set_control_signal_code(control_signal_code);
     return req;
 }
 
@@ -362,15 +365,37 @@ void RedoxiVideoReaderBase::_step()
 
         // time to get a new frame
         SourceData_t source_data;
-        int ret = _read_frame(source_data, m_last_read_frame_number);
-        if (ret != 0) {
-            // failed to read frame, do nothing
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "Failed to read frame, ret={}", ret);
-            return;
+        auto ret = _read_frame(source_data, m_last_read_frame_number);
+        switch (ret) {
+            case ReadFrameResult::OK: // good, pass it to downstream
+                break;
+            case ReadFrameResult::END_OF_VIDEO: // end of video, stop it
+                RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "End of video, stopping");
+
+                // TODO: need to send flush signal to downstream
+
+                // call this in another thread to avoid deadlock
+                // otherwise it will try to join this thread
+                m_impl->m_tasks.run([this]() {
+                    stop();
+                });
+
+                return;
+            case ReadFrameResult::NO_DATA: // no data, try again
+                return;
+            case ReadFrameResult::ERROR: // unknown error, raise an error
+                RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "Failed to read frame for unknown reason, skipping");
+                return;
+        }
+
+        ControlSignalCode control_signal_code = ControlSignalCode::Normal;
+        if (ret == ReadFrameResult::END_OF_VIDEO) {
+            // end of video, flush the pipeline, but do not terminate it because you can then load other videos
+            control_signal_code = ControlSignalCode::Flush;
         }
 
         // create delivery request
-        auto delivery_request = _create_delivery_request(source_data);
+        auto delivery_request = _create_delivery_request(source_data, control_signal_code);
 
         // this is used for logging
         auto msg_uuid = source_data.get_uuid();
