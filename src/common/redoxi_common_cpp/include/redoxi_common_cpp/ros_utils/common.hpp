@@ -6,6 +6,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rcpputils/asserts.hpp>
 #include <rcutils/logging_macros.h>
+#include <builtin_interfaces/msg/time.hpp>
 #include <fmt/format.h>
 
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
@@ -478,5 +479,11 @@ enum class ActionDownstreamResponse {
 //! declare some default parameters for the node, some are looked up by json string
 //! return 0 if success, otherwise return error code
 int declare_default_parameters_for_node(rclcpp::Node *node);
+
+//! Convert milliseconds to ros2 time message
+builtin_interfaces::msg::Time ros2_time_msg_from_ms(double ms);
+
+//! Convert seconds to ros2 time message
+builtin_interfaces::msg::Time ros2_time_msg_from_sec(double sec);
 
 } // namespace redoxi_works

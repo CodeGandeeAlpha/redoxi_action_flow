@@ -69,13 +69,14 @@ class RedoxiVideoReaderBase : public common_nodes::OpenCloseNode
     //! enable or disable image publishing
     virtual void set_publish_to_debug_topic(bool enable);
     virtual bool get_publish_to_debug_topic() const;
+    int64_t get_last_read_frame_number() const;
 
   protected: // from base class
     int _open() override;
     int _start() override;
     int _stop() override;
     int _close() override;
-    virtual void _step() override;
+    void _step() override;
     int _update_init_config(std::shared_ptr<BaseInitConfig_t> config) override;
     int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config) override;
 
@@ -83,12 +84,18 @@ class RedoxiVideoReaderBase : public common_nodes::OpenCloseNode
     /**
      * @brief Read next frame, intended to be overridden by subclass
      * @param source_data the source data to be filled with the read frame
-     * @param frame_number the frame number of this frame, you are responsible for updating this.
-     *        The input value is the previous frame number, and the output value will be the current frame number.
+     * @param frame_number input is the frame number of PREVIOUS frame, output is the frame number of CURRENT frame.
+     *        You should update this to the CURRENT frame number.
      * @return 0 if success, otherwise error code
      */
     virtual int _read_frame(SourceData_t &source_data,
                             std::atomic<int64_t> &frame_number) = 0;
+
+    //! read frame and update the frame number, without direct access to m_last_read_frame_number
+    int _read_frame(SourceData_t &source_data)
+    {
+        return _read_frame(source_data, m_last_read_frame_number);
+    }
 
     /**
      * @brief Create a delivery request from source data
@@ -129,14 +136,22 @@ class RedoxiVideoReaderBase : public common_nodes::OpenCloseNode
         return 0;
     };
 
+    //! reset the frame number to initial value
+    void _reset_frame_number()
+    {
+        m_last_read_frame_number = -1;
+    }
+
+    //! increment the frame number by the given increment, and return the new value
+    //! @note: this is atomic and thread safe
+    int64_t _increment_frame_number_by(std::atomic<int64_t> &frame_number, int64_t increment)
+    {
+        return frame_number.fetch_add(increment) + increment;
+    }
+
   protected:
     // member of downstreams
     std::shared_ptr<OutputPort_t> m_primary_output_port;
-
-    // current frame number read by this reader
-    // -1 means not read any frame, increment by each _read_frame()
-    // will be reset to -1 when open()
-    std::atomic<int64_t> m_frame_number{-1};
 
     // publish to debug topic
     std::atomic<bool> m_publish_to_debug_topic{false};
@@ -149,6 +164,12 @@ class RedoxiVideoReaderBase : public common_nodes::OpenCloseNode
 
     //! shared memory client
     std::shared_ptr<shared_memory::SharedMemoryClient> m_shm_client;
+
+  private:
+    // frame number last read by this reader, which is, the frame number of PREVIOUS frame
+    // -1 means not read any frame, increment by each _read_frame()
+    // will be reset to -1 when open()
+    std::atomic<int64_t> m_last_read_frame_number{-1};
 };
 
 } // namespace redoxi_works

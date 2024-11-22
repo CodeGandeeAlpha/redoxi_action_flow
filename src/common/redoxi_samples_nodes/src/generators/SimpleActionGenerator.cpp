@@ -41,9 +41,14 @@ int SimpleActionGenerator::_read_frame(SourceData_t &source_data, std::atomic<in
     auto frame_text = fmt::format("{}\nFrame Number: {}", boost::uuids::to_string(uuid), frame_number.load());
     random_image_with_text(random_frame, frame_size, frame_text);
 
+    // must do it this way to ensure thread safety
+    int64_t current_frame_number = _increment_frame_number_by(frame_number, 1);
+
     source_data.set_image(random_frame);
-    source_data.set_frame_number(frame_number);
-    frame_number++;
+    SourceData_t::FrameMetadata_t metadata;
+    metadata.frame_num = current_frame_number;
+    source_data.set_frame_metadata(metadata);
+
     return 0;
 }
 
@@ -60,7 +65,7 @@ void SimpleActionGenerator::_step_send_by_tbb_graph()
     //! Read a frame
     SourceData_t source_data;
     {
-        auto ret = _read_frame(source_data, m_frame_number);
+        auto ret = _read_frame(source_data);
         if (ret != 0) {
             RDX_LOG_ERROR(this, __func__, true, "{}", "Failed to read frame");
             return;
@@ -75,7 +80,7 @@ void SimpleActionGenerator::_step_send_by_tbb_graph()
 
     //! Put the delivery request into the frame delivery node
     auto msg_uuid = delivery_request.get_source_data().get_uuid();
-    auto frame_num = delivery_request.get_source_data().get_frame_number();
+    auto frame_num = delivery_request.get_source_data().get_frame_metadata().frame_num;
     // {
     //     auto ok = m_primary_output_port->try_push_request(delivery_request);
     //     if (!ok) {

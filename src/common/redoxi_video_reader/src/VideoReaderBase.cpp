@@ -40,7 +40,7 @@ RedoxiVideoReaderBase::~RedoxiVideoReaderBase()
 int RedoxiVideoReaderBase::_open()
 {
     //! Reset frame number
-    m_frame_number = -1;
+    _reset_frame_number();
 
     // create shm client
     auto shm_config = shared_memory::SharedMemoryFactory::get_shm_config_from_node(this);
@@ -123,6 +123,11 @@ void RedoxiVideoReaderBase::set_publish_to_debug_topic(bool enable)
 bool RedoxiVideoReaderBase::get_publish_to_debug_topic() const
 {
     return m_publish_to_debug_topic;
+}
+
+int64_t RedoxiVideoReaderBase::get_last_read_frame_number() const
+{
+    return m_last_read_frame_number;
 }
 
 int RedoxiVideoReaderBase::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
@@ -357,7 +362,7 @@ void RedoxiVideoReaderBase::_step()
 
         // time to get a new frame
         SourceData_t source_data;
-        int ret = _read_frame(source_data, m_frame_number);
+        int ret = _read_frame(source_data, m_last_read_frame_number);
         if (ret != 0) {
             // failed to read frame, do nothing
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "Failed to read frame, ret={}", ret);

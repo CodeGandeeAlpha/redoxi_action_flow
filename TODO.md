@@ -1,22 +1,21 @@
-[] bugfix: the uuid of message is changed during delivery, unknown why, and boost uuid and ros2 uuid are not the same
---------------------------------
-[] implement the frame payload type
-[] make use of vineyard to deliver the frame payload
-[] test random blocking from the receiver side
-[x] set goal handle expiration time to 1s or less
+## Roadmap
 
-## Debugging
+### core functions
+- [] support shared memory in all nodes
+- [] implement python action input/output port
 
-| Has Frame Payload | Is Ping | Always Accept | Passed | Detail                                                                                       |
-|-------------------|---------|---------------|--------|----------------------------------------------------------------------------------------------|
-| Yes (640x480)     | Yes     | Yes           | Yes    | Goal expiration is not a problem, it has a 10s timeout set by ros2 (when creating the server) |
-| Yes (640x480)     | Yes     | No            | Yes    | Ping requests with random rejection                                                           |
-| Yes (640x480)     | No      | No (best effort) | Yes (Simple Node)    | Normal frame delivery scenario                                                                |
-| Yes (640x480)     | No      | No (best effort) | ? (Complex Node)    | Normal frame delivery scenario                                                |
-| No                | Yes     | Yes           | ?      | Ping without frame payload                                                                    |
+### platform
+- [] support rk3588
 
-## Test cases
-### Run random frame generator with full videobase implementation
+### nodes
+- [] object snapshot node
+- [] head detection node
+- [] rtm pose node
+- [] tracking node
+- [] video reader by file
+- [] video reader by usb camera
+- [] multi stream video reader, like RGBD, stereo, etc.
+ 
 
 
 ## Assumptions

@@ -47,8 +47,10 @@ int RandomFrameVideoGenerator::_read_frame(SourceData_t &data, std::atomic<int64
     random_image_with_text(random_frame, frame_size, frame_text);
 
     data.set_image(random_frame);
-    data.set_frame_number(frame_number);
-    frame_number++;
+    SourceData_t::FrameMetadata_t metadata;
+    metadata.frame_num = _increment_frame_number_by(frame_number, 1);
+    data.set_frame_metadata(metadata);
+
     return 0;
 }
 

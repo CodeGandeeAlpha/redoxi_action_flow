@@ -1,8 +1,33 @@
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <nlohmann/json.hpp>
+#include <chrono>
 
 namespace redoxi_works
 {
+
+//! Convert milliseconds to ros2 time message
+builtin_interfaces::msg::Time ros2_time_msg_from_ms(double ms)
+{
+    std::chrono::nanoseconds ns(static_cast<int64_t>(ms * 1e6));
+    std::chrono::seconds sec = std::chrono::duration_cast<std::chrono::seconds>(ns);
+    std::chrono::nanoseconds nsec = ns - sec;
+    builtin_interfaces::msg::Time time_msg;
+    time_msg.sec = sec.count();
+    time_msg.nanosec = nsec.count();
+    return time_msg;
+}
+
+//! Convert seconds to ros2 time message
+builtin_interfaces::msg::Time ros2_time_msg_from_sec(double sec)
+{
+    builtin_interfaces::msg::Time time_msg;
+    std::chrono::nanoseconds ns(static_cast<int64_t>(sec * 1e9));
+    std::chrono::seconds s = std::chrono::duration_cast<std::chrono::seconds>(ns);
+    std::chrono::nanoseconds nsec = ns - s;
+    time_msg.sec = s.count();
+    time_msg.nanosec = nsec.count();
+    return time_msg;
+}
 
 int declare_default_parameters_for_node(rclcpp::Node *node)
 {
