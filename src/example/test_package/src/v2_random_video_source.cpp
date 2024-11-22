@@ -13,7 +13,7 @@ int main(int argc, char **argv)
     auto runtime_config = std::make_shared<rdx::RandomFrameVideoGenerator::RuntimeConfig_t>();
 
     init_config->parse_from_node_parameters(init_config.get(), video_generator.get());
-    runtime_config->from_node(video_generator.get());
+    runtime_config->parse_from_node_parameters(runtime_config.get(), video_generator.get());
 
     //! Initialize the node with the configuration
     video_generator->init(init_config, runtime_config);

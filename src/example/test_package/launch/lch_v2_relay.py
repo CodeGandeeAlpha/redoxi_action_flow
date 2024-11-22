@@ -8,7 +8,7 @@ import json
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
     "log_level",
-    default_value="info",
+    default_value="debug",
     description="Logging level",
 )
 
@@ -80,14 +80,21 @@ source_node_json_params = {
 relay_node_json_params = {
     "declare_params": {},
     "init_config": {
-        "input_port_config": {"buffer_capacity": 10, "action_name": "in/action"},
-        "_time_unit": "us(1e-6)",
-        "step_interval": 500,
+        "input_port_config": {
+            "buffer_capacity": 1,
+            "action_name": "in/action",
+            "goal_result_expire_time": 1000000,
+        },
         "publish_topic": "out/relayed_frame",
-        "enable_debug_topics": True,
         "debug_topic_frame_accepted": "debug_port/frame_accepted",
         "debug_topic_frame_rejected": "debug_port/frame_rejected",
+        "_time_unit": "us(1e-6)",
+    },
+    "runtime_config": {
         "enable_blocking_mode": False,
+        "enable_debug_topics": True,
+        "_time_unit": "us(1e-6)",
+        "step_interval": 5000,
     },
 }
 

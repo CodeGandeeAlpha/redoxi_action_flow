@@ -9,98 +9,76 @@ namespace redoxi_works
 
 FrameRelayNodeInitConfig::FrameRelayNodeInitConfig()
 {
-    {
-        auto p = input_port_config;
-        p->set_action_name("in/action");
-        p->set_buffer_capacity(1);
-    }
-}
-
-void FrameRelayNodeInitConfig::from_parameters(const FrameRelayNode *node)
-{
-    auto &json_params = node->get_json_parameters();
-
-    //! Retrieve the init_config from the top level JSON parameters
-    if (json_params.contains("init_config")) {
-        //! Convert the init_config to a string
-        std::string init_config_str = json_params["init_config"].dump();
-
-        //! Parse the string into the InitConfig structure using json_struct
-        JS::ParseContext pc(init_config_str);
-        auto ret = pc.parseTo(*this);
-        if (ret != JS::Error::NoError) {
-            RDX_RAISE_ERROR("[{}] Failed to parse init_config from JSON parameters: {}",
-                            __func__, JS::Internal::error_strings[static_cast<int>(ret)]);
-        }
-        RDX_INFO_DEV(node, __func__, false, "{}", "init_config parsed from JSON parameters");
-    } else {
-        RDX_INFO_DEV(node, __func__, false, "{}", "init_config not found in JSON parameters, using default values");
-    }
+    // default configuration for input port
+    input_port_config->set_action_name("in/action");
+    input_port_config->set_buffer_capacity(1);
 }
 
 FrameRelayNode::FrameRelayNode(const std::string &node_name, const rclcpp::NodeOptions &options)
-    : rclcpp::Node(node_name, options)
+    : common_nodes::StartStopNode(node_name, options)
 {
-    auto ret = declare_default_parameters_for_node(this);
-    if (ret != 0) {
-        RDX_RAISE_ERROR("[{}] Failed to declare default parameters for node", __func__);
-    }
-
-    auto node = this;
-    m_json_parameters = RDX_GET_JSON_PARAM_FROM_NODE(node);
 }
 
-FrameRelayNode::~FrameRelayNode()
+int FrameRelayNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
 {
-    stop();
-}
+    RDX_INFO_DEV(this, __func__, false, "{}", "updating init config");
 
-int FrameRelayNode::init(std::shared_ptr<InitConfig_t> init_config)
-{
-    m_init_config = init_config;
-
-    {
-        //! Convert the InitConfig structure to a JSON string for debugging
-        std::string init_config_json = JS::serializeStruct(*m_init_config);
-        RDX_INFO_DEV(this, __func__, false, "{}", "InitConfig JSON: {}", init_config_json);
+    //! Step 1: Cast config to InitConfig_t
+    auto init_config = std::dynamic_pointer_cast<InitConfig_t>(config);
+    if (!init_config) {
+        RDX_RAISE_ERROR("[{}] Failed to cast init config to FrameRelayNodeInitConfig", __func__);
     }
 
-    // create the input port
+    //! Step 2: Log init config as JSON for debugging
+    // {
+    //     RDX_INFO_DEV(this, __func__, false, "{}", "Parsing init config as JSON");
+    //     auto init_config_json = JS::serializeStruct(*init_config);
+    //     RDX_INFO_DEV(this, __func__, false, "InitConfig JSON: {}", init_config_json);
+    // }
+
+    //! Step 3: Create and initialize input port
+    RDX_INFO_DEV(this, __func__, false, "{}", "Creating input port");
     m_input_port = std::make_shared<InputPort_t>(this);
-    m_input_port->init(m_init_config->input_port_config);
+    m_input_port->init(init_config->input_port_config);
 
-    // create the publishers
-    m_pub_relayed_frame.init(this, m_init_config->publish_topic, StampedImagePub::DefaultQoS);
-    m_pub_frame_accepted.init(this, m_init_config->debug_topic_frame_accepted, StampedImagePub::DefaultUnreliableQoS);
-    m_pub_frame_rejected.init(this, m_init_config->debug_topic_frame_rejected, StampedImagePub::DefaultUnreliableQoS);
+    //! Step 4: Initialize publishers
+    RDX_INFO_DEV(this, __func__, false, "{}", "Initializing publishers");
+    m_pub_relayed_frame.init(this, init_config->publish_topic, StampedImagePub::DefaultQoS);
+    m_pub_frame_accepted.init(this, init_config->debug_topic_frame_accepted, StampedImagePub::DefaultUnreliableQoS);
+    m_pub_frame_rejected.init(this, init_config->debug_topic_frame_rejected, StampedImagePub::DefaultUnreliableQoS);
+
+    RDX_INFO_DEV(this, __func__, false, "{}", "Init config update completed successfully");
+    return 0;
+}
+
+int FrameRelayNode::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config)
+{
+    RDX_INFO_DEV(this, __func__, false, "{}", "updating runtime config");
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(config);
+    if (!runtime_config) {
+        RDX_RAISE_ERROR("[{}] Failed to cast runtime config to FrameRelayNodeRuntimeConfig", __func__);
+    }
+
+    // {
+    //     RDX_INFO_DEV(this, __func__, false, "{}", "Converting runtime config to JSON");
+    //     auto runtime_config_json = JS::serializeStruct(*runtime_config);
+    //     RDX_INFO_DEV(this, __func__, false, "RuntimeConfig JSON: {}", runtime_config_json);
+    // }
 
     // enable debug topics?
-    set_debug_topics_enabled(m_init_config->enable_debug_topics);
+    set_debug_topics_enabled(runtime_config->enable_debug_topics);
 
     return 0;
 }
 
-int FrameRelayNode::start()
+int FrameRelayNode::_start()
 {
     RDX_INFO_DEV(this, __func__, false, "{}", "Starting frame relay node");
 
-    m_input_port->start();
-    RDX_INFO_DEV(this, __func__, false, "{}", "input port started");
-
-    m_running = true;
-    auto step_interval = m_init_config->step_interval;
-    m_step_thread = std::make_shared<std::thread>([this, step_interval] {
-        while (this->m_running && rclcpp::ok()) {
-            auto start_time = std::chrono::high_resolution_clock::now();
-            this->_step();
-            auto end_time = std::chrono::high_resolution_clock::now();
-            auto elapsed_time = end_time - start_time;
-            auto sleep_time = step_interval - elapsed_time;
-            if (sleep_time.count() > 0) {
-                std::this_thread::sleep_for(sleep_time);
-            }
-        }
-    });
+    if (m_input_port) {
+        m_input_port->start();
+        RDX_INFO_DEV(this, __func__, false, "{}", "input port started");
+    }
 
     // create shm client
     {
@@ -115,22 +93,14 @@ int FrameRelayNode::start()
         }
     }
 
-    RDX_INFO_DEV(this, __func__, false, "{}", "step thread started");
+    // step thread and state will be handled by base class
     return 0;
 }
 
-int FrameRelayNode::stop()
+int FrameRelayNode::_stop()
 {
-    RDX_INFO_DEV(this, __func__, false, "{}", "Stopping frame relay node");
-
     m_input_port->stop();
     RDX_INFO_DEV(this, __func__, false, "{}", "input port stopped");
-
-    m_running = false;
-    if (m_step_thread) {
-        m_step_thread->join();
-    }
-    RDX_INFO_DEV(this, __func__, false, "{}", "step thread stopped");
 
     // delete shm client, disconnect from shm service
     m_shm_client.reset();
@@ -140,10 +110,15 @@ int FrameRelayNode::stop()
 
 void FrameRelayNode::_step()
 {
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(get_runtime_config());
+    if (!runtime_config) {
+        RDX_RAISE_ERROR("[{}] Failed to cast runtime config to FrameRelayNodeRuntimeConfig", __func__);
+    }
+
     // get data from input port
     // RDX_INFO_DEV(this, __func__, false, "{}", "getting data from input port");
     std::shared_ptr<SourceData_t> frame_data;
-    if (m_init_config->enable_blocking_mode) {
+    if (runtime_config->enable_blocking_mode) {
         // wait until there is data available
         frame_data = m_input_port->pop_source_data();
     } else {

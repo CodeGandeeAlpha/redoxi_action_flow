@@ -10,6 +10,8 @@ int declare_default_parameters_for_node(rclcpp::Node *node)
     node->declare_parameter(RosParams::ParamAsJsonString::MainKey, "");
     std::string param_as_json_string = node->get_parameter(RosParams::ParamAsJsonString::MainKey).as_string();
 
+    RDX_INFO_DEV(node, __func__, false, "param_as_json_string: {}", param_as_json_string);
+
     //! Parse the JSON string
     nlohmann::json json_params;
     try {
