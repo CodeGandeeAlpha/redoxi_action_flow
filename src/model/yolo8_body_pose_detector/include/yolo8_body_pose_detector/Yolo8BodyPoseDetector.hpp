@@ -32,7 +32,7 @@ class Yolo8BodyPoseDetector : public redoxi_works::common_nodes::StartStopNode
     using SourceData_t = ActionInputPort_t::SourceData_t;
     using InferenceResource_t = yolo8_body_pose_detector::InferenceResource;
     using InferenceModel_t = inference::yolo8::Yolo8PoseModel;
-    using DetectionResult_t = InferenceModel_t::SingleImageOutput;
+    using DetectionResult_t = InferenceModel_t::SingleImageOutput_t;
 
   public:
     explicit Yolo8BodyPoseDetector(const std::string &node_name,

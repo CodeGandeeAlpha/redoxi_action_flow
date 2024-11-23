@@ -1,5 +1,7 @@
 #pragma once
 
+#include <future>
+#include <tbb/task_group.h>
 #include <redoxi_common_nodes/redoxi_common_nodes.hpp>
 #include <redoxi_common_cpp/common_concepts.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
@@ -72,7 +74,7 @@ class BaseRosNode : public rclcpp::Node
 
   public:
     BaseRosNode(const std::string &node_name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
-    virtual ~BaseRosNode();
+    virtual ~BaseRosNode() noexcept;
 
   public:
     //! Initialize the node, default state transition: BEFORE_INIT -> CLOSED
@@ -144,11 +146,14 @@ class BaseRosNode : public rclcpp::Node
     virtual int _get_state_after_init() const = 0;
 
   protected:
-    //! Start the step thread
+    //! Start the step thread, note that you cannot call this function in the step thread
     virtual void _start_step_thread();
 
-    //! Stop the step thread
+    //! Stop the step thread, note that you cannot call this function in the step thread
     virtual void _stop_step_thread();
+
+    //! Stop the step thread asynchronously, call be called in the step thread
+    std::shared_future<void> _async_stop_step_thread();
 
   protected:
     //! Json parameters read from ros parameters
@@ -166,6 +171,9 @@ class BaseRosNode : public rclcpp::Node
 
     //! Runtime config
     std::shared_ptr<BaseRosNodeRuntimeConfig> m_runtime_config;
+
+    //! Task group for executing async tasks not in the calling thread
+    tbb::task_group m_async_task_group;
 
   private:
     //! make it private so that we can use it in constructor and destructor

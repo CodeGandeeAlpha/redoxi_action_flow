@@ -9,6 +9,26 @@ StartStopNode::StartStopNode(const std::string &node_name, const rclcpp::NodeOpt
 {
 }
 
+std::shared_future<int> StartStopNode::_async_stop()
+{
+    auto promise = std::make_shared<std::promise<int>>();
+    auto future = promise->get_future();
+
+    // stop the step thread
+    auto step_thread_future = _async_stop_step_thread();
+
+    // run the task in another thread
+    m_async_task_group.run([promise, this, step_thread_future]() {
+        // wait for the step thread to stop
+        step_thread_future.wait();
+
+        // do normal stop and set the promise
+        promise->set_value(stop());
+    });
+
+    return future;
+}
+
 int StartStopNode::start()
 {
     //! If already in STARTED state, just return

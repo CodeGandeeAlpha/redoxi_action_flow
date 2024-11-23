@@ -19,6 +19,12 @@ class StartStopNode : public BaseRosNode,
     int stop() final;
 
   protected:
+    //! async stop the node, after which you can start it again
+    //! @note This function is intended to be called in the step thread
+    //! @return the future which will be resolved into what stop() returns
+    std::shared_future<int> _async_stop();
+
+  protected:
     //! subclass should implement this function, with state transition handled by base class
     //! @return 0 if success, otherwise error code
     virtual int _start() = 0;

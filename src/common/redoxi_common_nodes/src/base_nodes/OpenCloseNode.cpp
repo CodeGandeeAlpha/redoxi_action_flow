@@ -8,6 +8,42 @@ OpenCloseNode::OpenCloseNode(const std::string &name, const rclcpp::NodeOptions 
 {
 }
 
+std::shared_future<int> OpenCloseNode::_async_close()
+{
+    auto promise = std::make_shared<std::promise<int>>();
+    auto future = promise->get_future();
+
+    // stop the thread
+    auto step_thread_future = _async_stop_step_thread();
+    m_async_task_group.run([promise, this, step_thread_future]() {
+        // wait for the step thread to stop
+        step_thread_future.wait();
+
+        // do normal close and set the promise
+        promise->set_value(close());
+    });
+
+    return future;
+}
+
+std::shared_future<int> OpenCloseNode::_async_stop()
+{
+    auto promise = std::make_shared<std::promise<int>>();
+    auto future = promise->get_future();
+
+    // stop the thread
+    auto step_thread_future = _async_stop_step_thread();
+    m_async_task_group.run([promise, this, step_thread_future]() {
+        // wait for the step thread to stop
+        step_thread_future.wait();
+
+        // do normal stop and set the promise
+        promise->set_value(stop());
+    });
+
+    return future;
+}
+
 int OpenCloseNode::open()
 {
     //! If already in OPENED state, just return
