@@ -29,10 +29,10 @@ struct InitConfig : public common_nodes::OpenCloseNode::InitConfig_t {
     {
         // by default, only starts sending any data when some downstream is ready
         // skip if no downstream is ready
-        primary_output_spec.set_fallback_delivery_precondition(DeliveryPrecondition::AnyDownstreamReady);
+        primary_output_spec->set_fallback_delivery_precondition(DeliveryPrecondition::AnyDownstreamReady);
     }
     //! The downstream nodes, indexed by node name
-    OutputPortSpec::InitConfig_t primary_output_spec;
+    std::shared_ptr<OutputPortSpec::InitConfig_t> primary_output_spec = std::make_shared<OutputPortSpec::InitConfig_t>();
 
     //! create the debug publish topic for this video reader?
     bool create_debug_pub = true;

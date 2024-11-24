@@ -38,6 +38,8 @@ struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
     virtual ~InitConfig() = default;
     using ModelConfig_t = YoloModelConfig_t;
 
+    //! input/output ports config when you send detection request to this node
+    //! using this type of input, the node will process the detection request and send the result back to you
     struct DetectionRequestConfig {
         using InputPort_t = DetectionRequestInputPort;
         std::shared_ptr<InputPort_t::InitConfig_t> input_port_config = std::make_shared<InputPort_t::InitConfig_t>();
@@ -45,6 +47,9 @@ struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
         JS_OBJECT(JS_MEMBER(input_port_config));
     };
 
+    //! input/output ports config when you send image to this node
+    //! using this type of input, the node will process the image but do not return detection result,
+    //! it will send the result to downstreams
     struct ImageRequestConfig {
         using InputPort_t = ImageRequestInputPort;
         using OutputPort_t = ImageRequestOutputPort;
@@ -60,9 +65,11 @@ struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
     std::vector<ModelConfig_t::Ptr>
         model_configs;
 
-    // use shared_ptr because the port asks for it
-    DetectionRequestConfig detection_request_config;
-    ImageRequestConfig image_request_config;
+    // detection request config
+    std::optional<DetectionRequestConfig> detection_request_config;
+
+    // image request config
+    std::optional<ImageRequestConfig> image_request_config;
 
     // debug topic
     std::string visualization_topic = "debug/visualization";

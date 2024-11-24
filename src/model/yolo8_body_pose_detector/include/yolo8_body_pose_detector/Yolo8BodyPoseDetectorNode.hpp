@@ -20,15 +20,31 @@ class Yolo8BodyPoseDetectorNode : public redoxi_works::common_nodes::StartStopNo
     inline static constexpr const char *RequiredImageEncoding = sensor_msgs::image_encodings::RGB8;
 
   public:
-    using ActionInputPort_t = yolo8_body_pose_detector::DetectionRequestInputPort;
-    using InputAction_t = typename ActionInputPort_t::ActionType_t;
-    using ActionDataTrait_t = typename ActionInputPort_t::ActionDataTrait_t;
+    struct ByDetectionRequest {
+        using InputPort_t = yolo8_body_pose_detector::DetectionRequestInputPort;
+        using InputAction_t = typename InputPort_t::ActionType_t;
+        using InputActionDataTrait_t = typename InputPort_t::ActionDataTrait_t;
+        using InputGoalUUID_t = typename InputPort_t::GoalUUID_t;
+        using InputSourceData_t = typename InputPort_t::SourceData_t;
+    };
+
+    struct ByImageRequest {
+        using InputPort_t = yolo8_body_pose_detector::ImageRequestInputPort;
+        using InputAction_t = typename InputPort_t::ActionType_t;
+        using InputActionDataTrait_t = typename InputPort_t::ActionDataTrait_t;
+        using InputGoalUUID_t = typename InputPort_t::GoalUUID_t;
+        using InputSourceData_t = typename InputPort_t::SourceData_t;
+
+        using OutputPort_t = yolo8_body_pose_detector::ImageRequestOutputPort;
+        using OutputAction_t = typename OutputPort_t::ActionType_t;
+        using OutputActionDataTrait_t = typename OutputPort_t::ActionDataTrait_t;
+        using OutputSourceData_t = typename OutputPort_t::SourceData_t;
+    };
+
     using InitConfig_t = yolo8_body_pose_detector::InitConfig;
     using BaseInitConfig_t = common_nodes::StartStopNode::InitConfig_t;
     using RuntimeConfig_t = yolo8_body_pose_detector::RuntimeConfig;
     using BaseRuntimeConfig_t = common_nodes::StartStopNode::RuntimeConfig_t;
-    using GoalUUID_t = ActionInputPort_t::GoalUUID_t;
-    using SourceData_t = ActionInputPort_t::SourceData_t;
     using InferenceResource_t = yolo8_body_pose_detector::InferenceResource;
     using InferenceModel_t = inference::yolo8::Yolo8PoseModel;
     using DetectionResult_t = InferenceModel_t::SingleImageOutput_t;
@@ -48,7 +64,11 @@ class Yolo8BodyPoseDetectorNode : public redoxi_works::common_nodes::StartStopNo
 
   protected:
     // from this class
-    int _extract_image(cv::Mat *output, const std::shared_ptr<ActionInputPort_t::SourceData_t> &source_data);
+    int _extract_image(cv::Mat *output, const std::shared_ptr<ByDetectionRequest::InputSourceData_t> &source_data);
+    int _process_detection_request();
+
+    int _extract_image(cv::Mat *output, const std::shared_ptr<ByImageRequest::InputSourceData_t> &source_data);
+    int _process_image_request();
 
     //! Draw visualization on canvas
     void _draw_visualization(cv::Mat &canvas,
@@ -60,9 +80,10 @@ class Yolo8BodyPoseDetectorNode : public redoxi_works::common_nodes::StartStopNo
     int _create_inference_resource(InitConfig_t::ModelConfig_t::Ptr model_config, int replicas = 1);
     int _create_all_inference_resources(const std::vector<InitConfig_t::ModelConfig_t::Ptr> &model_configs);
 
-    // void _register_input_port_callbacks(std::shared_ptr<ActionInputPort_t> input_port);
   protected:
-    std::shared_ptr<ActionInputPort_t> m_input_port;
+    std::shared_ptr<ByDetectionRequest::InputPort_t> m_detection_request_input_port;
+    std::shared_ptr<ByImageRequest::InputPort_t> m_image_request_input_port;
+    std::shared_ptr<ByImageRequest::OutputPort_t> m_image_request_output_port;
 
   private:
     struct Impl;

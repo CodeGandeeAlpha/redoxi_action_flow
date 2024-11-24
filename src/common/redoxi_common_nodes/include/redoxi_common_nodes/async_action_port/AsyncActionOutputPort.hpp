@@ -122,7 +122,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
      * @note state transition: BEFORE_INIT -> STOPPED
      * @return 0 if success, otherwise return error code
      */
-    virtual int init(const InitConfig_t &init_config)
+    virtual int init(std::shared_ptr<InitConfig_t> init_config)
     {
         // state must be BEFORE_INIT
         RDX_ASSERT_CHECK_TRUE(m_status == NodeStatusCode::BEFORE_INIT, "[{}] state must be BEFORE_INIT", __func__);
@@ -224,11 +224,13 @@ class AsyncActionOutputPort : public IStartStopProtocol
     }
 
     // get the init config
-    const InitConfig_t &get_init_config() const
+    std::shared_ptr<const InitConfig_t> get_init_config() const
     {
         return m_init_config;
     }
-    InitConfig_t &get_init_config()
+
+    // get the init config
+    std::shared_ptr<InitConfig_t> get_init_config()
     {
         return m_init_config;
     }
@@ -278,9 +280,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         // set node params
         RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Setting node params ...");
-        auto buffer_size = m_init_config.get_num_buffer_requests();
+        auto buffer_size = m_init_config->get_num_buffer_requests();
         node.set_input_data_buffer_size(buffer_size);
-        node.set_preserve_order(m_init_config.get_preserve_request_order());
+        node.set_preserve_order(m_init_config->get_preserve_request_order());
 
         // sync mode, all functions are executed in the graph
         RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Setting node to sync mode ...");
@@ -332,7 +334,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         // find and connect to downstreams
         m_downstreams.clear();
-        for (auto &it : m_init_config.get_downstream_specs()) {
+        for (auto &it : m_init_config->get_downstream_specs()) {
             Downstream_t ds;
             RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Initializing downstream ...");
             auto ret = ds.init_by_spec(it, m_parent_node);
@@ -538,7 +540,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                       boost::uuids::to_string(task.get_request().get_source_data().get_uuid()));
 
         // default precondition is any downstream ready
-        auto request_precondition = m_init_config.get_fallback_delivery_precondition();
+        auto request_precondition = m_init_config->get_fallback_delivery_precondition();
 
         // get the request's delivery policy, if any
         auto request_delivery_policy = task.get_request().get_delivery_policy();
@@ -838,7 +840,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
     std::atomic<bool> m_publish_to_debug_topic = false;
 
     // init config
-    InitConfig_t m_init_config;
+    std::shared_ptr<InitConfig_t> m_init_config;
 
     // downstreams
     std::vector<Downstream_t> m_downstreams;
