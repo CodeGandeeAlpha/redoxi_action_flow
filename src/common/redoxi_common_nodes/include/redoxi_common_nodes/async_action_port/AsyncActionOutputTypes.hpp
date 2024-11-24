@@ -75,30 +75,7 @@ static_assert(DeliverySourceDataConcept<_SampleSourceData>,
               "_SampleSourceData must satisfy DeliverySourceDataConcept");
 
 //! Sample action data trait
-struct _SampleActionDataTrait {
-    using ActionType_t = _SampleAction;
-    using Goal_t = typename ActionType_t::Goal;
-    using Result_t = typename ActionType_t::Result;
-    using Feedback_t = typename ActionType_t::Feedback;
-
-    static ControlSignalCode get_control_signal_code(const Goal_t &)
-    {
-        return ControlSignalCode::Normal;
-    }
-
-    static void mark_with_control_signal(Goal_t &, ControlSignalCode)
-    {
-    }
-
-    static boost::uuids::uuid get_uuid(const Goal_t &)
-    {
-        return boost::uuids::uuid();
-    }
-
-    static void set_uuid(Goal_t &, boost::uuids::uuid)
-    {
-    }
-};
+using _SampleActionDataTrait = NoneActionDataTrait<_SampleAction>;
 static_assert(ActionDataTraitConcept<_SampleActionDataTrait>,
               "_SampleActionDataTrait must satisfy ActionDataTraitConcept");
 

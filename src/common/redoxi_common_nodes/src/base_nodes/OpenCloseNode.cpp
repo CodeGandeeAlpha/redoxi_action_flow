@@ -44,6 +44,35 @@ std::shared_future<int> OpenCloseNode::_async_stop()
     return future;
 }
 
+std::shared_future<int> OpenCloseNode::_async_open()
+{
+    auto promise = std::make_shared<std::promise<int>>();
+    auto future = promise->get_future();
+
+    // run the task in another thread
+    m_async_task_group.run([promise, this]() {
+        // do normal open and set the promise
+        promise->set_value(open());
+    });
+
+    return future;
+}
+
+std::shared_future<int> OpenCloseNode::_async_start()
+{
+    auto promise = std::make_shared<std::promise<int>>();
+    auto future = promise->get_future();
+
+    // run the task in another thread
+    m_async_task_group.run([promise, this]() {
+        // do normal start and set the promise
+        promise->set_value(start());
+    });
+
+    return future;
+}
+
+
 int OpenCloseNode::open()
 {
     //! If already in OPENED state, just return
@@ -64,7 +93,7 @@ int OpenCloseNode::open()
     }
 
     set_status(NodeStatusCode::OPENED);
-    return 0;
+    return _on_opened();
 }
 
 int OpenCloseNode::close()
@@ -87,7 +116,7 @@ int OpenCloseNode::close()
     }
 
     set_status(NodeStatusCode::CLOSED);
-    return 0;
+    return _on_closed();
 }
 
 int OpenCloseNode::start()
@@ -112,7 +141,7 @@ int OpenCloseNode::start()
     _start_step_thread();
 
     set_status(NodeStatusCode::STARTED);
-    return 0;
+    return _on_started();
 }
 
 int OpenCloseNode::stop()
@@ -141,6 +170,6 @@ int OpenCloseNode::stop()
 
     RDX_INFO_DEV(this, __func__, true, "{}", "Setting node status to STOPPED");
     set_status(NodeStatusCode::STOPPED);
-    return 0;
+    return _on_stopped();
 }
 } // namespace redoxi_works::common_nodes

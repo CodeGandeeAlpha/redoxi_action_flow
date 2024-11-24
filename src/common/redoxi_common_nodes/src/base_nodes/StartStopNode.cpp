@@ -29,6 +29,21 @@ std::shared_future<int> StartStopNode::_async_stop()
     return future;
 }
 
+std::shared_future<int> StartStopNode::_async_start()
+{
+    auto promise = std::make_shared<std::promise<int>>();
+    auto future = promise->get_future();
+
+    // run the task in another thread
+    m_async_task_group.run([promise, this]() {
+        // do normal start and set the promise
+        promise->set_value(start());
+    });
+
+    return future;
+}
+
+
 int StartStopNode::start()
 {
     //! If already in STARTED state, just return
@@ -54,7 +69,7 @@ int StartStopNode::start()
     //! Update state
     set_status(NodeStatusCode::STARTED);
 
-    return 0;
+    return _on_started();
 }
 
 int StartStopNode::stop()
@@ -81,7 +96,7 @@ int StartStopNode::stop()
     //! Update state
     set_status(NodeStatusCode::STOPPED);
 
-    return 0;
+    return _on_stopped();
 }
 
 } // namespace redoxi_works::common_nodes

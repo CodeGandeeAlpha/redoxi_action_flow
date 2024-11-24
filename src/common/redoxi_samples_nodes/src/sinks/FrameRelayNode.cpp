@@ -142,6 +142,13 @@ void FrameRelayNode::_step()
         return;
     }
 
+    // flush signal?
+    auto control_signal_code = ActionDataTrait_t::get_control_signal_code(*goal_handle->get_goal());
+    if (control_signal_code == ControlSignalCode::Flush) {
+        RDX_INFO_DEV(this, __func__, false, "[goal_uuid={}] {}",
+                     boost::uuids::to_string(goal_uuid), "flush signal received");
+    }
+
     // get frame and publish
     const auto msg_uuid = ActionDataTrait_t::get_uuid(*goal_handle->get_goal());
     const auto msg_uuid_str = boost::uuids::to_string(msg_uuid);

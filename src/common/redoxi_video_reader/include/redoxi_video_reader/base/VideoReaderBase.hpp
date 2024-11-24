@@ -7,7 +7,7 @@
 #include <redoxi_video_reader/base/VideoReaderBaseTypes.hpp>
 #include <redoxi_shared_memory/SharedMemoryClient.hpp>
 #include <redoxi_common_nodes/base_nodes/OpenCloseNode.hpp>
-#include <thread>
+#include <optional>
 #include <nlohmann/json.hpp>
 
 namespace redoxi_works
@@ -109,11 +109,13 @@ class RedoxiVideoReaderBase : public common_nodes::OpenCloseNode
     /**
      * @brief Create a delivery request from source data
      * @param source_data the source data to be filled with the read frame
+     * @param control_signal_code the control signal code, default is std::nullopt,
+     *        which leaves the control signal code in source data unchanged.
      * @return the delivery request
      */
     virtual DeliveryRequest_t _create_delivery_request(
         const SourceData_t &source_data,
-        ControlSignalCode control_signal_code = ControlSignalCode::Normal);
+        std::optional<ControlSignalCode> control_signal_code = std::nullopt);
 
     //! create primary output port
     virtual std::shared_ptr<OutputPort_t> _create_primary_output_port(const InitConfig_t &init_config);

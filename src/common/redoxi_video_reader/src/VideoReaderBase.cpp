@@ -278,8 +278,13 @@ int RedoxiVideoReaderBase::_update_runtime_config(std::shared_ptr<BaseRuntimeCon
         }
 
         auto image = request.get_source_data().get_image();
-        cv::Mat resized_image;
 
+        // empty image? skip processing
+        if (image.empty()) {
+            return;
+        }
+
+        cv::Mat resized_image;
         if (output_image_size.width > 0 && output_image_size.height > 0) {
             cv::resize(image, resized_image, output_image_size);
         } else if (output_image_size.width > 0) {
@@ -311,7 +316,7 @@ std::shared_ptr<RedoxiVideoReaderImpl> RedoxiVideoReaderBase::_create_impl()
 
 RedoxiVideoReaderBase::DeliveryRequest_t
     RedoxiVideoReaderBase::_create_delivery_request(const SourceData_t &source_data,
-                                                    ControlSignalCode control_signal_code)
+                                                    std::optional<ControlSignalCode> control_signal_code)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
 
@@ -321,7 +326,9 @@ RedoxiVideoReaderBase::DeliveryRequest_t
     if (runtime_config->frame_request_policy.has_value()) {
         req.set_delivery_policy(*runtime_config->frame_request_policy);
     }
-    req.set_control_signal_code(control_signal_code);
+    if (control_signal_code.has_value()) {
+        req.set_control_signal_code(control_signal_code.value());
+    }
     return req;
 }
 
@@ -365,22 +372,14 @@ void RedoxiVideoReaderBase::_step()
 
         // time to get a new frame
         SourceData_t source_data;
-        auto ret = _read_frame(source_data, m_last_read_frame_number);
-        switch (ret) {
+        auto ret_read_frame = _read_frame(source_data, m_last_read_frame_number);
+        switch (ret_read_frame) {
             case ReadFrameResult::OK: // good, pass it to downstream
                 break;
-            case ReadFrameResult::END_OF_VIDEO: // end of video, stop it
-                RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "End of video, stopping");
-
-                // TODO: need to send flush signal to downstream
-
-                // call this in another thread to avoid deadlock
-                // otherwise it will try to join this thread
-                m_impl->m_tasks.run([this]() {
-                    stop();
-                });
-
-                return;
+            case ReadFrameResult::END_OF_VIDEO: // end of video, send this frame and then stop
+                RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "End of video, send this frame and then stop");
+                // the source data will still be sent with its original content, but it will be marked as a flush signal
+                break;
             case ReadFrameResult::NO_DATA: // no data, try again
                 return;
             case ReadFrameResult::ERROR: // unknown error, raise an error
@@ -388,9 +387,9 @@ void RedoxiVideoReaderBase::_step()
                 return;
         }
 
-        ControlSignalCode control_signal_code = ControlSignalCode::Normal;
-        if (ret == ReadFrameResult::END_OF_VIDEO) {
-            // end of video, flush the pipeline, but do not terminate it because you can then load other videos
+        std::optional<ControlSignalCode> control_signal_code = std::nullopt;
+        if (ret_read_frame == ReadFrameResult::END_OF_VIDEO) {
+            // end of video, flush the pipeline
             control_signal_code = ControlSignalCode::Flush;
         }
 
@@ -445,6 +444,12 @@ void RedoxiVideoReaderBase::_step()
         // FIXME: debug only
         // wait for all requests to be processed, not necessary
         m_primary_output_port->wait_for_all_requests();
+
+        if (ret_read_frame == ReadFrameResult::END_OF_VIDEO) {
+            // end of video, stop it
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "End of video, stopping");
+            _async_stop();
+        }
     }
 }
 

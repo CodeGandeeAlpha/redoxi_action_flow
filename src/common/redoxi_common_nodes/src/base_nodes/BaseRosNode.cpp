@@ -126,6 +126,9 @@ void BaseRosNode::_internal_stop_step_thread()
 BaseRosNode::~BaseRosNode() noexcept
 {
     _internal_stop_step_thread();
+
+    // wait for all async tasks to finish
+    m_async_task_group.wait();
 }
 
 } // namespace redoxi_works::common_nodes

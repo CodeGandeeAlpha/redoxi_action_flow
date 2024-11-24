@@ -179,6 +179,42 @@ concept ActionDataTraitConcept = requires(T t)
     {
         T::set_uuid(std::declval<typename T::Goal_t &>(), std::declval<boost::uuids::uuid>())
         } -> std::same_as<void>;
+
+    /**
+     * @brief Get the source task ID from the goal
+     * @details A source task is an action that initiates other actions. When an action (the source task)
+     *          spawns multiple other actions, the source task's UUID is stored in each of those actions
+     *          to track their relationship back to the originating task. For Redoxi actions, this ID
+     *          comes from ActionDataTrait::get_uuid(source_action.goal) which is stored in x_uid.
+     */
+    {
+        T::get_source_task_id(std::declval<const typename T::Goal_t &>())
+        } -> std::same_as<boost::uuids::uuid>;
+
+    /**
+     * @brief Get the source task info string from the goal
+     * @details Contains descriptive information about the source task (the action that initiated this action)
+     */
+    {
+        T::get_source_task_info(std::declval<const typename T::Goal_t &>())
+        } -> std::same_as<std::string>;
+
+    /**
+     * @brief Set the source task ID in the goal
+     * @details Sets the UUID of the source task (the action that initiated this action) to enable
+     *          tracking relationships between actions
+     */
+    {
+        T::set_source_task_id(std::declval<typename T::Goal_t &>(), std::declval<const boost::uuids::uuid &>())
+        } -> std::same_as<void>;
+
+    /**
+     * @brief Set the source task info string in the goal
+     * @details Sets descriptive information about the source task (the action that initiated this action)
+     */
+    {
+        T::set_source_task_info(std::declval<typename T::Goal_t &>(), std::declval<const std::string &>())
+        } -> std::same_as<void>;
 };
 template <RosActionConcept ActionType>
 struct NoneActionDataTrait {
@@ -202,6 +238,24 @@ struct NoneActionDataTrait {
     }
 
     static void set_uuid(Goal_t &, const boost::uuids::uuid &)
+    {
+    }
+
+    static boost::uuids::uuid get_source_task_id(const Goal_t &)
+    {
+        return boost::uuids::uuid();
+    }
+
+    static std::string get_source_task_info(const Goal_t &)
+    {
+        return std::string();
+    }
+
+    static void set_source_task_id(Goal_t &, const boost::uuids::uuid &)
+    {
+    }
+
+    static void set_source_task_info(Goal_t &, const std::string &)
     {
     }
 };
