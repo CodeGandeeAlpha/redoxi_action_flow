@@ -3,13 +3,14 @@
 #include <atomic>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <boost/uuid/uuid_generators.hpp>
 
 #include <redoxi_common_cpp/async_processor/SingleBufferExecNode.hpp>
 #include <redoxi_common_cpp/ros_utils/SyncActionSender.hpp>
 
 #include <redoxi_common_nodes/redoxi_common_nodes.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
-#include <redoxi_common_nodes/async_action_port/ImageOutputPortSpec.hpp>
+// #include <redoxi_common_nodes/image_ports/ImageOutputPortSpec.hpp>
 
 
 namespace redoxi_works

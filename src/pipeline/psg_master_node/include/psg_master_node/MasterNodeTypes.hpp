@@ -1,6 +1,6 @@
 #pragma once
 
-#include <redoxi_common_nodes/async_action_port/AsyncImageInputPort.hpp>
+#include <redoxi_common_nodes/image_ports/AsyncImageInputPort.hpp>
 #include <psg_master_node/AsyncDocumentOutputPort.hpp>
 #include <psg_master_node/DocumentOutputSpec.hpp>
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>

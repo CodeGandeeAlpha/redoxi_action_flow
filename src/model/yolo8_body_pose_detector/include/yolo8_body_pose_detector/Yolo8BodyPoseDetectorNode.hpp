@@ -1,21 +1,20 @@
 #pragma once
 #include <rclcpp/rclcpp.hpp>
 #include <memory>
-#include <thread>
-#include <atomic>
 #include <nlohmann/json.hpp>
 
-#include <redoxi_common_nodes/base_nodes/StartStopNode.hpp>
 #include <yolo8_body_pose_detector/yolo8_body_pose_detector.hpp>
 #include <yolo8_body_pose_detector/Yolo8BodyPoseDetectorTypes.hpp>
 #include <redoxi_dnn_models/yolo8/Yolo8PoseModel.hpp>
+
+#include <redoxi_common_nodes/base_nodes/StartStopNode.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 
 
 namespace redoxi_works::model_nodes
 {
 
-class Yolo8BodyPoseDetector : public redoxi_works::common_nodes::StartStopNode
+class Yolo8BodyPoseDetectorNode : public redoxi_works::common_nodes::StartStopNode
 {
   public:
     inline static constexpr const char *RequiredImageEncoding = sensor_msgs::image_encodings::RGB8;
@@ -35,9 +34,9 @@ class Yolo8BodyPoseDetector : public redoxi_works::common_nodes::StartStopNode
     using DetectionResult_t = InferenceModel_t::SingleImageOutput_t;
 
   public:
-    explicit Yolo8BodyPoseDetector(const std::string &node_name,
-                                   const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
-    virtual ~Yolo8BodyPoseDetector() noexcept;
+    explicit Yolo8BodyPoseDetectorNode(const std::string &node_name,
+                                       const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+    virtual ~Yolo8BodyPoseDetectorNode() noexcept;
 
   protected:
     // from base class

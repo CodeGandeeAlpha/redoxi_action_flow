@@ -3,7 +3,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <redoxi_samples_nodes/redoxi_samples_nodes.hpp>
 #include <redoxi_common_nodes/base_nodes/StartStopNode.hpp>
-#include <redoxi_common_nodes/async_action_port/AsyncImageInputPort.hpp>
+#include <redoxi_common_nodes/image_ports/AsyncImageInputPort.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 #include <redoxi_shared_memory/SharedMemoryClient.hpp>
 

@@ -8,7 +8,7 @@
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
 #include <redoxi_public_msgs/action/process_detections.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
-#include <redoxi_common_nodes/async_action_port/ImageOutputPortSpec.hpp>
+#include <redoxi_common_nodes/image_ports/ImageOutputPortSpec.hpp>
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 

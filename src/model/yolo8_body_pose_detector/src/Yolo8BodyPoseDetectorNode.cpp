@@ -1,6 +1,6 @@
 #include <chrono>
 #include <map>
-#include <yolo8_body_pose_detector/Yolo8BodyPoseDetector.hpp>
+#include <yolo8_body_pose_detector/Yolo8BodyPoseDetectorNode.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <tbb/concurrent_queue.h>
 #include <tbb/task_group.h>
@@ -16,7 +16,7 @@ using PointMessage_t = geometry_msgs::msg::Point;
 namespace redoxi_works::model_nodes
 {
 
-struct Yolo8BodyPoseDetector::Impl {
+struct Yolo8BodyPoseDetectorNode::Impl {
     tbb::task_group inference_task_group;
     // tbb::concurrent_queue<InferenceResource_t> inference_resources;
     tbb::concurrent_bounded_queue<InferenceResource_t> inference_resource_pool;
@@ -26,14 +26,14 @@ struct Yolo8BodyPoseDetector::Impl {
     std::shared_ptr<StampedImagePub> pub_visualization;
 };
 
-Yolo8BodyPoseDetector::Yolo8BodyPoseDetector(const std::string &node_name,
-                                             const rclcpp::NodeOptions &options)
+Yolo8BodyPoseDetectorNode::Yolo8BodyPoseDetectorNode(const std::string &node_name,
+                                                     const rclcpp::NodeOptions &options)
     : redoxi_works::common_nodes::StartStopNode(node_name, options)
 {
     m_impl = std::make_shared<Impl>();
 }
 
-Yolo8BodyPoseDetector::~Yolo8BodyPoseDetector() noexcept
+Yolo8BodyPoseDetectorNode::~Yolo8BodyPoseDetectorNode() noexcept
 {
     // do not call stop() here, because it will NOT call the subclass's stop()
     m_status = NodeStatusCode::STOPPED;
@@ -47,7 +47,7 @@ Yolo8BodyPoseDetector::~Yolo8BodyPoseDetector() noexcept
 }
 
 #ifdef BIND_RESOURCE_TO_SOURCE_DATA
-void Yolo8BodyPoseDetector::_register_input_port_callbacks(std::shared_ptr<ActionInputPort_t> input_port)
+void Yolo8BodyPoseDetectorNode::_register_input_port_callbacks(std::shared_ptr<ActionInputPort_t> input_port)
 {
     // resource booking callback
     input_port->set_on_goal_received_callback(
@@ -116,13 +116,13 @@ void Yolo8BodyPoseDetector::_register_input_port_callbacks(std::shared_ptr<Actio
 }
 #endif
 
-int Yolo8BodyPoseDetector::_start()
+int Yolo8BodyPoseDetectorNode::_start()
 {
     // start the input port
     return m_input_port->start();
 }
 
-int Yolo8BodyPoseDetector::_extract_image(cv::Mat *output, const std::shared_ptr<ActionInputPort_t::SourceData_t> &source_data)
+int Yolo8BodyPoseDetectorNode::_extract_image(cv::Mat *output, const std::shared_ptr<ActionInputPort_t::SourceData_t> &source_data)
 {
     if (!output) {
         // nothing to do
@@ -137,7 +137,7 @@ int Yolo8BodyPoseDetector::_extract_image(cv::Mat *output, const std::shared_ptr
     return 0;
 }
 
-int Yolo8BodyPoseDetector::_stop()
+int Yolo8BodyPoseDetectorNode::_stop()
 {
     // stop the input port from receiving new goals
     {
@@ -153,17 +153,17 @@ int Yolo8BodyPoseDetector::_stop()
     return 0;
 }
 
-int Yolo8BodyPoseDetector::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config)
+int Yolo8BodyPoseDetectorNode::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config)
 {
     (void)runtime_config;
     return 0;
 }
 
-int Yolo8BodyPoseDetector::_update_init_config(std::shared_ptr<BaseInitConfig_t> init_config)
+int Yolo8BodyPoseDetectorNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> init_config)
 {
     auto config = std::dynamic_pointer_cast<InitConfig_t>(init_config);
     if (!config) {
-        RDX_RAISE_ERROR("[f={}] Failed to convert init config to Yolo8BodyPoseDetector::InitConfig_t", __func__);
+        RDX_RAISE_ERROR("[f={}] Failed to convert init config to Yolo8BodyPoseDetectorNode::InitConfig_t", __func__);
     }
 
     // create input port and init it
@@ -191,8 +191,8 @@ int Yolo8BodyPoseDetector::_update_init_config(std::shared_ptr<BaseInitConfig_t>
     return 0;
 }
 
-void Yolo8BodyPoseDetector::_draw_visualization(cv::Mat &canvas,
-                                                const DetectionResult_t &detections)
+void Yolo8BodyPoseDetectorNode::_draw_visualization(cv::Mat &canvas,
+                                                    const DetectionResult_t &detections)
 {
     const auto &keypoint_connections = InferenceModel_t::get_keypoint_connections();
     for (const auto &obj : detections.objects) {
@@ -226,7 +226,7 @@ void Yolo8BodyPoseDetector::_draw_visualization(cv::Mat &canvas,
     }
 }
 
-void Yolo8BodyPoseDetector::_step()
+void Yolo8BodyPoseDetectorNode::_step()
 {
     // do nothing if not started
     if (m_status != NodeStatusCode::STARTED) {
@@ -361,7 +361,7 @@ void Yolo8BodyPoseDetector::_step()
     });
 }
 
-int Yolo8BodyPoseDetector::_create_inference_resource(
+int Yolo8BodyPoseDetectorNode::_create_inference_resource(
     InitConfig_t::ModelConfig_t::Ptr model_config,
     int replicas)
 {
@@ -399,7 +399,7 @@ int Yolo8BodyPoseDetector::_create_inference_resource(
     return 0;
 }
 
-int Yolo8BodyPoseDetector::_create_all_inference_resources(
+int Yolo8BodyPoseDetectorNode::_create_all_inference_resources(
     const std::vector<InitConfig_t::ModelConfig_t::Ptr> &model_configs)
 {
     // setup capacity of the inference resource pool

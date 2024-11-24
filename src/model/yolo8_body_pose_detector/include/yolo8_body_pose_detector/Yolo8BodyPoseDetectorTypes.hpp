@@ -9,11 +9,6 @@
 #include <redoxi_dnn_models/yolo8/Yolo8PoseModel.hpp>
 #include <redoxi_common_nodes/base_nodes/StartStopNode.hpp>
 
-namespace redoxi_works::model_nodes
-{
-class Yolo8BodyPoseDetector;
-}
-
 namespace redoxi_works::model_nodes::yolo8_body_pose_detector
 {
 using YoloModel_t = inference::yolo8::Yolo8PoseModel;
