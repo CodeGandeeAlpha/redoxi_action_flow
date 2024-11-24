@@ -20,7 +20,7 @@ class Yolo8BodyPoseDetectorNode : public redoxi_works::common_nodes::StartStopNo
     inline static constexpr const char *RequiredImageEncoding = sensor_msgs::image_encodings::RGB8;
 
   public:
-    using ActionInputPort_t = yolo8_body_pose_detector::DetectionActionInputPort;
+    using ActionInputPort_t = yolo8_body_pose_detector::DetectionRequestInputPort;
     using InputAction_t = typename ActionInputPort_t::ActionType_t;
     using ActionDataTrait_t = typename ActionInputPort_t::ActionDataTrait_t;
     using InitConfig_t = yolo8_body_pose_detector::InitConfig;

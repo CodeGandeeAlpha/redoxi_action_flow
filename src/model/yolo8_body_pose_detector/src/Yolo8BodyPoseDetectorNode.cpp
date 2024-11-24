@@ -169,7 +169,7 @@ int Yolo8BodyPoseDetectorNode::_update_init_config(std::shared_ptr<BaseInitConfi
     // create input port and init it
     m_input_port = std::make_shared<ActionInputPort_t>(this);
     {
-        auto ret = m_input_port->init(config->input_port_config);
+        auto ret = m_input_port->init(config->detection_request_config.input_port_config);
         if (ret != 0) {
             RDX_RAISE_ERROR("[f={}] Failed to init input port, error code: {}", __func__, ret);
         }

@@ -16,7 +16,7 @@ class RedoxiVideoReaderBase;
 namespace video_reader_base
 {
 
-using OutputPortSpec = async_action_image_output_port::ImageOutputPortSpec;
+using OutputPortSpec = redoxi_works::image_ports::types::ImageOutputPortSpec;
 using OutputPortType = AsyncActionOutputPort<OutputPortSpec>;
 
 //! The delivery policy for making frame delivery request

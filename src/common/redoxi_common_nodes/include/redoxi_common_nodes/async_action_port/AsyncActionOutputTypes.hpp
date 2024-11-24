@@ -100,7 +100,7 @@ class DefaultRetryPolicy
 
   private: // default fallback values, not visible to the outside
     inline static constexpr int64_t DefaultNumberOfRetry = 3;
-    inline static constexpr DurationType_t DefaultWaitTimeBetweenRetry = std::chrono::milliseconds(10);
+    inline static constexpr DurationType_t DefaultWaitTimeBetweenRetry = std::chrono::milliseconds(5);
     inline static constexpr DurationType_t DefaultWaitTimeRetryResponse = std::chrono::milliseconds(100);
 
   public:

@@ -14,11 +14,9 @@
 #include <redoxi_public_msgs/msg/frame_metadata.hpp>
 
 
-namespace redoxi_works
+namespace redoxi_works::image_ports::types
 {
 
-namespace async_action_image_output_port
-{
 using TimeUnit = DefaultTimeUnit_t;
 using DeliveryActionType = redoxi_public_msgs::action::ProcessFrame;
 static_assert(RedoxiActionConcept<DeliveryActionType>, "DeliveryActionType must satisfy RedoxiActionConcept");
@@ -455,6 +453,4 @@ struct ImageOutputPortSpec {
     using Downstream_t = Downstream;
 };
 
-} // namespace async_action_image_output_port
-
-} // namespace redoxi_works
+} // namespace redoxi_works::image_ports::types

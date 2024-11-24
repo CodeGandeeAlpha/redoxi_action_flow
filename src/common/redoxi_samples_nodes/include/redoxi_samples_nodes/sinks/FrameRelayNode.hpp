@@ -15,7 +15,7 @@ struct FrameRelayNodeInitConfig : public common_nodes::StartStopNode::InitConfig
     FrameRelayNodeInitConfig();
     virtual ~FrameRelayNodeInitConfig() = default;
 
-    using InputPort_t = AsyncImageInputPort;
+    using InputPort_t = image_ports::AsyncImageInputPort;
     std::shared_ptr<InputPort_t::InitConfig_t>
         input_port_config = std::make_shared<InputPort_t::InitConfig_t>();
 
@@ -48,7 +48,7 @@ class FrameRelayNode : public common_nodes::StartStopNode
     FrameRelayNode(const std::string &node_name, const rclcpp::NodeOptions &options);
 
   public: // useful types
-    using InputPort_t = AsyncImageInputPort;
+    using InputPort_t = image_ports::AsyncImageInputPort;
     using SourceData_t = InputPort_t::SourceData_t;
     using ActionDataTrait_t = InputPort_t::ActionDataTrait_t;
     using InitConfig_t = FrameRelayNodeInitConfig;

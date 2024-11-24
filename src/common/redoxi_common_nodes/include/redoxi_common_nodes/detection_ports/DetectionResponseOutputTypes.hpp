@@ -12,7 +12,7 @@
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 
-namespace redoxi_works::detection_ports::output_types
+namespace redoxi_works::detection_ports::response_only::types
 {
 using TimeUnit = DefaultTimeUnit_t;
 using DetectionActionType = redoxi_public_msgs::action::ProcessDetections;
@@ -20,16 +20,7 @@ using DetectionActionDataTrait = RedoxiActionDataTrait<DetectionActionType>;
 static_assert(RedoxiActionConcept<DetectionActionType>, "DetectionActionType must satisfy RedoxiActionConcept");
 
 //! Retry policy type implementing the RetryPolicyConcept
-class RetryPolicy : public output_port_types::DefaultRetryPolicy<TimeUnit>
-{
-  public:
-    RetryPolicy()
-    {
-        fallback_number_of_retry = 3;
-        fallback_wait_time_between_retry = std::chrono::milliseconds(5);
-        fallback_wait_time_retry_response = std::chrono::milliseconds(1000);
-    }
-};
+using RetryPolicy = output_port_types::DefaultRetryPolicy<TimeUnit>;
 
 //! Source data type for detection output port
 class DeliverySourceData
@@ -187,7 +178,7 @@ static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
               "DeliveryTask must satisfy DeliveryTaskConcept");
 
 //! Downstream debug publisher type for detection output port
-using DownstreamDebugPublisher = async_action_image_output_port::DownstreamDebugPublisher;
+using DownstreamDebugPublisher = redoxi_works::image_ports::types::DownstreamDebugPublisher;
 
 //! Downstream spec type for detection output port
 using DownstreamSpec = output_port_types::DefaultDownstreamSpec<DetectionActionType,
@@ -204,11 +195,11 @@ using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;
 using Downstream = output_port_types::DefaultDownstream<DownstreamSpec>;
 
 //! Detection output port spec
-struct DetectionActionOutputPortSpec {
-    DetectionActionOutputPortSpec()
+struct DetectionResponseOutputPortSpec {
+    DetectionResponseOutputPortSpec()
     {
-        static_assert(output_port_types::AsyncActionOutputPortSpecConcept<DetectionActionOutputPortSpec>,
-                      "DetectionActionOutputPortSpec must satisfy AsyncActionOutputPortSpecConcept");
+        static_assert(output_port_types::AsyncActionOutputPortSpecConcept<DetectionResponseOutputPortSpec>,
+                      "DetectionResponseOutputPortSpec must satisfy AsyncActionOutputPortSpecConcept");
     }
 
     //! Action type and related types
@@ -264,4 +255,4 @@ struct DetectionActionOutputPortSpec {
     using Downstream_t = Downstream;
 };
 
-} // namespace redoxi_works::detection_ports::output_types
+} // namespace redoxi_works::detection_ports::response_only::types
