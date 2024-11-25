@@ -98,13 +98,13 @@ psg_master_node_json_params = {
         },
         "create_debug_pub": False,
         "_time_unit": "us(1e-6)",
-        "enable_blocking_mode": False,
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
         "step_interval": 5,
         "frame_interval": 0,
         "publish_to_debug_topic": False,
+        "enable_blocking_mode": False,
         "frame_request_policy": {
             "precondition": "any_downstream_ready",
             "drop_strategy": "no_drop",
@@ -137,12 +137,12 @@ psg_detector_node_pipeline_json_params = {
         },
         "create_debug_pub": True,
         "_time_unit": "us(1e-6)",
-        "enable_blocking_mode": False,
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
         "step_interval": 5,
         "frame_interval": 0,
+        "enable_blocking_mode": False,
         "publish_to_debug_topic": False,
         "frame_request_policy": {
             "precondition": "any_downstream_ready",
@@ -176,12 +176,12 @@ psg_pose_detector_node_pipeline_json_params = {
         },
         "create_debug_pub": True,
         "_time_unit": "us(1e-6)",
-        "enable_blocking_mode": False,
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
         "step_interval": 5,
         "frame_interval": 0,
+        "enable_blocking_mode": False,
         "publish_to_debug_topic": False,
         "frame_request_policy": {
             "precondition": "any_downstream_ready",
@@ -197,6 +197,8 @@ document_sink_node_json_params = {
         "_time_unit": "us(1e-6)",
         "step_interval": 500,
         "publish_topic": "out/relayed_document",
+    },
+    "runtime_config": {
         "enable_debug_topics": True,
         "enable_blocking_mode": False,
     },

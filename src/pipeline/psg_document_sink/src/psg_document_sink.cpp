@@ -7,124 +7,97 @@ namespace redoxi_works
 
 PSGDocumentSinkInitConfig::PSGDocumentSinkInitConfig()
 {
-    {
-        auto p = input_port_config;
-        p->set_action_name("in/action");
-        p->set_buffer_capacity(1);
-    }
-}
-
-void PSGDocumentSinkInitConfig::from_parameters(const PSGDocumentSink *node)
-{
-    auto &json_params = node->get_json_parameters();
-
-    //! Retrieve the init_config from the top level JSON parameters
-    if (json_params.contains("init_config")) {
-        //! Convert the init_config to a string
-        std::string init_config_str = json_params["init_config"].dump();
-
-        //! Parse the string into the InitConfig structure using json_struct
-        JS::ParseContext pc(init_config_str);
-        auto ret = pc.parseTo(*this);
-        if (ret != JS::Error::NoError) {
-            RDX_RAISE_ERROR("[{}] Failed to parse init_config from JSON parameters: {}",
-                            __func__, JS::Internal::error_strings[static_cast<int>(ret)]);
-        }
-        RDX_INFO_DEV(node, __func__, false, "{}", "init_config parsed from JSON parameters");
-    } else {
-        RDX_INFO_DEV(node, __func__, false, "{}", "init_config not found in JSON parameters, using default values");
-    }
+    input_port_config->set_action_name("in/action");
+    input_port_config->set_buffer_capacity(1);
 }
 
 PSGDocumentSink::PSGDocumentSink(const std::string &node_name, const rclcpp::NodeOptions &options)
-    : rclcpp::Node(node_name, options)
+    : common_nodes::StartStopNode(node_name, options)
 {
-    auto ret = declare_default_parameters_for_node(this);
-    if (ret != 0) {
-        RDX_RAISE_ERROR("[{}] Failed to declare default parameters for node", __func__);
-    }
-
-    auto node = this;
-    m_json_parameters = RDX_GET_JSON_PARAM_FROM_NODE(node);
 }
 
 PSGDocumentSink::~PSGDocumentSink()
 {
-    stop();
 }
 
-int PSGDocumentSink::init(std::shared_ptr<InitConfig_t> init_config)
+int PSGDocumentSink::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
 {
-    m_init_config = init_config;
+    RDX_INFO_DEV(this, __func__, false, "{}", "updating init config");
 
-    {
-        //! Convert the InitConfig structure to a JSON string for debugging
-        std::string init_config_json = JS::serializeStruct(*m_init_config);
-        RDX_INFO_DEV(this, __func__, false, "{}", "InitConfig JSON: {}", init_config_json);
+    //! Step 1: Cast config to InitConfig_t
+    auto init_config = std::dynamic_pointer_cast<InitConfig_t>(config);
+    if (!init_config) {
+        RDX_RAISE_ERROR("[{}] Failed to cast init config to FrameRelayNodeInitConfig", __func__);
     }
 
-    // create the input port
-    m_input_port = std::make_shared<InputPort_t>(this);
-    m_input_port->init(m_init_config->input_port_config);
+    //! Step 2: Log init config as JSON for debugging
+    // {
+    //     RDX_INFO_DEV(this, __func__, false, "{}", "Parsing init config as JSON");
+    //     auto init_config_json = JS::serializeStruct(*init_config);
+    //     RDX_INFO_DEV(this, __func__, false, "InitConfig JSON: {}", init_config_json);
+    // }
 
-    // create the publishers
-    m_pub_relayed_document.init(this, m_init_config->publish_topic, StampedDocumentPub::DefaultQoS);
-    m_pub_debug_document_accepted.init(this, m_init_config->debug_topic_document_accepted, StampedDocumentPub::DefaultUnreliableQoS);
-    m_pub_debug_document_rejected.init(this, m_init_config->debug_topic_document_rejected, StampedDocumentPub::DefaultUnreliableQoS);
-    // enable debug topics?
-    set_debug_topics_enabled(m_init_config->enable_debug_topics);
+    //! Step 3: Create and initialize input port
+    RDX_INFO_DEV(this, __func__, false, "{}", "Creating input port");
+    m_input_port = std::make_shared<InputPort_t>(this);
+    m_input_port->init(init_config->input_port_config);
+
+    //! Step 4: Initialize publishers
+    RDX_INFO_DEV(this, __func__, false, "{}", "Initializing publishers");
+    m_pub_relayed_document.init(this, init_config->publish_topic, StampedImagePub::DefaultQoS);
+    m_pub_relayed_image.init(this, init_config->publish_topic_image, StampedImagePub::DefaultQoS);
+    m_pub_debug_document_accepted.init(this, init_config->debug_topic_document_accepted, StampedImagePub::DefaultUnreliableQoS);
+    m_pub_debug_document_rejected.init(this, init_config->debug_topic_document_rejected, StampedImagePub::DefaultUnreliableQoS);
+
+    RDX_INFO_DEV(this, __func__, false, "{}", "Init config update completed successfully");
+    return 0;
+}
+
+int PSGDocumentSink::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config)
+{
+    RDX_INFO_DEV(this, __func__, false, "{}", "updating runtime config");
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(config);
+    if (!runtime_config) {
+        RDX_RAISE_ERROR("[{}] Failed to cast runtime config to FrameRelayNodeRuntimeConfig", __func__);
+    }
+
+    // {
+    //     RDX_INFO_DEV(this, __func__, false, "{}", "Converting runtime config to JSON");
+    //     auto runtime_config_json = JS::serializeStruct(*runtime_config);
+    //     RDX_INFO_DEV(this, __func__, false, "RuntimeConfig JSON: {}", runtime_config_json);
+    // }
 
     return 0;
 }
 
-int PSGDocumentSink::start()
+
+int PSGDocumentSink::_start()
 {
     RDX_INFO_DEV(this, __func__, false, "{}", "Starting frame relay node");
 
     m_input_port->start();
     RDX_INFO_DEV(this, __func__, false, "{}", "input port started");
 
-    m_running = true;
-    auto step_interval = m_init_config->step_interval;
-    m_step_thread = std::make_shared<std::thread>([this, step_interval] {
-        while (this->m_running && rclcpp::ok()) {
-            auto start_time = std::chrono::high_resolution_clock::now();
-            this->_step();
-            auto end_time = std::chrono::high_resolution_clock::now();
-            auto elapsed_time = end_time - start_time;
-            auto sleep_time = step_interval - elapsed_time;
-            if (sleep_time.count() > 0) {
-                std::this_thread::sleep_for(sleep_time);
-            }
-        }
-    });
-
-    RDX_INFO_DEV(this, __func__, false, "{}", "step thread started");
     return 0;
 }
 
-int PSGDocumentSink::stop()
+int PSGDocumentSink::_stop()
 {
     RDX_INFO_DEV(this, __func__, false, "{}", "Stopping frame relay node");
 
     m_input_port->stop();
     RDX_INFO_DEV(this, __func__, false, "{}", "input port stopped");
 
-    m_running = false;
-    if (m_step_thread) {
-        m_step_thread->join();
-    }
-    RDX_INFO_DEV(this, __func__, false, "{}", "step thread stopped");
-
     return 0;
 }
 
 void PSGDocumentSink::_step()
 {
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(get_runtime_config());
     // get data from input port
     // RDX_INFO_DEV(this, __func__, false, "{}", "getting data from input port");
     std::shared_ptr<SourceData_t> psg_document_data;
-    if (m_init_config->enable_blocking_mode) {
+    if (runtime_config->enable_blocking_mode) {
         // wait until there is data available
         psg_document_data = m_input_port->pop_source_data();
     } else {
@@ -161,7 +134,7 @@ void PSGDocumentSink::_step()
     const auto &raw_image = raw_document.frame.raw_image;
 
     // publish debug topic?
-    if (get_debug_topics_enabled()) {
+    if (runtime_config->enable_debug_topics) {
         m_pub_debug_document_accepted.publish(raw_image, "accepted");
         RDX_INFO_DEV(this, __func__, false, "{}", "published debug document accepted");
     }

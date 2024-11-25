@@ -12,8 +12,18 @@ int main(int argc, char **argv)
     auto init_config = std::make_shared<rdx::VideoReaderOrbbec::InitConfig_t>();
     auto runtime_config = std::make_shared<rdx::VideoReaderOrbbec::RuntimeConfig_t>();
 
-    init_config->from_parameters(video_generator.get());
-    runtime_config->from_parameters(video_generator.get());
+    init_config->parse_from_node_parameters(init_config.get(), video_generator.get());
+    {
+        RDX_INFO_DEV(video_generator.get(), __func__, false, "{}", "Converting init config to JSON");
+        auto init_config_json = JS::serializeStruct(*init_config);
+        RDX_INFO_DEV(video_generator.get(), __func__, false, "InitConfig JSON: {}", init_config_json);
+    }
+    runtime_config->parse_from_node_parameters(runtime_config.get(), video_generator.get());
+    {
+        RDX_INFO_DEV(video_generator.get(), __func__, false, "{}", "Converting runtime config to JSON");
+        auto runtime_config_json = JS::serializeStruct(*runtime_config);
+        RDX_INFO_DEV(video_generator.get(), __func__, false, "RuntimeConfig JSON: {}", runtime_config_json);
+    }
 
     //! Initialize the node with the configuration
     video_generator->init(init_config, runtime_config);

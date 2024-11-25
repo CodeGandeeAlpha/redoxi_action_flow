@@ -1,4 +1,3 @@
-#include <psg_pose_detector/PipelineTypes.hpp>
 #include <psg_pose_detector/Pipeline.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <redoxi_samples_lib/random_image.hpp>
@@ -39,19 +38,9 @@ struct PSGPoseDetectorImpl {
 };
 
 PSGPoseDetectorNode::PSGPoseDetectorNode(const std::string &name, const rclcpp::NodeOptions &options)
-    : rclcpp::Node(name, options)
+    : common_nodes::StartStopNode(name, options)
 {
-    _declare_all_parameters();
 }
-
-// void test_tbb()
-// {
-//     tbb::task_group tg;
-//     tg.run([]{
-//         std::this_thread::sleep_for(std::chrono::seconds(1));
-//     });
-//     tg.wait();
-// }
 
 PSGPoseDetectorNode::~PSGPoseDetectorNode()
 {
@@ -68,12 +57,6 @@ PSGPoseDetectorNode::~PSGPoseDetectorNode()
         m_impl->m_ros_time_token->stop();
     }
 
-    // stop step thread
-    m_step_running = false;
-    if (m_step_thread != nullptr && m_step_thread->joinable()) {
-        m_step_thread->join();
-    }
-
     // stop get model result thread
     m_get_model_result_thread_running = false;
     if (m_get_model_result_thread != nullptr && m_get_model_result_thread->joinable()) {
@@ -84,13 +67,9 @@ PSGPoseDetectorNode::~PSGPoseDetectorNode()
     m_impl->m_model_result_task_group.wait();
 }
 
-int PSGPoseDetectorNode::start()
+int PSGPoseDetectorNode::_start()
 {
-    //! Can only start in STOPPED status
-    if (m_status_code != NodeStatusCode::STOPPED) {
-        RDX_RAISE_ERROR("[{}] status must be in STOPPED, got {}", __func__, NodeStatusCodeToString(m_status_code));
-        return -1;
-    }
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
 
     //! Start input port
     RDX_INFO_DEV(this, __func__, false, "{}", "Starting psg detector in node");
@@ -115,34 +94,14 @@ int PSGPoseDetectorNode::start()
 
     //! start ros time token
     {
-        auto interval = m_runtime_config->document_interval;
+        auto interval = runtime_config->document_interval;
         m_impl->m_ros_time_token->start(interval);
     }
-
-    //! Call subclass start implementation
-    auto ret = _start();
-    if (ret != 0) {
-        RDX_RAISE_ERROR("[{}] Failed to start video source, ret={}", __func__, ret);
-        return ret;
-    }
-
-    //! Change status to STARTED
-    _set_status_code(NodeStatusCode::STARTED);
-
-    //! Start step thread
-    auto step_interval = m_runtime_config->step_interval;
-    m_step_running = true;
-    m_step_thread = std::make_shared<std::thread>([this, step_interval]() {
-        while (m_status_code == NodeStatusCode::STARTED && rclcpp::ok() && m_step_running) {
-            _step();
-            std::this_thread::sleep_for(step_interval);
-        }
-    });
 
     //! start get model result thread
     m_get_model_result_thread_running = true;
     m_get_model_result_thread = std::make_shared<std::thread>([this]() {
-        while (m_status_code == NodeStatusCode::STARTED && rclcpp::ok() && m_get_model_result_thread_running) {
+        while (rclcpp::ok() && m_get_model_result_thread_running) {
             _get_model_result();
         }
     });
@@ -150,14 +109,8 @@ int PSGPoseDetectorNode::start()
     return 0;
 }
 
-int PSGPoseDetectorNode::stop()
+int PSGPoseDetectorNode::_stop()
 {
-    //! Can only stop in STARTED status
-    if (m_status_code != NodeStatusCode::STARTED) {
-        RDX_RAISE_ERROR("[{}] status must be in STARTED, got {}", __func__, NodeStatusCodeToString(m_status_code));
-        return -1;
-    }
-
     //! Stop input port
     RDX_INFO_DEV(this, __func__, false, "{}", "Stopping psg detector node");
     m_input_port->stop();
@@ -173,22 +126,6 @@ int PSGPoseDetectorNode::stop()
 
     //! stop ros time token
     m_impl->m_ros_time_token->stop();
-
-    //! Call subclass stop implementation
-    auto ret = _stop();
-    if (ret != 0) {
-        RDX_RAISE_ERROR("[{}] Failed to stop video source, ret={}", __func__, ret);
-        return ret;
-    }
-
-    //! Change status to STOPPED
-    _set_status_code(NodeStatusCode::STOPPED);
-
-    //! Stop step thread
-    m_step_running = false;
-    if (m_step_thread != nullptr && m_step_thread->joinable()) {
-        m_step_thread->join();
-    }
 
     //! Stop get model result thread
     m_get_model_result_thread_running = false;
@@ -220,100 +157,60 @@ bool PSGPoseDetectorNode::get_publish_to_debug_topic() const
     return m_publish_to_debug_topic;
 }
 
-int PSGPoseDetectorNode::init(std::shared_ptr<InitConfig_t> config,
-                              std::shared_ptr<RuntimeConfig_t> runtime_config)
+int PSGPoseDetectorNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
 {
-    //! Check if already initialized
-    if (m_status_code != NodeStatusCode::BEFORE_INIT) {
-        RDX_RAISE_ERROR("[{}] status must be in BEFORE_INIT, got {}", __func__, NodeStatusCodeToString(m_status_code));
-    }
-
-    //! Create implementation details of this node
-    //! @note this must be called before any other operations
-    m_impl = _create_impl();
-
-    //! apply or update init config
-    update_init_config(config);
-
-    //! apply or update runtime config
-    update_runtime_config(runtime_config);
-
-    // create the input port
-    m_input_port = std::make_shared<InputPort_t>(this);
-    m_input_port->init(m_init_config->input_port_config);
-
-    //! Change status to STOPPED
-    _set_status_code(NodeStatusCode::STOPPED);
-
-    return 0;
-}
-
-int PSGPoseDetectorNode::update_init_config(std::shared_ptr<InitConfig_t> config)
-{
-    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "update init config");
-    //! Can only update init config in BEFORE_INIT or STOPPED status
-    if (m_status_code != NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::STOPPED) {
-        RDX_RAISE_ERROR("[{}] status must be in BEFORE_INIT or STOPPED, got {}", __func__, NodeStatusCodeToString(m_status_code));
-        return -1;
-    }
-
-    //! Store configurations, this must come before other operations
-    m_init_config = config;
+    auto init_config = std::dynamic_pointer_cast<InitConfig_t>(config);
 
     // parse the config into a string and print it
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "parse init config into a string");
     auto config_str = JS::serializeStruct(*config);
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "init config: {}", config_str);
 
+    // create impl
+    m_impl = _create_impl();
+
     //! config must have some downstream
     // RDX_ASSERT_CHECK_TRUE(!config->primary_output_spec.get_downstream_specs().empty(),
     //                       "[{}] init config must have at least one downstream", __func__);
 
     //! Initialize output ports
-    auto primary_output_port_pipeline = _create_primary_output_port_pipeline();
+    auto primary_output_port_pipeline = _create_primary_output_port_pipeline(*init_config);
     if (!primary_output_port_pipeline) {
         RDX_RAISE_ERROR("[{}] Failed to create primary output port", __func__);
     }
     m_primary_output_port_pipeline = primary_output_port_pipeline;
 
-    auto primary_output_port_model = _create_primary_output_port_model();
+    auto primary_output_port_model = _create_primary_output_port_model(*init_config);
     if (!primary_output_port_model) {
         RDX_RAISE_ERROR("[{}] Failed to create primary output port", __func__);
     }
     m_primary_output_port_model = primary_output_port_model;
 
     //! Initialize debug publishers
-    if (m_init_config->create_debug_pub) {
+    if (init_config->create_debug_pub) {
         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
                      "initialize debug publishers, pipeline enqueue topic={}, pipeline drop topic={}, model enqueue topic={}, model drop topic={}",
-                     m_init_config->debug_pub_pipeline_enqueue_name,
-                     m_init_config->debug_pub_pipeline_drop_name,
-                     m_init_config->debug_pub_model_enqueue_name,
-                     m_init_config->debug_pub_model_drop_name);
+                     init_config->debug_pub_pipeline_enqueue_name,
+                     init_config->debug_pub_pipeline_drop_name,
+                     init_config->debug_pub_model_enqueue_name,
+                     init_config->debug_pub_model_drop_name);
         auto debug_qos = DefaultParams::DebugPublisherQoS;
-        m_pub_pipeline_enqueue.init(this, m_init_config->debug_pub_pipeline_enqueue_name, debug_qos);
-        m_pub_pipeline_drop.init(this, m_init_config->debug_pub_pipeline_drop_name, debug_qos);
-        m_pub_model_enqueue.init(this, m_init_config->debug_pub_model_enqueue_name, debug_qos);
-        m_pub_model_drop.init(this, m_init_config->debug_pub_model_drop_name, debug_qos);
+        m_pub_pipeline_enqueue.init(this, init_config->debug_pub_pipeline_enqueue_name, debug_qos);
+        m_pub_pipeline_drop.init(this, init_config->debug_pub_pipeline_drop_name, debug_qos);
+        m_pub_model_enqueue.init(this, init_config->debug_pub_model_enqueue_name, debug_qos);
+        m_pub_model_drop.init(this, init_config->debug_pub_model_drop_name, debug_qos);
     }
 
     return 0;
 }
 
-int PSGPoseDetectorNode::update_runtime_config(std::shared_ptr<RuntimeConfig_t> config)
+int PSGPoseDetectorNode::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config)
 {
-    //! cannot be updated in STARTED status
-    if (m_status_code == NodeStatusCode::STARTED) {
-        RDX_RAISE_ERROR("[{}] status must not be in STARTED, got {}", __func__, NodeStatusCodeToString(m_status_code));
-        return -1;
-    }
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(config);
 
     //! parse the config into a string and print it
-    auto config_str = JS::serializeStruct(*config);
+    auto config_str = JS::serializeStruct(*runtime_config);
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "runtime config: {}", config_str);
-
-    //! Store configurations
-    m_runtime_config = config;
 
     //! set callback on request enqueued to resize image if needed
     m_primary_output_port_pipeline->set_callback_on_request_enqueued([](DeliveryRequestPipeline_t &request) {
@@ -324,7 +221,7 @@ int PSGPoseDetectorNode::update_runtime_config(std::shared_ptr<RuntimeConfig_t> 
     });
 
     //! set publish to debug topic
-    set_publish_to_debug_topic(config->publish_to_debug_topic);
+    set_publish_to_debug_topic(runtime_config->publish_to_debug_topic);
 
     return 0;
 }
@@ -337,19 +234,15 @@ std::shared_ptr<PSGPoseDetectorImpl> PSGPoseDetectorNode::_create_impl()
     return impl;
 }
 
-void PSGPoseDetectorNode::_set_status_code(int status_code)
-{
-    m_status_code = status_code;
-}
-
 PSGPoseDetectorNode::DeliveryRequestPipeline_t
     PSGPoseDetectorNode::_create_delivery_request(const OutputSourceDataPipeline_t &source_data)
 {
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     //! Create delivery request
     DeliveryRequestPipeline_t req;
     req.set_source_data(source_data);
-    if (m_runtime_config->pipeline_request_policy.has_value()) {
-        req.set_delivery_policy(*m_runtime_config->pipeline_request_policy);
+    if (runtime_config->pipeline_request_policy.has_value()) {
+        req.set_delivery_policy(*runtime_config->pipeline_request_policy);
     }
 
     return req;
@@ -358,21 +251,22 @@ PSGPoseDetectorNode::DeliveryRequestPipeline_t
 PSGPoseDetectorNode::DeliveryRequestModel_t
     PSGPoseDetectorNode::_create_delivery_request(const OutputSourceDataModel_t &source_data)
 {
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     //! Create delivery request
     DeliveryRequestModel_t req;
     req.set_source_data(source_data);
-    if (m_runtime_config->model_request_policy.has_value()) {
-        req.set_delivery_policy(*m_runtime_config->model_request_policy);
+    if (runtime_config->model_request_policy.has_value()) {
+        req.set_delivery_policy(*runtime_config->model_request_policy);
     }
     return req;
 }
 
 std::shared_ptr<PSGPoseDetectorNode::OutputPortPipeline_t>
-    PSGPoseDetectorNode::_create_primary_output_port_pipeline()
+    PSGPoseDetectorNode::_create_primary_output_port_pipeline(const InitConfig_t &init_config)
 {
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "create primary output port pipeline");
     auto port = std::make_shared<OutputPortPipeline_t>(this);
-    auto &port_config = m_init_config->output_port_pipeline_config;
+    auto &port_config = init_config.output_port_pipeline_config;
     // RDX_ASSERT_CHECK_TRUE(!port_config.get_downstream_specs().empty(),
     //                       "[{}] port_config must have at least one downstream", __func__);
     port->init(port_config);
@@ -395,11 +289,11 @@ std::shared_ptr<PSGPoseDetectorNode::OutputPortPipeline_t>
 }
 
 std::shared_ptr<PSGPoseDetectorNode::OutputPortModel_t>
-    PSGPoseDetectorNode::_create_primary_output_port_model()
+    PSGPoseDetectorNode::_create_primary_output_port_model(const InitConfig_t &init_config)
 {
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "create primary output port model");
     auto port = std::make_shared<OutputPortModel_t>(this);
-    auto &port_config = m_init_config->output_port_model_config;
+    auto &port_config = init_config.output_port_model_config;
     // RDX_ASSERT_CHECK_TRUE(!port_config.get_downstream_specs().empty(),
     //                       "[{}] port_config must have at least one downstream", __func__);
     port->init(port_config);
@@ -422,33 +316,19 @@ std::shared_ptr<PSGPoseDetectorNode::OutputPortModel_t>
     return port;
 }
 
-int PSGPoseDetectorNode::_declare_all_parameters()
-{
-    auto ret = declare_default_parameters_for_node(this);
-    if (ret != 0) {
-        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                     "Failed to declare default parameters for node, ret={}", ret);
-        return ret;
-    }
-
-    // parse json parameters
-    auto node = this;
-    m_json_parameters = RDX_GET_JSON_PARAM_FROM_NODE(node);
-
-    return 0;
-}
-
 void PSGPoseDetectorNode::_step()
 {
     // 从input port pipeline获取数据，创建delivery request，并推送到output port model,
     // 从input port model获取数据，放到detections buffer中去
-    if (m_status_code != NodeStatusCode::STARTED) {
+    if (get_status() != NodeStatusCode::STARTED) {
         return;
     }
 
     if (m_impl->m_ros_time_token->try_pop_token()) {
+        auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+
         std::shared_ptr<InputSourceData_t> document_data;
-        if (m_init_config->enable_blocking_mode) {
+        if (runtime_config->enable_blocking_mode) {
             // wait until there is data available
             document_data = m_input_port->pop_source_data();
         } else {
@@ -486,7 +366,7 @@ void PSGPoseDetectorNode::_step()
         auto msg_uuid = output_model_source_data.get_uuid();
 
         // get qos, controls how to retry and drop frames
-        auto &qos = m_runtime_config->model_enqueue_policy;
+        auto &qos = runtime_config->model_enqueue_policy;
         auto max_attempts = qos.get_retry_policy().get_number_of_retry(true).value() + 1;
         auto interval_between_attempts = qos.get_retry_policy().get_wait_time_between_retry(true).value();
         auto drop_frame_strategy = qos.get_drop_strategy();
@@ -540,21 +420,17 @@ int PSGPoseDetectorNode::_on_deliver_to_downstream_finish(TargetDataModel_t &tar
 {
 
     //! 1. 创建modelresult
-    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "Creating model result");
     PSGPoseDetectorImpl::OutputModelResult output_model_result;
 
     //! 2. 绑定promise和future
-    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "Binding promise and future");
     output_model_result.promise = std::make_shared<ModelResultPromise>();
     output_model_result.future = output_model_result.promise->get_future().share();
     output_model_result.source_data = std::make_shared<OutputSourceDataModel_t>(request.get_source_data());
 
     //! 3. 将output_model_result推送到buffer中
-    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "Pushing output model result to buffer");
     m_impl->m_model_result_buffer.push(output_model_result);
 
     //! 4. 创建task 在tbb run中将结果写入promise
-    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "Creating task to write result to promise");
     auto promise = output_model_result.promise;
     //! 通过值捕获需要的数据
     auto ds_copy = ds;
@@ -563,29 +439,19 @@ int PSGPoseDetectorNode::_on_deliver_to_downstream_finish(TargetDataModel_t &tar
                                            result = result_copy,
                                            promise,
                                            this]() {
-        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "response_code is {}", int(result.response_code.value()));
-        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "waiting for goal handle");
-
         auto goal_handle = result.goal_handle_future.get();
         if (goal_handle) {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "got goal handle");
             auto action_result = ds.get_action_client()->async_get_result(goal_handle).get().result;
             // 将action result写入promise
             auto output_model_result = std::make_shared<PSGPoseDetectorNode::OutputModelResult_t>();
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "got action result, keypoints size is {}", action_result->keypoints.size());
             output_model_result->keypoints = action_result->keypoints;
             output_model_result->x_return = action_result->x_return;
             output_model_result->is_matched_by_uid = action_result->is_matched_by_uid;
             promise->set_value(output_model_result);
         } else {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "set_value to nullptr");
             promise->set_value(nullptr);
         }
-
-        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "set_value done");
     });
-
 
     return 0;
 }
@@ -700,6 +566,9 @@ void PSGPoseDetectorNode::_get_model_result()
 
     //! 3. 如果结果不为空，则构造output source data，并推送到output port pipeline
     if (result) {
+        auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+        auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
+
         RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始构造output source data", 0);
         // create output source data
         OutputSourceDataPipeline_t output_pipeline_source_data;
@@ -739,7 +608,7 @@ void PSGPoseDetectorNode::_get_model_result()
 
         // get qos, controls how to retry and drop frames
         RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始获取QoS配置", 0);
-        auto &qos = m_runtime_config->model_enqueue_policy;
+        auto &qos = runtime_config->model_enqueue_policy;
         auto max_attempts = qos.get_retry_policy().get_number_of_retry(true).value() + 1;
         auto interval_between_attempts = qos.get_retry_policy().get_wait_time_between_retry(true).value();
         auto drop_frame_strategy = qos.get_drop_strategy();
@@ -777,7 +646,7 @@ void PSGPoseDetectorNode::_get_model_result()
                          "[msg_uuid={}] success to push request",
                          boost::uuids::to_string(msg_uuid));
 
-            if (m_init_config->create_debug_pub) {
+            if (init_config->create_debug_pub) {
                 RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始创建debug图像", 0);
                 auto debug_image = _create_debug_image(*document);
                 m_pub_model_enqueue.publish(debug_image, "");

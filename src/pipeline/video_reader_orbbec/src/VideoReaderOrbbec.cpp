@@ -21,51 +21,10 @@ VideoReaderOrbbec::~VideoReaderOrbbec()
     }
 }
 
-void VideoReaderOrbbecInitConfig::from_parameters(RedoxiVideoReaderBase *node)
+
+int VideoReaderOrbbec::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
 {
-    auto orbbec_node = dynamic_cast<VideoReaderOrbbec *>(node);
-    RDX_INFO_DEV(orbbec_node, __func__, false, "{}", "load init config from node");
-    auto &json_params = orbbec_node->get_json_parameters();
-
-    //! Load init config from json parameters if exists
-    if (json_params.contains("init_config")) {
-        RDX_INFO_DEV(orbbec_node, __func__, false, "{}", "found init_config in json parameters");
-
-        std::string json_str = json_params["init_config"].dump();
-        JS::ParseContext context(json_str);
-        auto error = context.parseTo(*this);
-        if (error != JS::Error::NoError) {
-            RDX_RAISE_ERROR("[{}] Error parsing init_config: {}", __func__, context.makeErrorString());
-        }
-    }
-
-    RDX_INFO_DEV(orbbec_node, __func__, false, "{}", "init config loaded");
-    RDX_INFO_DEV(orbbec_node, __func__, false, "orbbec_net_device_ip: {}", this->orbbec_net_device_ip);
-}
-
-void VideoReaderOrbbecRuntimeConfig::from_parameters(RedoxiVideoReaderBase *node)
-{
-    auto orbbec_node = dynamic_cast<VideoReaderOrbbec *>(node);
-    RDX_INFO_DEV(orbbec_node, __func__, false, "{}", "load runtime config from node");
-    auto &json_params = orbbec_node->get_json_parameters();
-
-    //! Load runtime config from json parameters if exists
-    if (json_params.contains("runtime_config")) {
-        RDX_INFO_DEV(orbbec_node, __func__, false, "{}", "found runtime_config in json parameters");
-        std::string json_str = json_params["runtime_config"].dump();
-        JS::ParseContext context(json_str);
-        auto error = context.parseTo(*this);
-        if (error != JS::Error::NoError) {
-            RDX_RAISE_ERROR("[{}] Error parsing runtime_config: {}", __func__, context.makeErrorString());
-        }
-    }
-
-    RDX_INFO_DEV(orbbec_node, __func__, false, "{}", "runtime config loaded");
-}
-
-int VideoReaderOrbbec::update_init_config(std::shared_ptr<RedoxiVideoReaderBase::InitConfig_t> config)
-{
-    int ret = RedoxiVideoReaderBase::update_init_config(config);
+    int ret = RedoxiVideoReaderBase::_update_init_config(config);
     if (ret != 0) {
         return ret;
     }
@@ -116,27 +75,28 @@ int VideoReaderOrbbec::update_init_config(std::shared_ptr<RedoxiVideoReaderBase:
     return 0;
 }
 
-int VideoReaderOrbbec::update_runtime_config(std::shared_ptr<RedoxiVideoReaderBase::RuntimeConfig_t> config)
+int VideoReaderOrbbec::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config)
 {
+    auto orbbec_config = std::dynamic_pointer_cast<VideoReaderOrbbecRuntimeConfig>(config);
+
+    if (!orbbec_config) {
+        RDX_RAISE_ERROR("[{}] Failed to cast config to VideoReaderOrbbecRuntimeConfig", __func__);
+    }
+
     // ensure the output image size is valid, otherwise uses default size
-    if (config->output_image_size.width <= 0 || config->output_image_size.height <= 0) {
+    if (orbbec_config->output_image_size.width <= 0 || orbbec_config->output_image_size.height <= 0) {
         RCLCPP_WARN(this->get_logger(),
                     "[%s][update_runtime_config()] Invalid output_image_size (%d, %d). Using default size.",
-                    this->get_name(), config->output_image_size.width, config->output_image_size.height);
-        config->output_image_size = RuntimeConfig_t::DEFAULT_FRAME_SIZE;
+                    this->get_name(), orbbec_config->output_image_size.width, orbbec_config->output_image_size.height);
+        orbbec_config->output_image_size = RuntimeConfig_t::DEFAULT_FRAME_SIZE;
     }
 
     //! Call the base class implementation first
-    int ret = RedoxiVideoReaderBase::update_runtime_config(config);
+    int ret = RedoxiVideoReaderBase::_update_runtime_config(config);
     if (ret != 0) {
         return ret;
     }
 
-    auto orbbec_config = std::dynamic_pointer_cast<VideoReaderOrbbecRuntimeConfig>(config);
-    if (!orbbec_config) {
-        RDX_RAISE_ERROR("[{}] Failed to cast config to VideoReaderOrbbecRuntimeConfig", __func__);
-        return -1;
-    }
 
     RDX_INFO_DEV(this, __func__, false, "rotate_180: {}", orbbec_config->rotate_180);
 
@@ -154,7 +114,8 @@ cv::Mat VideoReaderOrbbec::_orbbec_color_to_cvmat(std::shared_ptr<ob::ColorFrame
     return colorRawMat;
 }
 
-int VideoReaderOrbbec::_read_frame(SourceData_t &data, std::atomic<int64_t> &frame_number)
+VideoReaderOrbbec::ReadFrameResult VideoReaderOrbbec::_read_frame(SourceData_t &source_data,
+                                                                  std::atomic<int64_t> &frame_number)
 {
     std::shared_ptr<ob::FrameSet> frameset;
     {
@@ -168,7 +129,7 @@ int VideoReaderOrbbec::_read_frame(SourceData_t &data, std::atomic<int64_t> &fra
         // data.set_image(black_frame);
         // data.set_frame_number(frame_number);
         // frame_number++;
-        return -1;
+        return ReadFrameResult::NO_DATA;
     }
 
     // get color frame frameset->colorFrame()
@@ -179,7 +140,7 @@ int VideoReaderOrbbec::_read_frame(SourceData_t &data, std::atomic<int64_t> &fra
         // data.set_image(black_frame);
         // data.set_frame_number(frame_number);
         // frame_number++;
-        return -1;
+        return ReadFrameResult::NO_DATA;
     }
 
     // get color frame data
@@ -196,7 +157,6 @@ int VideoReaderOrbbec::_read_frame(SourceData_t &data, std::atomic<int64_t> &fra
             // data.set_image(black_frame);
             // data.set_frame_number(frame_number);
             // frame_number++;
-            return -1;
         }
         color_frame = m_format_convert_filter->process(color_frame)->as<ob::ColorFrame>();
     }
@@ -208,17 +168,19 @@ int VideoReaderOrbbec::_read_frame(SourceData_t &data, std::atomic<int64_t> &fra
     auto orbbec_config = std::dynamic_pointer_cast<VideoReaderOrbbecRuntimeConfig>(m_runtime_config);
     if (!orbbec_config) {
         RDX_RAISE_ERROR("[{}] Failed to cast config to VideoReaderOrbbecRuntimeConfig", __func__);
-        return -1;
     }
 
     if (orbbec_config->rotate_180) {
         cv::rotate(frame, frame, cv::ROTATE_180);
     }
 
-    data.set_image(frame);
-    data.set_frame_number(frame_number);
-    frame_number++;
-    return 0;
+    source_data.set_image(frame);
+    SourceData_t::FrameMetadata_t metadata;
+    metadata.frame_num = _increment_frame_number_by(frame_number, 1);
+    // TODO: set timestamp
+    // metadata.source_timestamp =
+    source_data.set_frame_metadata(metadata);
+    return ReadFrameResult::OK;
 }
 
 } // namespace redoxi_works

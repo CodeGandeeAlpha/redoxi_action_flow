@@ -23,11 +23,11 @@ struct PSGDetectorImpl;
  * BEFORE_INIT -> [init()] -> CLOSED -> [open()] -> OPENED -> [start()] -> STARTED -> [stop()] -> STOPPED -> [close()] -> CLOSED
  * the action allowed at each state is shown in the comments of each function
  */
-class PSGDetectorNode : public rclcpp::Node,
-                        public IStartStopProtocol
+class PSGDetectorNode : public common_nodes::StartStopNode
 {
     friend struct PSGDetectorImpl;
     friend struct psg_detector::InitConfig;
+    friend struct psg_detector::RuntimeConfig;
 
   public:
     using InputPort_t = AsyncDocumentInputPort;
@@ -69,6 +69,10 @@ class PSGDetectorNode : public rclcpp::Node,
     using DeliveryTaskPipeline_t = OutputPortPipeline_t::DeliveryTask_t;
     using DeliveryTaskModel_t = OutputPortModel_t::DeliveryTask_t;
 
+    // init config and runtime config types of StartStopNode
+    using BaseInitConfig_t = common_nodes::StartStopNode::InitConfig_t;
+    using BaseRuntimeConfig_t = common_nodes::StartStopNode::RuntimeConfig_t;
+
   public:
     //! Constructor with node options and name
     explicit PSGDetectorNode(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
@@ -81,92 +85,14 @@ class PSGDetectorNode : public rclcpp::Node,
     virtual void set_publish_to_debug_topic(bool enable);
     virtual bool get_publish_to_debug_topic() const;
 
-    //! get json parameters parsed from ros parameters
-    virtual const nlohmann::json &get_json_parameters() const
-    {
-        return m_json_parameters;
-    }
-
-  public:
-    //! Initialize with configurations, must be called once before open()
-    //! state transition: BEFORE_INIT -> CLOSED
-    virtual int init(std::shared_ptr<InitConfig_t> config,
-                     std::shared_ptr<RuntimeConfig_t> runtime_config);
-
-    /**
-     * @brief Update the init config, only when the node is in CLOSED status
-     * @param config the new init config
-     * @return 0 if success, otherwise error code
-     */
-    virtual int update_init_config(std::shared_ptr<InitConfig_t> config);
-
-    /**
-     * @brief Get the init config
-     * @return the init config
-     */
-    virtual std::shared_ptr<InitConfig_t> get_init_config() const
-    {
-        return m_init_config;
-    }
-
-    /**
-     * @brief Update the runtime config, only when the node is in CLOSED or STOPPED status
-     * @param config the new runtime config
-     * @return 0 if success, otherwise error code
-     */
-    virtual int update_runtime_config(std::shared_ptr<RuntimeConfig_t> config);
-
-    /**
-     * @brief Get the runtime config
-     * @return the runtime config
-     */
-    virtual std::shared_ptr<RuntimeConfig_t> get_runtime_config() const
-    {
-        return m_runtime_config;
-    }
-
-    /**
-     * @brief Start the node, must be called in OPENED or STOPPED status,
-     * after which you cannot modify runtime config
-     * @return 0 if success, otherwise error code
-     */
-    int start() final;
-
-    /**
-     * @brief Stop the node, must be called in STARTED status
-     * @return 0 if success, otherwise error code
-     */
-    int stop() final;
-
-    /**
-     * @brief Get the status code of this node
-     * @return the status code
-     */
-    virtual int get_status_code() const
-    {
-        return m_status_code;
-    }
+  protected: // from base class
+    int _start() override;
+    int _stop() override;
+    void _step() override;
+    int _update_init_config(std::shared_ptr<BaseInitConfig_t> config) override;
+    int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config) override;
 
   protected:
-    //! Start reading frames, intended to be overridden by subclass
-    //! @note State transition is handled by base class
-    //! @return 0 if success, otherwise error code
-    //! @note If return != 0, state transition will not be applied
-    virtual int _start()
-    {
-        return 0;
-    }
-
-    //! Stop reading frames, intended to be overridden by subclass
-    //! @note State transition is handled by base class
-    //! @return 0 if success, otherwise error code
-    //! @note If return != 0, state transition will not be applied
-    virtual int _stop()
-    {
-        return 0;
-    }
-
-
     /**
      * @brief Create a delivery request from source data
      * @param source_data the source data to be filled with the read frame
@@ -176,18 +102,12 @@ class PSGDetectorNode : public rclcpp::Node,
     virtual DeliveryRequestModel_t _create_delivery_request(const OutputSourceDataModel_t &source_data);
 
     //! create primary output port
-    virtual std::shared_ptr<OutputPortPipeline_t> _create_primary_output_port_pipeline();
-    virtual std::shared_ptr<OutputPortModel_t> _create_primary_output_port_model();
+    virtual std::shared_ptr<OutputPortPipeline_t> _create_primary_output_port_pipeline(const InitConfig_t &init_config);
+    virtual std::shared_ptr<OutputPortModel_t> _create_primary_output_port_model(const InitConfig_t &init_config);
 
     //! create implementation details of this node
     //! @note this must be called before any other operations, so it cannot access any member variables
     virtual std::shared_ptr<PSGDetectorImpl> _create_impl();
-
-    //! change status code
-    virtual void _set_status_code(int status_code);
-
-    //! do periodic step operation
-    virtual void _step();
 
     //! get model result
     virtual void _get_model_result();
@@ -196,53 +116,12 @@ class PSGDetectorNode : public rclcpp::Node,
     virtual sensor_msgs::msg::Image _create_debug_image(const psg_private_msgs::msg::PsgDocument &document);
 
   protected: // output port callback
-    //! callback when a delivery task is started, about to send to any downstream
-    virtual int _on_delivery_task_begin(TargetDataPipeline_t &target_data,
-                                        const DeliveryRequestPipeline_t &request)
-    {
-        return 0;
-    }
-    virtual int _on_delivery_task_begin(TargetDataModel_t &target_data,
-                                        const DeliveryRequestModel_t &request)
-    {
-        return 0;
-    }
-
-    //! callback when a delivery task is finished, after sending to all downstreams
-    virtual int _on_delivery_task_finish(TargetDataPipeline_t &target_data,
-                                         const DeliveryRequestPipeline_t &request,
-                                         const DeliveryResultPipeline_t &result)
-    {
-        return 0;
-    }
-    virtual int _on_delivery_task_finish(TargetDataModel_t &target_data,
-                                         const DeliveryRequestModel_t &request,
-                                         const DeliveryResultModel_t &result)
-    {
-        return 0;
-    }
-
-    //! callback when a frame is sent to a downstream, failure or success
-    virtual int _on_deliver_to_downstream_finish(TargetDataPipeline_t &target_data,
-                                                 SendResultPipeline_t &result,
-                                                 const DeliveryRequestPipeline_t &request,
-                                                 const DownstreamPipeline_t &ds)
-    {
-        return 0;
-    }
     virtual int _on_deliver_to_downstream_finish(TargetDataModel_t &target_data,
                                                  SendResultModel_t &result,
                                                  const DeliveryRequestModel_t &request,
                                                  const DownstreamModel_t &ds);
 
   private:
-    /**
-     * @brief Declare all parameters (non-overridable)
-     * @details Should be called in subclass constructor
-     * @return 0 if success, otherwise return error code
-     */
-    int _declare_all_parameters();
-
     virtual int _read_frame(OutputSourceDataModel_t &source_data,
                             std::atomic<int64_t> &frame_number);
 
@@ -253,21 +132,11 @@ class PSGDetectorNode : public rclcpp::Node,
     std::shared_ptr<OutputPortPipeline_t> m_primary_output_port_pipeline;
     std::shared_ptr<OutputPortModel_t> m_primary_output_port_model;
 
-    // configuration
-    std::shared_ptr<InitConfig_t> m_init_config;
-    std::shared_ptr<RuntimeConfig_t> m_runtime_config;
-
-    // status code
-    std::atomic<int> m_status_code{NodeStatusCode::BEFORE_INIT};
-
     // publish to debug topic
     std::atomic<bool> m_publish_to_debug_topic{false};
 
     //! implementation details of this node
     std::shared_ptr<PSGDetectorImpl> m_impl;
-
-    //! json parameters read from ros parameters
-    nlohmann::json m_json_parameters;
 
     //! debug publishers
     StampedImagePub m_pub_pipeline_enqueue;
@@ -278,13 +147,9 @@ class PSGDetectorNode : public rclcpp::Node,
     //! frame number
     std::atomic<int64_t> m_frame_number{0};
 
-    //! thread for periodic step
-    std::shared_ptr<std::thread> m_step_thread;
-
     //! thread for model result
     std::shared_ptr<std::thread> m_get_model_result_thread;
 
-    std::atomic<bool> m_step_running{false};
     std::atomic<bool> m_get_model_result_thread_running{false};
 };
 

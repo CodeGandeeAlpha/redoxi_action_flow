@@ -1,4 +1,3 @@
-#include <psg_frame_det_source_sink/PSGFrameDetSourceSinkTypes.hpp>
 #include <psg_frame_det_source_sink/PSGFrameDetSourceSink.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <redoxi_samples_lib/random_image.hpp>
@@ -35,19 +34,9 @@ struct PSGFrameDetSourceSinkImpl {
 };
 
 PSGFrameDetSourceSink::PSGFrameDetSourceSink(const std::string &name, const rclcpp::NodeOptions &options)
-    : rclcpp::Node(name, options)
+    : common_nodes::StartStopNode(name, options)
 {
-    _declare_all_parameters();
 }
-
-// void test_tbb()
-// {
-//     tbb::task_group tg;
-//     tg.run([]{
-//         std::this_thread::sleep_for(std::chrono::seconds(1));
-//     });
-//     tg.wait();
-// }
 
 PSGFrameDetSourceSink::~PSGFrameDetSourceSink()
 {
@@ -61,24 +50,19 @@ PSGFrameDetSourceSink::~PSGFrameDetSourceSink()
         m_impl->m_ros_time_token->stop();
     }
 
-    // stop step thread
-    m_step_running = false;
-    if (m_step_thread != nullptr && m_step_thread->joinable()) {
-        m_step_thread->join();
+    // stop get model result thread
+    m_get_model_result_thread_running = false;
+    if (m_get_model_result_thread != nullptr && m_get_model_result_thread->joinable()) {
+        m_get_model_result_thread->join();
     }
 
     // destroy impl task group
     m_impl->m_model_result_task_group.wait();
 }
 
-int PSGFrameDetSourceSink::start()
+int PSGFrameDetSourceSink::_start()
 {
-    //! Can only start in STOPPED status
-    if (m_status_code != NodeStatusCode::STOPPED) {
-        RDX_RAISE_ERROR("[{}] status must be in STOPPED, got {}", __func__, NodeStatusCodeToString(m_status_code));
-        return -1;
-    }
-
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     //! Start primary output port
     if (m_primary_output_port) {
         auto ret = m_primary_output_port->start();
@@ -90,34 +74,14 @@ int PSGFrameDetSourceSink::start()
 
     //! start ros time token
     {
-        auto interval = m_runtime_config->step_interval;
+        auto interval = runtime_config->step_interval;
         m_impl->m_ros_time_token->start(interval);
     }
-
-    //! Call subclass start implementation
-    auto ret = _start();
-    if (ret != 0) {
-        RDX_RAISE_ERROR("[{}] Failed to start video source, ret={}", __func__, ret);
-        return ret;
-    }
-
-    //! Change status to STARTED
-    _set_status_code(NodeStatusCode::STARTED);
-
-    //! Start step thread
-    auto step_interval = m_runtime_config->step_interval;
-    m_step_running = true;
-    m_step_thread = std::make_shared<std::thread>([this, step_interval]() {
-        while (m_status_code == NodeStatusCode::STARTED && rclcpp::ok() && m_step_running) {
-            _step();
-            std::this_thread::sleep_for(step_interval);
-        }
-    });
 
     //! start get model result thread
     m_get_model_result_thread_running = true;
     m_get_model_result_thread = std::make_shared<std::thread>([this]() {
-        while (m_status_code == NodeStatusCode::STARTED && rclcpp::ok() && m_get_model_result_thread_running) {
+        while (rclcpp::ok() && m_get_model_result_thread_running) {
             _get_model_result();
         }
     });
@@ -125,36 +89,14 @@ int PSGFrameDetSourceSink::start()
     return 0;
 }
 
-int PSGFrameDetSourceSink::stop()
+int PSGFrameDetSourceSink::_stop()
 {
-    //! Can only stop in STARTED status
-    if (m_status_code != NodeStatusCode::STARTED) {
-        RDX_RAISE_ERROR("[{}] status must be in STARTED, got {}", __func__, NodeStatusCodeToString(m_status_code));
-        return -1;
-    }
-
     //! Stop primary output port
     if (m_primary_output_port) {
         m_primary_output_port->stop();
     }
     //! stop ros time token
     m_impl->m_ros_time_token->stop();
-
-    //! Call subclass stop implementation
-    auto ret = _stop();
-    if (ret != 0) {
-        RDX_RAISE_ERROR("[{}] Failed to stop video source, ret={}", __func__, ret);
-        return ret;
-    }
-
-    //! Change status to STOPPED
-    _set_status_code(NodeStatusCode::STOPPED);
-
-    //! Stop step thread
-    m_step_running = false;
-    if (m_step_thread != nullptr && m_step_thread->joinable()) {
-        m_step_thread->join();
-    }
 
     //! Stop get model result thread
     m_get_model_result_thread_running = false;
@@ -183,86 +125,50 @@ bool PSGFrameDetSourceSink::get_publish_to_debug_topic() const
     return m_publish_to_debug_topic;
 }
 
-int PSGFrameDetSourceSink::init(std::shared_ptr<InitConfig_t> config,
-                                std::shared_ptr<RuntimeConfig_t> runtime_config)
+int PSGFrameDetSourceSink::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
 {
-    //! Check if already initialized
-    if (m_status_code != NodeStatusCode::BEFORE_INIT) {
-        RDX_RAISE_ERROR("[{}] status must be in BEFORE_INIT, got {}", __func__, NodeStatusCodeToString(m_status_code));
-    }
-
-    //! Create implementation details of this node
-    //! @note this must be called before any other operations
-    m_impl = _create_impl();
-
-    //! apply or update init config
-    update_init_config(config);
-
-    //! apply or update runtime config
-    update_runtime_config(runtime_config);
-
-    //! Change status to STOPPED
-    _set_status_code(NodeStatusCode::STOPPED);
-
-    return 0;
-}
-
-int PSGFrameDetSourceSink::update_init_config(std::shared_ptr<InitConfig_t> config)
-{
-    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "update init config");
-    //! Can only update init config in BEFORE_INIT or STOPPED status
-    if (m_status_code != NodeStatusCode::BEFORE_INIT && m_status_code != NodeStatusCode::STOPPED) {
-        RDX_RAISE_ERROR("[{}] status must be in BEFORE_INIT or STOPPED, got {}", __func__, NodeStatusCodeToString(m_status_code));
-        return -1;
-    }
-
-    //! Store configurations, this must come before other operations
-    m_init_config = config;
+    auto init_config = std::dynamic_pointer_cast<InitConfig_t>(config);
 
     // parse the config into a string and print it
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "parse init config into a string");
     auto config_str = JS::serializeStruct(*config);
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "init config: {}", config_str);
 
+    // create impl
+    m_impl = _create_impl();
+
     //! config must have some downstream
     // RDX_ASSERT_CHECK_TRUE(!config->primary_output_spec.get_downstream_specs().empty(),
     //                       "[{}] init config must have at least one downstream", __func__);
 
     //! Initialize output ports
-    auto primary_output_port = _create_primary_output_port();
+    auto primary_output_port = _create_primary_output_port(*init_config);
     if (!primary_output_port) {
         RDX_RAISE_ERROR("[{}] Failed to create primary output port", __func__);
     }
     m_primary_output_port = primary_output_port;
 
     //! Initialize debug publishers
-    if (m_init_config->create_debug_pub) {
+    if (init_config->create_debug_pub) {
         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
                      "initialize debug publishers, task enqueue topic={}, task drop topic={}",
-                     m_init_config->debug_pub_task_enqueue_name,
-                     m_init_config->debug_pub_task_drop_name);
+                     init_config->debug_pub_task_enqueue_name,
+                     init_config->debug_pub_task_drop_name);
         auto debug_qos = DefaultParams::DebugPublisherQoS;
-        m_pub_task_enqueue.init(this, m_init_config->debug_pub_task_enqueue_name, debug_qos);
-        m_pub_task_drop.init(this, m_init_config->debug_pub_task_drop_name, debug_qos);
+        m_pub_task_enqueue.init(this, init_config->debug_pub_task_enqueue_name, debug_qos);
+        m_pub_task_drop.init(this, init_config->debug_pub_task_drop_name, debug_qos);
     }
 
     return 0;
 }
 
-int PSGFrameDetSourceSink::update_runtime_config(std::shared_ptr<RuntimeConfig_t> config)
+int PSGFrameDetSourceSink::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config)
 {
-    //! cannot be updated in STARTED status
-    if (m_status_code == NodeStatusCode::STARTED) {
-        RDX_RAISE_ERROR("[{}] status must not be in STARTED, got {}", __func__, NodeStatusCodeToString(m_status_code));
-        return -1;
-    }
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(config);
 
     //! parse the config into a string and print it
     auto config_str = JS::serializeStruct(*config);
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "runtime config: {}", config_str);
-
-    //! Store configurations
-    m_runtime_config = config;
 
     //! set callback on request enqueued to resize image if needed
     m_primary_output_port->set_callback_on_request_enqueued([](DeliveryRequest_t &request) {
@@ -270,7 +176,7 @@ int PSGFrameDetSourceSink::update_runtime_config(std::shared_ptr<RuntimeConfig_t
     });
 
     //! set publish to debug topic
-    set_publish_to_debug_topic(config->publish_to_debug_topic);
+    set_publish_to_debug_topic(runtime_config->publish_to_debug_topic);
 
     return 0;
 }
@@ -283,19 +189,15 @@ std::shared_ptr<PSGFrameDetSourceSinkImpl> PSGFrameDetSourceSink::_create_impl()
     return impl;
 }
 
-void PSGFrameDetSourceSink::_set_status_code(int status_code)
-{
-    m_status_code = status_code;
-}
-
 PSGFrameDetSourceSink::DeliveryRequest_t
     PSGFrameDetSourceSink::_create_delivery_request(const SourceData_t &source_data)
 {
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     //! Create delivery request
     DeliveryRequest_t req;
     req.set_source_data(source_data);
-    if (m_runtime_config->frame_request_policy.has_value()) {
-        req.set_delivery_policy(*m_runtime_config->frame_request_policy);
+    if (runtime_config->frame_request_policy.has_value()) {
+        req.set_delivery_policy(*runtime_config->frame_request_policy);
     }
 
     return req;
@@ -303,11 +205,11 @@ PSGFrameDetSourceSink::DeliveryRequest_t
 
 
 std::shared_ptr<PSGFrameDetSourceSink::OutputPort_t>
-    PSGFrameDetSourceSink::_create_primary_output_port()
+    PSGFrameDetSourceSink::_create_primary_output_port(const InitConfig_t &init_config)
 {
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "create primary output port pipeline");
     auto port = std::make_shared<OutputPort_t>(this);
-    auto &port_config = m_init_config->primary_output_spec;
+    auto &port_config = init_config.primary_output_spec;
     // RDX_ASSERT_CHECK_TRUE(!port_config.get_downstream_specs().empty(),
     //                       "[{}] port_config must have at least one downstream", __func__);
     port->init(port_config);
@@ -329,28 +231,12 @@ std::shared_ptr<PSGFrameDetSourceSink::OutputPort_t>
     return port;
 }
 
-
-int PSGFrameDetSourceSink::_declare_all_parameters()
-{
-    auto ret = declare_default_parameters_for_node(this);
-    if (ret != 0) {
-        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                     "Failed to declare default parameters for node, ret={}", ret);
-        return ret;
-    }
-
-    // parse json parameters
-    auto node = this;
-    m_json_parameters = RDX_GET_JSON_PARAM_FROM_NODE(node);
-
-    return 0;
-}
-
 void PSGFrameDetSourceSink::_step()
 {
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     // 从input port pipeline获取数据，创建delivery request，并推送到output port model,
     // 从input port model获取数据，放到detections buffer中去
-    if (m_status_code != NodeStatusCode::STARTED) {
+    if (get_status() != NodeStatusCode::STARTED) {
         return;
     }
 
@@ -369,7 +255,7 @@ void PSGFrameDetSourceSink::_step()
     auto msg_uuid = source_data.get_uuid();
 
     // get qos, controls how to retry and drop frames
-    auto &qos = m_runtime_config->frame_enqueue_policy;
+    auto &qos = runtime_config->frame_enqueue_policy;
     auto max_attempts = qos.get_retry_policy().get_number_of_retry(true).value() + 1;
     auto interval_between_attempts = qos.get_retry_policy().get_wait_time_between_retry(true).value();
     auto drop_frame_strategy = qos.get_drop_strategy();
@@ -467,23 +353,16 @@ int PSGFrameDetSourceSink::_on_deliver_to_downstream_finish(TargetData_t &target
 void PSGFrameDetSourceSink::_get_model_result()
 {
     //! 1. 从buffer中取出model result, 如果buffer为空，则等待
-    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "Start getting model result from buffer");
     PSGFrameDetSourceSinkImpl::OutputModelResult output_model_result;
     m_impl->m_model_result_buffer.pop(output_model_result);
-    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] Got model result from buffer",
-                 boost::uuids::to_string(output_model_result.source_data->get_uuid()));
 
     //! 2. 等待结果
-    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] Waiting for model result future",
-                 boost::uuids::to_string(output_model_result.source_data->get_uuid()));
     auto result = output_model_result.future.get();
-    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] Got model result future",
-                 boost::uuids::to_string(output_model_result.source_data->get_uuid()));
 
     //! 3. 如果结果不为空，则构造output source data，并推送到output port pipeline
     if (result) {
-        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] Model result is valid, constructing message",
-                     boost::uuids::to_string(output_model_result.source_data->get_uuid()));
+        auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
+        auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
         //! 构造string消息
         std_msgs::msg::String msg;
         std::string det_str;
@@ -494,7 +373,7 @@ void PSGFrameDetSourceSink::_get_model_result()
         msg.data = det_str;
 
         //! 通过debug publisher发布
-        if (m_init_config->create_debug_pub) {
+        if (init_config->create_debug_pub) {
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] Publishing detection result: {}",
                          boost::uuids::to_string(output_model_result.source_data->get_uuid()), det_str);
             m_pub_task_enqueue.publish(msg);
@@ -507,7 +386,8 @@ void PSGFrameDetSourceSink::_get_model_result()
 
 int PSGFrameDetSourceSink::_read_frame(SourceData_t &data, std::atomic<int64_t> &frame_number)
 {
-    auto frame_size = m_runtime_config->output_image_size;
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+    auto frame_size = runtime_config->output_image_size;
     if (frame_size.empty()) {
         RDX_RAISE_ERROR("[{}][_read_frame()] output_image_size is not set", this->get_name());
     }

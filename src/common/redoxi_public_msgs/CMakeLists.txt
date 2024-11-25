@@ -33,6 +33,7 @@ rosidl_generate_interfaces(
   "action/ProcessDetections.action"
   "action/ProcessDetectionsByFrame.action"
   "action/ProcessFrame.action"
+  "action/ProcessKeypointsByDets.action"
   DEPENDENCIES
   geometry_msgs
   std_msgs
