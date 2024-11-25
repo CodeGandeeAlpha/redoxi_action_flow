@@ -14,17 +14,22 @@ class Yolo8ModelConfig : public defaults::DefaultKeyValueStore
     using Ptr = std::shared_ptr<Yolo8ModelConfig>;
     using ConstPtr = std::shared_ptr<const Yolo8ModelConfig>;
 
+    struct AcceptableKeys {
+        inline static constexpr auto ModelPath = common_config_keys::ModelPath;
+        inline static constexpr auto DeviceType = common_config_keys::DeviceType;
+        inline static constexpr auto DeviceIndex = common_config_keys::DeviceIndex;
+    };
+
   public:
     Yolo8ModelConfig()
     {
-        namespace cmkeys = common_config_keys;
-        register_key(KeyInfo{cmkeys::ModelPath,
+        register_key(KeyInfo{AcceptableKeys::ModelPath,
                              "string", "The path to the model file"},
                      &m_model_path);
-        register_key(KeyInfo{cmkeys::DeviceType,
+        register_key(KeyInfo{AcceptableKeys::DeviceType,
                              "string", "The type of the device"},
                      &m_device_type);
-        register_key(KeyInfo{cmkeys::DeviceIndex,
+        register_key(KeyInfo{AcceptableKeys::DeviceIndex,
                              "int64", "The index of the device"},
                      &m_device_index);
     }
@@ -70,6 +75,11 @@ class PostprocessorConfig
     // output class selections, if not set, all classes are selected
     // the key is the class id, the value is the class name
     std::optional<std::map<int64_t, std::string>> selected_classes;
+
+    // TODO: add selected_classes with custom type handler
+
+    JS_OBJECT(JS_MEMBER(conf_threshold),
+              JS_MEMBER(iou_threshold));
 };
 
 } // namespace redoxi_works::inference::yolo8
