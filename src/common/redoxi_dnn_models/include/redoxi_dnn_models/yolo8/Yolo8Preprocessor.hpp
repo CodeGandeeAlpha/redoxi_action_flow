@@ -1,29 +1,13 @@
 #pragma once
 
 #include <redoxi_dnn_models/redoxi_dnn_models.hpp>
+#include <redoxi_dnn_models/detection_types.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 #include <opencv2/opencv.hpp>
 
 namespace redoxi_works::inference::yolo8
 {
-
-// information about how the preprocess transforms the original input image to the model input image
-// it selects a region of the source image (full size original image), and then transform that region to the model input image
-struct ImagePreprocessInfo {
-    using List = std::vector<ImagePreprocessInfo>;
-
-    // size of the original input image
-    cv::Size source_image_size;
-
-    // a box in the original input image, enclosing all the content of the model input image
-    cv::Rect roi_in_source_image;
-
-    // size of the model input image
-    cv::Size model_input_image_size;
-
-    // a box in the model input image, enclosing all the content of the original input image
-    cv::Rect roi_in_model_input_image;
-};
+using namespace redoxi_works::inference::detection::types;
 
 class Yolo8PreprocessorConfig
 {

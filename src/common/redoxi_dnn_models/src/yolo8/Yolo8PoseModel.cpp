@@ -10,7 +10,7 @@
 namespace redoxi_works::inference::yolo8
 {
 
-std::vector<Yolo8PoseModel::SingleImageOutput_t>
+det_types::SingleImageOutput::List
     Yolo8PoseModel::get_output_detections(
         InferenceInOutData::Ptr model_inout_data,
         const OutputConfig_t &config) const
@@ -63,10 +63,10 @@ const std::vector<std::pair<int, int>> &
 
 // for a single image
 void PoseModelPostprocessor::postprocess(
-    SingleImageOutput *output_result,
+    det_types::SingleImageOutput *output_result,
     const float *model_output_values_numboxes,
     const std::array<int64_t, 2> &model_output_shape,
-    const ImagePreprocessInfo &preprocess_info) const
+    const det_types::ImagePreprocessInfo &preprocess_info) const
 {
     // model_output_batch_values_numboxes is a pointer to the tensor data,
     // the shape is (num_values, num_boxes), given by model_output_shape

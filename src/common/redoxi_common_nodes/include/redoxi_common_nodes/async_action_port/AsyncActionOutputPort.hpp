@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -12,11 +13,10 @@
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
 // #include <redoxi_common_nodes/image_ports/ImageOutputPortSpec.hpp>
 
-
 namespace redoxi_works
 {
 
-// using TSpec = async_action_image_output_port::ImageOutputPortSpec;
+// using TSpec = image_ports::types::ImageOutputPortSpec;
 
 //! Sends action requests to downstream nodes, asynchronously
 //! Thread safe, can be used in multi thread executor
@@ -99,6 +99,60 @@ class AsyncActionOutputPort : public IStartStopProtocol
         DeliveryTask_t task;
         _create_frame_delivery_task(request, task);
         return m_delivery_task_node->put_data(task);
+    }
+
+    //! Try to push a request to the port with a specific delivery policy
+    //! @return true if success, otherwise false
+    virtual bool push_request(const DeliveryRequest_t &request,
+                              const DeliveryPolicy_t &enqueue_policy)
+    {
+        auto msg_uuid = request.get_source_data().get_uuid();
+        auto msg_uuid_str = UUIDTrait::to_string(msg_uuid);
+
+        auto max_attempts = enqueue_policy.get_retry_policy().get_number_of_retry(true).value() + 1;
+        auto interval_between_attempts = enqueue_policy.get_retry_policy().get_wait_time_between_retry(true).value();
+        auto drop_frame_strategy = enqueue_policy.get_drop_strategy();
+
+        RDX_INFO_DEV(m_parent_node, __func__, false,
+                     "[msg_uuid={}] try to push request in {} attempts, retry interval={}ms",
+                     msg_uuid_str, max_attempts, std::chrono::duration<double, std::milli>(interval_between_attempts).count());
+
+        bool success = false;
+        if (drop_frame_strategy == DropStrategy::NoDrop) {
+            // Keep trying until success if no drop strategy
+            int attempt = 0;
+            while (!try_push_request(request)) {
+                attempt++;
+                RDX_INFO_DEV(m_parent_node, __func__, false,
+                             "[msg_uuid={}] enqueue attempt {}/inf failed, retrying...",
+                             msg_uuid_str, attempt);
+                std::this_thread::sleep_for(interval_between_attempts);
+            }
+            RDX_INFO_DEV(m_parent_node, __func__, false,
+                         "[msg_uuid={}] succeeded after {} enqueue attempts",
+                         msg_uuid_str, attempt + 1);
+            success = true;
+        } else if (drop_frame_strategy == DropStrategy::DropAsNeeded) {
+            // Try up to max attempts if dropping is allowed
+            for (int attempt = 0; attempt < max_attempts; ++attempt) {
+                RDX_INFO_DEV(m_parent_node, __func__, false,
+                             "[msg_uuid={}] enqueue attempt {}/{}",
+                             msg_uuid_str, attempt + 1, max_attempts);
+                if (try_push_request(request)) {
+                    success = true;
+                    RDX_INFO_DEV(m_parent_node, __func__, false,
+                                 "[msg_uuid={}] succeeded after {} enqueueattempts",
+                                 msg_uuid_str, attempt + 1);
+                    break;
+                }
+                // wait for next attempt
+                std::this_thread::sleep_for(interval_between_attempts);
+            }
+        } else {
+            RDX_RAISE_ERROR("[{}] invalid drop strategy, got {}", __func__, int(drop_frame_strategy));
+        }
+
+        return success;
     }
 
     // wait for all requests to be processed

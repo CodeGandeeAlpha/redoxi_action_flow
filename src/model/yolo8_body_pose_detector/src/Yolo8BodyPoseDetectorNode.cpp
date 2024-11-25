@@ -1,15 +1,17 @@
 #include <chrono>
 #include <map>
-#include <yolo8_body_pose_detector/Yolo8BodyPoseDetectorNode.hpp>
-#include <redoxi_common_cpp/ros_utils/common.hpp>
+
 #include <tbb/concurrent_queue.h>
 #include <tbb/task_group.h>
 #include <boost/thread/synchronized_value.hpp>
-#include <boost/uuid/uuid_io.hpp>
-#include <redoxi_public_msgs/msg/detection.hpp>
 #include <geometry_msgs/msg/point.hpp>
 #include <cv_bridge/cv_bridge.hpp>
+
+#include <yolo8_body_pose_detector/Yolo8BodyPoseDetectorNode.hpp>
+#include <redoxi_common_cpp/ros_utils/common.hpp>
+#include <redoxi_public_msgs/msg/detection.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
+#include <redoxi_dnn_models/message_conversion.hpp>
 
 using DetectionMessage_t = redoxi_public_msgs::msg::Detection;
 using PointMessage_t = geometry_msgs::msg::Point;
@@ -73,15 +75,157 @@ int Yolo8BodyPoseDetectorNode::_extract_image(cv::Mat *output,
                                               const std::shared_ptr<ByDetectionRequest::InputSourceData_t> &source_data)
 {
     if (!output) {
-        // nothing to do
+        //! nothing to do
         return 0;
     }
 
-    const auto &frame_msg = source_data->get_goal()->frame;
+    return _extract_image(output, source_data->get_goal()->frame);
+}
 
-    // TODO: only support raw image, implement shared memory image extraction later
+int Yolo8BodyPoseDetectorNode::_extract_image(cv::Mat *output,
+                                              const std::shared_ptr<ByImageRequest::InputSourceData_t> &source_data)
+{
+    if (!output) {
+        //! nothing to do
+        return 0;
+    }
+
+    return _extract_image(output, source_data->get_goal()->frame);
+}
+
+int Yolo8BodyPoseDetectorNode::_extract_image(cv::Mat *output,
+                                              const redoxi_public_msgs::msg::Frame &frame_msg)
+{
+    if (!output) {
+        //! nothing to do
+        return 0;
+    }
+
+    //! TODO: currently only support raw image, implement shared memory image extraction later
     const auto &raw_image = frame_msg.raw_image;
+    if (raw_image.data.empty()) {
+        RDX_RAISE_ERROR("[f={}] Empty image data", __func__);
+    }
     *output = cv_bridge::toCvCopy(raw_image)->image;
+    return 0;
+}
+
+// TODO: test this function
+//! Process image request
+int Yolo8BodyPoseDetectorNode::_process_image_request()
+{
+    using InputDataTrait_t = ByImageRequest::InputPort_t::ActionDataTrait_t;
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+    auto use_blocking_mode = runtime_config->enable_blocking_mode;
+
+    std::shared_ptr<ByImageRequest::InputSourceData_t> input_data;
+    if (use_blocking_mode) {
+        input_data = m_image_request_input_port->pop_source_data();
+    } else {
+        input_data = m_image_request_input_port->try_pop_source_data();
+    }
+    if (!input_data) {
+        //! No data available
+        return 0;
+    }
+
+    // used for logging
+    auto msg_uuid = InputDataTrait_t::get_uuid(*input_data->get_goal());
+    std::string msg_uuid_str = UUIDTrait::to_string(msg_uuid);
+
+    RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Got an image request from input port", msg_uuid_str);
+
+    // got data, wait for goal handle
+    auto goal_handle = input_data->get_goal_handle_future().get();
+    if (!goal_handle) {
+        RDX_RAISE_ERROR("[f={}] Goal handle not found, something unexpected happened", __func__);
+    }
+
+    //! Extract image from input data
+    cv::Mat input_image;
+    {
+        auto ret = _extract_image(&input_image, input_data);
+        if (ret != 0) {
+            RDX_RAISE_ERROR("[f={}] Failed to extract image from input data, error code: {}", __func__, ret);
+        }
+    }
+
+    //! Try to get an inference resource
+    RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Getting an inference resource", msg_uuid_str);
+    InferenceResource_t resource;
+    {
+        auto ret = m_impl->inference_resource_pool.pop(resource);
+        if (ret != 0) {
+            RDX_RAISE_ERROR("[f={}] Failed to get an inference resource, error code: {}", __func__, ret);
+        }
+    }
+
+    // do inference
+    RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Got an inference resource, do inference", msg_uuid_str);
+    DetectionResult_t det_result;
+    auto ret = _do_inference(&det_result, input_image, resource, msg_uuid);
+    {
+        if (ret != 0) {
+            RDX_RAISE_ERROR("[f={}] Failed to do inference, error code: {}", __func__, ret);
+        }
+    }
+
+    // create output action and send it to output port
+    RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Creating output action and sending it to output port", msg_uuid_str);
+    {
+        auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
+        ByImageRequest::OutputSourceData_t o_source;
+        o_source.image = input_image;
+        inference::conversion::to_ros_msg(&o_source.detections, det_result);
+
+        ByImageRequest::OutputRequest_t request;
+        request.set_source_data(o_source);
+
+        const auto &output_enqueue_policy = init_config->image_request_config->output_enqueue_policy;
+        auto pushed_ok = m_image_request_output_port->push_request(request, output_enqueue_policy);
+        if (pushed_ok) {
+            RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Pushed target data to image request output port", msg_uuid_str);
+        } else {
+            RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Failed to push target data to image request output port", msg_uuid_str);
+        }
+    }
+
+    //! Schedule inference task
+    return 0;
+}
+
+int Yolo8BodyPoseDetectorNode::_do_inference(DetectionResult_t *output_result,
+                                             const cv::Mat &input_image,
+                                             const InferenceResource_t &resource,
+                                             std::optional<UUIDType> msg_uuid)
+{
+    // do inference
+    auto model = resource.model;
+    auto inout_data = resource.inout_data;
+    auto config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+
+    std::string msg_uuid_str;
+    if (msg_uuid) {
+        msg_uuid_str = UUIDTrait::to_string(*msg_uuid);
+    }
+
+    // inference
+    RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Doing inference", msg_uuid_str);
+    model->set_input_images(inout_data, {input_image}, RequiredImageEncoding);
+    model->do_inference(inout_data);
+
+    // get result
+    RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Getting inference result", msg_uuid_str);
+    auto output_detections = model->get_output_detections(inout_data,
+                                                          config->model_output_config);
+
+    // DO NOT return the resource here, although we do not need it anymore
+    // if goal reply is slower than inference (although unlikely), we will have a lot of pending reply requests
+    // m_impl->inference_resource_pool.push(inference_resource);
+    if (output_result) {
+        *output_result = output_detections[0];
+    }
+
     return 0;
 }
 

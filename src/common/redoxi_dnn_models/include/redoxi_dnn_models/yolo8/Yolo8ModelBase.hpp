@@ -3,17 +3,19 @@
 #include <redoxi_dnn_models/redoxi_dnn_models.hpp>
 #include <redoxi_inference/redoxi_inference.hpp>
 #include <redoxi_dnn_models/yolo8/Yolo8ModelTypes.hpp>
+#include <redoxi_dnn_models/detection_types.hpp>
 #include <opencv2/opencv.hpp>
 
 namespace redoxi_works::inference::yolo8
 {
+namespace det_types = redoxi_works::inference::detection::types;
 class Yolo8ModelBase : public RedoxiModelInference
 {
   public:
     // output types
-    using Keypoint_t = Keypoint;
-    using DetectedObject_t = DetectedObject;
-    using SingleImageOutput_t = SingleImageOutput;
+    using Keypoint_t = det_types::Keypoint;
+    using DetectedObject_t = det_types::DetectedObject;
+    using SingleImageOutput_t = det_types::SingleImageOutput;
     using InitConfig_t = Yolo8ModelConfig;
     using OutputConfig_t = PostprocessorConfig;
 

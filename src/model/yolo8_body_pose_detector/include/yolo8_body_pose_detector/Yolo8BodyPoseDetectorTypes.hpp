@@ -56,7 +56,10 @@ struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
         std::shared_ptr<InputPort_t::InitConfig_t> input_port_config = std::make_shared<InputPort_t::InitConfig_t>();
         std::shared_ptr<OutputPort_t::InitConfig_t> output_port_config = std::make_shared<OutputPort_t::InitConfig_t>();
 
-        JS_OBJECT(JS_MEMBER(input_port_config), JS_MEMBER(output_port_config));
+        // the delivery policy for the request enqueue request
+        OutputPort_t::DeliveryPolicy_t output_enqueue_policy;
+
+        JS_OBJECT(JS_MEMBER(input_port_config), JS_MEMBER(output_port_config), JS_MEMBER(output_enqueue_policy));
     };
 
     // yolo8 model configurations, different model will work concurrently
