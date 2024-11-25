@@ -3,14 +3,14 @@
 #include <redoxi_common_nodes/redoxi_common_nodes.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionInputPort.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputPort.hpp>
-#include <redoxi_common_nodes/image_ports/AsyncImageInputPort.hpp>
-#include <redoxi_common_nodes/image_ports/AsyncImageOutputPort.hpp>
+// #include <redoxi_common_nodes/image_ports/AsyncImageInputPort.hpp>
+// #include <redoxi_common_nodes/image_ports/AsyncImageOutputPort.hpp>
 #include <tbb/concurrent_queue.h>
 
 namespace redoxi_works::port_handlers
 {
-using InputPortSpecType = redoxi_works::image_ports::types::ImageActionInputPortSpec;
-using OutputPortSpecType = redoxi_works::image_ports::types::ImageActionOutputPortSpec;
+// using InputPortSpecType = redoxi_works::image_ports::types::ImageActionInputPortSpec;
+// using OutputPortSpecType = redoxi_works::image_ports::types::ImageActionOutputPortSpec;
 
 struct PullProcessSendHandlerConfig {
     //! Whether to block the input reading
@@ -20,19 +20,26 @@ struct PullProcessSendHandlerConfig {
     bool block_resource_acquisition = false;
 };
 
+// struct ResourceTokenType {
+// };
+
 template <input_port_types::AsyncActionInputPortSpecConcept InputPortSpecType,
           output_port_types::AsyncActionOutputPortSpecConcept OutputPortSpecType,
           ResourceTokenConcept ResourceTokenType>
 class PullProcessSendHandler
 {
   public:
+    using InitConfig_t = PullProcessSendHandlerConfig;
     using ResourceToken_t = ResourceTokenType;
     using ResourceTokenQueue_t = tbb::concurrent_bounded_queue<ResourceToken_t>;
 
     using InputPortSpec_t = InputPortSpecType;
     using InputPort_t = AsyncActionInputPort<InputPortSpec_t>;
+    using InputAction_t = typename InputPortSpec_t::ActionType_t;
+    using InputActionResult_t = typename InputAction_t::Result;
     using InputSourceData_t = typename InputPort_t::SourceData_t;
     using InputGoalHandle_t = typename InputSourceData_t::GoalHandle_t;
+    using InputActionDataTrait_t = typename InputPortSpec_t::ActionDataTrait_t;
 
     using OutputPortSpec_t = OutputPortSpecType;
     using OutputPort_t = AsyncActionOutputPort<OutputPortSpec_t>;
@@ -41,6 +48,7 @@ class PullProcessSendHandler
     using OutputDeliveryPolicy_t = typename OutputPort_t::DeliveryPolicy_t;
 
     using InputDataProcessCallback_t = std::function<int(OutputRequest_t *output_request,
+                                                         InputActionResult_t *action_result,
                                                          std::shared_ptr<InputSourceData_t> source_data,
                                                          ResourceToken_t &resource_token)>;
 
@@ -80,6 +88,7 @@ class PullProcessSendHandler
             return ProcessResult::NoData;
         }
 
+        // RDX_INFO_DEV(nullptr, __func__, true, "{}", "Trying to get input data");
         // get data from input port
         std::shared_ptr<InputSourceData_t> input_data;
         if (m_config->block_input_reading) {
@@ -88,15 +97,20 @@ class PullProcessSendHandler
             input_data = m_input_port->try_pop_source_data();
         }
         if (!input_data) {
+            // RDX_INFO_DEV(nullptr, __func__, true, "{}", "No input data");
             return ProcessResult::NoData;
         }
 
         // get goal handle
         auto goal_handle = input_data->get_goal_handle_future().get();
         if (!goal_handle) {
+            RDX_INFO_DEV(nullptr, __func__, true, "{}", "Goal handle not found");
             // goal handle is not found, which means the goal is not accepted, should not happen
             return ProcessResult::Error;
         }
+        auto msg_uuid = InputActionDataTrait_t::get_uuid(*input_data->get_goal());
+        auto msg_uuid_str = UUIDTrait::to_string(msg_uuid);
+        RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Got goal handle", msg_uuid_str);
 
         // get resource token
         ResourceToken_t resource_token;
@@ -107,40 +121,54 @@ class PullProcessSendHandler
             got_resource_token = m_resource_token_queue->try_pop(resource_token);
         }
         if (!got_resource_token) {
+            RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] No resource token", msg_uuid_str);
             // notify the user that no resource token is available
             if (on_resource_token_not_available) {
                 on_resource_token_not_available(input_data);
             }
             return ProcessResult::NoResourceToken;
         }
+        RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Got resource token", msg_uuid_str);
 
-        auto release_token = [this](ResourceToken_t &token) {
+
+        auto release_token = [this, msg_uuid_str](ResourceToken_t &token) {
             bool do_release = true;
             if (on_release_resource_token) {
                 do_release = on_release_resource_token(token) == 0;
             }
             if (do_release) {
+                RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Releasing resource token", msg_uuid_str);
                 m_resource_token_queue->push(token);
+            } else {
+                RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] User handled resource token, not releasing it", msg_uuid_str);
             }
         };
 
         // work on the input data
         OutputRequest_t output_request;
+        auto action_result = std::make_shared<InputActionResult_t>();
         if (on_process_input_data) {
-            int process_result = on_process_input_data(&output_request, input_data, resource_token);
+            RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Processing input data", msg_uuid_str);
+            int process_result = on_process_input_data(&output_request,
+                                                       action_result.get(),
+                                                       input_data,
+                                                       resource_token);
             if (process_result != 0) {
+                RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Processing input data failed, releasing resource token", msg_uuid_str);
                 release_token(resource_token);
+                goal_handle->abort(action_result);
                 return ProcessResult::Error;
             }
         }
 
         // notify the user that input data is processed
         if (on_input_data_processed) {
-            on_input_data_processed(output_request);
+            on_input_data_processed(output_request, resource_token);
         }
 
         // send data to output port
         if (m_output_port) {
+            RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Sending data to output port", msg_uuid_str);
             bool sent = false;
             if (m_output_delivery_policy.has_value()) {
                 sent = m_output_port->push_request(output_request, *m_output_delivery_policy);
@@ -148,15 +176,22 @@ class PullProcessSendHandler
                 sent = m_output_port->try_push_request(output_request);
             }
             if (!sent) {
+                RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Failed to send data to output port, releasing resource token", msg_uuid_str);
                 release_token(resource_token);
+                goal_handle->succeed(action_result);
                 return ProcessResult::FailedToSend;
+            } else {
+                RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Sent data to output port", msg_uuid_str);
             }
         }
 
         // ok, return resource token
+        RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Returning resource token", msg_uuid_str);
         release_token(resource_token);
 
         // done
+        RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Done, marking goal as success", msg_uuid_str);
+        goal_handle->succeed(action_result);
         return ProcessResult::Success;
     }
 

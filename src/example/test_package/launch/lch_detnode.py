@@ -33,7 +33,7 @@ det_node_params = {
             {
                 "model_path": fn_model_medium,
                 "device_type": "cuda",
-                "device_index": 0,
+                "device_index": 1,
             },
         ],
         # "detection_request_config": {
@@ -85,7 +85,7 @@ det_node_params = {
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
-        "step_interval": 5000,
+        "step_interval": 2000,
         "enable_blocking_mode": False,
         "model_output_config": {"conf_threshold": 0.25, "iou_threshold": 0.45},
         "enable_visualization": True,
@@ -143,7 +143,7 @@ video_source_params = {
             "drop_strategy": "drop_as_needed",
         },
         "_time_unit": "us(1e-6)",
-        "step_interval": 1000,
+        "step_interval": 5000,
     },
 }
 

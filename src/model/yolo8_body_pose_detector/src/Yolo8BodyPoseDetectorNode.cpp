@@ -12,9 +12,11 @@
 #include <redoxi_public_msgs/msg/detection.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 #include <redoxi_dnn_models/message_conversion.hpp>
+#include <redoxi_common_nodes/port_handlers/PullProcessSendHandler.hpp>
 
 using DetectionMessage_t = redoxi_public_msgs::msg::Detection;
 using PointMessage_t = geometry_msgs::msg::Point;
+
 namespace redoxi_works::model_nodes
 {
 
@@ -127,6 +129,71 @@ int Yolo8BodyPoseDetectorNode::_extract_image(cv::Mat *output,
     return 0;
 }
 
+int Yolo8BodyPoseDetectorNode::_process_image_request_2()
+{
+    using ProcessHandler_t = port_handlers::PullProcessSendHandler<ByImageRequest::InputPort_t::MasterSpec_t,
+                                                                   ByImageRequest::OutputPort_t::MasterSpec_t,
+                                                                   InferenceResource_t>;
+    using InputDataTrait_t = ByImageRequest::InputPort_t::ActionDataTrait_t;
+
+    ProcessHandler_t process_handler;
+    auto config = std::make_shared<ProcessHandler_t::InitConfig_t>();
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+    auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
+
+    config->block_input_reading = runtime_config->enable_blocking_mode;
+    config->block_resource_acquisition = runtime_config->enable_blocking_mode;
+
+    auto enqueue_policy = init_config->image_request_config->output_enqueue_policy;
+    process_handler.init(m_image_request_input_port.get(), m_image_request_output_port.get(),
+                         &m_impl->inference_resource_pool, config, enqueue_policy);
+
+    process_handler.on_process_input_data =
+        [this, init_config, runtime_config](auto *output_request, auto *action_result,
+                                            auto source_data, auto &resource) {
+            // extract image
+            cv::Mat input_image;
+            auto ret_extract_image = _extract_image(&input_image, source_data->get_goal()->frame);
+
+            // do inference
+            DetectionResult_t det_result;
+            if (ret_extract_image == 0) {
+                _do_inference(&det_result, input_image, resource);
+            };
+
+            // create output request
+            ByImageRequest::OutputSourceData_t o_source;
+            o_source.image = input_image;
+            inference::conversion::to_ros_msg(&o_source.detections, det_result);
+
+            ByImageRequest::OutputRequest_t request;
+            request.set_source_data(o_source);
+            request.set_control_signal_code(InputDataTrait_t::get_control_signal_code(*source_data->get_goal()));
+            *output_request = request;
+
+            // publish visualization
+            if (m_impl->pub_visualization && runtime_config->enable_visualization && ret_extract_image == 0) {
+                cv::Mat vis_canvas = input_image.clone();
+                _draw_visualization(vis_canvas, det_result);
+                m_impl->pub_visualization->publish(vis_canvas);
+            }
+
+            // fill the action result, nothing to do
+            (void)action_result;
+            return 0;
+        };
+
+    auto send_result = process_handler.process_and_send();
+    switch (send_result) {
+        case ProcessHandler_t::ProcessResult::Success:
+        case ProcessHandler_t::ProcessResult::NoData:
+        case ProcessHandler_t::ProcessResult::NoResourceToken:
+            return 0;
+        default:
+            return -1;
+    }
+}
+
 //! Process image request
 int Yolo8BodyPoseDetectorNode::_process_image_request()
 {
@@ -229,6 +296,7 @@ int Yolo8BodyPoseDetectorNode::_process_image_request()
 
     // return the resource
     m_impl->inference_resource_pool.push(resource);
+    goal_handle->succeed(std::make_shared<InputAction_t::Result>());
 
     //! Schedule inference task
     return 0;
@@ -525,13 +593,13 @@ void Yolo8BodyPoseDetectorNode::_step()
         tg.run([this]() {
             int task_id;
             m_impl->inference_task_pool.pop(task_id);
-            _process_image_request();
+            _process_image_request_2();
             m_impl->inference_task_pool.push(task_id);
         });
     } else {
         // do it sequentially
         _process_detection_request();
-        _process_image_request();
+        _process_image_request_2();
     }
 }
 
