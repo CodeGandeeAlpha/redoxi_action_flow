@@ -6,13 +6,10 @@
 #include <yolo8_body_pose_detector/yolo8_body_pose_detector.hpp>
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
 #include <redoxi_common_nodes/detection_ports/DetectionActionInputPort.hpp>
+#include <redoxi_common_nodes/detection_ports/DetectionResponseOutputPort.hpp>
+#include <redoxi_common_nodes/image_ports/AsyncImageInputPort.hpp>
 #include <redoxi_dnn_models/yolo8/Yolo8PoseModel.hpp>
 #include <redoxi_common_nodes/base_nodes/StartStopNode.hpp>
-
-namespace redoxi_works::model_nodes
-{
-class Yolo8BodyPoseDetector;
-}
 
 namespace redoxi_works::model_nodes::yolo8_body_pose_detector
 {
@@ -33,20 +30,46 @@ struct InferenceResource {
     int index_in_pool = 0;
 };
 
-using DetectionActionInputPort = detection_ports::DetectionActionInputPort;
+using DetectionRequestInputPort = detection_ports::request_response::DetectionActionInputPort;
+using ImageRequestInputPort = image_ports::AsyncImageInputPort;
+using ImageRequestOutputPort = detection_ports::response_only::DetectionResponseOutputPort;
 
 struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
     virtual ~InitConfig() = default;
     using ModelConfig_t = YoloModelConfig_t;
-    using InputPortConfig_t = DetectionActionInputPort::InitConfig_t;
+
+    //! input/output ports config when you send detection request to this node
+    //! using this type of input, the node will process the detection request and send the result back to you
+    struct DetectionRequestConfig {
+        using InputPort_t = DetectionRequestInputPort;
+        std::shared_ptr<InputPort_t::InitConfig_t> input_port_config = std::make_shared<InputPort_t::InitConfig_t>();
+
+        JS_OBJECT(JS_MEMBER(input_port_config));
+    };
+
+    //! input/output ports config when you send image to this node
+    //! using this type of input, the node will process the image but do not return detection result,
+    //! it will send the result to downstreams
+    struct ImageRequestConfig {
+        using InputPort_t = ImageRequestInputPort;
+        using OutputPort_t = ImageRequestOutputPort;
+        std::shared_ptr<InputPort_t::InitConfig_t> input_port_config = std::make_shared<InputPort_t::InitConfig_t>();
+        std::shared_ptr<OutputPort_t::InitConfig_t> output_port_config = std::make_shared<OutputPort_t::InitConfig_t>();
+
+        JS_OBJECT(JS_MEMBER(input_port_config), JS_MEMBER(output_port_config));
+    };
 
     // yolo8 model configurations, different model will work concurrently
     // if the same model config is pushed multiple times, they are regarded as replicas of the same model
     // and they will share the same model instance but using different inference inout data
-    std::vector<ModelConfig_t::Ptr> model_configs;
+    std::vector<ModelConfig_t::Ptr>
+        model_configs;
 
-    // use shared_ptr because the port asks for it
-    std::shared_ptr<InputPortConfig_t> input_port_config = std::make_shared<InputPortConfig_t>();
+    // detection request config
+    std::optional<DetectionRequestConfig> detection_request_config;
+
+    // image request config
+    std::optional<ImageRequestConfig> image_request_config;
 
     // debug topic
     std::string visualization_topic = "debug/visualization";
@@ -54,7 +77,8 @@ struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
     JS_OBJECT_WITH_SUPER(
         JS_SUPER(common_nodes::StartStopNode::InitConfig_t),
         JS_MEMBER(model_configs),
-        JS_MEMBER(input_port_config),
+        JS_MEMBER(detection_request_config),
+        JS_MEMBER(image_request_config),
         JS_MEMBER(visualization_topic));
 };
 

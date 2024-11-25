@@ -6,47 +6,6 @@
 namespace redoxi_works::common_nodes
 {
 
-// void BaseRosNodeInitConfig::from_parameters(const BaseRosNode *node)
-// {
-//     parse_from_node_parameters(this, node);
-//     // RDX_INFO_DEV(node, __func__, false, "{}", "load init config from node");
-//     // auto &json_params = node->get_json_parameters();
-
-//     // //! Load init config from json parameters if exists
-//     // if (json_params.contains("init_config")) {
-//     //     RDX_INFO_DEV(node, __func__, false, "{}", "found init_config in json parameters");
-
-//     //     std::string json_str = json_params["init_config"].dump();
-//     //     JS::ParseContext context(json_str);
-//     //     auto error = context.parseTo(*this);
-//     //     if (error != JS::Error::NoError) {
-//     //         RDX_RAISE_ERROR("[{}] Error parsing init_config: {}", __func__, context.makeErrorString());
-//     //     }
-//     // }
-
-//     // RDX_INFO_DEV(node, __func__, false, "{}", "init config loaded");
-// }
-
-// void BaseRosNodeRuntimeConfig::from_parameters(const BaseRosNode *node)
-// {
-//     parse_from_node_parameters(this, node);
-//     // RDX_INFO_DEV(node, __func__, false, "{}", "load runtime config from node");
-//     // auto &json_params = node->get_json_parameters();
-
-//     // //! Load runtime config from json parameters if exists
-//     // if (json_params.contains("runtime_config")) {
-//     //     RDX_INFO_DEV(node, __func__, false, "{}", "found runtime_config in json parameters");
-//     //     std::string json_str = json_params["runtime_config"].dump();
-//     //     JS::ParseContext context(json_str);
-//     //     auto error = context.parseTo(*this);
-//     //     if (error != JS::Error::NoError) {
-//     //         RDX_RAISE_ERROR("[{}] Error parsing runtime_config: {}", __func__, context.makeErrorString());
-//     //     }
-//     // }
-
-//     // RDX_INFO_DEV(node, __func__, false, "{}", "runtime config loaded");
-// }
-
 BaseRosNode::BaseRosNode(const std::string &node_name, const rclcpp::NodeOptions &options)
     : rclcpp::Node(node_name, options)
 {
@@ -58,6 +17,22 @@ BaseRosNode::BaseRosNode(const std::string &node_name, const rclcpp::NodeOptions
     // get json parameters
     auto node = this;
     m_json_parameters = RDX_GET_JSON_PARAM_FROM_NODE(node);
+}
+
+std::shared_future<void> BaseRosNode::_async_stop_step_thread()
+{
+    // make sure the step thread cannot proceed anymore
+    m_step_running = false;
+
+    auto promise = std::make_shared<std::promise<void>>();
+    auto future = promise->get_future();
+
+    m_async_task_group.run([promise, this]() {
+        _internal_stop_step_thread();
+        promise->set_value();
+    });
+
+    return future;
 }
 
 int BaseRosNode::set_runtime_config(std::shared_ptr<BaseRosNodeRuntimeConfig> runtime_config)
@@ -148,9 +123,12 @@ void BaseRosNode::_internal_stop_step_thread()
     }
 }
 
-BaseRosNode::~BaseRosNode()
+BaseRosNode::~BaseRosNode() noexcept
 {
     _internal_stop_step_thread();
+
+    // wait for all async tasks to finish
+    m_async_task_group.wait();
 }
 
 } // namespace redoxi_works::common_nodes

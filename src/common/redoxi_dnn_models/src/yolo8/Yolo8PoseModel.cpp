@@ -1,6 +1,4 @@
 #include <pluginlib/class_loader.hpp>
-#include <typeinfo>
-#include <filesystem>
 
 #include <redoxi_dnn_models/yolo8/Yolo8PoseModel.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
@@ -12,7 +10,7 @@
 namespace redoxi_works::inference::yolo8
 {
 
-std::vector<Yolo8PoseModel::SingleImageOutput>
+std::vector<Yolo8PoseModel::SingleImageOutput_t>
     Yolo8PoseModel::get_output_detections(
         InferenceInOutData::Ptr model_inout_data,
         const OutputConfig_t &config) const

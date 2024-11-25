@@ -12,27 +12,31 @@ RandomFrameVideoGenerator::RandomFrameVideoGenerator(const std::string &name, co
 {
 }
 
-int RandomFrameVideoGenerator::update_runtime_config(std::shared_ptr<RedoxiVideoReaderBase::RuntimeConfig_t> config)
+int RandomFrameVideoGenerator::_update_runtime_config(std::shared_ptr<RedoxiVideoReaderBase::BaseRuntimeConfig_t> config)
 {
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(config);
+
     // ensure the output image size is valid, otherwise uses default size
-    if (config->output_image_size.width <= 0 || config->output_image_size.height <= 0) {
+    if (runtime_config->output_image_size.width <= 0 || runtime_config->output_image_size.height <= 0) {
         RCLCPP_WARN(this->get_logger(),
                     "[%s][update_runtime_config()] Invalid output_image_size (%d, %d). Using default size.",
-                    this->get_name(), config->output_image_size.width, config->output_image_size.height);
-        config->output_image_size = RuntimeConfig_t::DEFAULT_FRAME_SIZE;
+                    this->get_name(), runtime_config->output_image_size.width, runtime_config->output_image_size.height);
+        runtime_config->output_image_size = RuntimeConfig_t::DEFAULT_FRAME_SIZE;
     }
 
-    //! Call the base class implementation first
-    int ret = RedoxiVideoReaderBase::update_runtime_config(config);
+    //! Call the base class implementation
+    int ret = RedoxiVideoReaderBase::_update_runtime_config(config);
     if (ret != 0) {
         return ret;
     }
     return 0;
 }
 
-int RandomFrameVideoGenerator::_read_frame(SourceData_t &data, std::atomic<int64_t> &frame_number)
+RandomFrameVideoGenerator::ReadFrameResult
+    RandomFrameVideoGenerator::_read_frame(SourceData_t &data, std::atomic<int64_t> &frame_number)
 {
-    auto frame_size = m_runtime_config->output_image_size;
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+    auto frame_size = runtime_config->output_image_size;
     if (frame_size.empty()) {
         RDX_RAISE_ERROR("[{}][_read_frame()] output_image_size is not set", this->get_name());
     }
@@ -44,9 +48,11 @@ int RandomFrameVideoGenerator::_read_frame(SourceData_t &data, std::atomic<int64
     random_image_with_text(random_frame, frame_size, frame_text);
 
     data.set_image(random_frame);
-    data.set_frame_number(frame_number);
-    frame_number++;
-    return 0;
+    SourceData_t::FrameMetadata_t metadata;
+    metadata.frame_num = _increment_frame_number_by(frame_number, 1);
+    data.set_frame_metadata(metadata);
+
+    return ReadFrameResult::OK;
 }
 
 } // namespace redoxi_works

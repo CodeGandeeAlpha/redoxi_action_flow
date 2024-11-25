@@ -12,8 +12,8 @@ int main(int argc, char **argv)
     auto init_config = std::make_shared<rdx::SimpleActionGenerator::InitConfig_t>();
     auto runtime_config = std::make_shared<rdx::SimpleActionGenerator::RuntimeConfig_t>();
 
-    init_config->from_parameters(node.get());
-    runtime_config->from_parameters(node.get());
+    init_config->parse_from_node_parameters(init_config.get(), node.get());
+    runtime_config->parse_from_node_parameters(runtime_config.get(), node.get());
 
     node->init(init_config, runtime_config);
     node->open();

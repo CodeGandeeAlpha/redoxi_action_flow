@@ -3,8 +3,17 @@ unique_identifier_msgs/UUID x_uid
 Control x_control
 std_msgs/Header header
 
+# this is a logical frame number, not the actual frame number from the video source
+# it usually starts from 0, and increases by 1 for each frame
 # frame number, -1 for empty frame
 int64 frame_num -1
+
+# this records timestamp of the frame in video source
+builtin_interfaces/Time source_timestamp
+
+# this records the frame index in video source
+# -1 for empty value
+int64 source_frame_index -1
 
 # any other data
 AnyData any_data

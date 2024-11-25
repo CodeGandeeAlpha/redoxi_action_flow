@@ -9,8 +9,48 @@ StartStopNode::StartStopNode(const std::string &node_name, const rclcpp::NodeOpt
 {
 }
 
+std::shared_future<int> StartStopNode::_async_stop()
+{
+    auto promise = std::make_shared<std::promise<int>>();
+    auto future = promise->get_future();
+
+    // stop the step thread
+    auto step_thread_future = _async_stop_step_thread();
+
+    // run the task in another thread
+    m_async_task_group.run([promise, this, step_thread_future]() {
+        // wait for the step thread to stop
+        step_thread_future.wait();
+
+        // do normal stop and set the promise
+        promise->set_value(stop());
+    });
+
+    return future;
+}
+
+std::shared_future<int> StartStopNode::_async_start()
+{
+    auto promise = std::make_shared<std::promise<int>>();
+    auto future = promise->get_future();
+
+    // run the task in another thread
+    m_async_task_group.run([promise, this]() {
+        // do normal start and set the promise
+        promise->set_value(start());
+    });
+
+    return future;
+}
+
+
 int StartStopNode::start()
 {
+    //! If already in STARTED state, just return
+    if (m_status == NodeStatusCode::STARTED) {
+        RDX_INFO_DEV(this, __func__, true, "{}", "Node already in STARTED state, skipping");
+        return 0;
+    }
     //! Check state is STOPPED
     if (m_status != NodeStatusCode::STOPPED) {
         RDX_RAISE_ERROR("[f={}] Node cannot be started in state {}", __func__, m_status);
@@ -29,11 +69,16 @@ int StartStopNode::start()
     //! Update state
     set_status(NodeStatusCode::STARTED);
 
-    return 0;
+    return _on_started();
 }
 
 int StartStopNode::stop()
 {
+    //! If already in STOPPED state, just return
+    if (m_status == NodeStatusCode::STOPPED) {
+        RDX_INFO_DEV(this, __func__, true, "{}", "Node already in STOPPED state, skipping");
+        return 0;
+    }
     //! Check state is STARTED
     if (m_status != NodeStatusCode::STARTED) {
         RDX_RAISE_ERROR("[f={}] Node cannot be stopped in state {}", __func__, m_status);
@@ -51,7 +96,7 @@ int StartStopNode::stop()
     //! Update state
     set_status(NodeStatusCode::STOPPED);
 
-    return 0;
+    return _on_stopped();
 }
 
 } // namespace redoxi_works::common_nodes

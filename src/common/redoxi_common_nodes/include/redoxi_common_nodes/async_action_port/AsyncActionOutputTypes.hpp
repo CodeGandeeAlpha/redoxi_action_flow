@@ -75,30 +75,7 @@ static_assert(DeliverySourceDataConcept<_SampleSourceData>,
               "_SampleSourceData must satisfy DeliverySourceDataConcept");
 
 //! Sample action data trait
-struct _SampleActionDataTrait {
-    using ActionType_t = _SampleAction;
-    using Goal_t = typename ActionType_t::Goal;
-    using Result_t = typename ActionType_t::Result;
-    using Feedback_t = typename ActionType_t::Feedback;
-
-    static ControlSignalCode get_control_signal_code(const Goal_t &)
-    {
-        return ControlSignalCode::Normal;
-    }
-
-    static void mark_with_control_signal(Goal_t &, ControlSignalCode)
-    {
-    }
-
-    static boost::uuids::uuid get_uuid(const Goal_t &)
-    {
-        return boost::uuids::uuid();
-    }
-
-    static void set_uuid(Goal_t &, boost::uuids::uuid)
-    {
-    }
-};
+using _SampleActionDataTrait = NoneActionDataTrait<_SampleAction>;
 static_assert(ActionDataTraitConcept<_SampleActionDataTrait>,
               "_SampleActionDataTrait must satisfy ActionDataTraitConcept");
 
@@ -123,7 +100,7 @@ class DefaultRetryPolicy
 
   private: // default fallback values, not visible to the outside
     inline static constexpr int64_t DefaultNumberOfRetry = 3;
-    inline static constexpr DurationType_t DefaultWaitTimeBetweenRetry = std::chrono::milliseconds(10);
+    inline static constexpr DurationType_t DefaultWaitTimeBetweenRetry = std::chrono::milliseconds(5);
     inline static constexpr DurationType_t DefaultWaitTimeRetryResponse = std::chrono::milliseconds(100);
 
   public:
@@ -409,9 +386,10 @@ class DefaultDeliveryRequest
     }
 
     //! Check if this is a ping request
-    virtual bool is_ping_request() const
+    //! @deprecated Use get_control_signal_code() == ControlSignalCode::Ping instead
+    [[deprecated("Use get_control_signal_code() == ControlSignalCode::Ping instead")]] virtual bool is_ping_request() const
     {
-        return m_is_ping;
+        return m_control_signal_code == ControlSignalCode::Ping;
     }
 
     //! Get the delivery policy, nullptr if not set
@@ -434,10 +412,57 @@ class DefaultDeliveryRequest
      * Convert this to a ping request, which is always a no-precondition and can always be dropped.
      * If not so, it will be set. If wait time retry response is not set, it will be set to the default value.
      */
-    virtual void as_ping()
+    //! @deprecated Use set_control_signal_code(ControlSignalCode::Ping) instead
+    [[deprecated("Use set_control_signal_code(ControlSignalCode::Ping) instead")]] virtual void as_ping()
+    {
+        set_control_signal_code(ControlSignalCode::Ping);
+    }
+
+    //! Convert to target data
+    virtual int to_target_data(TargetDataType_t &) const
+    {
+        // we have default implementation here so that static_assert can be used to check all concepts are satisfied
+        throw std::runtime_error("to_target_data() not implemented");
+    }
+
+    //! Get the control signal code
+    virtual ControlSignalCode get_control_signal_code() const
+    {
+        return m_control_signal_code;
+    }
+
+    //! Set the control signal code. Note that if the code is ping, it will be converted to a ping request,
+    //! removing all data in the request.
+    virtual void set_control_signal_code(ControlSignalCode code)
+    {
+        // if ping, convert to ping request
+        if (code == ControlSignalCode::Ping) {
+            _as_ping();
+        } else {
+            m_control_signal_code = code;
+        }
+    }
+
+  protected:
+    //! Source data for the delivery request
+    SourceDataType_t m_source_data;
+
+    //! Stamp data for getting delivery in-progress status
+    StampType_t m_stamp;
+
+    //! The delivery policy
+    std::optional<DeliveryPolicy_t> m_delivery_policy;
+
+    //! Flag indicating if this is a ping request
+    ControlSignalCode m_control_signal_code{ControlSignalCode::Normal};
+
+  private:
+    //! Convert to a ping request, which is always a no-precondition and can always be dropped.
+    //! If not so, it will be set. If wait time retry response is not set, it will be set to the default value.
+    void _as_ping()
     {
         // already a ping request
-        if (m_is_ping) {
+        if (m_control_signal_code == ControlSignalCode::Ping) {
             return;
         }
 
@@ -457,28 +482,8 @@ class DefaultDeliveryRequest
         m_delivery_policy.value().set_drop_strategy(DropStrategy::DropAsNeeded);
 
         // set the ping flag
-        m_is_ping = true;
+        m_control_signal_code = ControlSignalCode::Ping;
     }
-
-    //! Convert to target data
-    virtual int to_target_data(TargetDataType_t &) const
-    {
-        // we have default implementation here so that static_assert can be used to check all concepts are satisfied
-        throw std::runtime_error("to_target_data() not implemented");
-    }
-
-  protected:
-    //! Source data for the delivery request
-    SourceDataType_t m_source_data;
-
-    //! Stamp data for getting delivery in-progress status
-    StampType_t m_stamp;
-
-    //! The delivery policy
-    std::optional<DeliveryPolicy_t> m_delivery_policy;
-
-    //! Flag indicating if this is a ping request
-    bool m_is_ping{false};
 };
 using _SampleDeliveryRequest = DefaultDeliveryRequest<_SampleSourceData, _SampleTargetData, _SampleDeliveryPolicy, DefaultStampData>;
 static_assert(DeliveryRequestConcept<_SampleDeliveryRequest>,

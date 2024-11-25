@@ -14,7 +14,8 @@ find_package(unique_identifier_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 # find_package(rclpy REQUIRED)
 
-rosidl_generate_interfaces(${PROJECT_NAME}
+rosidl_generate_interfaces(
+  ${PROJECT_NAME}
   "msg/AnyData.msg"
   "msg/Box2.msg"
   "msg/CacheData.msg"
@@ -27,13 +28,15 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ReturnResponse.msg"
   "msg/SharedMemoryToken.msg"
   "msg/TrackTarget.msg"
+  "msg/TaskMetadata.msg"
   "action/ProcessBodyPoses.action"
   "action/ProcessDetections.action"
   "action/ProcessDetectionsByFrame.action"
   "action/ProcessFrame.action"
-  "action/ProcessKeypointsByDets.action"
-
-  DEPENDENCIES geometry_msgs std_msgs unique_identifier_msgs sensor_msgs
-)
+  DEPENDENCIES
+  geometry_msgs
+  std_msgs
+  unique_identifier_msgs
+  sensor_msgs)
 
 ament_package()

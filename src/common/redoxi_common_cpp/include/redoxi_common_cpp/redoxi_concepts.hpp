@@ -170,6 +170,49 @@ struct RedoxiActionDataTrait {
     {
         return feedback.x_feedback.message;
     }
+
+    /**
+     * @brief Get the source task id from the goal.
+     * @details Source task is what initiated this action, a single source task may initiate multiple actions
+     *          and the source task uid is used to relate all these actions together.
+     *          Source task id is what you get from ActionDataTrait::get_uuid(source_action.goal), x_uid for redoxi actions
+     * @param goal The goal from which to extract the source task id
+     * @return The source task id as a boost UUID
+     */
+    static boost::uuids::uuid get_source_task_id(const Goal_t &goal)
+    {
+        return to_boost_uuid(goal.x_task_metadata.source_task_uid);
+    }
+
+    /**
+     * @brief Set the source task id in the goal.
+     * @param goal The goal in which to set the source task id
+     * @param source_task_id The source task id to set
+     */
+    static void set_source_task_id(Goal_t &goal, const boost::uuids::uuid &source_task_id)
+    {
+        goal.x_task_metadata.source_task_uid = to_ros_uuid_msg(source_task_id);
+    }
+
+    /**
+     * @brief Get the source task info from the goal.
+     * @param goal The goal from which to extract the source task info
+     * @return The source task info string
+     */
+    static std::string get_source_task_info(const Goal_t &goal)
+    {
+        return goal.x_task_metadata.source_task_info;
+    }
+
+    /**
+     * @brief Set the source task info in the goal.
+     * @param goal The goal in which to set the source task info
+     * @param source_task_info The source task info to set
+     */
+    static void set_source_task_info(Goal_t &goal, const std::string &source_task_info)
+    {
+        goal.x_task_metadata.source_task_info = source_task_info;
+    }
 };
 
 

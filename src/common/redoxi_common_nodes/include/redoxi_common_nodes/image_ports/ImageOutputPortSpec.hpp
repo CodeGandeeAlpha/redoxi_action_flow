@@ -2,6 +2,7 @@
 
 #include <any>
 #include <boost/uuid/uuid_generators.hpp>
+#include <builtin_interfaces/msg/time.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 #include <cv_bridge/cv_bridge.hpp>
@@ -10,13 +11,12 @@
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
+#include <redoxi_public_msgs/msg/frame_metadata.hpp>
 
 
-namespace redoxi_works
+namespace redoxi_works::image_ports::types
 {
 
-namespace async_action_image_output_port
-{
 using TimeUnit = DefaultTimeUnit_t;
 using DeliveryActionType = redoxi_public_msgs::action::ProcessFrame;
 static_assert(RedoxiActionConcept<DeliveryActionType>, "DeliveryActionType must satisfy RedoxiActionConcept");
@@ -45,6 +45,7 @@ class RetryPolicy : public output_port_types::DefaultRetryPolicy<TimeUnit>
 class DeliverySourceData
 {
   public:
+    using FrameMetadata_t = redoxi_public_msgs::msg::FrameMetadata;
     using PublishMessageType_t = sensor_msgs::msg::Image;
     inline static constexpr const char *DefaultEncoding = sensor_msgs::image_encodings::BGR8;
 
@@ -73,6 +74,12 @@ class DeliverySourceData
         return m_image;
     }
 
+    //! Get the image, mutable version
+    virtual cv::Mat &get_image()
+    {
+        return m_image;
+    }
+
     //! Set the image
     virtual void set_image(const cv::Mat &image)
     {
@@ -80,15 +87,27 @@ class DeliverySourceData
     }
 
     //! Get the frame number
-    virtual int64_t get_frame_number() const
+    //! @deprecated Use get_frame_metadata().frame_num instead
+    [[deprecated("Use get_frame_metadata().frame_num instead")]] virtual int64_t get_frame_number() const
     {
-        return m_frame_number;
+        return m_frame_metadata.frame_num;
     }
 
     //! Set the frame number
-    virtual void set_frame_number(int64_t frame_number)
+    //! @deprecated Use set_frame_metadata() instead
+    [[deprecated("Use set_frame_metadata() instead")]] virtual void set_frame_number(int64_t frame_number)
     {
-        m_frame_number = frame_number;
+        m_frame_metadata.frame_num = frame_number;
+    }
+
+    virtual const FrameMetadata_t &get_frame_metadata() const
+    {
+        return m_frame_metadata;
+    }
+
+    virtual void set_frame_metadata(const FrameMetadata_t &frame_metadata)
+    {
+        m_frame_metadata = frame_metadata;
     }
 
     //! Convert the source data to a ROS message for publishing
@@ -120,7 +139,9 @@ class DeliverySourceData
     cv::Mat m_image;
     std::string m_encoding = DefaultEncoding;
     boost::uuids::uuid m_uuid;
-    int64_t m_frame_number = 0;
+
+    // source timestamp and frame index
+    FrameMetadata_t m_frame_metadata;
 };
 
 
@@ -184,7 +205,7 @@ class DeliveryRequest : public DeliveryRequestBase
         cv_bridge_image.image = image;
         cv_bridge_image.encoding = sensor_msgs::image_encodings::BGR8;
         cv_bridge_image.toImageMsg(goal.frame.raw_image);
-        goal.frame.metadata.frame_num = this->m_source_data.get_frame_number();
+        goal.frame.metadata = this->m_source_data.get_frame_metadata();
 
         // set additional information into the goal
         using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
@@ -193,9 +214,10 @@ class DeliveryRequest : public DeliveryRequestBase
         ActionTrait::set_uuid(goal, this->m_source_data.get_uuid());
 
         // set the control signal code
-        if (this->is_ping_request()) {
-            ActionTrait::mark_with_control_signal(goal, ControlSignalCode::Ping);
-        }
+        // if (this->get_control_signal_code() == ControlSignalCode::Ping) {
+        //     ActionTrait::mark_with_control_signal(goal, ControlSignalCode::Ping);
+        // }
+        ActionTrait::mark_with_control_signal(goal, this->get_control_signal_code());
 
         return 0;
     }
@@ -431,6 +453,4 @@ struct ImageOutputPortSpec {
     using Downstream_t = Downstream;
 };
 
-} // namespace async_action_image_output_port
-
-} // namespace redoxi_works
+} // namespace redoxi_works::image_ports::types

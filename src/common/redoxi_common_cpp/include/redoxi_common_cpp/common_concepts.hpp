@@ -43,6 +43,46 @@ enum class ControlSignalCode {
     Unknown = std::numeric_limits<int32_t>::max(), //!< Unknown signal, should be ignored
 };
 
+//! Convert control signal code to string
+inline constexpr const char *control_signal_code_to_string(ControlSignalCode code)
+{
+    switch (code) {
+        case ControlSignalCode::Normal:
+            return "Normal";
+        case ControlSignalCode::Ping:
+            return "Ping";
+        case ControlSignalCode::Flush:
+            return "Flush";
+        case ControlSignalCode::Reset:
+            return "Reset";
+        case ControlSignalCode::Terminate:
+            return "Terminate";
+        case ControlSignalCode::Custom_1:
+            return "Custom_1";
+        case ControlSignalCode::Custom_2:
+            return "Custom_2";
+        case ControlSignalCode::Custom_3:
+            return "Custom_3";
+        case ControlSignalCode::Custom_4:
+            return "Custom_4";
+        case ControlSignalCode::Custom_5:
+            return "Custom_5";
+        case ControlSignalCode::Custom_6:
+            return "Custom_6";
+        case ControlSignalCode::Custom_7:
+            return "Custom_7";
+        case ControlSignalCode::Custom_8:
+            return "Custom_8";
+        case ControlSignalCode::Custom_9:
+            return "Custom_9";
+        case ControlSignalCode::Unknown:
+            return "Unknown";
+        default:
+            return "Invalid";
+    }
+}
+
+
 //! Concept to check if a type is ROS message
 template <typename T>
 concept RosMessageConcept = requires(T t)
@@ -139,6 +179,42 @@ concept ActionDataTraitConcept = requires(T t)
     {
         T::set_uuid(std::declval<typename T::Goal_t &>(), std::declval<boost::uuids::uuid>())
         } -> std::same_as<void>;
+
+    /**
+     * @brief Get the source task ID from the goal
+     * @details A source task is an action that initiates other actions. When an action (the source task)
+     *          spawns multiple other actions, the source task's UUID is stored in each of those actions
+     *          to track their relationship back to the originating task. For Redoxi actions, this ID
+     *          comes from ActionDataTrait::get_uuid(source_action.goal) which is stored in x_uid.
+     */
+    {
+        T::get_source_task_id(std::declval<const typename T::Goal_t &>())
+        } -> std::same_as<boost::uuids::uuid>;
+
+    /**
+     * @brief Get the source task info string from the goal
+     * @details Contains descriptive information about the source task (the action that initiated this action)
+     */
+    {
+        T::get_source_task_info(std::declval<const typename T::Goal_t &>())
+        } -> std::same_as<std::string>;
+
+    /**
+     * @brief Set the source task ID in the goal
+     * @details Sets the UUID of the source task (the action that initiated this action) to enable
+     *          tracking relationships between actions
+     */
+    {
+        T::set_source_task_id(std::declval<typename T::Goal_t &>(), std::declval<const boost::uuids::uuid &>())
+        } -> std::same_as<void>;
+
+    /**
+     * @brief Set the source task info string in the goal
+     * @details Sets descriptive information about the source task (the action that initiated this action)
+     */
+    {
+        T::set_source_task_info(std::declval<typename T::Goal_t &>(), std::declval<const std::string &>())
+        } -> std::same_as<void>;
 };
 template <RosActionConcept ActionType>
 struct NoneActionDataTrait {
@@ -162,6 +238,24 @@ struct NoneActionDataTrait {
     }
 
     static void set_uuid(Goal_t &, const boost::uuids::uuid &)
+    {
+    }
+
+    static boost::uuids::uuid get_source_task_id(const Goal_t &)
+    {
+        return boost::uuids::uuid();
+    }
+
+    static std::string get_source_task_info(const Goal_t &)
+    {
+        return std::string();
+    }
+
+    static void set_source_task_id(Goal_t &, const boost::uuids::uuid &)
+    {
+    }
+
+    static void set_source_task_info(Goal_t &, const std::string &)
     {
     }
 };

@@ -1,0 +1,123 @@
+#include <redoxi_video_reader/VideoSourceFromUrl.hpp>
+#include <redoxi_common_cpp/ros_utils/common.hpp>
+
+namespace redoxi_works::video_readers
+{
+VideoSourceFromUrl::VideoSourceFromUrl(const std::string &name, const rclcpp::NodeOptions &options)
+    : RedoxiVideoReaderBase(name, options)
+{
+}
+
+VideoSourceFromUrl::~VideoSourceFromUrl() noexcept
+{
+}
+
+int VideoSourceFromUrl::_open()
+{
+    // call base implementation first
+    auto ret = RedoxiVideoReaderBase::_open();
+    if (ret != 0) {
+        return ret;
+    }
+
+    // open file
+    auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
+    auto video_capture = std::make_shared<cv::VideoCapture>(init_config->video_url);
+    if (!video_capture->isOpened()) {
+        RDX_INFO_DEV(this, __func__, false, "Failed to open video source from URL: {}", init_config->video_url);
+        return -1;
+    }
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+
+    // seek to start time
+    if (runtime_config->video_start_time > RuntimeConfig_t::TimeUnit_t{0}) {
+        // convert to milliseconds
+        auto start_time_ms = std::chrono::duration<double, std::milli>(runtime_config->video_start_time).count();
+        static_assert(std::is_same_v<decltype(start_time_ms), double>);
+
+        video_capture->set(cv::CAP_PROP_POS_MSEC, start_time_ms);
+    }
+    m_video_capture = video_capture;
+
+    return 0;
+}
+
+int VideoSourceFromUrl::_close()
+{
+    //! Log that we're closing video source
+    RDX_INFO_DEV(this, __func__, false, "{}", "Closing video source");
+
+    //! Call base implementation first
+    auto ret = RedoxiVideoReaderBase::_close();
+    if (ret != 0) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Failed to close base video reader");
+        return ret;
+    }
+
+    //! Close video capture
+    m_video_capture.reset();
+    RDX_INFO_DEV(this, __func__, false, "{}", "Video source closed successfully");
+
+    return 0;
+}
+
+const cv::VideoCapture *VideoSourceFromUrl::get_video_capture() const
+{
+    return m_video_capture.get();
+}
+
+cv::VideoCapture *VideoSourceFromUrl::get_video_capture()
+{
+    return m_video_capture.get();
+}
+
+std::string VideoSourceFromUrl::get_video_url() const
+{
+    auto config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
+    return config->video_url;
+}
+
+void VideoSourceFromUrl::set_video_url(const std::string &video_url)
+{
+    //! Can only set video url in closed state
+    if (get_status() != NodeStatusCode::CLOSED) {
+        RDX_RAISE_ERROR("[{}] Cannot set video url in non-closed state", __func__);
+    }
+    auto config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
+    config->video_url = video_url;
+}
+
+VideoSourceFromUrl::ReadFrameResult VideoSourceFromUrl::_read_frame(SourceData_t &source_data, std::atomic<int64_t> &frame_number)
+{
+    // check if video capture is opened
+    if (m_video_capture == nullptr || !m_video_capture->isOpened()) {
+        return ReadFrameResult::ERROR;
+    }
+
+    // did we reach the user specified end time?
+    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+    if (runtime_config->video_end_time > RuntimeConfig_t::TimeUnit_t{0}) {
+        auto current_time_ms = m_video_capture->get(cv::CAP_PROP_POS_MSEC);
+        auto end_time_ms = std::chrono::duration<double, std::milli>(runtime_config->video_end_time).count();
+        if (current_time_ms > end_time_ms) {
+            return ReadFrameResult::END_OF_VIDEO;
+        }
+    }
+
+    // read frame
+    cv::Mat &frame = source_data.get_image();
+    auto read_ok = m_video_capture->read(frame);
+    if (!read_ok) {
+        return ReadFrameResult::END_OF_VIDEO;
+    }
+
+    // update metedata
+    SourceData_t::FrameMetadata_t metadata;
+    metadata.frame_num = _increment_frame_number_by(frame_number, 1);
+    auto timestamp_ms = m_video_capture->get(cv::CAP_PROP_POS_MSEC);
+    metadata.source_timestamp = ros2_time_msg_from_ms(timestamp_ms);
+    source_data.set_frame_metadata(metadata);
+
+    return ReadFrameResult::OK;
+}
+} // namespace redoxi_works::video_readers

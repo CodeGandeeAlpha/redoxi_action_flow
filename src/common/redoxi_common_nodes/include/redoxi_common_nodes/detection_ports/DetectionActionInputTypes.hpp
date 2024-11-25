@@ -4,7 +4,7 @@
 #include <redoxi_public_msgs/action/process_detections_by_frame.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionInputTypes.hpp>
 
-namespace redoxi_works::detection_ports::input_types
+namespace redoxi_works::detection_ports::request_response::types
 {
 
 using TimeUnit = DefaultTimeUnit_t;
@@ -24,4 +24,4 @@ struct DetectionActionInputPortSpec {
 static_assert(input_port_types::AsyncActionInputPortSpecConcept<DetectionActionInputPortSpec>,
               "DetectionActionInputPortSpec must satisfy AsyncActionInputPortSpecConcept");
 
-} // namespace redoxi_works::detection_ports::input_types
+} // namespace redoxi_works::detection_ports::request_response::types

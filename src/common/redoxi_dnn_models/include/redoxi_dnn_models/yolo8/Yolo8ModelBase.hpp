@@ -11,9 +11,9 @@ class Yolo8ModelBase : public RedoxiModelInference
 {
   public:
     // output types
-    using Keypoint = Keypoint;
-    using DetectedObject = DetectedObject;
-    using SingleImageOutput = SingleImageOutput;
+    using Keypoint_t = Keypoint;
+    using DetectedObject_t = DetectedObject;
+    using SingleImageOutput_t = SingleImageOutput;
     using InitConfig_t = Yolo8ModelConfig;
     using OutputConfig_t = PostprocessorConfig;
 
@@ -41,7 +41,7 @@ class Yolo8ModelBase : public RedoxiModelInference
                                  const std::string &image_format);
 
     // postprocess the model output, and get the detections
-    virtual std::vector<SingleImageOutput> get_output_detections(
+    virtual std::vector<SingleImageOutput_t> get_output_detections(
         InferenceInOutData::Ptr model_inout_data,
         const OutputConfig_t &config) const = 0;
 

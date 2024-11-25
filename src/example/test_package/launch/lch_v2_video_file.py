@@ -14,7 +14,7 @@ log_level_arg = DeclareLaunchArgument(
 
 source_node_json_params = {
     "init_config": {
-        "_time_unit": "us(1e-6)",
+        "video_url": "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4",
         "primary_output_spec": {
             "downstream_specs": [
                 {
@@ -23,11 +23,8 @@ source_node_json_params = {
                     "delivery_policy": {
                         "retry_policy": {
                             "number_of_retry": 5,
-                            "fallback_number_of_retry": 3,
                             "wait_time_between_retry": 10000,
-                            "fallback_wait_time_between_retry": 5000,
                             "wait_time_retry_response": 5000,
-                            "fallback_wait_time_retry_response": 1000000,
                         },
                         "precondition": "dont_care",
                         "drop_strategy": "dont_care",
@@ -43,25 +40,15 @@ source_node_json_params = {
         "debug_pub_queue_size": 10,
         "debug_pub_task_enqueue_name": "debug_port/task_enqueue",
         "debug_pub_task_drop_name": "debug_port/task_drop",
+        "_time_unit": "us(1e-6)",
     },
     "runtime_config": {
-        "_time_unit": "us(1e-6)",
-        "step_interval": 1000,
+        "video_start_time": 0,
+        "video_end_time": -1,
         "frame_interval": 0,
-        "output_image_size": {"width": 640, "height": 480},
-        "output_image_encoding": "bgr8",
-        "publish_to_debug_topic": True,
-        "frame_request_policy": {
-            "retry_policy": {
-                "fallback_number_of_retry": 10,
-                "fallback_wait_time_between_retry": 5000,
-                "fallback_wait_time_retry_response": 1000000,
-            },
-            # "precondition": "any_downstream_ready",
-            "precondition": "dont_care",
-            "drop_strategy": "dont_care",
-            # "drop_strategy": "no_drop",
-        },
+        "output_image_size": {"width": 800, "height": -1},
+        "output_image_encoding": "rgb8",
+        "publish_to_debug_topic": False,
         "frame_enqueue_policy": {
             "retry_policy": {
                 "number_of_retry": 5,
@@ -74,6 +61,8 @@ source_node_json_params = {
             "precondition": "any_downstream_ready",
             "drop_strategy": "drop_as_needed",
         },
+        "_time_unit": "us(1e-6)",
+        "step_interval": 50000,
     },
 }
 
@@ -103,26 +92,9 @@ common_prefix = None
 # common_ros_args = ["--disable-external-lib-logs"]
 common_ros_args = []
 
-simple_action_generator = Node(
-    package="test_package",
-    executable="v2_simple_action",
-    name="simple_action_generator",
-    namespace="simple_action_generator",
-    parameters=[
-        {
-            "param_as_json_string": json.dumps(
-                source_node_json_params, separators=(",", ":")
-            ),
-        },
-    ],
-    prefix=common_prefix,
-    arguments=["--ros-args", "--log-level", ["simple_action_generator:=", logger]]
-    + common_ros_args,
-)
-
 video_source_node = Node(
     package="test_package",
-    executable="v2_random_video_source",
+    executable="test_video_from_url",
     name="video_source",
     namespace="video_source",
     parameters=[
@@ -168,7 +140,6 @@ def generate_launch_description():
         [
             *env_var_settings,
             log_level_arg,
-            # simple_action_generator,
             video_source_node,
             video_sink_node,
         ]
