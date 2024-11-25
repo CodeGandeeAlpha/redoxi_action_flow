@@ -6,6 +6,6 @@
 namespace redoxi_works::image_ports
 {
 
-using AsyncImageOutputPort = AsyncActionOutputPort<types::ImageOutputPortSpec>;
+using AsyncImageOutputPort = AsyncActionOutputPort<types::ImageActionOutputPortSpec>;
 
 } // namespace redoxi_works::image_ports

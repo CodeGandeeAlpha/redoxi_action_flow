@@ -15,7 +15,10 @@ log_level_arg = DeclareLaunchArgument(
 DetectionNodeName = "detector"
 DetectionInputActionName = "in/image_request"
 VideoSourceNodeName = "video_source"
-fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
+fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
+fn_model_medium = (
+    "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8m-pose-dynbatch.onnx"
+)
 fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
 
 det_node_params = {
@@ -23,10 +26,15 @@ det_node_params = {
     "init_config": {
         "model_configs": [
             {
-                "model_path": fn_model,
+                "model_path": fn_model_medium,
                 "device_type": "cuda",
                 "device_index": 0,
-            }
+            },
+            {
+                "model_path": fn_model_medium,
+                "device_type": "cuda",
+                "device_index": 0,
+            },
         ],
         # "detection_request_config": {
         #     "input_port_config": {
@@ -78,7 +86,7 @@ det_node_params = {
     "runtime_config": {
         "_time_unit": "us(1e-6)",
         "step_interval": 5000,
-        "enable_blocking_mode": True,
+        "enable_blocking_mode": False,
         "model_output_config": {"conf_threshold": 0.25, "iou_threshold": 0.45},
         "enable_visualization": True,
     },
@@ -119,7 +127,7 @@ video_source_params = {
         "video_start_time": 0,
         "video_end_time": -1,
         "frame_interval": 0,
-        "output_image_size": {"width": -1, "height": -1},
+        "output_image_size": {"width": 1024, "height": -1},
         "output_image_encoding": "rgb8",
         "publish_to_debug_topic": True,
         "frame_enqueue_policy": {
@@ -150,19 +158,23 @@ detection_node = Node(
     name=DetectionNodeName,
     namespace=DetectionNodeName,
     prefix=common_prefix,
+    output="screen",
     parameters=[
         {
             "param_as_json_string": json.dumps(det_node_params, separators=(",", ":")),
         },
     ],
-    arguments=["--ros-args", "--log-level", ["video_sink:=", logger]] + common_ros_args,
+    arguments=["--ros-args", "--log-level", [f"{DetectionNodeName}:=", logger]]
+    + common_ros_args,
+    # arguments=["--ros-args", "--disable-external-lib-logs"],
 )
 
 video_source_node = Node(
     package="test_package",
     executable="test_video_from_url",
-    name="video_source",
-    namespace="video_source",
+    name=VideoSourceNodeName,
+    namespace=VideoSourceNodeName,
+    output="screen",
     parameters=[
         {
             "param_as_json_string": json.dumps(
@@ -171,6 +183,9 @@ video_source_node = Node(
         },
     ],
     prefix=common_prefix,
+    arguments=["--ros-args", "--log-level", [f"{VideoSourceNodeName}:=", logger]]
+    + common_ros_args,
+    # arguments=["--ros-args", "--disable-external-lib-logs"],
 )
 
 

@@ -401,10 +401,10 @@ class Downstream : public DownstreamBase
 //! Image output port spec
 //! This type must satisfy the AsyncActionOutputPortSpecConcept
 //! Any async output port can use this spec as a template argument
-struct ImageOutputPortSpec {
-    ImageOutputPortSpec()
+struct ImageActionOutputPortSpec {
+    ImageActionOutputPortSpec()
     {
-        static_assert(output_port_types::AsyncActionOutputPortSpecConcept<ImageOutputPortSpec>,
+        static_assert(output_port_types::AsyncActionOutputPortSpecConcept<ImageActionOutputPortSpec>,
                       "ImageOutputPortSpec must satisfy AsyncActionOutputPortSpecConcept");
     }
     //! Action type and related types

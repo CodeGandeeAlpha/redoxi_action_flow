@@ -32,4 +32,16 @@ struct NodeConfigTemplateInitOnly {
 };
 } // namespace redoxi_works
 
+namespace redoxi_works::port_handlers
+{
+//! Resource token concept requires copy constructible and copyable
+template <typename T>
+concept ResourceTokenConcept = requires(T a)
+{
+    T{};
+    requires std::copy_constructible<T>;
+    requires std::copyable<T>;
+};
+} // namespace redoxi_works::port_handlers
+
 #endif // REDOXI_COMMON_NODES__REDOXI_COMMON_NODES_HPP_

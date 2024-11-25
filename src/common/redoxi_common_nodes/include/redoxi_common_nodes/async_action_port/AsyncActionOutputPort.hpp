@@ -763,6 +763,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
             // for no_drop, we need to keep trying until the frame is delivered (return in the loop)
             //! Publish the frame to the debug topic
+            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Publishing frame to debug topic", boost::uuids::to_string(msg_uuid));
             _debug_publish_sending_to_downstream(nullptr, &target_data, ds, attempts + 1, max_attempts);
 
             //! Send the frame to the downstream

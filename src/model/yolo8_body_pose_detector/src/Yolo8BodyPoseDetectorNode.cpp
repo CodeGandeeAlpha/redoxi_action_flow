@@ -19,9 +19,25 @@ namespace redoxi_works::model_nodes
 {
 
 struct Yolo8BodyPoseDetectorNode::Impl {
+    Impl()
+    {
+        int capacity = num_parallel_tasks;
+        inference_task_pool.set_capacity(capacity);
+        for (int i = 0; i < capacity; ++i) {
+            inference_task_pool.push(i);
+        }
+    }
     tbb::task_group inference_task_group;
-    // tbb::concurrent_queue<InferenceResource_t> inference_resources;
+
+    // this limits the number of inference resources, like GPU, NPU
+    // each task must first acquire a resource from this pool, then do inference
     tbb::concurrent_bounded_queue<InferenceResource_t> inference_resource_pool;
+
+    // this limits the number of concurrent inference tasks
+    // each task must first acquire a task id from this pool, then enqueued to wait for inference resource
+    tbb::concurrent_bounded_queue<int> inference_task_pool;
+    int num_parallel_tasks = 4;
+    bool use_parallel_task = false;
 
     // visualization publisher
     std::shared_ptr<StampedImagePub> pub_visualization;
@@ -104,7 +120,8 @@ int Yolo8BodyPoseDetectorNode::_extract_image(cv::Mat *output,
     //! TODO: currently only support raw image, implement shared memory image extraction later
     const auto &raw_image = frame_msg.raw_image;
     if (raw_image.data.empty()) {
-        RDX_RAISE_ERROR("[f={}] Empty image data", __func__);
+        RDX_INFO_DEV(this, __func__, false, "[f={}] Empty image data", __func__);
+        return -1;
     }
     *output = cv_bridge::toCvCopy(raw_image)->image;
     return 0;
@@ -114,7 +131,7 @@ int Yolo8BodyPoseDetectorNode::_extract_image(cv::Mat *output,
 int Yolo8BodyPoseDetectorNode::_process_image_request()
 {
     if (!m_image_request_input_port) {
-        RDX_INFO_DEV(this, __func__, false, "{}", "No image request input port, skipping");
+        // RDX_INFO_DEV(this, __func__, false, "{}", "No image request input port, skipping");
         return 0;
     }
 
@@ -170,7 +187,9 @@ int Yolo8BodyPoseDetectorNode::_process_image_request()
     }
 
     // do inference
-    RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Got an inference resource, do inference", msg_uuid_str);
+    RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Got inference resource {}, doing inference",
+                 msg_uuid_str, resource.index_in_pool);
+
     DetectionResult_t det_result;
     auto ret = _do_inference(&det_result, input_image, resource, msg_uuid);
     {
@@ -382,7 +401,7 @@ void Yolo8BodyPoseDetectorNode::_draw_visualization(cv::Mat &canvas,
 int Yolo8BodyPoseDetectorNode::_process_detection_request()
 {
     if (!m_detection_request_input_port) {
-        RDX_INFO_DEV(this, __func__, false, "{}", "No detection request input port, skipping");
+        // RDX_INFO_DEV(this, __func__, false, "{}", "No detection request input port, skipping");
         return 0;
     }
 
@@ -443,7 +462,8 @@ int Yolo8BodyPoseDetectorNode::_process_detection_request()
     }
 
     // do inference
-    RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Got an inference resource, do inference", msg_uuid_str);
+    RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Got inference resource {}, doing inference",
+                 msg_uuid_str, resource.index_in_pool);
     DetectionResult_t det_result;
     auto ret = _do_inference(&det_result, input_image, resource, msg_uuid);
     {
@@ -488,44 +508,30 @@ void Yolo8BodyPoseDetectorNode::_step()
         return;
     }
 
-    // pop a resource
-    // InferenceResource_t resource;
-    // RDX_INFO_DEV(this, __func__, false, "{}", "Popping an inference resource");
+    auto &tg = m_impl->inference_task_group;
 
-    // bool popped = m_impl->inference_resource_pool.pop(resource);
-    // if (!popped) {
-    //     RDX_INFO_DEV(this, __func__, false, "{}", "No inference resource available, skipping");
-    //     return;
-    // } else {
-    //     RDX_INFO_DEV(this, __func__, false, "got an inference resource, index = {}", resource.index_in_pool);
+    if (m_impl->use_parallel_task) {
+        // detection request can be processed in parallel, because the output is bound to goal handle
+        // and the order does not matter, upstream can use goal handle to maintain order
+        tg.run([this]() {
+            int task_id;
+            m_impl->inference_task_pool.pop(task_id);
+            _process_detection_request();
+            m_impl->inference_task_pool.push(task_id);
+        });
 
-    //     // pop again
-    //     InferenceResource_t resource2;
-    //     bool popped2 = m_impl->inference_resource_pool.pop(resource2);
-    //     if (popped2) {
-    //         RDX_INFO_DEV(this, __func__, false, "got another inference resource, index = {}", resource2.index_in_pool);
-    //         m_impl->inference_resource_pool.push(resource2);
-    //     } else {
-    //         RDX_INFO_DEV(this, __func__, false, "{}", "No inference resource available, skipping");
-    //     }
-    //     // return it
-    //     m_impl->inference_resource_pool.push(resource);
-    //     return;
-    // }
-
-    {
-        RDX_INFO_DEV(this, __func__, false, "{}", "Processing detection request");
-        auto ret = _process_detection_request();
-        if (ret != 0) {
-            RDX_RAISE_ERROR("[f={}] Failed to process detection request, error code: {}", __func__, ret);
-        }
-    }
-    {
-        RDX_INFO_DEV(this, __func__, false, "{}", "Processing image request");
-        auto ret = _process_image_request();
-        if (ret != 0) {
-            RDX_RAISE_ERROR("[f={}] Failed to process image request, error code: {}", __func__, ret);
-        }
+        // FIXME: output order is not guaranteed, downstream must use frame index to maintain order
+        // this can be fixed using task graph, let the processing to be parallel but the output in order
+        tg.run([this]() {
+            int task_id;
+            m_impl->inference_task_pool.pop(task_id);
+            _process_image_request();
+            m_impl->inference_task_pool.push(task_id);
+        });
+    } else {
+        // do it sequentially
+        _process_detection_request();
+        _process_image_request();
     }
 }
 
