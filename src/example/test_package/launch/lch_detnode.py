@@ -24,7 +24,7 @@ det_node_params = {
         "model_configs": [
             {
                 "model_path": fn_model,
-                "device_type": "cpu",
+                "device_type": "cuda",
                 "device_index": 0,
             }
         ],
@@ -77,7 +77,7 @@ det_node_params = {
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
-        "step_interval": 5000000,
+        "step_interval": 5000,
         "enable_blocking_mode": True,
         "model_output_config": {"conf_threshold": 0.25, "iou_threshold": 0.45},
         "enable_visualization": True,
@@ -121,7 +121,7 @@ video_source_params = {
         "frame_interval": 0,
         "output_image_size": {"width": -1, "height": -1},
         "output_image_encoding": "rgb8",
-        "publish_to_debug_topic": False,
+        "publish_to_debug_topic": True,
         "frame_enqueue_policy": {
             "retry_policy": {
                 "number_of_retry": 5,
@@ -135,7 +135,7 @@ video_source_params = {
             "drop_strategy": "drop_as_needed",
         },
         "_time_unit": "us(1e-6)",
-        "step_interval": 1000000,
+        "step_interval": 1000,
     },
 }
 

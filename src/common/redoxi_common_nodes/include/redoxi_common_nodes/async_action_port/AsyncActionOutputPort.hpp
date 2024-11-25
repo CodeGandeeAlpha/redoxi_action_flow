@@ -148,6 +148,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 // wait for next attempt
                 std::this_thread::sleep_for(interval_between_attempts);
             }
+        } else if (drop_frame_strategy == DropStrategy::DontCare) {
+            // just try once, regardless of success or failure
+            RDX_INFO_DEV(m_parent_node, __func__, false,
+                         "[msg_uuid={}] drop strategy is DontCare, just try once",
+                         msg_uuid_str);
+            success = try_push_request(request);
         } else {
             RDX_RAISE_ERROR("[{}] invalid drop strategy, got {}", __func__, int(drop_frame_strategy));
         }

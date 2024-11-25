@@ -161,8 +161,8 @@ int Yolo8BodyPoseDetectorNode::_process_image_request()
     RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Getting an inference resource", msg_uuid_str);
     InferenceResource_t resource;
     {
-        auto ret = m_impl->inference_resource_pool.pop(resource);
-        if (ret != 0) {
+        auto got_resource = m_impl->inference_resource_pool.pop(resource);
+        if (!got_resource) {
             RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Failed to get an inference resource, aborting goal", msg_uuid_str);
             goal_handle->abort(std::make_shared<InputAction_t::Result>());
             return -1;
@@ -177,6 +177,13 @@ int Yolo8BodyPoseDetectorNode::_process_image_request()
         if (ret != 0) {
             RDX_RAISE_ERROR("[f={}] Failed to do inference, error code: {}", __func__, ret);
         }
+    }
+
+    // visualize if enabled
+    if (m_impl->pub_visualization && runtime_config->enable_visualization) {
+        cv::Mat vis_canvas = input_image.clone();
+        _draw_visualization(vis_canvas, det_result);
+        m_impl->pub_visualization->publish(vis_canvas);
     }
 
     // create output action and send it to output port
@@ -200,6 +207,9 @@ int Yolo8BodyPoseDetectorNode::_process_image_request()
     } else {
         RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] No image request output port, skipping", msg_uuid_str);
     }
+
+    // return the resource
+    m_impl->inference_resource_pool.push(resource);
 
     //! Schedule inference task
     return 0;
@@ -424,8 +434,8 @@ int Yolo8BodyPoseDetectorNode::_process_detection_request()
     RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Getting an inference resource", msg_uuid_str);
     InferenceResource_t resource;
     {
-        auto ret = m_impl->inference_resource_pool.pop(resource);
-        if (ret != 0) {
+        auto got_resource = m_impl->inference_resource_pool.pop(resource);
+        if (!got_resource) {
             RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Failed to get an inference resource, aborting goal", msg_uuid_str);
             goal_handle->abort(std::make_shared<InputAction_t::Result>());
             return -1;
@@ -477,6 +487,31 @@ void Yolo8BodyPoseDetectorNode::_step()
     if (m_status != NodeStatusCode::STARTED) {
         return;
     }
+
+    // pop a resource
+    // InferenceResource_t resource;
+    // RDX_INFO_DEV(this, __func__, false, "{}", "Popping an inference resource");
+
+    // bool popped = m_impl->inference_resource_pool.pop(resource);
+    // if (!popped) {
+    //     RDX_INFO_DEV(this, __func__, false, "{}", "No inference resource available, skipping");
+    //     return;
+    // } else {
+    //     RDX_INFO_DEV(this, __func__, false, "got an inference resource, index = {}", resource.index_in_pool);
+
+    //     // pop again
+    //     InferenceResource_t resource2;
+    //     bool popped2 = m_impl->inference_resource_pool.pop(resource2);
+    //     if (popped2) {
+    //         RDX_INFO_DEV(this, __func__, false, "got another inference resource, index = {}", resource2.index_in_pool);
+    //         m_impl->inference_resource_pool.push(resource2);
+    //     } else {
+    //         RDX_INFO_DEV(this, __func__, false, "{}", "No inference resource available, skipping");
+    //     }
+    //     // return it
+    //     m_impl->inference_resource_pool.push(resource);
+    //     return;
+    // }
 
     {
         RDX_INFO_DEV(this, __func__, false, "{}", "Processing detection request");
