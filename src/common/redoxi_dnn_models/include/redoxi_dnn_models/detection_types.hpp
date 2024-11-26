@@ -23,12 +23,16 @@ struct DetectedObject {
     std::array<float, 4> xywh = {0, 0, 0, 0};
     float score = 0;
     std::vector<Keypoint> keypoints;
+
+    // visualization color
+    std::optional<cv::Scalar> vis_color;
 };
 
 // output of the model for a single image
 struct SingleImageOutput {
     using List = std::vector<SingleImageOutput>;
     std::vector<DetectedObject> objects;
+    cv::Size source_image_size;
 };
 
 // information about how the preprocess transforms the original input image to the model input image

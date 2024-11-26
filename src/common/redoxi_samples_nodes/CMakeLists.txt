@@ -11,6 +11,7 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(redoxi_samples_lib REQUIRED)
 find_package(redoxi_video_reader REQUIRED)
 find_package(redoxi_common_nodes REQUIRED)
+find_package(redoxi_dnn_models REQUIRED)
 find_package(Boost REQUIRED COMPONENTS timer)
 find_package(cv_bridge REQUIRED)
 
@@ -43,6 +44,7 @@ ament_target_dependencies(redoxi_samples_nodes PUBLIC
   redoxi_samples_lib
   redoxi_video_reader
   redoxi_common_nodes
+  redoxi_dnn_models
   cv_bridge
 )
 
@@ -74,6 +76,7 @@ ament_export_dependencies(
   redoxi_samples_lib
   redoxi_video_reader
   redoxi_common_nodes
+  redoxi_dnn_models
   cv_bridge
 )
 

@@ -42,6 +42,17 @@ concept ResourceTokenConcept = requires(T a)
     requires std::copy_constructible<T>;
     requires std::copyable<T>;
 };
+
+struct PullProcessSendHandlerConfig {
+    //! Whether to block the input reading
+    bool block_input_reading = false;
+
+    //! Whether to block the resource acquisition
+    bool block_resource_acquisition = false;
+};
+
+struct DummyResourceToken {
+};
 } // namespace redoxi_works::port_handlers
 
 #endif // REDOXI_COMMON_NODES__REDOXI_COMMON_NODES_HPP_
