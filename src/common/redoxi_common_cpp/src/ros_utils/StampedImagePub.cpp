@@ -38,6 +38,17 @@ int StampedImagePub::publish(const sensor_msgs::msg::Image &image_msg,
                              double scale,
                              std::optional<cv::Scalar> background_color)
 {
+    if (!m_pub) {
+        RDX_RAISE_ERROR("Publisher is not initialized in {}", __func__);
+        return -1;
+    }
+
+    //! If image is empty, just publish it without text
+    if (image_msg.data.empty()) {
+        m_pub->publish(image_msg);
+        return 0;
+    }
+
     //! Convert sensor_msgs::msg::Image to cv::Mat
     cv_bridge::CvImageConstPtr cv_ptr;
     try {
@@ -61,6 +72,12 @@ int StampedImagePub::publish(const cv::Mat &image,
     if (!m_pub) {
         RDX_RAISE_ERROR("Publisher is not initialized in {}", __func__);
         return -1;
+    }
+
+    //! If image is empty, just publish it without text
+    if (image.empty()) {
+        m_pub->publish(sensor_msgs::msg::Image());
+        return 0;
     }
 
     cv::Mat stamped_image = image;

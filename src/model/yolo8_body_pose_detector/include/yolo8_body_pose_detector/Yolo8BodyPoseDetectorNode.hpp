@@ -39,6 +39,7 @@ class Yolo8BodyPoseDetectorNode : public redoxi_works::common_nodes::StartStopNo
         using OutputAction_t = typename OutputPort_t::ActionType_t;
         using OutputActionDataTrait_t = typename OutputPort_t::ActionDataTrait_t;
         using OutputSourceData_t = typename OutputPort_t::SourceData_t;
+        using OutputRequest_t = typename OutputPort_t::DeliveryRequest_t;
     };
 
     using InitConfig_t = yolo8_body_pose_detector::InitConfig;
@@ -69,6 +70,7 @@ class Yolo8BodyPoseDetectorNode : public redoxi_works::common_nodes::StartStopNo
 
     int _extract_image(cv::Mat *output, const std::shared_ptr<ByImageRequest::InputSourceData_t> &source_data);
     int _process_image_request();
+    int _process_image_request_2();
 
     //! Draw visualization on canvas
     void _draw_visualization(cv::Mat &canvas,
@@ -88,6 +90,12 @@ class Yolo8BodyPoseDetectorNode : public redoxi_works::common_nodes::StartStopNo
   private:
     struct Impl;
     std::shared_ptr<Impl> m_impl;
+
+    int _extract_image(cv::Mat *output, const redoxi_public_msgs::msg::Frame &frame_msg);
+    int _do_inference(DetectionResult_t *output_result,
+                      const cv::Mat &input_image,
+                      const InferenceResource_t &resource,
+                      std::optional<UUIDType> msg_uuid = std::nullopt);
 };
 
 } // namespace redoxi_works::model_nodes

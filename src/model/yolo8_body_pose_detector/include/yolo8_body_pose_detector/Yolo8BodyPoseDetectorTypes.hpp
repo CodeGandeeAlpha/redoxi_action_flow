@@ -1,5 +1,7 @@
 #pragma once
 
+#define JS_STD_OPTIONAL
+
 #include <optional>
 #include <json_struct/json_struct.h>
 
@@ -34,30 +36,37 @@ using DetectionRequestInputPort = detection_ports::request_response::DetectionAc
 using ImageRequestInputPort = image_ports::AsyncImageInputPort;
 using ImageRequestOutputPort = detection_ports::response_only::DetectionResponseOutputPort;
 
+//! input/output ports config when you send detection request to this node
+//! using this type of input, the node will process the detection request and send the result back to you
+struct DetectionRequestConfig {
+    using InputPort_t = DetectionRequestInputPort;
+    std::shared_ptr<InputPort_t::InitConfig_t> input_port_config = std::make_shared<InputPort_t::InitConfig_t>();
+
+    JS_OBJECT(JS_MEMBER(input_port_config));
+};
+
+//! input/output ports config when you send image to this node
+//! using this type of input, the node will process the image but do not return detection result,
+//! it will send the result to downstreams
+struct ImageRequestConfig {
+    using InputPort_t = ImageRequestInputPort;
+    using OutputPort_t = ImageRequestOutputPort;
+    std::shared_ptr<InputPort_t::InitConfig_t> input_port_config = std::make_shared<InputPort_t::InitConfig_t>();
+    std::shared_ptr<OutputPort_t::InitConfig_t> output_port_config = std::make_shared<OutputPort_t::InitConfig_t>();
+
+    // the delivery policy for the request enqueue request
+    OutputPort_t::DeliveryPolicy_t output_enqueue_policy;
+
+    JS_OBJECT(JS_MEMBER(input_port_config),
+              JS_MEMBER(output_port_config),
+              JS_MEMBER(output_enqueue_policy));
+};
+
 struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
     virtual ~InitConfig() = default;
     using ModelConfig_t = YoloModelConfig_t;
-
-    //! input/output ports config when you send detection request to this node
-    //! using this type of input, the node will process the detection request and send the result back to you
-    struct DetectionRequestConfig {
-        using InputPort_t = DetectionRequestInputPort;
-        std::shared_ptr<InputPort_t::InitConfig_t> input_port_config = std::make_shared<InputPort_t::InitConfig_t>();
-
-        JS_OBJECT(JS_MEMBER(input_port_config));
-    };
-
-    //! input/output ports config when you send image to this node
-    //! using this type of input, the node will process the image but do not return detection result,
-    //! it will send the result to downstreams
-    struct ImageRequestConfig {
-        using InputPort_t = ImageRequestInputPort;
-        using OutputPort_t = ImageRequestOutputPort;
-        std::shared_ptr<InputPort_t::InitConfig_t> input_port_config = std::make_shared<InputPort_t::InitConfig_t>();
-        std::shared_ptr<OutputPort_t::InitConfig_t> output_port_config = std::make_shared<OutputPort_t::InitConfig_t>();
-
-        JS_OBJECT(JS_MEMBER(input_port_config), JS_MEMBER(output_port_config));
-    };
+    using DetectionRequestConfig_t = DetectionRequestConfig;
+    using ImageRequestConfig_t = ImageRequestConfig;
 
     // yolo8 model configurations, different model will work concurrently
     // if the same model config is pushed multiple times, they are regarded as replicas of the same model
@@ -66,10 +75,10 @@ struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
         model_configs;
 
     // detection request config
-    std::optional<DetectionRequestConfig> detection_request_config;
+    std::optional<DetectionRequestConfig_t> detection_request_config;
 
     // image request config
-    std::optional<ImageRequestConfig> image_request_config;
+    std::optional<ImageRequestConfig_t> image_request_config;
 
     // debug topic
     std::string visualization_topic = "debug/visualization";
@@ -98,8 +107,6 @@ struct RuntimeConfig : public common_nodes::StartStopNode::RuntimeConfig_t {
 
     JS_OBJECT_WITH_SUPER(
         JS_SUPER(common_nodes::StartStopNode::RuntimeConfig_t),
-        JS_MEMBER(_time_unit),
-        JS_MEMBER(step_interval),
         JS_MEMBER(enable_blocking_mode),
         JS_MEMBER(model_output_config),
         JS_MEMBER(enable_visualization));

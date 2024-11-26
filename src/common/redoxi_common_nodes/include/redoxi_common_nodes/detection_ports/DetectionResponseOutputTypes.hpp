@@ -48,12 +48,12 @@ class DeliverySourceData
     //! Convert the source data to a ROS message for publishing
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        if (image.empty()) {
+        if (!image.has_value() || image->empty()) {
             // no image to publish
             return -1;
         }
 
-        cv::Mat output_image = image.clone();
+        cv::Mat output_image = image->clone();
 
         //! Draw detections on the image
         for (const auto &detection : detections) {
@@ -81,7 +81,9 @@ class DeliverySourceData
     std::any auxiliary_data;
     boost::uuids::uuid uid;
     std::vector<redoxi_public_msgs::msg::Detection> detections;
-    cv::Mat image;
+
+    // the image is for publish only
+    std::optional<cv::Mat> image;
 };
 
 //! Delivery target data type for detection output port
@@ -144,19 +146,20 @@ class DeliveryRequest : public DeliveryRequestBase
         }
 
         auto &goal = target_data.get_goal();
-        goal.detections = this->m_source_data.detections;
-        target_data.image = this->m_source_data.image;
+        const auto &source_data = this->m_source_data;
+        goal.detections = source_data.detections;
+        if (source_data.image.has_value()) {
+            target_data.image = this->m_source_data.image.value();
+        }
 
         // set additional information into the goal
         using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
 
         // set the source data UUID
-        ActionTrait::set_uuid(goal, this->m_source_data.get_uuid());
+        ActionTrait::set_uuid(goal, source_data.get_uuid());
 
         // set the control signal code
-        if (this->is_ping_request()) {
-            ActionTrait::mark_with_control_signal(goal, ControlSignalCode::Ping);
-        }
+        ActionTrait::mark_with_control_signal(goal, get_control_signal_code());
 
         return 0;
     }

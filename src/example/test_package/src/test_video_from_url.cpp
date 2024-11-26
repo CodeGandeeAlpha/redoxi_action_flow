@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 
 namespace rdx_video = redoxi_works::video_readers;
+namespace rdx = redoxi_works;
 const char *fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4";
 
 void print_jsons();
@@ -21,7 +22,7 @@ int main(int argc, char **argv)
     spdlog::info("Parsing initialization configuration from parameters...");
     auto init_config = std::make_shared<rdx_video::VideoSourceFromUrl::InitConfig_t>();
     init_config->parse_from_node_parameters(init_config.get(), node.get());
-    init_config->video_url = fn_video;
+    // init_config->video_url = fn_video;
 
     //! Set runtime configuration from parameters
     spdlog::info("Parsing runtime configuration from parameters...");
@@ -50,14 +51,11 @@ int main(int argc, char **argv)
 
 void print_jsons()
 {
-    {
-        rdx_video::VideoSourceFromUrl::InitConfig_t config;
-        auto json_string = JS::serializeStruct(config);
-        std::cout << json_string << std::endl;
-    }
-    {
-        rdx_video::VideoSourceFromUrl::RuntimeConfig_t runtime_config;
-        auto json_string = JS::serializeStruct(runtime_config);
-        std::cout << json_string << std::endl;
-    }
+    using InitConfig_t = rdx_video::VideoSourceFromUrl::InitConfig_t;
+    using RuntimeConfig_t = rdx_video::VideoSourceFromUrl::RuntimeConfig_t;
+    using DownstreamSpec_t = rdx_video::VideoSourceFromUrl::DownstreamSpec_t;
+    rdx::NodeConfigTemplate<InitConfig_t, RuntimeConfig_t> node_config;
+    node_config.init_config.primary_output_spec->set_downstream_specs({DownstreamSpec_t()});
+    auto json_string = JS::serializeStruct(node_config);
+    std::cout << json_string << std::endl;
 }

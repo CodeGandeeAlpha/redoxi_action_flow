@@ -113,6 +113,11 @@ class DeliverySourceData
     //! Convert the source data to a ROS message for publishing
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
+        // empty image, skip
+        if (m_image.empty()) {
+            return -1;
+        }
+
         cv_bridge::CvImage cv_image;
         cv_image.image = m_image;
         cv_image.encoding = m_encoding;
@@ -165,8 +170,10 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         auto &raw_image = this->m_goal.frame.raw_image;
         if (!raw_image.data.empty()) {
             msg = raw_image;
+            return 0;
+        } else {
+            return -1;
         }
-        return 0;
     }
 
   public:
@@ -201,10 +208,12 @@ class DeliveryRequest : public DeliveryRequestBase
         auto image = this->m_source_data.get_image();
 
         // convert image to ROS message
-        cv_bridge::CvImage cv_bridge_image;
-        cv_bridge_image.image = image;
-        cv_bridge_image.encoding = sensor_msgs::image_encodings::BGR8;
-        cv_bridge_image.toImageMsg(goal.frame.raw_image);
+        if (!image.empty()) {
+            cv_bridge::CvImage cv_bridge_image;
+            cv_bridge_image.image = image;
+            cv_bridge_image.encoding = sensor_msgs::image_encodings::BGR8;
+            cv_bridge_image.toImageMsg(goal.frame.raw_image);
+        }
         goal.frame.metadata = this->m_source_data.get_frame_metadata();
 
         // set additional information into the goal
@@ -392,10 +401,10 @@ class Downstream : public DownstreamBase
 //! Image output port spec
 //! This type must satisfy the AsyncActionOutputPortSpecConcept
 //! Any async output port can use this spec as a template argument
-struct ImageOutputPortSpec {
-    ImageOutputPortSpec()
+struct ImageActionOutputPortSpec {
+    ImageActionOutputPortSpec()
     {
-        static_assert(output_port_types::AsyncActionOutputPortSpecConcept<ImageOutputPortSpec>,
+        static_assert(output_port_types::AsyncActionOutputPortSpecConcept<ImageActionOutputPortSpec>,
                       "ImageOutputPortSpec must satisfy AsyncActionOutputPortSpecConcept");
     }
     //! Action type and related types
