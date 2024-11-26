@@ -3,6 +3,7 @@
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 #include <json_struct/json_struct.h>
+#include <PassengerFlow/utils/util_functions.h>
 
 #define PRINT_THREAD_ID_IN_LOG (true)
 
@@ -13,8 +14,12 @@ struct PSGPersonGeneratorImpl {
     //! ros time token
     std::shared_ptr<RosTimeToken> m_ros_time_token;
 
-    // PASSENGERFLOW person extractor
-    PassengerFlow::PersonExtractor m_person_extractor;
+    //! person extractor
+    std::vector<PassengerFlow::PersonPtr> _extract_persons(const std::vector<PassengerFlow::DetectionPtr> &heads,
+                                                           const std::vector<PassengerFlow::DetectionPtr> &body_dets,
+                                                           const std::vector<PassengerFlow::DetectionPtr> &face_dets,
+                                                           const std::vector<std::map<PassengerFlow::KeyPointSemanticType, PassengerFlow::Keypoint>>
+                                                               &body_keypoints);
 };
 
 PSGPersonGenerator::PSGPersonGenerator(const std::string &name, const rclcpp::NodeOptions &options)
@@ -231,14 +236,26 @@ void PSGPersonGenerator::_step()
         psg_private_msgs::msg::PsgDocument document_msg;
         document_msg = document_in_data->m_goal->document;
 
-        std::vector<PassengerFlow::DetectionPtr> v_all_detections;
+        std::vector<PassengerFlow::DetectionPtr> v_heads, v_bodies, v_faces;
+        std::vector<std::map<PassengerFlow::KeyPointSemanticType, PassengerFlow::Keypoint>> v_body_keypoints;
+        // msg Detection {0: body, 1: head, 2: face}
         for (auto &msg_det : document_msg.detections) {
-            PassengerFlow::DetectionPtr det = std::make_shared<PassengerFlow::Detection>();
-            FlowRos2Pipeline::convert_msg_to_detection(msg_det, det);
-            v_all_detections.push_back(det);
+            if (msg_det.category == 0) {
+                v_bodies.push_back(std::make_shared<PassengerFlow::Detection>());
+                FlowRos2Pipeline::convert_msg_to_detection(msg_det, v_bodies.back());
+                v_body_keypoints.push_back(std::map<PassengerFlow::KeyPointSemanticType, PassengerFlow::Keypoint>());
+                FlowRos2Pipeline::convert_msg_to_keypoints(msg_det.keypoints, v_body_keypoints.back());
+            } else if (msg_det.category == 1) {
+                v_heads.push_back(std::make_shared<PassengerFlow::Detection>());
+                FlowRos2Pipeline::convert_msg_to_detection(msg_det, v_heads.back());
+            } else if (msg_det.category == 2) {
+                v_faces.push_back(std::make_shared<PassengerFlow::Detection>());
+                FlowRos2Pipeline::convert_msg_to_detection(msg_det, v_faces.back());
+            }
         }
+
         // extract person
-        auto v_persons = m_impl->m_person_extractor.extract_persons(v_all_detections);
+        auto v_persons = m_impl->_extract_persons(v_heads, v_bodies, v_faces, v_body_keypoints);
 
         // convert to msg
         for (auto &person : v_persons) {
@@ -263,35 +280,7 @@ void PSGPersonGenerator::_step()
 
         // get qos, controls how to retry and drop frames
         auto &qos = runtime_config->frame_enqueue_policy;
-        auto max_attempts = qos.get_retry_policy().get_number_of_retry(true).value() + 1;
-        auto interval_between_attempts = qos.get_retry_policy().get_wait_time_between_retry(true).value();
-        auto drop_frame_strategy = qos.get_drop_strategy();
-
-        // start pushing request to output port
-        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                     "try to push request in {} attempts, retry interval={}ms",
-                     max_attempts, interval_between_attempts.count());
-
-        bool success = false;
-        if (drop_frame_strategy == DropStrategy::NoDrop) {
-            // Keep trying until success if no drop strategy
-            while (!m_primary_output_port->try_push_request(delivery_request)) {
-                std::this_thread::sleep_for(interval_between_attempts);
-            }
-            success = true;
-        } else if (drop_frame_strategy == DropStrategy::DropAsNeeded) {
-            // Try up to max attempts if dropping is allowed
-            for (int attempt = 0; attempt < max_attempts; ++attempt) {
-                if (m_primary_output_port->try_push_request(delivery_request)) {
-                    success = true;
-                    break;
-                }
-                // wait for next attempt
-                std::this_thread::sleep_for(interval_between_attempts);
-            }
-        } else {
-            RDX_RAISE_ERROR("[{}] invalid drop strategy, got {}", __func__, int(drop_frame_strategy));
-        }
+        bool success = m_primary_output_port->push_request(delivery_request, qos);
 
         if (success) {
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
@@ -309,5 +298,84 @@ void PSGPersonGenerator::_step()
     }
 }
 
+// body_keypoints is same order as bodies, one to one, no missing
+std::vector<PassengerFlow::PersonPtr> PSGPersonGeneratorImpl::_extract_persons(const std::vector<PassengerFlow::DetectionPtr> &heads,
+                                                                               const std::vector<PassengerFlow::DetectionPtr> &bodies,
+                                                                               const std::vector<PassengerFlow::DetectionPtr> &faces,
+                                                                               const std::vector<std::map<PassengerFlow::KeyPointSemanticType, PassengerFlow::Keypoint>>
+                                                                                   &body_keypoints)
+{
+    std::vector<std::pair<int, int>> matched_body_head, matched_head_face;
+    std::vector<int> unmatched_body, unmatched_face, unmatched_head_without_face, unmatched_head_without_body;
+    PassengerFlow::body_head_match(bodies, heads, &matched_body_head, &unmatched_body, &unmatched_head_without_body);
+    PassengerFlow::head_face_match(heads, faces, &matched_head_face, &unmatched_head_without_face, &unmatched_face);
+
+    std::vector<PassengerFlow::PersonPtr> output_persons;
+
+    std::vector<int> used_head_index;
+    // create body-head-face or body-head-null
+    for (auto body_head_pair : matched_body_head) {
+        PassengerFlow::PersonPtr temp_person = std::make_shared<PassengerFlow::Person>();
+        PassengerFlow::DetectionPtr temp_face = nullptr;
+        for (auto head_face_pair : matched_head_face) {
+            if (body_head_pair.second == head_face_pair.first) {
+                temp_face = faces[head_face_pair.second];
+                break;
+            }
+        }
+        temp_person->init(heads[body_head_pair.second],
+                          temp_face,
+                          bodies[body_head_pair.first]);
+        // 如果有body,则添加对应的keypoints
+        temp_person->set_keypoints(body_keypoints[body_head_pair.first]);
+        output_persons.push_back(temp_person);
+    }
+
+    // create head-face
+    for (auto head_face_pair : matched_head_face) {
+        PassengerFlow::PersonPtr temp_person = std::make_shared<PassengerFlow::Person>();
+        bool only_head_face = true;
+        for (auto body_head_pair : matched_body_head) {
+            if (body_head_pair.second == head_face_pair.first) {
+                only_head_face = false;
+                break;
+            }
+        }
+        if (only_head_face) {
+            temp_person->init(heads[head_face_pair.first], faces[head_face_pair.second], nullptr);
+            output_persons.push_back(temp_person);
+        }
+    }
+
+    // create only body
+    for (auto unmatched_body_index : unmatched_body) {
+        PassengerFlow::PersonPtr temp_person = std::make_shared<PassengerFlow::Person>();
+        temp_person->init(nullptr, nullptr, bodies[unmatched_body_index]);
+        // 如果有body,则添加对应的keypoints
+        temp_person->set_keypoints(body_keypoints[unmatched_body_index]);
+        output_persons.push_back(temp_person);
+    }
+    // create only head
+    std::vector<int> unmatched_head;
+    std::sort(unmatched_head_without_body.begin(), unmatched_head_without_body.end());
+    std::sort(unmatched_head_without_face.begin(), unmatched_head_without_face.end());
+    std::set_intersection(unmatched_head_without_body.begin(), unmatched_head_without_body.end(),
+                          unmatched_head_without_face.begin(), unmatched_head_without_face.end(),
+                          back_inserter(unmatched_head));
+    for (auto unmatched_head_index : unmatched_head) {
+        PassengerFlow::PersonPtr temp_person = std::make_shared<PassengerFlow::Person>();
+        temp_person->init(heads[unmatched_head_index], nullptr, nullptr);
+        output_persons.push_back(temp_person);
+    }
+    // create only face
+    for (auto unmatched_face_index : unmatched_face) {
+        PassengerFlow::PersonPtr temp_person = std::make_shared<PassengerFlow::Person>();
+        temp_person->init(nullptr, faces[unmatched_face_index], nullptr);
+        output_persons.push_back(temp_person);
+    }
+
+
+    return output_persons;
+}
 
 } // namespace redoxi_works

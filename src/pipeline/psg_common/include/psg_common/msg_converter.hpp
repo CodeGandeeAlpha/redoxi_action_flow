@@ -35,4 +35,6 @@ void convert_event_to_msg(const PassengerFlow::TrajectoryEvent &event, psg_priva
 
 // void convert_events_to_msg(const std::vector<PassengerFlow::TrajectoryEvent> &events, psg_private_msgs::msg::TrajectoryEvents &msg);
 // void convert_msg_to_events(const psg_private_msgs::msg::TrajectoryEvents& msg, std::vector<PassengerFlow::TrajectoryEvent>& events);
+
+void convert_msg_to_keypoints(const redoxi_public_msgs::msg::Keypoints &msg, std::map<PassengerFlow::KeyPointSemanticType, PassengerFlow::Keypoint> &keypoints);
 } // namespace FlowRos2Pipeline

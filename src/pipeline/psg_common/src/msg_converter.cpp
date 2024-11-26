@@ -289,4 +289,17 @@ void convert_event_to_msg(const PassengerFlow::TrajectoryEvent &event, psg_priva
 //         msg.trajectory_events.push_back(msg_traj_event);
 //     }
 // }
+
+void convert_msg_to_keypoints(const redoxi_public_msgs::msg::Keypoints &msg, std::map<PassengerFlow::KeyPointSemanticType, PassengerFlow::Keypoint> &keypoints)
+{
+    for (size_t i = 0; i < msg.confidence.size(); i++) {
+        PassengerFlow::KeyPointSemanticType pt_type = msg.semantic_type[i];
+        PassengerFlow::Keypoint kpt;
+        kpt.m_confidence = msg.confidence[i];
+        auto &pt = msg.keypoints_2[i];
+        kpt.m_point.x = pt.x;
+        kpt.m_point.y = pt.y;
+        keypoints[pt_type] = kpt;
+    }
+}
 } // namespace FlowRos2Pipeline
