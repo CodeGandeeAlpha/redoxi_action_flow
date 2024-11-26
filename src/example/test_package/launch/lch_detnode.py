@@ -143,7 +143,7 @@ video_source_params = {
             "drop_strategy": "drop_as_needed",
         },
         "_time_unit": "us(1e-6)",
-        "step_interval": 5000,
+        "step_interval": 10000,
     },
 }
 
