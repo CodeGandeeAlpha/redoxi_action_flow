@@ -113,6 +113,11 @@ int PSGMasterNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
     }
     m_primary_output_port = primary_output_port;
 
+    //! Create and initialize input port
+    RDX_INFO_DEV(this, __func__, false, "{}", "Creating input port");
+    m_input_port = std::make_shared<InputPort_t>(this);
+    m_input_port->init(init_config->input_port_config);
+
     //! Initialize debug publishers
     if (init_config->create_debug_pub) {
         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
