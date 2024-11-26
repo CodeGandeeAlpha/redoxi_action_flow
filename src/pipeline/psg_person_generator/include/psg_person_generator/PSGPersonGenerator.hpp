@@ -86,6 +86,9 @@ class PSGPersonGenerator : public common_nodes::StartStopNode
     //! @note this must be called before any other operations, so it cannot access any member variables
     virtual std::shared_ptr<PSGPersonGeneratorImpl> _create_impl();
 
+    //! create debug image
+    virtual sensor_msgs::msg::Image _create_debug_image(const psg_private_msgs::msg::PsgDocument &document);
+
   protected:
     // input port
     std::shared_ptr<InputPort_t> m_input_port;

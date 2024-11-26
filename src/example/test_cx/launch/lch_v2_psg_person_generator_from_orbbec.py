@@ -205,7 +205,7 @@ psg_person_generator_node_json_params = {
             "preserve_request_order": True,
             "fallback_delivery_precondition": "any_downstream_ready",
         },
-        "create_debug_pub": False,
+        "create_debug_pub": True,
         "_time_unit": "us(1e-6)",
         "enable_blocking_mode": False,
     },

@@ -218,6 +218,7 @@ void PSGPersonGenerator::_step()
     // get input document msg
     if (m_impl->m_ros_time_token->try_pop_token()) {
         auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+        auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
 
         std::shared_ptr<InputSourceData_t> document_in_data;
         if (runtime_config->enable_blocking_mode) {
@@ -286,6 +287,10 @@ void PSGPersonGenerator::_step()
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
                          "[msg_uuid={}] success to push request",
                          boost::uuids::to_string(msg_uuid));
+            if (init_config->create_debug_pub) {
+                auto debug_image = _create_debug_image(document_msg);
+                m_pub_task_enqueue.publish(debug_image, "");
+            }
         } else {
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
                          "[msg_uuid={}] failed to push request",
@@ -376,6 +381,136 @@ std::vector<PassengerFlow::PersonPtr> PSGPersonGeneratorImpl::_extract_persons(c
 
 
     return output_persons;
+}
+
+//! 将document中的raw image转换为带有检测框和body keypoints的debug image
+sensor_msgs::msg::Image PSGPersonGenerator::_create_debug_image(const psg_private_msgs::msg::PsgDocument &document)
+{
+    //! 转换raw image到cv::Mat
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换raw image到cv::Mat", 0);
+    cv::Mat cv_image;
+    try {
+        cv_image = cv_bridge::toCvCopy(document.frame.raw_image, sensor_msgs::image_encodings::BGR8)->image;
+        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "成功转换raw image, 大小: {}x{}", cv_image.cols, cv_image.rows);
+    } catch (const cv_bridge::Exception &e) {
+        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID_IN_LOG, "cv_bridge转换失败: {}", e.what());
+        return sensor_msgs::msg::Image(); // 返回空图像
+    }
+
+    //! 在图像上画person相关的框和keypoints
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始在图像上绘制person相关的框和keypoints, 共{}个person", document.persons.size());
+    for (const auto &person : document.persons) {
+        //! 随机生成颜色
+        cv::Scalar color = cv::Scalar(rand() % 256, rand() % 256, rand() % 256);
+
+        //! 获取body bbox坐标
+        if (person.body.category == 0) {
+            int x = static_cast<int>(person.body.bbox.x);
+            int y = static_cast<int>(person.body.bbox.y);
+            int width = static_cast<int>(person.body.bbox.width);
+            int height = static_cast<int>(person.body.bbox.height);
+
+            //! 画body bbox
+            cv::rectangle(cv_image,
+                          cv::Point(x, y),
+                          cv::Point(x + width, y + height),
+                          color, 2);
+        }
+
+        //! 画body keypoints
+        const auto &keypoints = person.body.keypoints;
+
+        //! 在访问数组或指针前添加检查
+        if (!keypoints.keypoints_2.empty() && !keypoints.confidence.empty()) {
+            //! 画出17个关键点
+            for (size_t i = 0; i < keypoints.keypoints_2.size(); i++) {
+                if (keypoints.confidence[i] > 0.3) { // 只画置信度大于0.3的点
+                    //! 记录关键点的位置和置信度
+                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                                  "绘制关键点[{}] - 位置:[{}, {}], 置信度:{}",
+                                  i, keypoints.keypoints_2[i].x, keypoints.keypoints_2[i].y, keypoints.confidence[i]);
+                    cv::circle(cv_image,
+                               cv::Point(keypoints.keypoints_2[i].x, keypoints.keypoints_2[i].y),
+                               3, color, -1);
+                }
+            }
+
+            //! 画出骨架连接
+            //! COCO数据集的17个关键点连接对
+            const std::vector<std::pair<int, int>> skeleton = {
+                {5, 7}, {7, 9}, {6, 8}, {8, 10}, // 手臂
+                {11, 13},
+                {13, 15},
+                {12, 14},
+                {14, 16}, // 腿
+                {5, 6},
+                {5, 11},
+                {6, 12},  // 躯干
+                {11, 12}, // 臀部
+                {1, 2},
+                {1, 3},
+                {2, 4},
+                {3, 5},
+                {4, 6} // 头部和肩膀
+            };
+
+            for (const auto &bone : skeleton) {
+                if (keypoints.confidence[bone.first] > 0.3 && keypoints.confidence[bone.second] > 0.3) {
+                    //! 记录骨架连接的起点和终点
+                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                                  "绘制骨架连接 - 从关键点[{},{}]到关键点[{},{}]",
+                                  keypoints.keypoints_2[bone.first].x, keypoints.keypoints_2[bone.first].y,
+                                  keypoints.keypoints_2[bone.second].x, keypoints.keypoints_2[bone.second].y);
+                    cv::line(cv_image,
+                             cv::Point(keypoints.keypoints_2[bone.first].x, keypoints.keypoints_2[bone.first].y),
+                             cv::Point(keypoints.keypoints_2[bone.second].x, keypoints.keypoints_2[bone.second].y),
+                             color, 2);
+                }
+            }
+        }
+
+        //! 画head bbox
+        if (person.head.category == 1) {
+            int x = static_cast<int>(person.head.bbox.x);
+            int y = static_cast<int>(person.head.bbox.y);
+            int width = static_cast<int>(person.head.bbox.width);
+            int height = static_cast<int>(person.head.bbox.height);
+
+            //! 画head bbox
+            cv::rectangle(cv_image,
+                          cv::Point(x, y),
+                          cv::Point(x + width, y + height),
+                          color, 2);
+        }
+
+        //! 画face bbox
+        if (person.face.category == 2) {
+            int x = static_cast<int>(person.face.bbox.x);
+            int y = static_cast<int>(person.face.bbox.y);
+            int width = static_cast<int>(person.face.bbox.width);
+            int height = static_cast<int>(person.face.bbox.height);
+
+            //! 画face bbox
+            cv::rectangle(cv_image,
+                          cv::Point(x, y),
+                          cv::Point(x + width, y + height),
+                          color, 2);
+        }
+    }
+
+    //! 转回sensor_msgs/Image
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换回sensor_msgs/Image", 0);
+    sensor_msgs::msg::Image debug_image;
+    debug_image.header = document.frame.raw_image.header;
+    debug_image.height = cv_image.rows;
+    debug_image.width = cv_image.cols;
+    debug_image.encoding = "bgr8";
+    debug_image.is_bigendian = false;
+    debug_image.step = cv_image.cols * 3;
+    debug_image.data.assign(cv_image.data, cv_image.data + cv_image.total() * cv_image.elemSize());
+
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "完成debug图像创建, 大小: {}x{}", debug_image.width, debug_image.height);
+    return debug_image;
 }
 
 } // namespace redoxi_works
