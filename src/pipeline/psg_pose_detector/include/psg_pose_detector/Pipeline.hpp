@@ -120,11 +120,15 @@ class PSGPoseDetectorNode : public common_nodes::StartStopNode
     virtual int _on_delivery_task_begin(TargetDataPipeline_t &target_data,
                                         const DeliveryRequestPipeline_t &request)
     {
+        (void)target_data;
+        (void)request;
         return 0;
     }
     virtual int _on_delivery_task_begin(TargetDataModel_t &target_data,
                                         const DeliveryRequestModel_t &request)
     {
+        (void)target_data;
+        (void)request;
         return 0;
     }
 
@@ -133,12 +137,18 @@ class PSGPoseDetectorNode : public common_nodes::StartStopNode
                                          const DeliveryRequestPipeline_t &request,
                                          const DeliveryResultPipeline_t &result)
     {
+        (void)target_data;
+        (void)request;
+        (void)result;
         return 0;
     }
     virtual int _on_delivery_task_finish(TargetDataModel_t &target_data,
                                          const DeliveryRequestModel_t &request,
                                          const DeliveryResultModel_t &result)
     {
+        (void)target_data;
+        (void)request;
+        (void)result;
         return 0;
     }
 
@@ -148,6 +158,10 @@ class PSGPoseDetectorNode : public common_nodes::StartStopNode
                                                  const DeliveryRequestPipeline_t &request,
                                                  const DownstreamPipeline_t &ds)
     {
+        (void)target_data;
+        (void)result;
+        (void)request;
+        (void)ds;
         return 0;
     }
     virtual int _on_deliver_to_downstream_finish(TargetDataModel_t &target_data,
