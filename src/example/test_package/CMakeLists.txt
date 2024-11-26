@@ -67,6 +67,7 @@ option(BUILD_ONNX_YOLO8POSE "Build onnx_yolo8pose target" OFF)
 option(BUILD_ONNX_YOLO8DET "Build onnx_yolo8det target" OFF)
 option(BUILD_TEST_YOLO_DETECTOR_NODE "Build test_yolo_detector_node target" ON)
 option(BUILD_TEST_VIDEO_FROM_URL "Build test_video_from_url target" ON)
+option(BUILD_TEST_DETECTION_RELAY_NODE "Build test_detection_relay_node target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -90,6 +91,10 @@ function(configure_target target_name)
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_TEST_DETECTION_RELAY_NODE)
+  configure_target(test_detection_relay_node)
+endif()
 
 if(BUILD_TEST_VIDEO_FROM_URL)
   configure_target(test_video_from_url)
