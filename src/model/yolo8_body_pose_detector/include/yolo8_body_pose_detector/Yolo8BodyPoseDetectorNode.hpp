@@ -70,7 +70,6 @@ class Yolo8BodyPoseDetectorNode : public redoxi_works::common_nodes::StartStopNo
 
     int _extract_image(cv::Mat *output, const std::shared_ptr<ByImageRequest::InputSourceData_t> &source_data);
     int _process_image_request();
-    int _process_image_request_2();
 
     //! Draw visualization on canvas
     void _draw_visualization(cv::Mat &canvas,

@@ -96,6 +96,7 @@ void PoseModelPostprocessor::postprocess(
     cv::transpose(_object_data, object_data);
 
     SingleImageOutput final_output;
+    final_output.source_image_size = preprocess_info.source_image_size;
     auto &detections = final_output.objects;
 
     for (int64_t obj = 0; obj < num_objects; obj++) {

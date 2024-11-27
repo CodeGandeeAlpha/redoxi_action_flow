@@ -8,6 +8,7 @@
 - [] support rk3588
 
 ### nodes
+- [] general object detection node
 - [] object snapshot node
 - [] head detection node
 - [] rtm pose node
@@ -15,6 +16,9 @@
 - [] video reader by file
 - [] video reader by usb camera
 - [] multi stream video reader, like RGBD, stereo, etc.
+
+### tests
+- [] object detection node, including calling action (return by action result) and streaming action (send to downstream)
  
 
 
