@@ -216,10 +216,10 @@ int OnnxModelInference::do_inference(InferenceInOutData::Ptr inout_data)
                          onnx_element_type_to_string(o_dtype));
 
             if (o_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
-                float *raw_output_data = ov.GetTensorMutableData<float>();
+                const float *raw_output_data = ov.GetTensorData<float>();
                 port_data->set_tensor_data(raw_output_data, o_shape);
             } else if (o_dtype == ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8) {
-                uint8_t *raw_output_data = ov.GetTensorMutableData<uint8_t>();
+                const uint8_t *raw_output_data = ov.GetTensorData<uint8_t>();
                 port_data->set_tensor_data(raw_output_data, o_shape);
             } else {
                 RDX_RAISE_ERROR("[f={}] Unsupported output data type: {}", __func__, o_dtype);
@@ -304,6 +304,12 @@ std::shared_ptr<Ort::Session> OnnxModelInference::create_onnx_session(
     //! Create an ONNX session and load the model based on the provider type
     Ort::SessionOptions session_options;
     session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+
+    // FIXME:disable memory pattern to avoid memory leak
+    // session_options.DisableMemPattern();
+    // session_options.DisableCpuMemArena();
+    // session_options.SetIntraOpNumThreads(1);
+    // session_options.SetInterOpNumThreads(1);
 
     RDX_INFO_DEV(nullptr, __func__, false, "Configuring execution providier {}", provider_type);
     if (provider_type == onnx_ep_names::CUDA) {

@@ -46,7 +46,12 @@ det_node_params = {
             {
                 "model_path": fn_model_medium,
                 "device_type": "cuda",
-                "device_index": 1,
+                "device_index": 0,
+            },
+            {
+                "model_path": fn_model_medium,
+                "device_type": "cuda",
+                "device_index": 0,
             },
         ],
         # "detection_request_config": {
