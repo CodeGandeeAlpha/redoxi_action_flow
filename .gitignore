@@ -51,3 +51,4 @@ build-*/
 .cache/
 
 __pycache__/
+src/extern/rosboard
