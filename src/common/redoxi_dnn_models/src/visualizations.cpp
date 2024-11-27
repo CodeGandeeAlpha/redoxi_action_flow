@@ -1,4 +1,5 @@
 #include <redoxi_dnn_models/visualizations.hpp>
+#include <redoxi_common_cpp/ros_utils/common.hpp>
 
 namespace redoxi_works::dnn_models::visualizations
 {
@@ -10,8 +11,10 @@ void draw_detections(cv::Mat *output,
         return;
     }
 
-    auto image_size = detections.source_image_size;
-    output->create(image_size, CV_8UC3);
+    if (output->empty()) {
+        auto image_size = detections.source_image_size;
+        output->create(image_size, CV_8UC3);
+    }
 
     //! Draw each detected object and its keypoints
     for (const auto &det : detections.objects) {

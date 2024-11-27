@@ -15,5 +15,9 @@ builtin_interfaces/Time source_timestamp
 # -1 for empty value
 int64 source_frame_index -1
 
+# image size
+int64 width 0
+int64 height 0
+
 # any other data
 AnyData any_data

@@ -61,6 +61,49 @@ int VideoSourceFromUrl::_close()
     return 0;
 }
 
+int VideoSourceFromUrl::_on_stopped()
+{
+    //! Log that we're triggering close
+    RDX_INFO_DEV(this, __func__, false, "{}", "Triggering close on video source");
+
+    // FIXME: the api should provide the reason why the node is stopped
+    // otherwise the node will always restart even if the video source is not ready
+    auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
+    if (init_config->auto_reply && rclcpp::ok()) {
+        // trigger close
+        close();
+    }
+
+    //! Log that close was triggered successfully
+    RDX_INFO_DEV(this, __func__, false, "{}", "Close triggered successfully");
+
+    return 0;
+}
+
+int VideoSourceFromUrl::_on_closed()
+{
+    //! Log that we're restarting video capture
+    RDX_INFO_DEV(this, __func__, false, "{}", "Restarting video capture");
+
+    // FIXME: broken logic, the node should know why it is closed
+    // otherwise it will always restart
+    auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
+    if (init_config->auto_reply && rclcpp::ok()) {
+        // restart video capture
+        open();
+
+        //! Log that video capture was opened successfully
+        RDX_INFO_DEV(this, __func__, false, "{}", "Video capture opened successfully");
+
+        start();
+
+        //! Log that video capture was started successfully
+        RDX_INFO_DEV(this, __func__, false, "{}", "Video capture started successfully");
+    }
+
+    return 0;
+}
+
 const cv::VideoCapture *VideoSourceFromUrl::get_video_capture() const
 {
     return m_video_capture.get();
@@ -114,6 +157,8 @@ VideoSourceFromUrl::ReadFrameResult VideoSourceFromUrl::_read_frame(SourceData_t
     // update metedata
     SourceData_t::FrameMetadata_t metadata;
     metadata.frame_num = _increment_frame_number_by(frame_number, 1);
+    metadata.width = frame.cols;
+    metadata.height = frame.rows;
     auto timestamp_ms = m_video_capture->get(cv::CAP_PROP_POS_MSEC);
     metadata.source_timestamp = ros2_time_msg_from_ms(timestamp_ms);
     source_data.set_frame_metadata(metadata);

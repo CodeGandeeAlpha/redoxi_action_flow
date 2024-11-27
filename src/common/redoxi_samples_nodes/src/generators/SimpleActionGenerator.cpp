@@ -42,6 +42,8 @@ SimpleActionGenerator::ReadFrameResult
     source_data.set_image(random_frame);
     SourceData_t::FrameMetadata_t metadata;
     metadata.frame_num = current_frame_number;
+    metadata.width = random_frame.cols;
+    metadata.height = random_frame.rows;
     source_data.set_frame_metadata(metadata);
 
     return ReadFrameResult::OK;

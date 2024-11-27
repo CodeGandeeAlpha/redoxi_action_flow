@@ -141,7 +141,14 @@ class PullProcessReplyHandler
             if (process_result != 0) {
                 RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Processing input data failed, releasing resource token", msg_uuid_str);
                 release_token(resource_token);
-                goal_handle->abort(action_result);
+                try {
+                    // FIXME: this might throw an exception if the goal on the client side is terminated
+                    // saying: Asked to publish result for goal that does not exist
+                    goal_handle->abort(action_result);
+                } catch (const std::exception &e) {
+                    RDX_LOG_ERROR(nullptr, __func__, true, "[msg_uuid={}] Failed to abort goal: {}", msg_uuid_str, e.what());
+                    return ProcessResult::Error;
+                }
                 return ProcessResult::Error;
             }
         }
@@ -157,7 +164,15 @@ class PullProcessReplyHandler
 
         // done
         RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Done, marking goal as success", msg_uuid_str);
-        goal_handle->succeed(action_result);
+        try {
+            // FIXME: this might throw an exception if the goal on the client side is terminated
+            // saying: Asked to publish result for goal that does not exist
+            goal_handle->succeed(action_result);
+        } catch (const std::exception &e) {
+            // FIXME: the goal is ignored, not terminated, will it have memory leak?
+            RDX_LOG_ERROR(nullptr, __func__, true, "[msg_uuid={}] Failed to mark goal as success: {}", msg_uuid_str, e.what());
+            return ProcessResult::Error;
+        }
         return ProcessResult::Success;
     }
 

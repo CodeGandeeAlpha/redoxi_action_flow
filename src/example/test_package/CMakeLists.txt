@@ -65,9 +65,10 @@ option(BUILD_ONNX_HELLO_WORLD "Build onnx_hello_world target" OFF)
 option(BUILD_ONNX_INFERENCE_API "Build onnx_inference_api target" OFF)
 option(BUILD_ONNX_YOLO8POSE "Build onnx_yolo8pose target" OFF)
 option(BUILD_ONNX_YOLO8DET "Build onnx_yolo8det target" OFF)
-option(BUILD_TEST_YOLO_DETECTOR_NODE "Build test_yolo_detector_node target" ON)
-option(BUILD_TEST_VIDEO_FROM_URL "Build test_video_from_url target" ON)
-option(BUILD_TEST_DETECTION_RELAY_NODE "Build test_detection_relay_node target" ON)
+
+option(BUILD_VIDEO_FROM_URL_NODE "Build video_from_url_node target" ON)
+option(BUILD_YOLO_BODY_POSE_DETECTION_NODE "Build yolo_body_pose_detection_node target" ON)
+option(BUILD_DETECTION_RELAY_NODE "Build detection_relay_node target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -92,16 +93,16 @@ function(configure_target target_name)
       PARENT_SCOPE)
 endfunction()
 
-if(BUILD_TEST_DETECTION_RELAY_NODE)
-  configure_target(test_detection_relay_node)
+if(BUILD_DETECTION_RELAY_NODE)
+  configure_target(detection_relay_node)
 endif()
 
-if(BUILD_TEST_VIDEO_FROM_URL)
-  configure_target(test_video_from_url)
+if(BUILD_VIDEO_FROM_URL_NODE)
+  configure_target(video_from_url_node)
 endif()
 
-if(BUILD_TEST_YOLO_DETECTOR_NODE)
-  configure_target(test_yolo_detector_node)
+if(BUILD_YOLO_BODY_POSE_DETECTION_NODE)
+  configure_target(yolo_body_pose_detection_node)
 endif()
 
 if(BUILD_ONNX_YOLO8DET)

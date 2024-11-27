@@ -97,6 +97,9 @@ void PoseModelPostprocessor::postprocess(
 
     SingleImageOutput final_output;
     final_output.source_image_size = preprocess_info.source_image_size;
+    //! Log the source image size using RDX_INFO_DEV
+    // RDX_INFO_DEV(nullptr, __func__, false, "Source image size: {}x{}",
+    //              final_output.source_image_size.width, final_output.source_image_size.height);
     auto &detections = final_output.objects;
 
     for (int64_t obj = 0; obj < num_objects; obj++) {

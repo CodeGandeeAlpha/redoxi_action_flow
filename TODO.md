@@ -9,6 +9,9 @@
 
 ### nodes
 - [] general object detection node
+- [] general object tracking node
+- [] command line controllable video source node, set file, play, pause, stop, etc.
+- [] publish-to-action node, which accepts published messages and convert them into actions, driving the video pipeline
 - [] object snapshot node
 - [] head detection node
 - [] rtm pose node
