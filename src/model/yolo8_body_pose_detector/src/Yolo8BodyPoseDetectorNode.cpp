@@ -336,7 +336,7 @@ int Yolo8BodyPoseDetectorNode::_update_init_config(std::shared_ptr<BaseInitConfi
     }
 
     // create detection done publisher
-    m_impl->pub_detection_done = this->create_publisher<std_msgs::msg::String>("probe/detection_done", 100);
+    m_impl->pub_detection_done = this->create_publisher<std_msgs::msg::String>("probe/detection_done", rclcpp::SensorDataQoS());
 
     return 0;
 }

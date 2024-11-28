@@ -15,11 +15,11 @@
 //! importance is an integer value, the higher the value, the more important the log message is
 //! importance below the threshold will be ignored
 #ifndef REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_INFO
-#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_INFO 0
+#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_INFO 3
 #endif
 
 #ifndef REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_DEBUG
-#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_DEBUG 0
+#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_DEBUG 3
 #endif
 
 #ifndef REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_WARN
@@ -46,7 +46,7 @@ constexpr int DebugPublisherQueueSize = 10;
 
 
 //! QoS for the debug publisher
-const rclcpp::QoS DebugPublisherQoS = rclcpp::QoS(DebugPublisherQueueSize).best_effort();
+const rclcpp::QoS DebugPublisherQoS = rclcpp::SensorDataQoS();
 // const rclcpp::QoS DebugPublisherQoS = rclcpp::QoS(DebugPublisherQueueSize).reliable();
 
 } // namespace DefaultParams
