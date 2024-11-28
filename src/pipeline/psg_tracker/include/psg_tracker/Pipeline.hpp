@@ -111,6 +111,10 @@ class PSGTrackerPipelineNode : public common_nodes::StartStopNode
     //! get model result
     virtual void _get_model_result();
 
+    //! test step that itself generate some data delivering to downstream
+    virtual void _generate_source_data(psg_private_msgs::msg::PsgDocument &document, std::atomic<int64_t> &frame_number);
+    std::atomic<int64_t> m_frame_number{0};
+
     //! create debug image
     virtual sensor_msgs::msg::Image _create_debug_image(const psg_private_msgs::msg::PsgDocument &document);
 

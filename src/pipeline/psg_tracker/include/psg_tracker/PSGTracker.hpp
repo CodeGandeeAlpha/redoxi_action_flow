@@ -63,16 +63,14 @@ class PSGTracker : public common_nodes::OpenCloseNode
 
   protected:
     std::shared_ptr<InputPort_t> m_input_port;
-    std::shared_ptr<InitConfig_t> m_init_config;
     std::atomic<bool> m_enable_debug_topics{false};
 
     //! implementation details of this node
     std::shared_ptr<PSGTrackerImpl> m_impl;
 
     // publishers
-    StampedImagePub m_pub_relayed_frame;
-    StampedImagePub m_pub_frame_accepted;
-    StampedImagePub m_pub_frame_rejected;
+    StampedImagePub m_pub_person_accepted;
+    StampedImagePub m_pub_person_rejected;
     std::shared_ptr<shared_memory::SharedMemoryClient> m_shm_client;
 };
 

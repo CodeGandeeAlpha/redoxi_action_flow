@@ -263,6 +263,7 @@ void PSGPersonGenerator::_step()
             psg_private_msgs::msg::Person msg_person;
             msg_person.frame_metadata = document_msg.frame.metadata;
             FlowRos2Pipeline::convert_person_to_msg(person, document_msg.frame, msg_person);
+            msg_person.x_uid = to_ros_uuid_msg(boost::uuids::random_generator()()); // 不加这个会导致tracker无法匹配
             document_msg.persons.push_back(msg_person);
         }
 

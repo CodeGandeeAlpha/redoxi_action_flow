@@ -399,6 +399,92 @@ void PSGTrackerPipelineNode::_step()
     }
 }
 
+// for test
+// void PSGTrackerPipelineNode::_step()
+// {
+//     // 从input port pipeline获取数据，创建delivery request，并推送到output port model,
+//     // 从input port model获取数据，放到detections buffer中去
+//     if (get_status() != NodeStatusCode::STARTED) {
+//         return;
+//     }
+
+//     psg_private_msgs::msg::PsgDocument doc_msg;
+//     _generate_source_data(doc_msg, m_frame_number);
+
+//     // 将document数据放入document map中
+//     m_impl->m_document_map.synchronize()->insert({doc_msg.frame.metadata.frame_num,
+//                                                   std::make_shared<psg_private_msgs::msg::PsgDocument>(doc_msg)});
+
+//     // 将person数据放入person map中
+//     auto lock_ptr_person_map = m_impl->m_person_map.synchronize();
+//     for (const auto &person : doc_msg.persons) {
+//         lock_ptr_person_map->insert({person.x_uid.uuid, std::make_shared<psg_private_msgs::msg::Person>(person)});
+//     }
+
+//     // 创建delivery request，并推送到output port model
+//     // from input source data to output source data
+//     OutputSourceDataModel_t output_model_source_data;
+//     output_model_source_data.set_frame(doc_msg.frame);
+//     output_model_source_data.set_persons(doc_msg.persons);
+
+//     // create delivery request
+//     auto delivery_request = _create_delivery_request(output_model_source_data);
+
+//     // this is used for logging
+//     auto msg_uuid = output_model_source_data.get_uuid();
+
+//     // get qos, controls how to retry and drop frames
+//     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+//     auto &qos = runtime_config->model_enqueue_policy;
+//     auto success = m_primary_output_port_model->push_request(delivery_request, qos);
+
+//     if (success) {
+//         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+//                      "[msg_uuid={}] success to push request",
+//                      boost::uuids::to_string(msg_uuid));
+//     } else {
+//         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+//                      "[msg_uuid={}] failed to push request",
+//                      boost::uuids::to_string(msg_uuid));
+//     }
+
+//     // FIXME: debug only
+//     // wait for all requests to be processed, not necessary
+//     m_primary_output_port_model->wait_for_all_requests();
+// }
+
+void PSGTrackerPipelineNode::_generate_source_data(psg_private_msgs::msg::PsgDocument &document, std::atomic<int64_t> &frame_number)
+{
+    //! Generate a random frame with the UUID text
+    // cv::Mat random_frame = cv::imread("data/ori_img.jpg");
+    cv::Mat random_frame;
+    auto frame_text = fmt::format("Frame Number: {}", frame_number.load());
+    random_image_with_text(random_frame, cv::Size(1920, 1080), frame_text);
+
+
+    // generate solid persons
+    psg_private_msgs::msg::Person person;
+    person.x_uid = to_ros_uuid_msg(boost::uuids::random_generator()());
+    person.track_id = 1;
+    person.body.bbox.x = 100;
+    person.body.bbox.y = 100;
+    person.body.bbox.width = 100;
+    person.body.bbox.height = 100;
+    person.body.category = 0;
+    person.body.confidence = 0.9;
+    document.persons.push_back(person);
+
+
+    // convert image to ROS message
+    cv_bridge::CvImage cv_bridge_image;
+    cv_bridge_image.image = random_frame;
+    cv_bridge_image.encoding = sensor_msgs::image_encodings::BGR8;
+    cv_bridge_image.toImageMsg(document.frame.raw_image);
+    document.frame.metadata.frame_num = frame_number;
+
+    frame_number++;
+}
+
 int PSGTrackerPipelineNode::_on_deliver_to_downstream_finish(TargetDataModel_t &target_data,
                                                              SendResultModel_t &result,
                                                              const DeliveryRequestModel_t &request,
@@ -407,17 +493,21 @@ int PSGTrackerPipelineNode::_on_deliver_to_downstream_finish(TargetDataModel_t &
     (void)target_data;
 
     //! 1. 创建modelresult
+    RDX_INFO_DEV(this, __func__, false, "{}", "开始创建model result");
     PSGTrackerPipelineImpl::OutputModelResult output_model_result;
 
     //! 2. 绑定promise和future
+    RDX_INFO_DEV(this, __func__, false, "{}", "开始绑定promise和future");
     output_model_result.promise = std::make_shared<ModelResultPromise>();
     output_model_result.future = output_model_result.promise->get_future().share();
     output_model_result.source_data = std::make_shared<OutputSourceDataModel_t>(request.get_source_data());
 
     //! 3. 将output_model_result推送到buffer中
+    RDX_INFO_DEV(this, __func__, false, "{}", "开始将output_model_result推送到buffer中");
     m_impl->m_model_result_buffer.push(output_model_result);
 
     //! 4. 创建task 在tbb run中将结果写入promise
+    RDX_INFO_DEV(this, __func__, false, "{}", "开始创建task并运行");
     auto promise = output_model_result.promise;
     //! 通过值捕获需要的数据
     auto ds_copy = ds;
@@ -427,8 +517,10 @@ int PSGTrackerPipelineNode::_on_deliver_to_downstream_finish(TargetDataModel_t &
                                            promise,
                                            this]() {
         (void)this;
+        RDX_INFO_DEV(this, __func__, false, "{}", "开始获取goal handle");
         auto goal_handle = result.goal_handle_future.get();
         if (goal_handle) {
+            RDX_INFO_DEV(this, __func__, false, "{}", "开始获取action result并写入promise");
             auto action_result = ds.get_action_client()->async_get_result(goal_handle).get().result;
             // 将action result写入promise
             auto final_output_model_result = std::make_shared<PSGTrackerPipelineNode::OutputModelResult_t>();
@@ -436,6 +528,7 @@ int PSGTrackerPipelineNode::_on_deliver_to_downstream_finish(TargetDataModel_t &
             final_output_model_result->x_return = action_result->x_return;
             promise->set_value(final_output_model_result);
         } else {
+            RDX_INFO_DEV(this, __func__, false, "{}", "goal handle为空,写入空promise");
             promise->set_value(nullptr);
         }
     });
@@ -574,7 +667,7 @@ void PSGTrackerPipelineNode::_get_model_result()
                               track_target.track_id, track_target.track_status,
                               boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
 
-                // 1. 将track_targets中的track_id和person_id进行匹配
+                // 1. 将track_targets中的track_id和person_id进行匹配，并赋予跟踪的id
                 {
                     auto lock_ptr_person_map = m_impl->m_person_map.synchronize();
                     if (lock_ptr_person_map->find(track_target.x_group_uid.uuid) != lock_ptr_person_map->end()) {

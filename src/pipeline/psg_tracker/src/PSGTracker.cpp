@@ -5,6 +5,8 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 
+#define PRINT_THREAD_ID_IN_LOG (true)
+
 namespace redoxi_works
 {
 struct PSGTrackerImpl {
@@ -48,6 +50,17 @@ int PSGTracker::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
     m_input_port = std::make_shared<InputPort_t>(this);
     m_input_port->init(init_config->input_port_config);
 
+    //! Initialize debug publishers
+    if (init_config->create_debug_pub) {
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                     "initialize debug publishers, person accepted topic={}, person rejected topic={}",
+                     init_config->debug_topic_person_accepted,
+                     init_config->debug_topic_person_rejected);
+        auto debug_qos = DefaultParams::DebugPublisherQoS;
+        m_pub_person_accepted.init(this, init_config->debug_topic_person_accepted, debug_qos);
+        m_pub_person_rejected.init(this, init_config->debug_topic_person_rejected, debug_qos);
+    }
+
     RDX_INFO_DEV(this, __func__, false, "{}", "Init config update completed successfully");
     return 0;
 }
@@ -60,11 +73,11 @@ int PSGTracker::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> conf
         RDX_RAISE_ERROR("[{}] Failed to cast runtime config to FrameRelayNodeRuntimeConfig", __func__);
     }
 
-    // {
-    //     RDX_INFO_DEV(this, __func__, false, "{}", "Converting runtime config to JSON");
-    //     auto runtime_config_json = JS::serializeStruct(*runtime_config);
-    //     RDX_INFO_DEV(this, __func__, false, "RuntimeConfig JSON: {}", runtime_config_json);
-    // }
+    {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Converting runtime config to JSON");
+        auto runtime_config_json = JS::serializeStruct(*runtime_config);
+        RDX_INFO_DEV(this, __func__, false, "RuntimeConfig JSON: {}", runtime_config_json);
+    }
 
     // enable debug topics?
     set_debug_topics_enabled(runtime_config->enable_debug_topics);
@@ -83,28 +96,43 @@ std::shared_ptr<PSGTrackerImpl> PSGTracker::_create_impl()
 
 int PSGTracker::_open()
 {
+    auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
+    if (!init_config) {
+        RDX_RAISE_ERROR("[{}] Failed to cast init config to PSGTrackerInitConfig", __func__);
+    }
+    //! Step 1: Create ROS tracker and event handler
+    RDX_INFO_DEV(this, __func__, false, "{}", "Creating ROS tracker and event handler");
     m_impl->tracker = std::make_shared<ROSTracker>();
+    RDX_INFO_DEV(this, __func__, false, "{}", "Created ROS tracker");
     m_impl->ros_track_event_handler = std::make_shared<MyROSTrackEventHandler>();
+    RDX_INFO_DEV(this, __func__, false, "{}", "Created ROS tracker event handler");
     m_impl->tracker->add_event_handler(m_impl->ros_track_event_handler);
-    if (m_init_config->tracker_type == psg_tracker::TrackerTypes::DEEPSORT) {
+    RDX_INFO_DEV(this, __func__, false, "{}", "Added ROS tracker event handler to tracker");
+    //! Step 2: Initialize tracker based on config type
+    if (init_config->tracker_type == psg_tracker::TrackerTypes::DEEPSORT) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Initializing DeepSORT tracker");
         auto deepsort_tracker_ptr = std::make_shared<RedoxiTrack::DeepSortTracker>();
         auto param = RedoxiTrack::DeepSortTrackerParam();
         deepsort_tracker_ptr->init(param);
         auto track_event_handler = std::make_shared<TrackEventHandler>();
         deepsort_tracker_ptr->add_event_handler(track_event_handler);
 
+        RDX_INFO_DEV(this, __func__, false, "{}", "Initializing ROS tracker with DeepSORT");
         m_impl->tracker->init(deepsort_tracker_ptr, track_event_handler);
 
-    } else if (m_init_config->tracker_type == psg_tracker::TrackerTypes::BOTSORT) {
+    } else if (init_config->tracker_type == psg_tracker::TrackerTypes::BOTSORT) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Initializing BOTSORT tracker");
         auto botsort_tracker_ptr = std::make_shared<RedoxiTrack::BotsortTracker>();
         auto param = RedoxiTrack::BotsortTrackerParam();
         botsort_tracker_ptr->init(param);
         auto track_event_handler = std::make_shared<TrackEventHandler>();
         botsort_tracker_ptr->add_event_handler(track_event_handler);
 
+        RDX_INFO_DEV(this, __func__, false, "{}", "Initializing ROS tracker with BOTSORT");
         m_impl->tracker->init(botsort_tracker_ptr, track_event_handler);
     }
 
+    RDX_INFO_DEV(this, __func__, false, "{}", "Tracker initialization completed successfully");
     return 0;
 }
 
@@ -198,20 +226,29 @@ void PSGTracker::_step()
                  msg_uuid_str, "frame received and goal resolved");
 
 
-    // track
+    RDX_INFO_DEV(this, __func__, false, "{}", "开始跟踪处理");
     auto track_targets = _track(source_data, control_signal_code);
-
+    RDX_INFO_DEV(this, __func__, false, "{}", "跟踪处理完成");
 
     // publish debug topic?
     if (get_debug_topics_enabled()) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "发布调试主题");
         auto control_signal_code = ActionDataTrait_t::get_control_signal_code(*goal_handle->get_goal());
         auto label_text = fmt::format("accepted, signal = {}", control_signal_code_to_string(control_signal_code));
-        m_pub_frame_accepted.publish(goal_handle->get_goal()->frame.raw_image, label_text);
+        m_pub_person_accepted.publish(goal_handle->get_goal()->frame.raw_image, label_text);
     }
 
-    // at the end, terminate the goal
+    RDX_INFO_DEV(this, __func__, false, "{}", "完成目标处理");
+    RDX_INFO_DEV(this, __func__, false, "跟踪结果: 共检测到 {} 个目标", track_targets.size());
+    for (size_t i = 0; i < track_targets.size(); i++) {
+        RDX_INFO_DEV(this, __func__, false, "目标 {}: id={}, 置信度={:.3f}, bbox=[{:.1f}, {:.1f}, {:.1f}, {:.1f}]",
+                     i, track_targets[i].track_id, track_targets[i].confidence,
+                     track_targets[i].track_bbox.x, track_targets[i].track_bbox.y,
+                     track_targets[i].track_bbox.width, track_targets[i].track_bbox.height);
+    }
     auto result_msg = std::make_shared<InputPort_t::ActionResult_t>();
     result_msg->track_targets = track_targets;
+
     goal_handle->succeed(result_msg);
 }
 

@@ -228,8 +228,8 @@ psg_tracker_node_pipeline_json_params = {
         "output_port_pipeline_config": {
             "downstream_specs": [
                 {
-                    "name": "psg_document_sink",
-                    "action_name": "/psg_document_sink/in/action",
+                    "name": "document_sink",
+                    "action_name": "/document_sink/in/action",
                 }
             ],
             "num_buffer_requests": 1,
@@ -240,11 +240,11 @@ psg_tracker_node_pipeline_json_params = {
             "downstream_specs": [
                 {
                     "name": "psg_tracker_node",
-                    "action_name": "/psg_tracker_node/model_process_frame_action",
+                    "action_name": "/psg_tracker_node/in/action",
                 }
             ],
         },
-        "create_debug_pub": True,
+        "create_debug_pub": False,
         "_time_unit": "us(1e-6)",
     },
     "runtime_config": {
@@ -264,7 +264,7 @@ psg_tracker_node_json_params = {
     "declare_params": {},
     "init_config": {
         "input_port_config": {"buffer_capacity": 10, "action_name": "in/action"},
-        "create_debug_pub": True,
+        "create_debug_pub": False,
         "_time_unit": "us(1e-6)",
     },
     "runtime_config": {
@@ -272,6 +272,7 @@ psg_tracker_node_json_params = {
         "step_interval": 5,
         "frame_interval": 0,
         "enable_blocking_mode": False,
+        "enable_debug_topics": False,
         "publish_to_debug_topic": False,
         "frame_request_policy": {
             "precondition": "any_downstream_ready",
@@ -285,7 +286,7 @@ document_sink_node_json_params = {
     "init_config": {
         "input_port_config": {"buffer_capacity": 10, "action_name": "in/action"},
         "_time_unit": "us(1e-6)",
-        "step_interval": 500,
+        "step_interval": 5,
         "publish_topic": "out/relayed_document",
     },
     "runtime_config": {
@@ -407,6 +408,40 @@ psg_person_generator_node = Node(
     + common_ros_args,
 )
 
+psg_tracker_pipeline_node = Node(
+    package="test_cx",
+    executable="v2_psg_tracker_pipeline",
+    name="psg_tracker_pipeline_node",
+    namespace="psg_tracker_pipeline_node",
+    prefix=common_prefix,
+    parameters=[
+        {
+            "param_as_json_string": json.dumps(
+                psg_tracker_node_pipeline_json_params, separators=(",", ":")
+            ),
+        },
+    ],
+    arguments=["--ros-args", "--log-level", ["psg_tracker_pipeline_node:=", logger]]
+    + common_ros_args,
+)
+
+psg_tracker_node = Node(
+    package="test_cx",
+    executable="v2_psg_tracker",
+    name="psg_tracker_node",
+    namespace="psg_tracker_node",
+    prefix=common_prefix,
+    parameters=[
+        {
+            "param_as_json_string": json.dumps(
+                psg_tracker_node_json_params, separators=(",", ":")
+            ),
+        },
+    ],
+    arguments=["--ros-args", "--log-level", ["psg_tracker_node:=", logger]]
+    + common_ros_args,
+)
+
 document_sink_node = Node(
     package="test_cx",
     executable="v2_document_sink",
@@ -446,6 +481,8 @@ def generate_launch_description():
             psg_pose_detector_node,
             psg_pose_detector_node_model,
             psg_person_generator_node,
+            psg_tracker_pipeline_node,
+            psg_tracker_node,
             document_sink_node,
         ]
     )
