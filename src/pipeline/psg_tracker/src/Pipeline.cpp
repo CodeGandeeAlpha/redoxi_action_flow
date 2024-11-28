@@ -4,6 +4,7 @@
 #include <cv_bridge/cv_bridge.hpp>
 #include <json_struct/json_struct.h>
 #include <tbb/concurrent_queue.h>
+#include <RedoxiTrack/RedoxiTrack.h>
 
 // #include <tbb/task_group.h>
 
@@ -23,6 +24,8 @@ struct PSGTrackerPipelineImpl {
         std::shared_ptr<PSGTrackerPipelineNode::OutputSourceDataModel_t> source_data;
     };
 
+    using ArrayUUID = std::array<uint8_t, 16>;
+
     //! ros time token
     std::shared_ptr<RosTimeToken> m_ros_time_token;
 
@@ -35,6 +38,13 @@ struct PSGTrackerPipelineImpl {
     //! 记录document的异步字典
     using DocumentMap_t = boost::synchronized_value<std::map<int, std::shared_ptr<psg_private_msgs::msg::PsgDocument>>>;
     DocumentMap_t m_document_map;
+
+    //! 记录person的异步字典
+    using PersonMap_t = boost::synchronized_value<std::map<ArrayUUID, std::shared_ptr<psg_private_msgs::msg::Person>>>;
+    PersonMap_t m_person_map;
+
+    //! 记录trajectory的异步字典
+    std::map<int, std::vector<ArrayUUID>> m_closed_trajectory_map; // indexed by track id
 };
 
 PSGTrackerPipelineNode::PSGTrackerPipelineNode(const std::string &name, const rclcpp::NodeOptions &options)
@@ -351,6 +361,12 @@ void PSGTrackerPipelineNode::_step()
         m_impl->m_document_map.synchronize()->insert({document_data->get_goal()->document.frame.metadata.frame_num,
                                                       std::make_shared<psg_private_msgs::msg::PsgDocument>(document_data->get_goal()->document)});
 
+        // 将person数据放入person map中
+        auto lock_ptr_person_map = m_impl->m_person_map.synchronize();
+        for (const auto &person : document_data->get_goal()->document.persons) {
+            lock_ptr_person_map->insert({person.x_uid.uuid, std::make_shared<psg_private_msgs::msg::Person>(person)});
+        }
+
         // 创建delivery request，并推送到output port model
         // from input source data to output source data
         OutputSourceDataModel_t output_model_source_data;
@@ -410,14 +426,15 @@ int PSGTrackerPipelineNode::_on_deliver_to_downstream_finish(TargetDataModel_t &
                                            result = result_copy,
                                            promise,
                                            this]() {
+        (void)this;
         auto goal_handle = result.goal_handle_future.get();
         if (goal_handle) {
             auto action_result = ds.get_action_client()->async_get_result(goal_handle).get().result;
             // 将action result写入promise
-            auto output_model_result = std::make_shared<PSGTrackerPipelineNode::OutputModelResult_t>();
-            output_model_result->track_targets = action_result->track_targets;
-            output_model_result->x_return = action_result->x_return;
-            promise->set_value(output_model_result);
+            auto final_output_model_result = std::make_shared<PSGTrackerPipelineNode::OutputModelResult_t>();
+            final_output_model_result->track_targets = action_result->track_targets;
+            final_output_model_result->x_return = action_result->x_return;
+            promise->set_value(final_output_model_result);
         } else {
             promise->set_value(nullptr);
         }
@@ -551,38 +568,98 @@ void PSGTrackerPipelineNode::_get_model_result()
 
         if (result->track_targets.size() > 0) {
             RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始处理track_targets结果", 0);
-            // TODO: 处理track_targets结果，仿照pipeline_out.cpp中的处理方式
-            // 1. 将track_targets中的track_id和person_id进行匹配
-            // 2. 将匹配到的person_id和track_id写入document中的persons中的track_id和track_status
-            // 3. 收集closed trajectory，并写入document中的trajectories
-        }
-        output_pipeline_source_data.set_document(*document);
-        // create pipeline delivery request
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始创建delivery request", 0);
-        auto delivery_request = _create_delivery_request(output_pipeline_source_data);
-        // push to output port pipeline
-        // this is used for logging
-        auto msg_uuid = output_pipeline_source_data.get_uuid();
+            for (const auto &track_target : result->track_targets) {
+                RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                              "处理track_target - track_id:{}, track_status:{}, uuid:{}",
+                              track_target.track_id, track_target.track_status,
+                              boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
 
-        // get qos, controls how to retry and drop frames
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始获取QoS配置", 0);
-        auto &qos = runtime_config->pipeline_enqueue_policy;
-        auto success = m_primary_output_port_pipeline->push_request(delivery_request, qos);
-
-        if (success) {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] success to push request",
-                         boost::uuids::to_string(msg_uuid));
-
-            if (init_config->create_debug_pub) {
-                RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始创建debug图像", 0);
-                auto debug_image = _create_debug_image(*document);
-                m_pub_model_enqueue.publish(debug_image, "");
+                // 1. 将track_targets中的track_id和person_id进行匹配
+                {
+                    auto lock_ptr_person_map = m_impl->m_person_map.synchronize();
+                    if (lock_ptr_person_map->find(track_target.x_group_uid.uuid) != lock_ptr_person_map->end()) {
+                        auto &person = (*lock_ptr_person_map)[track_target.x_group_uid.uuid];
+                        person->track_id = track_target.track_id;
+                        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                                      "更新person track_id - uuid:{}, track_id:{}",
+                                      boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)),
+                                      track_target.track_id);
+                    }
+                }
+                // 2. 收集closed trajectory，并写入document中的trajectories
+                // if track_target is new, create a new trajectory
+                if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::New) {
+                    m_impl->m_closed_trajectory_map[track_target.track_id] = std::vector<PSGTrackerPipelineImpl::ArrayUUID>();
+                    m_impl->m_closed_trajectory_map[track_target.track_id].push_back(track_target.x_group_uid.uuid);
+                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                                  "创建新轨迹 - track_id:{}, uuid:{}",
+                                  track_target.track_id,
+                                  boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
+                }
+                // if track_target is open, add it to trajectory
+                else if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::Open) {
+                    m_impl->m_closed_trajectory_map[track_target.track_id].push_back(track_target.x_group_uid.uuid);
+                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                                  "添加到现有轨迹 - track_id:{}, uuid:{}",
+                                  track_target.track_id,
+                                  boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
+                }
+                // if track_target is close, get trajectory and remove it from buffer
+                else if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::Close) {
+                    // get closed trajectory uuids
+                    auto closed_trajectory_uuids = m_impl->m_closed_trajectory_map[track_target.track_id];
+                    // remove closed trajectory from buffer
+                    m_impl->m_closed_trajectory_map.erase(track_target.track_id);
+                    // get closed trajectory
+                    psg_private_msgs::msg::PersonTrajectory closed_trajectory;
+                    closed_trajectory.track_id = track_target.track_id;
+                    {
+                        auto lock_ptr_person_map = m_impl->m_person_map.synchronize();
+                        for (auto &uuid : closed_trajectory_uuids) {
+                            closed_trajectory.persons.push_back(*(*lock_ptr_person_map)[uuid]);
+                            if (lock_ptr_person_map->find(uuid) != lock_ptr_person_map->end()) {
+                                lock_ptr_person_map->erase(uuid);
+                            }
+                        }
+                    }
+                    // put closed trajectory to document
+                    document->trajectories.push_back(closed_trajectory);
+                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                                  "关闭轨迹 - track_id:{}, 轨迹长度:{}",
+                                  track_target.track_id,
+                                  closed_trajectory.persons.size());
+                } else
+                    continue;
             }
-        } else {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] failed to push request",
-                         boost::uuids::to_string(msg_uuid));
+            output_pipeline_source_data.set_document(*document);
+
+            // create pipeline delivery request
+            RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始创建delivery request", 0);
+            auto delivery_request = _create_delivery_request(output_pipeline_source_data);
+            // push to output port pipeline
+            // this is used for logging
+            auto msg_uuid = output_pipeline_source_data.get_uuid();
+
+            // get qos, controls how to retry and drop frames
+            RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始获取QoS配置", 0);
+            auto &qos = runtime_config->pipeline_enqueue_policy;
+            auto success = m_primary_output_port_pipeline->push_request(delivery_request, qos);
+
+            if (success) {
+                RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                             "[msg_uuid={}] success to push request",
+                             boost::uuids::to_string(msg_uuid));
+
+                if (init_config->create_debug_pub) {
+                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始创建debug图像", 0);
+                    auto debug_image = _create_debug_image(*document);
+                    m_pub_model_enqueue.publish(debug_image, "");
+                }
+            } else {
+                RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                             "[msg_uuid={}] failed to push request",
+                             boost::uuids::to_string(msg_uuid));
+            }
         }
     }
 }

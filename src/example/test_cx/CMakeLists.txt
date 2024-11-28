@@ -30,6 +30,7 @@ set(DEPENDENCIES
     psg_person_generator
     psg_pose_detector
     video_reader_orbbec
+    psg_tracker
     pluginlib)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb)
@@ -70,6 +71,8 @@ option(BUILD_TEST_V2_PSG_FRAME_DET_SOURCE_SINK "Build test_v2_psg_frame_det_sour
 option(BUILD_TEST_V2_PSG_PERSON_GENERATOR "Build test_v2_psg_person_generator target" ON)
 option(BUILD_TEST_V2_PSG_POSE_DETECTOR "Build test_v2_psg_pose_detector target" ON)
 option(BUILD_TEST_V2_ORBBEC_VIDEO_SOURCE "Build test_v2_orbbec_video_source target" ON)
+option(BUILD_TEST_V2_PSG_TRACKER_PIPELINE "Build test_v2_psg_tracker_pipeline target" ON)
+option(BUILD_TEST_V2_PSG_TRACKER "Build test_v2_psg_tracker target" ON)
 # Function to configure a target
 function(configure_target target_name)
   add_executable(${target_name} src/${target_name}.cpp)
@@ -180,6 +183,14 @@ endif()
 
 if(BUILD_TEST_V2_ORBBEC_VIDEO_SOURCE)
   configure_target(v2_orbbec_video_source)
+endif()
+
+if(BUILD_TEST_V2_PSG_TRACKER_PIPELINE)
+  configure_target(v2_psg_tracker_pipeline)
+endif()
+
+if(BUILD_TEST_V2_PSG_TRACKER)
+  configure_target(v2_psg_tracker)
 endif()
 
 # Install targets
