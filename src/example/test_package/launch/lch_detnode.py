@@ -21,6 +21,8 @@ class StepIntervals:
     VeryFast = 1000
 
 
+InputPortQueueSize = 10
+
 DetectionNodeName = "detector"
 DetectionInputActionName = "in/image_request"
 
@@ -29,7 +31,8 @@ fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbat
 fn_model_medium = (
     "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8m-pose-dynbatch.onnx"
 )
-fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+# fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
 
 DetectionRelayNodeName = "detection_relay"
 DetectionRelayInputActionName = "in/detections"
@@ -43,16 +46,16 @@ det_node_params = {
                 "device_type": "cuda",
                 "device_index": 0,
             },
-            {
-                "model_path": fn_model_medium,
-                "device_type": "cuda",
-                "device_index": 0,
-            },
-            {
-                "model_path": fn_model_medium,
-                "device_type": "cuda",
-                "device_index": 0,
-            },
+            # {
+            #     "model_path": fn_model_medium,
+            #     "device_type": "cuda",
+            #     "device_index": 0,
+            # },
+            # {
+            #     "model_path": fn_model_medium,
+            #     "device_type": "cuda",
+            #     "device_index": 0,
+            # },
         ],
         # "detection_request_config": {
         #     "input_port_config": {
@@ -63,7 +66,7 @@ det_node_params = {
         # },
         "image_request_config": {
             "input_port_config": {
-                "buffer_capacity": -1,
+                "buffer_capacity": InputPortQueueSize,
                 "action_name": DetectionInputActionName,
                 "goal_result_expire_time": 1000000,
             },
@@ -94,8 +97,8 @@ det_node_params = {
     "runtime_config": {
         "_time_unit": "us(1e-6)",
         "step_interval": StepIntervals.VeryFast,
-        "enable_blocking_mode": True,
-        "model_output_config": {"conf_threshold": 0.25, "iou_threshold": 0.45},
+        "enable_blocking_mode": False,
+        "model_output_config": {"conf_threshold": 0.1, "iou_threshold": 0.6},
         "enable_visualization": True,
     },
 }
@@ -104,7 +107,7 @@ video_source_params = {
     "declare_params": {},
     "init_config": {
         "video_url": fn_video,
-        "auto_reply": True,
+        "auto_replay": True,
         "primary_output_spec": {
             "downstream_specs": [
                 {
@@ -117,14 +120,14 @@ video_source_params = {
                             "fallback_wait_time_retry_response": 1000000,
                         },
                         "precondition": "dont_care",
-                        "drop_strategy": "dont_care",
+                        "drop_strategy": "no_drop",
                     },
                     "create_debug_pub": False,
                 }
             ],
             "num_buffer_requests": 1,
             "preserve_request_order": True,
-            "fallback_delivery_precondition": "any_downstream_ready",
+            "fallback_delivery_precondition": "dont_care",
         },
         "create_debug_pub": True,
         "debug_pub_queue_size": 10,
@@ -148,8 +151,8 @@ video_source_params = {
                 "wait_time_retry_response": 5000,
                 "fallback_wait_time_retry_response": 1000000,
             },
-            "precondition": "any_downstream_ready",
-            "drop_strategy": "drop_as_needed",
+            "precondition": "dont_care",
+            "drop_strategy": "no_drop",
         },
         "_time_unit": "us(1e-6)",
         "step_interval": StepIntervals.Fast,
@@ -160,7 +163,7 @@ detection_relay_params = {
     "declare_params": {},
     "init_config": {
         "input_port_config": {
-            "buffer_capacity": -1,
+            "buffer_capacity": InputPortQueueSize,
             "action_name": f"{DetectionRelayInputActionName}",
             "goal_result_expire_time": 1000000,
         },
@@ -169,7 +172,7 @@ detection_relay_params = {
         "_time_unit": "us(1e-6)",
     },
     "runtime_config": {
-        "enable_blocking_mode": True,
+        "enable_blocking_mode": False,
         "enable_visualization": True,
         "_time_unit": "us(1e-6)",
         "step_interval": StepIntervals.Fast,

@@ -69,7 +69,7 @@ int VideoSourceFromUrl::_on_stopped()
     // FIXME: the api should provide the reason why the node is stopped
     // otherwise the node will always restart even if the video source is not ready
     auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
-    if (init_config->auto_reply && rclcpp::ok()) {
+    if (init_config->auto_replay && rclcpp::ok()) {
         // trigger close
         close();
     }
@@ -88,7 +88,7 @@ int VideoSourceFromUrl::_on_closed()
     // FIXME: broken logic, the node should know why it is closed
     // otherwise it will always restart
     auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
-    if (init_config->auto_reply && rclcpp::ok()) {
+    if (init_config->auto_replay && rclcpp::ok()) {
         // restart video capture
         open();
 

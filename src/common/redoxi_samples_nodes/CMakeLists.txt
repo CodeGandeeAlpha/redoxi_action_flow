@@ -26,6 +26,7 @@ set(srcfiles
   src/sinks/FrameRelayPublisher.cpp
   src/sinks/FrameRelayNode.cpp
   src/sinks/DetectionRelayNode.cpp
+  src/drivers/DetectionRequestDriver.cpp
 )
 
 add_library(redoxi_samples_nodes ${srcfiles})

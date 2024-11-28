@@ -15,12 +15,12 @@ namespace video_source_from_url_types
 struct InitConfig : public RedoxiVideoReaderBase::InitConfig_t {
     // read video from this file
     std::string video_url;
-    bool auto_reply = false;
+    bool auto_replay = false;
 
     JS_OBJECT_WITH_SUPER(
         JS_SUPER(RedoxiVideoReaderBase::InitConfig_t),
         JS_MEMBER(video_url),
-        JS_MEMBER(auto_reply));
+        JS_MEMBER(auto_replay));
 };
 
 struct RuntimeConfig : public RedoxiVideoReaderBase::RuntimeConfig_t {
