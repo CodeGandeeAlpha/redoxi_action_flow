@@ -64,11 +64,11 @@ class OnnxInferenceInOutData : public InferenceInOutData
     std::atomic_bool m_output_port_configuration_dirty{false};
 
     // whenever possible, use io binding to do inference?
-    std::atomic_bool m_use_io_binding{true};
+    std::atomic_bool m_use_io_binding{false};
 
     // in io-binding, should we bind to output tensor whenever possible?
     // if false, we will always bind to memory info instead
-    std::atomic_bool m_prefer_bind_output_tensor{true};
+    std::atomic_bool m_prefer_bind_output_tensor{false};
 
     // flag to indicate if the output port is bound by tensor
     // if false, the port is bound by memory info

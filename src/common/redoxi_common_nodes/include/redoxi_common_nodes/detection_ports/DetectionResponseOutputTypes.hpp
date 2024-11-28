@@ -149,7 +149,15 @@ class DeliveryRequest : public DeliveryRequestBase
         const auto &source_data = this->m_source_data;
         goal.detections = source_data.detections;
         if (source_data.image.has_value()) {
-            target_data.image = this->m_source_data.image.value();
+            target_data.image = source_data.image.value();
+            std_msgs::msg::Header header;
+            header.stamp = rclcpp::Clock().now();
+            goal.frame.raw_image = *cv_bridge::CvImage(header,
+                                                       DeliverySourceData::DefaultPublishEncoding,
+                                                       target_data.image)
+                                        .toImageMsg();
+            goal.frame.metadata.width = target_data.image.cols;
+            goal.frame.metadata.height = target_data.image.rows;
         }
 
         // set additional information into the goal

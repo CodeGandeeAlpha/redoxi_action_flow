@@ -19,7 +19,8 @@ find_package(json_struct REQUIRED)
 
 add_library(
   yolo8_body_pose_detector
-  src/yolo8_body_pose_detector.cpp src/Yolo8BodyPoseDetectorNode.cpp
+  src/yolo8_body_pose_detector.cpp 
+  src/Yolo8BodyPoseDetectorNode.cpp
   src/Yolo8BodyPoseDetectorTypes.cpp)
 
 add_library(yolo8_body_pose_detector::yolo8_body_pose_detector ALIAS
@@ -47,15 +48,15 @@ install(
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 
-add_executable(yolo8_body_pose_detector_node
-               src/yolo8_body_pose_detector_node.cpp)
-target_include_directories(
-  yolo8_body_pose_detector_node
-  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-         $<INSTALL_INTERFACE:include>)
-target_link_libraries(yolo8_body_pose_detector_node yolo8_body_pose_detector)
+# add_executable(yolo8_body_pose_detector_node
+#                src/yolo8_body_pose_detector_node.cpp)
+# target_include_directories(
+#   yolo8_body_pose_detector_node
+#   PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+#          $<INSTALL_INTERFACE:include>)
+# target_link_libraries(yolo8_body_pose_detector_node yolo8_body_pose_detector)
 
-install(TARGETS yolo8_body_pose_detector_node DESTINATION lib/${PROJECT_NAME})
+# install(TARGETS yolo8_body_pose_detector_node DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

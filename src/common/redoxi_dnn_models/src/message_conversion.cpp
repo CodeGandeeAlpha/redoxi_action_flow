@@ -55,6 +55,8 @@ void to_ros_msg(std::vector<redoxi_public_msgs::msg::Detection> *output_msg,
     for (const auto &object : image_detections.objects) {
         redoxi_public_msgs::msg::Detection detection_msg;
         to_ros_msg(&detection_msg, object);
+        detection_msg.frame_metadata.width = image_detections.source_image_size.width;
+        detection_msg.frame_metadata.height = image_detections.source_image_size.height;
         output_msg->push_back(detection_msg);
     }
 }
@@ -71,6 +73,10 @@ void from_ros_msg(det_types::SingleImageOutput *output_detections,
         det_types::DetectedObject object;
         from_ros_msg(&object, detection_msg);
         output_detections->objects.push_back(object);
+
+        auto width = detection_msg.frame_metadata.width;
+        auto height = detection_msg.frame_metadata.height;
+        output_detections->source_image_size = cv::Size(width, height);
     }
 }
 

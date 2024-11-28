@@ -1,6 +1,7 @@
 #include <redoxi_samples_nodes/sinks/DetectionRelayNode.hpp>
 #include <redoxi_dnn_models/message_conversion.hpp>
 #include <redoxi_dnn_models/visualizations.hpp>
+#include <cv_bridge/cv_bridge.hpp>
 namespace redoxi_works
 {
 
@@ -46,9 +47,14 @@ int DetectionRelayNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> co
         // publish visualization
         auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(get_runtime_config());
         if (runtime_config->enable_visualization && m_pub_visualization.valid()) {
-            cv::Mat visualization;
-            _parse_detection(&visualization, *source_data);
-            m_pub_visualization.publish(visualization);
+            auto msg_uuid = ActionDataTrait_t::get_uuid(*source_data->get_goal());
+            RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Publishing visualization",
+                         boost::uuids::to_string(msg_uuid));
+            cv::Mat vis_image;
+            _parse_detection(&vis_image, *source_data);
+
+            RDX_INFO_DEV(this, __func__, false, "Visualization image size: {}x{}", vis_image.cols, vis_image.rows);
+            m_pub_visualization.publish(vis_image);
         }
 
         return 0;
@@ -94,13 +100,16 @@ int DetectionRelayNode::_stop()
 
 void DetectionRelayNode::_step()
 {
+    // auto msg_uuid = UUIDTrait::generate();
+    // RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Processing input data",
+    //              boost::uuids::to_string(msg_uuid));
     m_port_handler.process_and_reply();
 }
 
 int DetectionRelayNode::_parse_detection(cv::Mat *output,
                                          const SourceData_t &source_data)
 {
-    if (output == nullptr || output->empty()) {
+    if (output == nullptr) {
         return 0;
     }
 
@@ -110,11 +119,22 @@ int DetectionRelayNode::_parse_detection(cv::Mat *output,
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Parsing detection data",
                  boost::uuids::to_string(msg_uuid));
 
+    try {
+        const auto &image_msg = source_data.get_goal()->frame.raw_image;
+        *output = cv_bridge::toCvCopy(image_msg, image_msg.encoding)->image;
+    } catch (cv_bridge::Exception &e) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "cv_bridge exception: {}, ignoring the error", e.what());
+    }
+
     // parse detections
     auto output_detections = inference::conversion::from_ros_msg(source_data.get_goal()->detections);
+    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Got {} detections",
+                 boost::uuids::to_string(msg_uuid), output_detections.objects.size());
 
     // draw detections
     dnn_models::visualizations::draw_detections(output, output_detections);
+
+    // RDX_INFO_DEV(this, __func__, false, "Output image size: {}x{}", output->cols, output->rows);
 
     return 0;
 }

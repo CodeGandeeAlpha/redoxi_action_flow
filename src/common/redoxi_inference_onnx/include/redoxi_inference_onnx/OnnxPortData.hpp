@@ -13,7 +13,7 @@ namespace redoxi_works::inference::onnx
 template <typename T>
 struct MappedTensorData {
     std::shared_ptr<std::vector<T>> data;
-    std::shared_ptr<Ort::Value> onnx_tensor;
+    // std::shared_ptr<Ort::Value> onnx_tensor;
     std::shared_ptr<Ort::MemoryInfo> onnx_memory_info;
     std::vector<int64_t> shape;
 
@@ -53,16 +53,16 @@ struct MappedTensorData {
         // dynamic dimensions cannot be preallocated, just skip
         if (has_dynamic_dims()) {
             this->data.reset();
-            this->onnx_tensor.reset();
+            // this->onnx_tensor.reset();
             return;
         }
 
         // allocate data
         auto num_elements = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<int64_t>());
         this->data = std::make_shared<std::vector<T>>(num_elements);
-        this->onnx_tensor = std::make_shared<Ort::Value>(Ort::Value::CreateTensor<T>(
-            *onnx_memory_info, data->data(), data->size(),
-            shape.data(), shape.size()));
+        // this->onnx_tensor = std::make_shared<Ort::Value>(Ort::Value::CreateTensor<T>(
+        //     *onnx_memory_info, data->data(), data->size(),
+        //     shape.data(), shape.size()));
         RDX_INFO_DEV(nullptr, __func__, false, "Tensor data initialized, shape={}, num_elements={}",
                      fmt::join(shape, ", "), num_elements);
     }
@@ -112,6 +112,8 @@ class OnnxPortData : public ModelPortData
         } else {
             auto &tensor_data_f32 = std::get<MappedTensorData_f32>(m_tensor_data);
             tensor_data_f32.data->assign(data, data + num_elements);
+            // RDX_INFO_DEV(nullptr, __func__, false, "Port name={}, shape={}, num_elements={}",
+            //              m_port_info->get_name(), fmt::join(tensor_data_f32.shape, ", "), tensor_data_f32.data->size());
             //! Print first element for debugging
             if (!tensor_data_f32.data->empty()) {
                 RDX_INFO_DEV(nullptr, __func__, false, "Port name={}, first element: {}",
@@ -238,6 +240,7 @@ class OnnxPortData : public ModelPortData
     {
         if (shape == m_shape) {
             // shape is the same, no need to set shape
+            // RDX_INFO_DEV(nullptr, __func__, false, "{}", "Shape is the same, no need to set shape");
             return 0;
         }
 
@@ -280,6 +283,7 @@ class OnnxPortData : public ModelPortData
     //! If you change the shape, you need to call this function again
     virtual int _allocate_data()
     {
+        // RDX_INFO_DEV(nullptr, __func__, false, "Allocating data for port: {}", m_port_info->get_name());
         // do we have port info?
         if (!m_port_info) {
             RDX_RAISE_ERROR("[f={}] Port info not found", __func__);

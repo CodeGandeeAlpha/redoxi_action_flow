@@ -15,5 +15,12 @@ https://github.com/ros-perception/vision_opencv.git
 ### rosboard
 
 rosboard is a GUI for ROS.
+To allow resizing of the windows, modify the index.css file to include the following line:
+```
+.card {
+  resize: both;
+  overflow: auto;
+}
+```
 
 https://github.com/dheera/rosboard.git

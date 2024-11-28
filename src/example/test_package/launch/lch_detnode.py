@@ -12,14 +12,27 @@ log_level_arg = DeclareLaunchArgument(
     description="Logging level",
 )
 
+
+class StepIntervals:
+    VerySlow = 3000000
+    Slow = 200000
+    Medium = 20000
+    Fast = 5000
+    VeryFast = 1000
+
+
 DetectionNodeName = "detector"
 DetectionInputActionName = "in/image_request"
+
 VideoSourceNodeName = "video_source"
 fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
 fn_model_medium = (
     "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8m-pose-dynbatch.onnx"
 )
 fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+
+DetectionRelayNodeName = "detection_relay"
+DetectionRelayInputActionName = "in/detections"
 
 det_node_params = {
     "declare_params": {},
@@ -33,7 +46,12 @@ det_node_params = {
             {
                 "model_path": fn_model_medium,
                 "device_type": "cuda",
-                "device_index": 1,
+                "device_index": 0,
+            },
+            {
+                "model_path": fn_model_medium,
+                "device_type": "cuda",
+                "device_index": 0,
             },
         ],
         # "detection_request_config": {
@@ -50,32 +68,22 @@ det_node_params = {
                 "goal_result_expire_time": 1000000,
             },
             "output_port_config": {
-                # "downstream_specs": [
-                #     {
-                #         "name": "",
-                #         "action_name": "/detection_sink/in/detection_response",
-                #         "delivery_policy": {
-                #             "retry_policy": {
-                #                 "fallback_number_of_retry": 3,
-                #                 "fallback_wait_time_between_retry": 5000,
-                #                 "fallback_wait_time_retry_response": 100000,
-                #             },
-                #             "precondition": "dont_care",
-                #             "drop_strategy": "dont_care",
-                #         },
-                #         "create_debug_pub": False,
-                #     }
-                # ],
+                "downstream_specs": [
+                    {
+                        "name": "",
+                        "action_name": f"/{DetectionRelayNodeName}/{DetectionRelayInputActionName}",
+                        "delivery_policy": {
+                            "precondition": "dont_care",
+                            "drop_strategy": "dont_care",
+                        },
+                        "create_debug_pub": False,
+                    }
+                ],
                 "num_buffer_requests": 1,
                 "preserve_request_order": True,
                 "fallback_delivery_precondition": "dont_care",
             },
             "output_enqueue_policy": {
-                "retry_policy": {
-                    "fallback_number_of_retry": 3,
-                    "fallback_wait_time_between_retry": 5000,
-                    "fallback_wait_time_retry_response": 100000,
-                },
                 "precondition": "dont_care",
                 "drop_strategy": "dont_care",
             },
@@ -85,8 +93,8 @@ det_node_params = {
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
-        "step_interval": 2000,
-        "enable_blocking_mode": False,
+        "step_interval": StepIntervals.VeryFast,
+        "enable_blocking_mode": True,
         "model_output_config": {"conf_threshold": 0.25, "iou_threshold": 0.45},
         "enable_visualization": True,
     },
@@ -96,6 +104,7 @@ video_source_params = {
     "declare_params": {},
     "init_config": {
         "video_url": fn_video,
+        "auto_reply": True,
         "primary_output_spec": {
             "downstream_specs": [
                 {
@@ -143,7 +152,27 @@ video_source_params = {
             "drop_strategy": "drop_as_needed",
         },
         "_time_unit": "us(1e-6)",
-        "step_interval": 10000,
+        "step_interval": StepIntervals.Fast,
+    },
+}
+
+detection_relay_params = {
+    "declare_params": {},
+    "init_config": {
+        "input_port_config": {
+            "buffer_capacity": -1,
+            "action_name": f"{DetectionRelayInputActionName}",
+            "goal_result_expire_time": 1000000,
+        },
+        "publish_detection_topic": "out/relayed_detection",
+        "publish_visualization_topic": "out/relayed_visualization",
+        "_time_unit": "us(1e-6)",
+    },
+    "runtime_config": {
+        "enable_blocking_mode": True,
+        "enable_visualization": True,
+        "_time_unit": "us(1e-6)",
+        "step_interval": StepIntervals.Fast,
     },
 }
 
@@ -154,7 +183,7 @@ common_ros_args = []
 
 detection_node = Node(
     package="test_package",
-    executable="test_yolo_detector_node",
+    executable="yolo_body_pose_detection_node",
     name=DetectionNodeName,
     namespace=DetectionNodeName,
     prefix=common_prefix,
@@ -171,7 +200,7 @@ detection_node = Node(
 
 video_source_node = Node(
     package="test_package",
-    executable="test_video_from_url",
+    executable="video_from_url_node",
     name=VideoSourceNodeName,
     namespace=VideoSourceNodeName,
     output="screen",
@@ -184,6 +213,25 @@ video_source_node = Node(
     ],
     prefix=common_prefix,
     arguments=["--ros-args", "--log-level", [f"{VideoSourceNodeName}:=", logger]]
+    + common_ros_args,
+    # arguments=["--ros-args", "--disable-external-lib-logs"],
+)
+
+detection_relay_node = Node(
+    package="test_package",
+    executable="detection_relay_node",
+    name=DetectionRelayNodeName,
+    namespace=DetectionRelayNodeName,
+    output="screen",
+    parameters=[
+        {
+            "param_as_json_string": json.dumps(
+                detection_relay_params, separators=(",", ":")
+            ),
+        },
+    ],
+    prefix=common_prefix,
+    arguments=["--ros-args", "--log-level", [f"{DetectionRelayNodeName}:=", logger]]
     + common_ros_args,
     # arguments=["--ros-args", "--disable-external-lib-logs"],
 )
@@ -207,5 +255,6 @@ def generate_launch_description():
             log_level_arg,
             video_source_node,
             detection_node,
+            detection_relay_node,
         ]
     )

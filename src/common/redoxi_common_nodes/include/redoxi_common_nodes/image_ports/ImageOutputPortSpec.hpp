@@ -215,6 +215,8 @@ class DeliveryRequest : public DeliveryRequestBase
             cv_bridge_image.toImageMsg(goal.frame.raw_image);
         }
         goal.frame.metadata = this->m_source_data.get_frame_metadata();
+        goal.frame.metadata.width = image.cols;
+        goal.frame.metadata.height = image.rows;
 
         // set additional information into the goal
         using ActionTrait = DeliveryTargetData::ActionDataTrait_t;

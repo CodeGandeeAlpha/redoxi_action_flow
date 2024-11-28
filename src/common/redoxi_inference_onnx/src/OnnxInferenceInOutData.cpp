@@ -41,7 +41,11 @@ bool OnnxInferenceInOutData::_update_io_binding_input()
                 RDX_RAISE_ERROR("Input port {} does not have fixed shape data, failed to bind", port_name);
             }
 
-            m_io_binding->BindInput(port_name.c_str(), *tensor_data_f32.onnx_tensor);
+            auto ort_value = Ort::Value::CreateTensor<float>(
+                *tensor_data_f32.onnx_memory_info, tensor_data_f32.data->data(), tensor_data_f32.data->size(),
+                tensor_data_f32.shape.data(), tensor_data_f32.shape.size());
+            m_io_binding->BindInput(port_name.c_str(), std::move(ort_value));
+
         } else if (dtype_str == "uint8") {
             RDX_INFO_DEV(nullptr, __func__, "Binding input port: {} (uint8)", port_name);
             auto &tensor_data_u8 = std::get<MappedTensorData_u8>(port_data->m_tensor_data);
@@ -49,7 +53,10 @@ bool OnnxInferenceInOutData::_update_io_binding_input()
                 RDX_RAISE_ERROR("Input port {} does not have fixed shape data, failed to bind", port_name);
             }
 
-            m_io_binding->BindInput(port_name.c_str(), *tensor_data_u8.onnx_tensor);
+            auto ort_value = Ort::Value::CreateTensor<uint8_t>(
+                *tensor_data_u8.onnx_memory_info, tensor_data_u8.data->data(), tensor_data_u8.data->size(),
+                tensor_data_u8.shape.data(), tensor_data_u8.shape.size());
+            m_io_binding->BindInput(port_name.c_str(), std::move(ort_value));
         } else {
             RDX_RAISE_ERROR("Unsupported data type: {}", dtype_str);
         }
@@ -111,7 +118,10 @@ bool OnnxInferenceInOutData::_update_io_binding_output()
             auto &tensor_data_f32 = std::get<MappedTensorData_f32>(port_data->m_tensor_data);
             if (tensor_data_f32.has_data() && m_prefer_bind_output_tensor) {
                 RDX_INFO_DEV(nullptr, __func__, "Binding output port: {} (float32) with tensor", port_name);
-                m_io_binding->BindOutput(port_name.c_str(), *tensor_data_f32.onnx_tensor);
+                auto ort_value = Ort::Value::CreateTensor<float>(
+                    *tensor_data_f32.onnx_memory_info, tensor_data_f32.data->data(), tensor_data_f32.data->size(),
+                    tensor_data_f32.shape.data(), tensor_data_f32.shape.size());
+                m_io_binding->BindOutput(port_name.c_str(), std::move(ort_value));
                 m_output_port_bound_by_tensor[port_name] = true;
             } else {
                 if (m_prefer_bind_output_tensor) {
@@ -126,7 +136,10 @@ bool OnnxInferenceInOutData::_update_io_binding_output()
             auto &tensor_data_u8 = std::get<MappedTensorData_u8>(port_data->m_tensor_data);
             if (tensor_data_u8.has_data() && m_prefer_bind_output_tensor) {
                 RDX_INFO_DEV(nullptr, __func__, "Binding output port: {} (uint8) with tensor", port_name);
-                m_io_binding->BindOutput(port_name.c_str(), *tensor_data_u8.onnx_tensor);
+                auto ort_value = Ort::Value::CreateTensor<uint8_t>(
+                    *tensor_data_u8.onnx_memory_info, tensor_data_u8.data->data(), tensor_data_u8.data->size(),
+                    tensor_data_u8.shape.data(), tensor_data_u8.shape.size());
+                m_io_binding->BindOutput(port_name.c_str(), std::move(ort_value));
                 m_output_port_bound_by_tensor[port_name] = true;
             } else {
                 if (m_prefer_bind_output_tensor) {

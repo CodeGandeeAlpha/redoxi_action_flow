@@ -50,6 +50,8 @@ RandomFrameVideoGenerator::ReadFrameResult
     data.set_image(random_frame);
     SourceData_t::FrameMetadata_t metadata;
     metadata.frame_num = _increment_frame_number_by(frame_number, 1);
+    metadata.width = random_frame.cols;
+    metadata.height = random_frame.rows;
     data.set_frame_metadata(metadata);
 
     return ReadFrameResult::OK;

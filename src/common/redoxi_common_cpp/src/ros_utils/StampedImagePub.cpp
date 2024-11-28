@@ -43,10 +43,10 @@ int StampedImagePub::publish(const sensor_msgs::msg::Image &image_msg,
         return -1;
     }
 
-    //! If image is empty, just publish it without text
+    //! If image is empty, treat it as error, ignore it
     if (image_msg.data.empty()) {
-        m_pub->publish(image_msg);
-        return 0;
+        // m_pub->publish(image_msg);
+        return -1;
     }
 
     //! Convert sensor_msgs::msg::Image to cv::Mat
@@ -74,10 +74,10 @@ int StampedImagePub::publish(const cv::Mat &image,
         return -1;
     }
 
-    //! If image is empty, just publish it without text
+    //! If image is empty, treat it as error, ignore it
     if (image.empty()) {
-        m_pub->publish(sensor_msgs::msg::Image());
-        return 0;
+        // m_pub->publish(sensor_msgs::msg::Image());
+        return -1;
     }
 
     cv::Mat stamped_image = image;

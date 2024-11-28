@@ -4,7 +4,7 @@
 
 namespace rdx_video = redoxi_works::video_readers;
 namespace rdx = redoxi_works;
-const char *fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4";
+// const char *fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4";
 
 void print_jsons();
 

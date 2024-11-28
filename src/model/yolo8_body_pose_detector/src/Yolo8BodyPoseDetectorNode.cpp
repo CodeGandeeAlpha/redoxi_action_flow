@@ -158,8 +158,10 @@ int Yolo8BodyPoseDetectorNode::_process_image_request()
             // do inference
             DetectionResult_t det_result;
             if (ret_extract_image == 0) {
+                //! Log the resource index using RDX_INFO_DEV
+                RDX_INFO_DEV(this, __func__, false, "Using inference resource index: {}", resource.index_in_pool);
                 _do_inference(&det_result, input_image, resource);
-            };
+            }
 
             // create output request
             ByImageRequest::OutputSourceData_t o_source;
@@ -199,6 +201,7 @@ int Yolo8BodyPoseDetectorNode::_do_inference(DetectionResult_t *output_result,
                                              const InferenceResource_t &resource,
                                              std::optional<UUIDType> msg_uuid)
 {
+    // FIXME: it looks like onnx inference has memory leak, need to investigate
     // do inference
     auto model = resource.model;
     auto inout_data = resource.inout_data;
