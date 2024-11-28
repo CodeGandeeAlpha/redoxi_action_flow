@@ -104,7 +104,7 @@ video_source_params = {
     "declare_params": {},
     "init_config": {
         "video_url": fn_video,
-        "auto_reply": True,
+        "auto_replay": True,
         "primary_output_spec": {
             "downstream_specs": [
                 {

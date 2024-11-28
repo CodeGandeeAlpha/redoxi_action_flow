@@ -7,7 +7,7 @@
 
 #include <yolo8_body_pose_detector/yolo8_body_pose_detector.hpp>
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
-#include <redoxi_common_nodes/detection_ports/DetectionActionInputPort.hpp>
+#include <redoxi_common_nodes/detection_ports/DetectionRequestInputPort.hpp>
 #include <redoxi_common_nodes/detection_ports/DetectionResponseOutputPort.hpp>
 #include <redoxi_common_nodes/image_ports/AsyncImageInputPort.hpp>
 #include <redoxi_dnn_models/yolo8/Yolo8PoseModel.hpp>
@@ -32,7 +32,7 @@ struct InferenceResource {
     int index_in_pool = 0;
 };
 
-using DetectionRequestInputPort = detection_ports::request_response::DetectionActionInputPort;
+using DetectionRequestInputPort = detection_ports::request_response::DetectionRequestInputPort;
 using ImageRequestInputPort = image_ports::AsyncImageInputPort;
 using ImageRequestOutputPort = detection_ports::response_only::DetectionResponseOutputPort;
 

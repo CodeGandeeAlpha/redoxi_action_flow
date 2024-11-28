@@ -63,6 +63,7 @@ class OnnxInferenceInOutData : public InferenceInOutData
     std::atomic_bool m_input_port_configuration_dirty{false};
     std::atomic_bool m_output_port_configuration_dirty{false};
 
+    // FIXME: disabled due to possible memory leak, investigate later
     // whenever possible, use io binding to do inference?
     std::atomic_bool m_use_io_binding{false};
 
