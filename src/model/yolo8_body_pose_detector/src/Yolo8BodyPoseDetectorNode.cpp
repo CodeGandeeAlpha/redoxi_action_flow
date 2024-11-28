@@ -13,6 +13,7 @@
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 #include <redoxi_dnn_models/message_conversion.hpp>
 #include <redoxi_common_nodes/port_handlers/PullProcessSendHandler.hpp>
+#include <std_msgs/msg/string.hpp>
 
 using DetectionMessage_t = redoxi_public_msgs::msg::Detection;
 using PointMessage_t = geometry_msgs::msg::Point;
@@ -43,6 +44,7 @@ struct Yolo8BodyPoseDetectorNode::Impl {
 
     // visualization publisher
     std::shared_ptr<StampedImagePub> pub_visualization;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_detection_done;
 };
 
 Yolo8BodyPoseDetectorNode::Yolo8BodyPoseDetectorNode(const std::string &node_name,
@@ -178,6 +180,16 @@ int Yolo8BodyPoseDetectorNode::_process_image_request()
                 cv::Mat vis_canvas = input_image.clone();
                 _draw_visualization(vis_canvas, det_result);
                 m_impl->pub_visualization->publish(vis_canvas);
+            }
+
+            // FIXME: add this to config
+            // publish detection done, used for timing measurement
+            auto frame_num = source_data->get_goal()->frame.metadata.frame_num;
+            RDX_INFO_DEV(this, __func__, false, "Publishing detection done, frame_num={}", frame_num);
+            if (m_impl->pub_detection_done) {
+                std_msgs::msg::String msg;
+                msg.data = fmt::format("detection done,frame_num={}", frame_num);
+                m_impl->pub_detection_done->publish(msg);
             }
 
             // fill the action result, nothing to do
@@ -322,6 +334,9 @@ int Yolo8BodyPoseDetectorNode::_update_init_config(std::shared_ptr<BaseInitConfi
     if (!config->visualization_topic.empty()) {
         m_impl->pub_visualization = std::make_shared<StampedImagePub>(this, config->visualization_topic);
     }
+
+    // create detection done publisher
+    m_impl->pub_detection_done = this->create_publisher<std_msgs::msg::String>("probe/detection_done", 100);
 
     return 0;
 }

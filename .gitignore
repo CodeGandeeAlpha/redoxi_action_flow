@@ -49,6 +49,7 @@ design.md
 
 build-*/
 .cache/
+.bigdata/
 
 __pycache__/
 # src/extern/rosboard

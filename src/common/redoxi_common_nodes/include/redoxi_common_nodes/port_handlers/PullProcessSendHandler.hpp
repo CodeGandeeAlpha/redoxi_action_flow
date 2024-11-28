@@ -17,7 +17,7 @@ namespace redoxi_works::port_handlers
 
 template <input_port_types::AsyncActionInputPortSpecConcept InputPortSpecType,
           output_port_types::AsyncActionOutputPortSpecConcept OutputPortSpecType,
-          ResourceTokenConcept ResourceTokenType>
+          ResourceTokenConcept ResourceTokenType = DummyResourceToken>
 class PullProcessSendHandler
 {
   public:

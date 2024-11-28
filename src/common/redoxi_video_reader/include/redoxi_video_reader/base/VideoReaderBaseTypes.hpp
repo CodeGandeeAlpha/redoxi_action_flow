@@ -25,12 +25,7 @@ using RequestPolicy = OutputPortSpec::DeliveryPolicy_t;
 //! The init config for RedoxiVideoReaderBase or its subclass
 struct InitConfig : public common_nodes::OpenCloseNode::InitConfig_t {
     virtual ~InitConfig() = default;
-    InitConfig()
-    {
-        // by default, only starts sending any data when some downstream is ready
-        // skip if no downstream is ready
-        primary_output_spec->set_fallback_delivery_precondition(DeliveryPrecondition::AnyDownstreamReady);
-    }
+    InitConfig() = default;
     //! The downstream nodes, indexed by node name
     std::shared_ptr<OutputPortSpec::InitConfig_t> primary_output_spec = std::make_shared<OutputPortSpec::InitConfig_t>();
 

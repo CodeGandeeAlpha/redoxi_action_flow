@@ -18,68 +18,6 @@ using RetryPolicy = output_port_types::DefaultRetryPolicy<TimeUnit>;
 
 //! Source data type for detection request output port
 using DeliverySourceData = image_ports::types::DeliverySourceData;
-// class DeliverySourceData
-// {
-//   public:
-//     using PublishMessageType_t = sensor_msgs::msg::Image;
-//     using ActionDataTrait_t = DetectionRequestActionDataTrait;
-//     inline static constexpr const char *DefaultPublishEncoding = sensor_msgs::image_encodings::BGR8;
-
-//     DeliverySourceData()
-//     {
-//         static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>,
-//                       "DeliverySourceData must satisfy DeliverySourceDataConcept");
-//         uid = boost::uuids::random_generator()();
-//     }
-
-//     virtual ~DeliverySourceData() = default;
-
-//     //! Get the UUID associated with this source data
-//     virtual boost::uuids::uuid get_uuid() const
-//     {
-//         return uid;
-//     }
-
-//     //! Convert the source data to a ROS message for publishing
-//     virtual int to_publish_message(PublishMessageType_t &msg) const
-//     {
-//         if (!image.has_value() || image->empty()) {
-//             // no image to publish
-//             return -1;
-//         }
-
-//         cv::Mat output_image = image->clone();
-
-//         //! Draw detections on the image
-//         for (const auto &detection : detections) {
-//             // Draw bounding box
-//             cv::Rect bbox(detection.bbox.x, detection.bbox.y,
-//                           detection.bbox.width, detection.bbox.height);
-//             cv::rectangle(output_image, bbox, cv::Scalar(0, 255, 0), 2);
-
-//             // Draw keypoints
-//             for (const auto &keypoint : detection.keypoints.keypoints_2) {
-//                 cv::Point2f pt(keypoint.x, keypoint.y);
-//                 cv::circle(output_image, pt, 3, cv::Scalar(255, 0, 0), -1);
-//             }
-//         }
-
-//         //! Convert to ROS message using cv_bridge
-//         std_msgs::msg::Header header;
-//         header.stamp = rclcpp::Clock().now();
-//         cv_bridge::CvImage cv_bridge_img(header, DefaultPublishEncoding, output_image);
-//         msg = *cv_bridge_img.toImageMsg();
-//         return 0;
-//     }
-
-//     // auxiliary data for easy extension without inheritance
-//     std::any auxiliary_data;
-//     boost::uuids::uuid uid;
-//     std::vector<redoxi_public_msgs::msg::Detection> detections;
-
-//     // the image is for publish only
-//     std::optional<cv::Mat> image;
-// };
 
 //! Delivery target data type for detection request output port
 using DeliveryTargetDataBase = output_port_types::DefaultTargetData<DetectionRequestActionType,
@@ -152,17 +90,15 @@ class DeliveryRequest : public DeliveryRequestBase
 
         auto &goal = target_data.get_goal();
         const auto &source_data = this->m_source_data;
-        goal.detections = source_data.detections;
-        if (source_data.image.has_value()) {
-            target_data.image = source_data.image.value();
+        const auto &image_msg = source_data.get_image();
+        target_data.image = image_msg;
+
+        if (!image_msg.empty()) {
             std_msgs::msg::Header header;
             header.stamp = rclcpp::Clock().now();
-            goal.frame.raw_image = *cv_bridge::CvImage(header,
-                                                       DeliverySourceData::DefaultPublishEncoding,
-                                                       target_data.image)
-                                        .toImageMsg();
-            goal.frame.metadata.width = target_data.image.cols;
-            goal.frame.metadata.height = target_data.image.rows;
+            source_data.to_publish_message(goal.frame.raw_image);
+            goal.frame.metadata.width = image_msg.cols;
+            goal.frame.metadata.height = image_msg.rows;
         }
 
         // set additional information into the goal

@@ -1,5 +1,8 @@
 ## Roadmap
 
+### IMPORTANT
+- in output port, "fallback_delivery_precondition" actually controls the precondition, not the downstream.precondition
+
 ### core functions
 - [] support shared memory in all nodes
 - [] implement python action input/output port
