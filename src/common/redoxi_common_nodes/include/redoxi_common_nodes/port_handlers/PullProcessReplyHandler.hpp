@@ -96,7 +96,7 @@ class PullProcessReplyHandler
         if (m_resource_token_queue) {
             // resource is limited, so we need to get it from the queue
             if (m_config->block_resource_acquisition) {
-                got_resource_token = m_resource_token_queue->pop(resource_token);
+                m_resource_token_queue->pop(resource_token);
             } else {
                 got_resource_token = m_resource_token_queue->try_pop(resource_token);
             }

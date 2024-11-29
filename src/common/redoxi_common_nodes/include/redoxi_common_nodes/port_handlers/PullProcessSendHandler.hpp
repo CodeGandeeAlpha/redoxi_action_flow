@@ -106,9 +106,9 @@ class PullProcessSendHandler
 
         // get resource token
         ResourceToken_t resource_token;
-        bool got_resource_token = false;
+        bool got_resource_token = true;
         if (m_config->block_resource_acquisition) {
-            got_resource_token = m_resource_token_queue->pop(resource_token);
+            m_resource_token_queue->pop(resource_token);
         } else {
             got_resource_token = m_resource_token_queue->try_pop(resource_token);
         }

@@ -431,12 +431,13 @@ int Yolo8BodyPoseDetectorNode::_process_detection_request()
     RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Getting an inference resource", msg_uuid_str);
     InferenceResource_t resource;
     {
-        auto got_resource = m_impl->inference_resource_pool.pop(resource);
-        if (!got_resource) {
-            RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Failed to get an inference resource, aborting goal", msg_uuid_str);
-            goal_handle->abort(std::make_shared<InputAction_t::Result>());
-            return -1;
-        }
+        m_impl->inference_resource_pool.pop(resource);
+        // auto got_resource = m_impl->inference_resource_pool.pop(resource);
+        // if (!got_resource) {
+        //     RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Failed to get an inference resource, aborting goal", msg_uuid_str);
+        //     goal_handle->abort(std::make_shared<InputAction_t::Result>());
+        //     return -1;
+        // }
     }
 
     // do inference
