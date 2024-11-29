@@ -17,6 +17,7 @@
   <depend>redoxi_public_msgs</depend>
   <depend>cv_bridge</depend>
   <depend>json_struct</depend>
+
   <!-- cpp libraries -->
   <depend>nlohmann-json3-dev</depend>
 

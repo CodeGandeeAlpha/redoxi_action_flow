@@ -13,8 +13,8 @@ void print_config_jsons();
 
 int main(int argc, char **argv)
 {
-    // print_config_jsons();
-    // return 0;
+    print_config_jsons();
+    return 0;
 
     spdlog::info("Initializing ROS2...");
     //! Initialize ROS2

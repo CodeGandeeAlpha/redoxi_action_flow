@@ -1,6 +1,8 @@
 #include <redoxi_samples_nodes/drivers/DetectionRequestDriver.hpp>
 #include <json_struct/json_struct.h>
 #include <spdlog/spdlog.h>
+#include <redoxi_public_msgs/action/process_detections.hpp>
+#include <rosidl_runtime_cpp/traits.hpp>
 
 namespace rdx = redoxi_works;
 namespace rdx_nodes = redoxi_works::common_nodes;
@@ -9,12 +11,15 @@ using NodeType = redoxi_works::samples_nodes::drivers::DetectionRequestDriver;
 using NodeInitConfig = NodeType::InitConfig_t;
 using NodeRuntimeConfig = NodeType::RuntimeConfig_t;
 using NodeConfigTemplate = rdx::NodeConfigTemplate<NodeInitConfig, NodeRuntimeConfig>;
+using DetectionRequestAction = redoxi_public_msgs::action::ProcessDetections;
 
 void print_json()
 {
     NodeConfigTemplate config;
     auto json_string = JS::serializeStruct(config);
     std::cout << json_string << std::endl;
+
+    // std::cout << rosidl_generator_traits::name<DetectionRequestAction::Goal>() << std::endl;
 }
 
 int main(int argc, char **argv)

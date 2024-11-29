@@ -93,5 +93,9 @@ colcon build --packages-up-to $PackagesToBuild \
     -DJSON_STRUCT_OPT_INSTALL=ON
 source install/setup.bash
 
-# select gpu 0, because windows docker has issues with multiple gpus
-export CUDA_VISIBLE_DEVICES=0
+# Set CUDA_VISIBLE_DEVICES in WSL2 environment
+# windows docker has problem with multiple gpus
+if grep -q "WSL2" /proc/version; then
+    echo "Running in WSL2, setting CUDA_VISIBLE_DEVICES=0"
+    export CUDA_VISIBLE_DEVICES=0
+fi

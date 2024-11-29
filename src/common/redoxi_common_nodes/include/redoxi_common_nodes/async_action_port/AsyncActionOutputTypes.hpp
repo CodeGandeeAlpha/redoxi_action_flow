@@ -1,9 +1,10 @@
 #pragma once
 
 #include <optional>
-#include <any>
+#include <typeinfo>
 #include <sensor_msgs/msg/image.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
+#include <rosidl_runtime_cpp/traits.hpp>
 #include <json_struct/json_struct.h>
 
 #include <redoxi_common_nodes/async_action_port/output_port_concepts.hpp>
@@ -822,9 +823,11 @@ class DefaultInitConfig
     int num_buffer_requests{1};
     bool preserve_request_order{true};
     DeliveryPrecondition fallback_delivery_precondition{DeliveryPrecondition::DontCare};
+    std::string _action_goal_type = rosidl_generator_traits::name<typename DownstreamSpec_t::ActionType_t::Goal>();
 
   public:
-    JS_OBJECT(JS_MEMBER(downstream_specs),
+    JS_OBJECT(JS_MEMBER(_action_goal_type),
+              JS_MEMBER(downstream_specs),
               JS_MEMBER(num_buffer_requests),
               JS_MEMBER(preserve_request_order),
               JS_MEMBER(fallback_delivery_precondition));
