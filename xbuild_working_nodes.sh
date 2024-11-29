@@ -49,7 +49,7 @@ if [[ "$*" == *"--verbose"* ]]; then
 fi
 
 # number of parallel jobs, equal to the number of cores-1
-NUM_JOBS=$(($(nproc) - 1))
+NUM_JOBS=$(($(nproc) - 3))
 
 # Check if --debug or --release flag is provided, default to release
 BUILD_TYPE="RelWithDebInfo"
