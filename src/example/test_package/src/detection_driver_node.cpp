@@ -1,4 +1,6 @@
 #include <redoxi_samples_nodes/drivers/DetectionRequestDriver.hpp>
+#include <json_struct/json_struct.h>
+#include <spdlog/spdlog.h>
 
 namespace rdx = redoxi_works;
 namespace rdx_nodes = redoxi_works::common_nodes;
@@ -6,9 +8,20 @@ namespace rdx_nodes = redoxi_works::common_nodes;
 using NodeType = redoxi_works::samples_nodes::drivers::DetectionRequestDriver;
 using NodeInitConfig = NodeType::InitConfig_t;
 using NodeRuntimeConfig = NodeType::RuntimeConfig_t;
+using NodeConfigTemplate = rdx::NodeConfigTemplate<NodeInitConfig, NodeRuntimeConfig>;
+
+void print_json()
+{
+    NodeConfigTemplate config;
+    auto json_string = JS::serializeStruct(config);
+    std::cout << json_string << std::endl;
+}
 
 int main(int argc, char **argv)
 {
+    print_json();
+    return 0;
+
     //! Initialize ROS
     rclcpp::init(argc, argv);
 
