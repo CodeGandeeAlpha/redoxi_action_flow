@@ -72,7 +72,7 @@ void SimpleActionGenerator::_step_send_by_tbb_graph()
     //! Create delivery request
     auto delivery_request = _create_delivery_request(source_data);
     if (AlwaysUsePing) {
-        delivery_request.as_ping();
+        delivery_request.set_control_signal_code(ControlSignalCode::Ping);
     }
 
     //! Put the delivery request into the frame delivery node

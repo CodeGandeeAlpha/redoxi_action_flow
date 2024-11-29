@@ -13,7 +13,8 @@ namespace output_port_types
 //! data to be sent to the downstream action, in its original format
 //! for example, a cv::Mat image, which is not related to ROS
 template <typename T>
-concept DeliverySourceDataConcept = requires(T t) {
+concept DeliverySourceDataConcept = requires(T t)
+{
     requires std::copyable<T>;
     requires std::is_default_constructible_v<T>;
 
@@ -24,18 +25,19 @@ concept DeliverySourceDataConcept = requires(T t) {
     //! Must have method to get ROS message
     {
         std::declval<const T &>().to_publish_message(std::declval<typename T::PublishMessageType_t &>())
-    } -> std::same_as<int>;
+        } -> std::same_as<int>;
 
     //! Must have method to get UUID
     {
         std::declval<const T &>().get_uuid()
-    } -> std::same_as<boost::uuids::uuid>;
+        } -> std::same_as<boost::uuids::uuid>;
 };
 
 //! data to be sent to the downstream action, in a format that the downstream action can use
 //! for example, a ROS message
 template <typename T>
-concept DeliveryTargetDataConcept = requires(T t) {
+concept DeliveryTargetDataConcept = requires(T t)
+{
     //! Must have ROS message type
     typename T::ActionType_t;
     requires RosActionConcept<typename T::ActionType_t>;
@@ -51,10 +53,6 @@ concept DeliveryTargetDataConcept = requires(T t) {
     typename T::ActionDataTrait_t;
     requires ActionDataTraitConcept<typename T::ActionDataTrait_t>;
 
-    typename T::SendGoalOptions_t;
-    requires std::same_as<typename T::SendGoalOptions_t,
-                          typename rclcpp_action::Client<typename T::ActionType_t>::SendGoalOptions>;
-
     //! Must be copyable
     requires std::copyable<T>;
 
@@ -64,48 +62,41 @@ concept DeliveryTargetDataConcept = requires(T t) {
     //! Must be constructible with a goal
     requires std::constructible_from<T, const typename T::Goal_t &>;
 
-    //! Must have public send goal options
-    {
-        std::declval<const T &>().send_goal_options
-    } -> std::same_as<const typename T::SendGoalOptions_t &>;
-    {
-        std::declval<T &>().send_goal_options
-    } -> std::same_as<typename T::SendGoalOptions_t &>;
-
     //! Must have method to get ROS message
     {
         std::declval<const T &>().get_goal()
-    } -> std::same_as<const typename T::Goal_t &>;
+        } -> std::same_as<const typename T::Goal_t &>;
 
     {
         t.get_goal()
-    } -> std::same_as<typename T::Goal_t &>;
+        } -> std::same_as<typename T::Goal_t &>;
 
     //! Must have method to save/read source data UUID
     {
         std::declval<const T &>().get_source_data_uuid()
-    } -> std::same_as<boost::uuids::uuid>;
+        } -> std::same_as<boost::uuids::uuid>;
     {
         std::declval<T &>().set_source_data_uuid(std::declval<boost::uuids::uuid>())
-    } -> std::same_as<void>;
+        } -> std::same_as<void>;
 
     //! Must have method to get the control signal code
     {
         std::declval<const T &>().get_control_signal_code()
-    } -> std::same_as<ControlSignalCode>;
+        } -> std::same_as<ControlSignalCode>;
     {
         std::declval<T &>().set_control_signal_code(std::declval<ControlSignalCode>())
-    } -> std::same_as<void>;
+        } -> std::same_as<void>;
 
     //! Must have method to convert to publish message
     {
         std::declval<const T &>().to_publish_message(std::declval<typename T::PublishMessageType_t &>())
-    } -> std::same_as<int>;
+        } -> std::same_as<int>;
 };
 
 //! data collected during the delivery process
 template <typename T>
-concept DeliveryStampConcept = requires(T t) {
+concept DeliveryStampConcept = requires(T t)
+{
     requires std::is_default_constructible_v<T>;
     requires std::copyable<T>;
 };
@@ -113,7 +104,8 @@ concept DeliveryStampConcept = requires(T t) {
 
 //! Concept for delivery policy that defines how to send downstream actions
 template <typename T>
-concept DeliveryPolicyConcept = requires(T t) {
+concept DeliveryPolicyConcept = requires(T t)
+{
     requires std::is_default_constructible_v<T>;
 
     //! Must have these type aliases
@@ -125,26 +117,27 @@ concept DeliveryPolicyConcept = requires(T t) {
     //! Must have method to get retry policy
     {
         t.get_retry_policy()
-    } -> std::same_as<typename T::RetryPolicyType_t &>;
+        } -> std::same_as<typename T::RetryPolicyType_t &>;
 
     {
         std::declval<const T &>().get_retry_policy()
-    } -> std::same_as<const typename T::RetryPolicyType_t &>;
+        } -> std::same_as<const typename T::RetryPolicyType_t &>;
 
     //! Must have method to get precondition
     {
         t.get_precondition()
-    } -> std::same_as<DeliveryPrecondition>;
+        } -> std::same_as<DeliveryPrecondition>;
 
     //! Must have method to get drop strategy
     {
         t.get_drop_strategy()
-    } -> std::same_as<DropStrategy>;
+        } -> std::same_as<DropStrategy>;
 };
 
 //! The request to deliver to the downstream action
 template <typename T>
-concept DeliveryRequestConcept = requires(T t) {
+concept DeliveryRequestConcept = requires(T t)
+{
     //! Must have these type aliases
     typename T::SourceDataType_t;
     typename T::TargetDataType_t;
@@ -174,58 +167,59 @@ concept DeliveryRequestConcept = requires(T t) {
     //! Required methods
     {
         t.get_source_data()
-    } -> std::same_as<typename T::SourceDataType_t &>;
+        } -> std::same_as<typename T::SourceDataType_t &>;
     {
         std::declval<const T &>().get_source_data()
-    } -> std::same_as<const typename T::SourceDataType_t &>;
+        } -> std::same_as<const typename T::SourceDataType_t &>;
     {
         t.get_stamp()
-    } -> std::same_as<typename T::StampType_t &>;
+        } -> std::same_as<typename T::StampType_t &>;
     {
         std::declval<const T &>().get_stamp()
-    } -> std::same_as<const typename T::StampType_t &>;
+        } -> std::same_as<const typename T::StampType_t &>;
     // {
     //     t.is_ping_request()
     //     } -> std::same_as<bool>;
     {
         t.get_delivery_policy()
-    } -> std::same_as<typename T::DeliveryPolicy_t *>;
+        } -> std::same_as<typename T::DeliveryPolicy_t *>;
     {
         std::declval<const T &>().get_delivery_policy()
-    } -> std::same_as<const typename T::DeliveryPolicy_t *>;
+        } -> std::same_as<const typename T::DeliveryPolicy_t *>;
 
     //! Must have method to convert this to a ping request
     //! To create a ping request, you do T().as_ping()
     {
         t.as_ping()
-    } -> std::same_as<void>;
+        } -> std::same_as<void>;
 
     //! must be able to convert to target data
     //! @return 0 if success, -1 if failed
     {
         std::declval<const T &>().to_target_data(std::declval<typename T::TargetDataType_t &>())
-    } -> std::same_as<int>;
+        } -> std::same_as<int>;
 
     //! Must have method to get and set control signal code
     {
         std::declval<const T &>().get_control_signal_code()
-    } -> std::same_as<ControlSignalCode>;
+        } -> std::same_as<ControlSignalCode>;
     {
         std::declval<T &>().set_control_signal_code(std::declval<ControlSignalCode>())
-    } -> std::same_as<void>;
+        } -> std::same_as<void>;
 
     //! Must have method to get and set send goal options
     {
         std::declval<const T &>().send_goal_options
-    } -> std::same_as<const typename T::SendGoalOptions_t &>;
+        } -> std::same_as<const typename T::SendGoalOptions_t &>;
     {
         std::declval<T &>().send_goal_options
-    } -> std::same_as<typename T::SendGoalOptions_t &>;
+        } -> std::same_as<typename T::SendGoalOptions_t &>;
 };
 
 //! A task to deliver to the downstream action
 template <typename T>
-concept DeliveryTaskConcept = requires(T t) {
+concept DeliveryTaskConcept = requires(T t)
+{
     requires std::is_default_constructible_v<T>;
     requires std::copyable<T>;
 
@@ -241,28 +235,29 @@ concept DeliveryTaskConcept = requires(T t) {
     //! Required methods
     {
         t.get_request()
-    } -> std::same_as<typename T::RequestType_t &>;
+        } -> std::same_as<typename T::RequestType_t &>;
     {
         std::declval<const T &>().get_request()
-    } -> std::same_as<const typename T::RequestType_t &>;
+        } -> std::same_as<const typename T::RequestType_t &>;
     {
         t.set_request(std::declval<const typename T::RequestType_t &>())
-    } -> std::same_as<void>;
+        } -> std::same_as<void>;
     {
         t.get_target_data()
-    } -> std::same_as<typename T::TargetDataType_t &>;
+        } -> std::same_as<typename T::TargetDataType_t &>;
     {
         std::declval<const T &>().get_target_data()
-    } -> std::same_as<const typename T::TargetDataType_t &>;
+        } -> std::same_as<const typename T::TargetDataType_t &>;
     {
         t.set_target_data(std::declval<const typename T::TargetDataType_t &>())
-    } -> std::same_as<void>;
+        } -> std::same_as<void>;
 };
 
 
 //! Concept for downstream specification that defines how to send downstream actions
 template <typename T>
-concept DownstreamSpecConcept = requires(T t) {
+concept DownstreamSpecConcept = requires(T t)
+{
     requires std::is_default_constructible_v<T>;
     requires std::copyable<T>;
     //! Must have action type
@@ -293,64 +288,65 @@ concept DownstreamSpecConcept = requires(T t) {
     //! Must have method to get its own name
     {
         std::declval<const T &>().get_name()
-    } -> std::same_as<const std::string &>;
+        } -> std::same_as<const std::string &>;
 
     //! Must have method to set its own name
     {
         std::declval<T &>().set_name(std::declval<const std::string &>())
-    } -> std::same_as<void>;
+        } -> std::same_as<void>;
 
     //! Must have method to get action name
     {
         std::declval<const T &>().get_action_name()
-    } -> std::same_as<const std::string &>;
+        } -> std::same_as<const std::string &>;
 
     //! Must have method to get delivery policy
     {
         std::declval<T &>().get_delivery_policy()
-    } -> std::same_as<typename T::DeliveryPolicy_t &>;
+        } -> std::same_as<typename T::DeliveryPolicy_t &>;
     {
         std::declval<const T &>().get_delivery_policy()
-    } -> std::same_as<const typename T::DeliveryPolicy_t &>;
+        } -> std::same_as<const typename T::DeliveryPolicy_t &>;
     {
         std::declval<T &>().set_delivery_policy(std::declval<const typename T::DeliveryPolicy_t &>())
-    } -> std::same_as<void>;
+        } -> std::same_as<void>;
 
     //! Must have method to get debug publish flag
     {
         std::declval<const T &>().get_use_debug_publish()
-    } -> std::same_as<bool>;
+        } -> std::same_as<bool>;
 
     //! Must have methods to get source data debug topics
     {
         std::declval<const T &>().get_debug_topic_source_data_sending()
-    } -> std::same_as<std::optional<std::string>>;
+        } -> std::same_as<std::optional<std::string>>;
 
     {
         std::declval<const T &>().get_debug_topic_source_data_succeeded()
-    } -> std::same_as<std::optional<std::string>>;
+        } -> std::same_as<std::optional<std::string>>;
 
     {
         std::declval<const T &>().get_debug_topic_source_data_failed()
-    } -> std::same_as<std::optional<std::string>>;
+        } -> std::same_as<std::optional<std::string>>;
 
     //! Must have methods to get target data debug topics
     {
         std::declval<const T &>().get_debug_topic_target_data_sending()
-    } -> std::same_as<std::optional<std::string>>;
+        } -> std::same_as<std::optional<std::string>>;
 
     {
         std::declval<const T &>().get_debug_topic_target_data_succeeded()
-    } -> std::same_as<std::optional<std::string>>;
+        } -> std::same_as<std::optional<std::string>>;
 
     {
         std::declval<const T &>().get_debug_topic_target_data_failed()
-    } -> std::same_as<std::optional<std::string>>;
+        } -> std::same_as<std::optional<std::string>>;
 };
 
 //! Concept for initialization configuration
 template <typename T>
-concept InitConfigConcept = requires(T t) {
+concept InitConfigConcept = requires(T t)
+{
     requires std::is_default_constructible_v<T>;
     requires std::copyable<T>;
     typename T::DownstreamSpec_t;
@@ -359,31 +355,32 @@ concept InitConfigConcept = requires(T t) {
     //! Must have both const and non-const methods to get downstream specs
     {
         std::declval<const T &>().get_downstream_specs()
-    } -> std::same_as<const std::vector<typename T::DownstreamSpec_t> &>;
+        } -> std::same_as<const std::vector<typename T::DownstreamSpec_t> &>;
 
     {
         std::declval<T &>().get_downstream_specs()
-    } -> std::same_as<std::vector<typename T::DownstreamSpec_t> &>;
+        } -> std::same_as<std::vector<typename T::DownstreamSpec_t> &>;
 
     //! Must have method to get number of buffer requests
     {
         std::declval<const T &>().get_num_buffer_requests()
-    } -> std::convertible_to<int64_t>;
+        } -> std::convertible_to<int64_t>;
 
     //! Must have method to get preserve request order flag
     {
         std::declval<const T &>().get_preserve_request_order()
-    } -> std::same_as<bool>;
+        } -> std::same_as<bool>;
 
     //! Must have method to get fallback delivery precondition
     {
         std::declval<const T &>().get_fallback_delivery_precondition()
-    } -> std::same_as<DeliveryPrecondition>;
+        } -> std::same_as<DeliveryPrecondition>;
 };
 
 //! Concept for downstream interface
 template <typename T>
-concept DownstreamConcept = requires(T t) {
+concept DownstreamConcept = requires(T t)
+{
     requires std::is_default_constructible_v<T>;
     requires std::copyable<T>;
 
@@ -429,53 +426,53 @@ concept DownstreamConcept = requires(T t) {
     //! Must have method to get downstream spec
     {
         std::declval<const T &>().get_downstream_spec()
-    } -> std::same_as<const typename T::DownstreamSpec_t &>;
+        } -> std::same_as<const typename T::DownstreamSpec_t &>;
 
     {
         std::declval<T &>().get_downstream_spec()
-    } -> std::same_as<typename T::DownstreamSpec_t &>;
+        } -> std::same_as<typename T::DownstreamSpec_t &>;
 
     //! Must have methods to get/set action client
     {
         std::declval<const T &>().get_action_client()
-    } -> std::same_as<typename T::ActionClient_t::SharedPtr>;
+        } -> std::same_as<typename T::ActionClient_t::SharedPtr>;
 
     {
         std::declval<T &>().set_action_client(std::declval<typename T::ActionClient_t::SharedPtr>())
-    } -> std::same_as<void>;
+        } -> std::same_as<void>;
 
     //! Must have initialization method
     {
         std::declval<T &>().init_by_spec(
             std::declval<const typename T::DownstreamSpec_t &>(),
             std::declval<rclcpp::Node *>())
-    } -> std::same_as<int>;
+        } -> std::same_as<int>;
 
     //! Get source data debug publishers
     {
         std::declval<const T &>().get_debug_pub_source_data_sending()
-    } -> std::same_as<std::shared_ptr<typename T::SourcePublisherType_t>>;
+        } -> std::same_as<std::shared_ptr<typename T::SourcePublisherType_t>>;
 
     {
         std::declval<const T &>().get_debug_pub_source_data_succeeded()
-    } -> std::same_as<std::shared_ptr<typename T::SourcePublisherType_t>>;
+        } -> std::same_as<std::shared_ptr<typename T::SourcePublisherType_t>>;
 
     {
         std::declval<const T &>().get_debug_pub_source_data_failed()
-    } -> std::same_as<std::shared_ptr<typename T::SourcePublisherType_t>>;
+        } -> std::same_as<std::shared_ptr<typename T::SourcePublisherType_t>>;
 
     //! Get target data debug publishers
     {
         std::declval<const T &>().get_debug_pub_target_data_sending()
-    } -> std::same_as<std::shared_ptr<typename T::TargetPublisherType_t>>;
+        } -> std::same_as<std::shared_ptr<typename T::TargetPublisherType_t>>;
 
     {
         std::declval<const T &>().get_debug_pub_target_data_succeeded()
-    } -> std::same_as<std::shared_ptr<typename T::TargetPublisherType_t>>;
+        } -> std::same_as<std::shared_ptr<typename T::TargetPublisherType_t>>;
 
     {
         std::declval<const T &>().get_debug_pub_target_data_failed()
-    } -> std::same_as<std::shared_ptr<typename T::TargetPublisherType_t>>;
+        } -> std::same_as<std::shared_ptr<typename T::TargetPublisherType_t>>;
 };
 
 

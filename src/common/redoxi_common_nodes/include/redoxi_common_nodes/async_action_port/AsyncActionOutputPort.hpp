@@ -684,7 +684,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
             for (auto &ds : m_downstreams) {
                 SendResult_t result_for_ds;
                 auto ret = _deliver_data_with_retry(&result_for_ds, target_data,
-                                                    ds, request_delivery_policy);
+                                                    ds, task.get_request(), request_delivery_policy);
 
                 // notify the callback
                 if (m_cb_on_deliver_to_downstream_finish) {
@@ -725,6 +725,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         _deliver_data_with_retry(SendResult_t *output_result,
                                  TargetData_t &target_data,
                                  const Downstream_t &ds,
+                                 const DeliveryRequest_t &request,
                                  const DeliveryPolicy_t *prefer_delivery_policy = nullptr)
     {
         //! Set up retry strategy
@@ -772,7 +773,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                          boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name(),
                          attempts + 1, max_attempts, no_drop ? "true" : "false");
 
-            auto result = _send_data_to_downstream(target_data, ds, timeout_each_attempt);
+            auto result = _send_data_to_downstream(target_data, ds, timeout_each_attempt, request.send_goal_options);
             if (output_result != nullptr) {
                 *output_result = result;
             }
@@ -840,7 +841,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
     //! send a single piece of data to downstream
     virtual SendResult_t _send_data_to_downstream(const TargetData_t &target_data,
                                                   const Downstream_t &ds,
-                                                  TimeUnit_t timeout)
+                                                  TimeUnit_t timeout,
+                                                  std::optional<typename DeliveryRequest_t::SendGoalOptions_t> send_goal_options = std::nullopt)
     {
         //! Get the action client for the downstream
         auto client = ds.get_action_client();
@@ -858,7 +860,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         SyncActionSender_t sender(m_parent_node);
         // auto logging_callbacks = sender.template get_logging_callbacks<ActionDataTrait_t>(goal);
         // auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout, logging_callbacks);
-        auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout);
+        auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout, send_goal_options);
 
         return result;
     }

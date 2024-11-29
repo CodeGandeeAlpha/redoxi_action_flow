@@ -208,7 +208,6 @@ class DefaultTargetData
     using Goal_t = typename ActionType_t::Goal;
     using PublishMessageType_t = PublishMessageType;
     using ActionDataTrait_t = ActionDataTrait;
-    using SendGoalOptions_t = typename rclcpp_action::Client<ActionType_t>::SendGoalOptions;
 
     virtual ~DefaultTargetData() = default;
     DefaultTargetData(const Goal_t &goal = Goal_t())
@@ -258,9 +257,6 @@ class DefaultTargetData
     {
         return 0;
     }
-
-    //! Send goal options
-    SendGoalOptions_t send_goal_options;
 
   protected:
     Goal_t m_goal;
@@ -964,7 +960,8 @@ static_assert(DownstreamConcept<_SampleDownstream>,
 //! Concept for AsyncActionOutputPortSpec, which is used to define the async action output port
 //! @note this is a concept for downstream spec, not the port itself, but the port has to use it
 template <typename T>
-concept AsyncActionOutputPortSpecConcept = requires(T t) {
+concept AsyncActionOutputPortSpecConcept = requires(T t)
+{
     //! Action type and related types
     typename T::ActionType_t;
     requires RosActionConcept<typename T::ActionType_t>;

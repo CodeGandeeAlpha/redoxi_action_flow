@@ -81,6 +81,8 @@ void DetectionRequestDriver::_on_detection_request_sent(DetectionRequestOutputPo
                                                         const DetectionRequestOutputPort_t::Downstream_t &downstream)
 {
     (void)delivery_request;
+    auto msg_uuid = target_data.get_source_data_uuid();
+    auto msg_uuid_str = boost::uuids::to_string(msg_uuid);
 
     if (send_result.goal_handle) {
         auto goal_handle = send_result.goal_handle;
@@ -88,7 +90,7 @@ void DetectionRequestDriver::_on_detection_request_sent(DetectionRequestOutputPo
             auto result = downstream.get_action_client()->async_get_result(goal_handle).get();
 
             if (result.code == rclcpp_action::ResultCode::SUCCEEDED && m_detection_response_output_port) {
-                RDX_INFO_DEV(this, __func__, false, "{}", "Got detection request result, sending to detection response output port");
+                RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Got detection request result, sending to detection response output port", msg_uuid_str);
                 auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(get_runtime_config());
                 auto policy = runtime_config->detection_response_enqueue_policy;
 
@@ -103,15 +105,15 @@ void DetectionRequestDriver::_on_detection_request_sent(DetectionRequestOutputPo
                 response_request.set_source_data(response_source_data);
                 auto sent = m_detection_response_output_port->push_request(response_request, policy);
                 if (sent) {
-                    RDX_INFO_DEV(this, __func__, false, "{}", "Sent detection response request to output port");
+                    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Sent detection response request to output port", msg_uuid_str);
                 } else {
-                    RDX_INFO_DEV(this, __func__, false, "{}", "Failed to send detection response request to output port");
+                    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to send detection response request to output port", msg_uuid_str);
                 }
             } else {
-                RDX_INFO_DEV(this, __func__, false, "{}", "Failed to retrieve detection request result");
+                RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to retrieve detection request result", msg_uuid_str);
             }
         } else {
-            RDX_INFO_DEV(this, __func__, false, "{}", "Failed to get goal handle for detection request");
+            RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to get goal handle for detection request", msg_uuid_str);
         }
     }
 }
@@ -155,8 +157,11 @@ int DetectionRequestDriver::_update_runtime_config(std::shared_ptr<BaseRuntimeCo
                 (void)resource_token;
                 (void)output_result;
 
+                auto msg_uuid = ByImageRequest::ActionDataTrait_t::get_uuid(*source_data->get_goal());
+                auto msg_uuid_str = boost::uuids::to_string(msg_uuid);
+
                 // create request
-                RDX_INFO_DEV(this, __func__, false, "{}", "Creating request from source data");
+                RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Creating request from source data", msg_uuid_str);
                 DetectionRequestOutputPort_t::SourceData_t output_source_data;
                 cv::Mat image;
                 if (_extract_image(&image, *source_data)) {
@@ -168,7 +173,7 @@ int DetectionRequestDriver::_update_runtime_config(std::shared_ptr<BaseRuntimeCo
                 // publish visualization
                 bool do_publish_visualization = config->enable_visualization && m_pub_visualization && !image.empty();
                 if (do_publish_visualization) {
-                    RDX_INFO_DEV(this, __func__, false, "{}", "Publishing visualization");
+                    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Publishing visualization", msg_uuid_str);
                     m_pub_visualization->publish(image);
                 }
 
