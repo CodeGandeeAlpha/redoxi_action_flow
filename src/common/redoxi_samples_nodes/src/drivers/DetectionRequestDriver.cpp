@@ -1,6 +1,7 @@
 #include <redoxi_samples_nodes/drivers/DetectionRequestDriver.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <typeinfo>
+#include <functional>
 
 namespace redoxi_works::samples_nodes::drivers
 {
@@ -57,10 +58,10 @@ int DetectionRequestDriver::_update_init_config(std::shared_ptr<BaseInitConfig_t
     }
 
     // create output port
-    if (config->output_port_config) {
+    if (config->detection_request_output_port_config) {
         RDX_INFO_DEV(this, __func__, false, "{}", "Creating output port");
-        m_detection_request_output_port = std::make_shared<OutputPort_t>(this);
-        m_detection_request_output_port->init(config->output_port_config);
+        m_detection_request_output_port = std::make_shared<DetectionRequestOutputPort_t>(this);
+        m_detection_request_output_port->init(config->detection_request_output_port_config);
     }
 
     // create visualization publisher
@@ -74,6 +75,48 @@ int DetectionRequestDriver::_update_init_config(std::shared_ptr<BaseInitConfig_t
     return 0;
 }
 
+void DetectionRequestDriver::_on_detection_request_sent(DetectionRequestOutputPort_t::TargetData_t &target_data,
+                                                        DetectionRequestOutputPort_t::SendResult_t &send_result,
+                                                        const DetectionRequestOutputPort_t::DeliveryRequest_t &delivery_request,
+                                                        const DetectionRequestOutputPort_t::Downstream_t &downstream)
+{
+    (void)delivery_request;
+
+    if (send_result.goal_handle) {
+        auto goal_handle = send_result.goal_handle;
+        if (goal_handle) {
+            auto result = downstream.get_action_client()->async_get_result(goal_handle).get();
+
+            if (result.code == rclcpp_action::ResultCode::SUCCEEDED && m_detection_response_output_port) {
+                RDX_INFO_DEV(this, __func__, false, "{}", "Got detection request result, sending to detection response output port");
+                auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(get_runtime_config());
+                auto policy = runtime_config->detection_response_enqueue_policy;
+
+                //! Log: Creating detection response source data
+                DetectionResponseOutputPort_t::SourceData_t response_source_data;
+                response_source_data.detections = result.result->detections;
+                response_source_data.image = target_data.image.clone();
+                response_source_data.uid = target_data.get_source_data_uuid();
+
+                //! Log: Creating and pushing detection response request
+                DetectionResponseOutputPort_t::DeliveryRequest_t response_request;
+                response_request.set_source_data(response_source_data);
+                auto sent = m_detection_response_output_port->push_request(response_request, policy);
+                if (sent) {
+                    RDX_INFO_DEV(this, __func__, false, "{}", "Sent detection response request to output port");
+                } else {
+                    RDX_INFO_DEV(this, __func__, false, "{}", "Failed to send detection response request to output port");
+                }
+            } else {
+                RDX_INFO_DEV(this, __func__, false, "{}", "Failed to retrieve detection request result");
+            }
+        } else {
+            RDX_INFO_DEV(this, __func__, false, "{}", "Failed to get goal handle for detection request");
+        }
+    }
+}
+
+
 int DetectionRequestDriver::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config)
 {
     RDX_INFO_DEV(this, __func__, false, "{}", "Updating runtime configuration");
@@ -82,6 +125,11 @@ int DetectionRequestDriver::_update_runtime_config(std::shared_ptr<BaseRuntimeCo
     if (!config) {
         RDX_RAISE_ERROR("Invalid runtime config, expected type: {}", typeid(RuntimeConfig_t).name());
     }
+
+    m_detection_request_output_port->set_callback_on_deliver_to_downstream_finish(
+        std::bind(&DetectionRequestDriver::_on_detection_request_sent, this,
+                  std::placeholders::_1, std::placeholders::_2,
+                  std::placeholders::_3, std::placeholders::_4));
 
     // create port handler
     if (m_image_input_port) {
@@ -96,11 +144,11 @@ int DetectionRequestDriver::_update_runtime_config(std::shared_ptr<BaseRuntimeCo
             m_detection_request_output_port.get(),
             nullptr,
             handler_config,
-            config->output_enqueue_policy,
+            config->detection_request_enqueue_policy,
             this);
 
         m_image_request_port_handler->on_process_input_data =
-            [this, config](OutputRequest_t *output_request,
+            [this, config](DetectionRequestOutputPort_t::DeliveryRequest_t *output_request,
                            ByImageRequest::ActionResult_t *output_result,
                            std::shared_ptr<ByImageRequest::SourceData_t> source_data,
                            auto &resource_token) {
@@ -109,7 +157,7 @@ int DetectionRequestDriver::_update_runtime_config(std::shared_ptr<BaseRuntimeCo
 
                 // create request
                 RDX_INFO_DEV(this, __func__, false, "{}", "Creating request from source data");
-                OutputSourceData_t output_source_data;
+                DetectionRequestOutputPort_t::SourceData_t output_source_data;
                 cv::Mat image;
                 if (_extract_image(&image, *source_data)) {
                     output_source_data.set_image(image);

@@ -27,12 +27,13 @@ DetectionNodeName = "detector"
 DetectionInputActionName = "in/image_request"
 
 VideoSourceNodeName = "video_source"
-fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
+# fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
+fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx"
 fn_model_medium = (
     "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8m-pose-dynbatch.onnx"
 )
-# fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
+fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+# fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
 
 DetectionRelayNodeName = "detection_relay"
 DetectionRelayInputActionName = "in/detections"
@@ -42,8 +43,8 @@ det_node_params = {
     "init_config": {
         "model_configs": [
             {
-                "model_path": fn_model_medium,
-                "device_type": "cuda",
+                "model_path": fn_model_nano,
+                "device_type": "cpu",
                 "device_index": 0,
             },
             # {

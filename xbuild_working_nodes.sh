@@ -49,14 +49,22 @@ if [[ "$*" == *"--verbose"* ]]; then
 fi
 
 # number of parallel jobs, equal to the number of cores-1
-NUM_JOBS=$(($(nproc) - 3))
+NUM_JOBS=$(($(nproc) - 2))
+
+# Add memory check before building
+FREE_MEM_GB=$(free -g | awk '/^Mem:/{print $4}')
+if [ $FREE_MEM_GB -lt 4 ]; then
+    echo "Warning: Low memory available ($FREE_MEM_GB GB). Build might fail."
+    NUM_JOBS=1
+fi
+
 
 # Check if --debug or --release flag is provided, default to release
 BUILD_TYPE="RelWithDebInfo"
 if [[ "$*" == *"--debug"* ]]; then
     BUILD_TYPE="Debug"
 elif [[ "$*" == *"--release"* ]]; then
-    BUILD_TYPE="RelWithDebInfo"
+    BUILD_TYPE="Release"
 fi
 
 # PackagesToBuild="stream_worker psg_common psg_private_msgs psg_public_msgs video_reader"

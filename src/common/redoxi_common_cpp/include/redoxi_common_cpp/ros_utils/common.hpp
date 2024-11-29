@@ -15,11 +15,11 @@
 //! importance is an integer value, the higher the value, the more important the log message is
 //! importance below the threshold will be ignored
 #ifndef REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_INFO
-#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_INFO 3
+#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_INFO 0
 #endif
 
 #ifndef REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_DEBUG
-#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_DEBUG 3
+#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_DEBUG 0
 #endif
 
 #ifndef REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_WARN
@@ -200,12 +200,11 @@ class LogImportanceThreshold
 };
 
 template <typename T>
-concept NodeOrLoggerConcept = requires(T t)
-{
+concept NodeOrLoggerConcept = requires(T t) {
     requires std::is_same_v<std::remove_cvref_t<T>, rclcpp::Logger> ||
-        std::is_convertible_v < std::remove_cvref_t<T>,
-    const rclcpp::Node * > ||
-        std::is_null_pointer_v<std::remove_cvref_t<T>>;
+                 std::is_convertible_v<std::remove_cvref_t<T>,
+                                       const rclcpp::Node *> ||
+                 std::is_null_pointer_v<std::remove_cvref_t<T>>;
 };
 
 //! Log a message using RCLCPP macros with or without thread ID

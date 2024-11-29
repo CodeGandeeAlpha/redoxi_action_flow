@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <any>
 #include <sensor_msgs/msg/image.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <json_struct/json_struct.h>
@@ -207,14 +208,13 @@ class DefaultTargetData
     using Goal_t = typename ActionType_t::Goal;
     using PublishMessageType_t = PublishMessageType;
     using ActionDataTrait_t = ActionDataTrait;
+    using SendGoalOptions_t = typename rclcpp_action::Client<ActionType_t>::SendGoalOptions;
 
     virtual ~DefaultTargetData() = default;
     DefaultTargetData(const Goal_t &goal = Goal_t())
     {
         m_goal = goal;
     }
-
-    virtual DefaultTargetData &operator=(const DefaultTargetData &) = default;
 
     //! Get the underlying ROS message
     const Goal_t &get_goal() const
@@ -258,6 +258,9 @@ class DefaultTargetData
     {
         return 0;
     }
+
+    //! Send goal options
+    SendGoalOptions_t send_goal_options;
 
   protected:
     Goal_t m_goal;
@@ -350,6 +353,7 @@ class DefaultDeliveryRequest
     using DeliveryPolicy_t = DeliveryPolicyType;
     using StampType_t = StampType;
     using TimeUnit_t = typename DeliveryPolicy_t::RetryPolicyType_t::DurationType_t;
+    using SendGoalOptions_t = typename rclcpp_action::Client<typename TargetDataType_t::ActionType_t>::SendGoalOptions;
 
   private:
     inline static constexpr TimeUnit_t DefaultPingResponseWaitTime{std::chrono::milliseconds(50)};
@@ -442,6 +446,9 @@ class DefaultDeliveryRequest
             m_control_signal_code = code;
         }
     }
+
+    //! Send goal options
+    SendGoalOptions_t send_goal_options;
 
   protected:
     //! Source data for the delivery request
@@ -957,8 +964,7 @@ static_assert(DownstreamConcept<_SampleDownstream>,
 //! Concept for AsyncActionOutputPortSpec, which is used to define the async action output port
 //! @note this is a concept for downstream spec, not the port itself, but the port has to use it
 template <typename T>
-concept AsyncActionOutputPortSpecConcept = requires(T t)
-{
+concept AsyncActionOutputPortSpecConcept = requires(T t) {
     //! Action type and related types
     typename T::ActionType_t;
     requires RosActionConcept<typename T::ActionType_t>;
