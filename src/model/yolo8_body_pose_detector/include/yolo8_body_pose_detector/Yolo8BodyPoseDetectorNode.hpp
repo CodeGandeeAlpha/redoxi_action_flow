@@ -69,9 +69,6 @@ class Yolo8BodyPoseDetectorNode : public redoxi_works::common_nodes::StartStopNo
 
     virtual int _process_detection_request();
 
-    //! process detection request
-    virtual int _process_detection_request_old();
-
     //! create a new pull process reply handler for detection request
     virtual int _create_detection_request_handler(const RuntimeConfig_t &runtime_config);
 

@@ -17,10 +17,21 @@ struct Yolo8BodyPoseDetectorNode::Impl {
     using Node_t = Yolo8BodyPoseDetectorNode;
     Impl()
     {
-        int capacity = num_parallel_tasks;
-        inference_task_pool.set_capacity(capacity);
-        for (int i = 0; i < capacity; ++i) {
-            inference_task_pool.push(i);
+        // fill the token queue with initial tokens
+        {
+            int capacity = num_detection_handler_tokens;
+            detection_request_handler_tokens.set_capacity(capacity);
+            for (int i = 0; i < capacity; ++i) {
+                detection_request_handler_tokens.push(i);
+            }
+        }
+
+        {
+            int capacity = num_image_handler_tokens;
+            image_request_handler_tokens.set_capacity(capacity);
+            for (int i = 0; i < capacity; ++i) {
+                image_request_handler_tokens.push(i);
+            }
         }
     }
     tbb::task_group inference_task_group;
@@ -31,9 +42,22 @@ struct Yolo8BodyPoseDetectorNode::Impl {
 
     // this limits the number of concurrent inference tasks
     // each task must first acquire a task id from this pool, then enqueued to wait for inference resource
-    tbb::concurrent_bounded_queue<int> inference_task_pool;
-    int num_parallel_tasks = 4;
-    bool use_parallel_task = false;
+
+    // detection request handler tokens, used for parallel task
+    // detection request's order is maintained by client using goal handle
+    // so it is safe to use parallel task here
+    tbb::concurrent_bounded_queue<int> detection_request_handler_tokens;
+    int num_detection_handler_tokens = 2;
+
+    // image request handler tokens, used for sequential task
+    // image response's order is undetermined, not safe to use parallel task here
+    // so only one token is available, equivalent to sequential task
+    tbb::concurrent_bounded_queue<int> image_request_handler_tokens;
+    int num_image_handler_tokens = 1;
+
+    // use parallel task to handle the detection and image request
+    // so that in blocking mode, one port's missing data will not hang the other port
+    bool use_parallel_task = true;
 
     // visualization publisher
     std::shared_ptr<StampedImagePub> pub_visualization;
@@ -43,11 +67,11 @@ struct Yolo8BodyPoseDetectorNode::Impl {
     using PullProcessSendHandler_t = redoxi_works::port_handlers::PullProcessSendHandler<Node_t::ByImageRequest::InputPort_t::MasterSpec_t,
                                                                                          Node_t::ByImageRequest::OutputPort_t::MasterSpec_t,
                                                                                          InferenceResource_t>;
-    PullProcessSendHandler_t work_then_send_handler;
+    std::shared_ptr<PullProcessSendHandler_t> work_then_send_handler;
 
     // pull input, work on it and then reply
     using PullProcessReplyHandler_t = redoxi_works::port_handlers::PullProcessReplyHandler<Node_t::ByDetectionRequest::InputPort_t::MasterSpec_t,
                                                                                            InferenceResource_t>;
-    PullProcessReplyHandler_t work_then_reply_handler;
+    std::shared_ptr<PullProcessReplyHandler_t> work_then_reply_handler;
 };
 } // namespace redoxi_works::model_nodes
