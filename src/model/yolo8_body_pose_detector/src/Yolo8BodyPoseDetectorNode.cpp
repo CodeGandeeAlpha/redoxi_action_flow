@@ -8,6 +8,7 @@
 #include <cv_bridge/cv_bridge.hpp>
 
 #include <yolo8_body_pose_detector/Yolo8BodyPoseDetectorNode.hpp>
+#include <yolo8_body_pose_detector/Yolo8BodyPoseDetectorImpl.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <redoxi_public_msgs/msg/detection.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
@@ -20,32 +21,6 @@ using PointMessage_t = geometry_msgs::msg::Point;
 
 namespace redoxi_works::model_nodes
 {
-
-struct Yolo8BodyPoseDetectorNode::Impl {
-    Impl()
-    {
-        int capacity = num_parallel_tasks;
-        inference_task_pool.set_capacity(capacity);
-        for (int i = 0; i < capacity; ++i) {
-            inference_task_pool.push(i);
-        }
-    }
-    tbb::task_group inference_task_group;
-
-    // this limits the number of inference resources, like GPU, NPU
-    // each task must first acquire a resource from this pool, then do inference
-    tbb::concurrent_bounded_queue<InferenceResource_t> inference_resource_pool;
-
-    // this limits the number of concurrent inference tasks
-    // each task must first acquire a task id from this pool, then enqueued to wait for inference resource
-    tbb::concurrent_bounded_queue<int> inference_task_pool;
-    int num_parallel_tasks = 4;
-    bool use_parallel_task = false;
-
-    // visualization publisher
-    std::shared_ptr<StampedImagePub> pub_visualization;
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_detection_done;
-};
 
 Yolo8BodyPoseDetectorNode::Yolo8BodyPoseDetectorNode(const std::string &node_name,
                                                      const rclcpp::NodeOptions &options)
@@ -276,9 +251,84 @@ int Yolo8BodyPoseDetectorNode::_stop()
     return 0;
 }
 
+int Yolo8BodyPoseDetectorNode::_create_image_request_handler(const RuntimeConfig_t &runtime_config)
+{
+    (void)runtime_config;
+    return 0;
+}
+
+int Yolo8BodyPoseDetectorNode::_create_detection_request_handler(const RuntimeConfig_t &runtime_config)
+{
+    using ActionDataTrait_t = ByDetectionRequest::InputPort_t::ActionDataTrait_t;
+
+    auto handler_config = std::make_shared<Impl::PullProcessReplyHandler_t::InitConfig_t>();
+    handler_config->block_input_reading = runtime_config.enable_blocking_mode;
+    handler_config->block_resource_acquisition = runtime_config.enable_blocking_mode;
+    bool enable_visualization = runtime_config.enable_visualization;
+
+    m_impl->work_then_reply_handler.init(
+        m_detection_request_input_port.get(),
+        &m_impl->inference_resource_pool,
+        handler_config, this);
+
+    Impl::PullProcessReplyHandler_t::OnProcessInputDataCallback_t process_func =
+        [this, enable_visualization](Impl::PullProcessReplyHandler_t::InputActionResult_t *output_action_result,
+                                     std::shared_ptr<Impl::PullProcessReplyHandler_t::InputSourceData_t> source_data,
+                                     Impl::PullProcessReplyHandler_t::ResourceToken_t &resource_token) {
+            auto msg_uuid = ActionDataTrait_t::get_uuid(*source_data->get_goal());
+            std::string msg_uuid_str = UUIDTrait::to_string(msg_uuid);
+
+            // Extract image from input data
+            cv::Mat input_image;
+            auto ret_extract_image = _extract_image(&input_image, source_data);
+            if (ret_extract_image != 0) {
+                RDX_RAISE_ERROR("[f={}] [msg_uid={}] Failed to extract image from input data, error code: {}",
+                                __func__, msg_uuid_str, ret_extract_image);
+            }
+
+            if (input_image.empty()) {
+                RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Empty image, aborting goal", msg_uuid_str);
+                return -1;
+            }
+
+            // Perform inference
+            DetectionResult_t det_result;
+            auto ret_inference = _do_inference(&det_result, input_image, resource_token);
+            if (ret_inference != 0) {
+                RDX_RAISE_ERROR("[f={}] [msg_uid={}] Failed to do inference, error code: {}",
+                                __func__, msg_uuid_str, ret_inference);
+            }
+
+            // Convert detections to ROS message
+            inference::conversion::to_ros_msg(&output_action_result->detections, det_result);
+
+            // Add frame metadata to each detection
+            for (auto &detection : output_action_result->detections) {
+                detection.frame_metadata = source_data->get_goal()->frame.metadata;
+            }
+
+            // publish visualization
+            if (m_impl->pub_visualization && enable_visualization) {
+                cv::Mat vis_canvas = input_image.clone();
+                _draw_visualization(vis_canvas, det_result);
+                m_impl->pub_visualization->publish(vis_canvas);
+            }
+
+            // Mark the goal as succeeded
+            return 0;
+        };
+    m_impl->work_then_reply_handler.on_process_input_data = process_func;
+
+    return 0;
+}
+
 int Yolo8BodyPoseDetectorNode::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config)
 {
     (void)runtime_config;
+
+    // initialize detection request handler
+    auto config = std::dynamic_pointer_cast<RuntimeConfig_t>(runtime_config);
+    _create_detection_request_handler(*config);
     return 0;
 }
 
@@ -336,7 +386,7 @@ int Yolo8BodyPoseDetectorNode::_update_init_config(std::shared_ptr<BaseInitConfi
     }
 
     // create detection done publisher
-    m_impl->pub_detection_done = this->create_publisher<std_msgs::msg::String>("probe/detection_done", rclcpp::SensorDataQoS());
+    m_impl->pub_detection_done = this->create_publisher<std_msgs::msg::String>("probe/detection_done", 1000);
 
     return 0;
 }
@@ -377,6 +427,27 @@ void Yolo8BodyPoseDetectorNode::_draw_visualization(cv::Mat &canvas,
 }
 
 int Yolo8BodyPoseDetectorNode::_process_detection_request()
+{
+    auto ret = m_impl->work_then_reply_handler.process_and_reply();
+    if (ret == Impl::PullProcessReplyHandler_t::ProcessResult::Error) {
+        RDX_INFO_DEV(this, __func__, false, "Failed to process detection request, error code: {}", int(ret));
+        return -1;
+    } else if (ret == Impl::PullProcessReplyHandler_t::ProcessResult::NoData) {
+        // RDX_INFO_DEV(this, __func__, false, "{}", "No data available, skipping");
+        return 0;
+    } else if (ret == Impl::PullProcessReplyHandler_t::ProcessResult::Success) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Successfully processed detection request");
+        return 0;
+    } else if (ret == Impl::PullProcessReplyHandler_t::ProcessResult::NoResourceToken) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "No resource token, skipping");
+        return 0;
+    } else {
+        RDX_RAISE_ERROR("[f={}] Unexpected process result: {}", __func__, int(ret));
+        return -1;
+    }
+}
+
+int Yolo8BodyPoseDetectorNode::_process_detection_request_old()
 {
     if (!m_detection_request_input_port) {
         // RDX_INFO_DEV(this, __func__, false, "{}", "No detection request input port, skipping");
@@ -579,6 +650,8 @@ int Yolo8BodyPoseDetectorNode::_create_all_inference_resources(
             return ret;
         }
     }
+
+    RDX_INFO_DEV(this, __func__, false, "Successfully created all inference resources, total = {}", m_impl->inference_resource_pool.size());
     return 0;
 }
 

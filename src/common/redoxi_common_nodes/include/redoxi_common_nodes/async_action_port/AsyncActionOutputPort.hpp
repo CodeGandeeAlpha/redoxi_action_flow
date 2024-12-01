@@ -396,7 +396,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         m_downstreams.clear();
         for (auto &it : m_init_config->get_downstream_specs()) {
             Downstream_t ds;
-            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Initializing downstream ...");
+            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Connecting to downstream with action name: {}", it.get_action_name());
             auto ret = ds.init_by_spec(it, m_parent_node);
             if (ret != 0) {
                 RDX_RAISE_ERROR("[{}] failed to initialize downstream", __func__);
@@ -860,7 +860,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         SyncActionSender_t sender(m_parent_node);
         // auto logging_callbacks = sender.template get_logging_callbacks<ActionDataTrait_t>(goal);
         // auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout, logging_callbacks);
-        auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout);
+        auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout, send_goal_options);
 
         return result;
     }

@@ -20,6 +20,9 @@ int DetectionRequestDriver::_start()
     if (m_detection_request_output_port) {
         m_detection_request_output_port->start();
     }
+    if (m_detection_response_output_port) {
+        m_detection_response_output_port->start();
+    }
     return 0;
 }
 
@@ -31,6 +34,9 @@ int DetectionRequestDriver::_stop()
     }
     if (m_detection_request_output_port) {
         m_detection_request_output_port->stop();
+    }
+    if (m_detection_response_output_port) {
+        m_detection_response_output_port->stop();
     }
     return 0;
 }
@@ -54,16 +60,23 @@ int DetectionRequestDriver::_update_init_config(std::shared_ptr<BaseInitConfig_t
 
     // create input port
     if (config->input_port_config && !config->input_port_config->get_action_name().empty()) {
-        RDX_INFO_DEV(this, __func__, false, "{}", "Creating input port with action name: {}", config->input_port_config->get_action_name());
+        RDX_INFO_DEV(this, __func__, false, "Creating input port with action name: {}", config->input_port_config->get_action_name());
         m_image_input_port = std::make_shared<ByImageRequest::InputPort_t>(this);
         m_image_input_port->init(config->input_port_config);
     }
 
     // create output port
     if (config->detection_request_output_port_config) {
-        RDX_INFO_DEV(this, __func__, false, "{}", "Creating output port");
+        RDX_INFO_DEV(this, __func__, false, "{}", "Creating detection request output port");
         m_detection_request_output_port = std::make_shared<DetectionRequestOutputPort_t>(this);
         m_detection_request_output_port->init(config->detection_request_output_port_config);
+    }
+
+    // create detection response output port
+    if (config->detection_response_output_port_config) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Creating detection response output port");
+        m_detection_response_output_port = std::make_shared<DetectionResponseOutputPort_t>(this);
+        m_detection_response_output_port->init(config->detection_response_output_port_config);
     }
 
     // create visualization publisher

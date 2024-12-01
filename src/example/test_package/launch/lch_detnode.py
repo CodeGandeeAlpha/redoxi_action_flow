@@ -30,6 +30,8 @@ DetectionResponseInputActionName = "in/detection_response"
 DetectionResponseOutputActionName = "out/detection_response"
 
 DetectionNodeName = "detector"
+DetectionNodeInputActionName = DetectionRequestInputActionName
+
 VideoSourceNodeName = "video_source"
 
 DetectionDriverNodeName = "driver"
@@ -44,7 +46,7 @@ fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-0
 # fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
 
 DetectionRelayNodeName = "detection_relay"
-DetectionRelayInputActionName = "in/detections"
+DetectionRelayInputActionName = DetectionResponseInputActionName
 
 det_node_params = {
     "declare_params": {},
@@ -64,7 +66,7 @@ det_node_params = {
         "detection_request_config": {
             "input_port_config": {
                 "buffer_capacity": 1,
-                "action_name": DetectionRequestInputActionName,
+                "action_name": DetectionNodeInputActionName,
                 "goal_result_expire_time": 1000000,
             }
         },
@@ -100,8 +102,8 @@ det_node_params = {
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
-        "step_interval": StepIntervals.Fast,
-        "enable_blocking_mode": False,
+        "step_interval": StepIntervals.VeryFast,
+        "enable_blocking_mode": True,
         "model_output_config": {"conf_threshold": 0.1, "iou_threshold": 0.6},
         "enable_visualization": True,
     },
@@ -156,7 +158,7 @@ video_source_params = {
             "drop_strategy": "no_drop",
         },
         "_time_unit": "us(1e-6)",
-        "step_interval": StepIntervals.Slow,
+        "step_interval": StepIntervals.VeryFast,
     },
 }
 
@@ -174,7 +176,7 @@ detection_relay_params = {
         "_time_unit": "us(1e-6)",
     },
     "runtime_config": {
-        "enable_blocking_mode": False,
+        "enable_blocking_mode": True,
         "enable_visualization": True,
         "_time_unit": "us(1e-6)",
         "step_interval": StepIntervals.Fast,
@@ -195,7 +197,7 @@ detection_driver_params = {
             "downstream_specs": [
                 {
                     "name": DetectionNodeName,
-                    "action_name": f"/{DetectionNodeName}/{DetectionRequestInputActionName}",
+                    "action_name": f"/{DetectionNodeName}/{DetectionNodeInputActionName}",
                     "delivery_policy": {
                         "precondition": "dont_care",
                         "drop_strategy": "dont_care",
@@ -209,7 +211,17 @@ detection_driver_params = {
         },
         "detection_response_output_port_config": {
             "_action_goal_type": "redoxi_public_msgs/action/ProcessDetections_Goal",
-            "downstream_specs": [],
+            "downstream_specs": [
+                {
+                    "name": DetectionRelayNodeName,
+                    "action_name": f"/{DetectionRelayNodeName}/{DetectionRelayInputActionName}",
+                    "delivery_policy": {
+                        "precondition": "dont_care",
+                        "drop_strategy": "dont_care",
+                    },
+                    "create_debug_pub": False,
+                },
+            ],
             "num_buffer_requests": 1,
             "preserve_request_order": True,
             "fallback_delivery_precondition": "dont_care",
@@ -343,6 +355,6 @@ def generate_launch_description():
             video_source_node,
             detection_driver_node,
             detection_node,
-            # detection_relay_node,
+            detection_relay_node,
         ]
     )
