@@ -143,7 +143,7 @@ video_source_params = {
             "drop_strategy": "no_drop",
         },
         "_time_unit": "us(1e-6)",
-        "step_interval": StepIntervals.Slow,
+        "step_interval": StepIntervals.VeryFast,
     },
 }
 
@@ -161,7 +161,7 @@ detection_relay_params = {
         "_time_unit": "us(1e-6)",
     },
     "runtime_config": {
-        "enable_blocking_mode": True,
+        "enable_blocking_mode": False,
         "enable_visualization": True,
         "_time_unit": "us(1e-6)",
         "step_interval": StepIntervals.Fast,

@@ -31,15 +31,7 @@ Yolo8BodyPoseDetectorNode::Yolo8BodyPoseDetectorNode(const std::string &node_nam
 
 Yolo8BodyPoseDetectorNode::~Yolo8BodyPoseDetectorNode() noexcept
 {
-    // do not call stop() here, because it will NOT call the subclass's stop()
-    m_status = NodeStatusCode::STOPPED;
-
-    if (m_step_thread && m_step_thread->joinable()) {
-        m_step_thread->join();
-    }
-
-    // let all inference tasks finish
-    m_impl->inference_task_group.wait();
+    _close_all_ports();
 }
 
 int Yolo8BodyPoseDetectorNode::_start()
@@ -210,6 +202,12 @@ int Yolo8BodyPoseDetectorNode::_do_inference(DetectionResult_t *output_result,
 
 int Yolo8BodyPoseDetectorNode::_stop()
 {
+    _close_all_ports();
+    return 0;
+}
+
+void Yolo8BodyPoseDetectorNode::_close_all_ports()
+{
     // stop the input port from receiving new goals
     if (m_detection_request_input_port) {
         auto ret = m_detection_request_input_port->stop();
@@ -233,11 +231,6 @@ int Yolo8BodyPoseDetectorNode::_stop()
             RDX_RAISE_ERROR("[f={}] Failed to stop image request output port, error code: {}", __func__, ret);
         }
     }
-
-    // wait for all inference tasks to finish
-    m_impl->inference_task_group.wait();
-
-    return 0;
 }
 
 // int Yolo8BodyPoseDetectorNode::_create_image_request_handler(const RuntimeConfig_t &runtime_config)
@@ -468,51 +461,12 @@ int Yolo8BodyPoseDetectorNode::_process_image_request()
 
 void Yolo8BodyPoseDetectorNode::_step()
 {
-    auto &tg = m_impl->inference_task_group;
-
-    // process request, and then return the token back to the pool
-    auto process_request = [&](auto &token_pool, auto process_function, const std::string &request_type) {
-        int handler_token;
-        bool got_handler_token = token_pool.try_pop(handler_token);
-        if (got_handler_token) {
-            RDX_INFO_DEV(this, __func__, false, "[req={}] Got handler token: {}", request_type, handler_token);
-            if (m_impl->use_parallel_task) {
-                // parallel run, the output is bound to goal handle
-                // so the order of the output is handled by client using goal handle
-                tg.run([this, handler_token, &token_pool, process_function, request_type]() {
-                    RDX_INFO_DEV(this, __func__, false, "[req={}] Running process function in parallel with token: {}", request_type, handler_token);
-                    process_function();
-
-                    // return the token back to the pool
-                    token_pool.push(handler_token);
-                    RDX_INFO_DEV(this, __func__, false, "[req={}] Returned handler token: {}", request_type, handler_token);
-                });
-            } else {
-                // sequential run, the output is bound to goal handle
-                // so the order of the output is handled by client using goal handle
-                RDX_INFO_DEV(this, __func__, false, "[req={}] Running process function sequentially with token: {}", request_type, handler_token);
-                process_function();
-
-                // return the token back to the pool
-                token_pool.push(handler_token);
-                RDX_INFO_DEV(this, __func__, false, "[req={}] Returned handler token: {}", request_type, handler_token);
-            }
-        } else {
-            // RDX_INFO_DEV(this, __func__, false, "{}", "No handler token available");
-        }
-    };
-
-    // deal with detection request
-    process_request(
-        m_impl->detection_request_handler_tokens,
-        [this]() { _process_detection_request(); },
-        "detection");
-
-    // deal with image request
-    process_request(
-        m_impl->image_request_handler_tokens,
-        [this]() { _process_image_request(); },
-        "image");
+    if (m_detection_request_input_port) {
+        _process_detection_request();
+    }
+    if (m_image_request_input_port) {
+        _process_image_request();
+    }
 }
 
 int Yolo8BodyPoseDetectorNode::_create_inference_resource(

@@ -15,49 +15,11 @@ namespace redoxi_works::model_nodes
 
 struct Yolo8BodyPoseDetectorNode::Impl {
     using Node_t = Yolo8BodyPoseDetectorNode;
-    Impl()
-    {
-        // fill the token queue with initial tokens
-        {
-            int capacity = num_detection_handler_tokens;
-            detection_request_handler_tokens.set_capacity(capacity);
-            for (int i = 0; i < capacity; ++i) {
-                detection_request_handler_tokens.push(i);
-            }
-        }
-
-        {
-            int capacity = num_image_handler_tokens;
-            image_request_handler_tokens.set_capacity(capacity);
-            for (int i = 0; i < capacity; ++i) {
-                image_request_handler_tokens.push(i);
-            }
-        }
-    }
-    tbb::task_group inference_task_group;
+    Impl() = default;
 
     // this limits the number of inference resources, like GPU, NPU
     // each task must first acquire a resource from this pool, then do inference
     tbb::concurrent_bounded_queue<InferenceResource_t> inference_resource_pool;
-
-    // this limits the number of concurrent inference tasks
-    // each task must first acquire a task id from this pool, then enqueued to wait for inference resource
-
-    // detection request handler tokens, used for parallel task
-    // detection request's order is maintained by client using goal handle
-    // so it is safe to use parallel task here
-    tbb::concurrent_bounded_queue<int> detection_request_handler_tokens;
-    int num_detection_handler_tokens = 2;
-
-    // image request handler tokens, used for sequential task
-    // image response's order is undetermined, not safe to use parallel task here
-    // so only one token is available, equivalent to sequential task
-    tbb::concurrent_bounded_queue<int> image_request_handler_tokens;
-    int num_image_handler_tokens = 1;
-
-    // use parallel task to handle the detection and image request
-    // so that in blocking mode, one port's missing data will not hang the other port
-    bool use_parallel_task = true;
 
     // visualization publisher
     std::shared_ptr<StampedImagePub> pub_visualization;

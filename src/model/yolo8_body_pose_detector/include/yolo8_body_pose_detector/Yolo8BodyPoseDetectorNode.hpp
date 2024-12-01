@@ -106,6 +106,7 @@ class Yolo8BodyPoseDetectorNode : public redoxi_works::common_nodes::StartStopNo
                       const cv::Mat &input_image,
                       const InferenceResource_t &resource,
                       std::optional<UUIDType> msg_uuid = std::nullopt);
+    void _close_all_ports();
 };
 
 } // namespace redoxi_works::model_nodes
