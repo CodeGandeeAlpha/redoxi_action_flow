@@ -76,7 +76,8 @@ class DetectionRequestDriver : public common_nodes::StartStopNode
     std::shared_ptr<ByImageRequest::InputPort_t> m_image_input_port;
     std::shared_ptr<DetectionRequestOutputPort_t> m_detection_request_output_port;
     std::shared_ptr<DetectionResponseOutputPort_t> m_detection_response_output_port;
-    std::shared_ptr<StampedImagePub> m_pub_visualization;
+    std::shared_ptr<StampedImagePub> m_pub_input;
+    std::shared_ptr<StampedImagePub> m_pub_detection_result;
     std::shared_ptr<ImageRequestPortHandler_t> m_image_request_port_handler;
 };
 
@@ -89,13 +90,15 @@ struct DetectionRequestDriverInitConfig : public common_nodes::StartStopNode::In
     std::shared_ptr<DetectionRequestOutputPortConfig_t> detection_request_output_port_config = std::make_shared<DetectionRequestOutputPortConfig_t>();
     std::shared_ptr<DetectionResponseOutputPortConfig_t> detection_response_output_port_config = std::make_shared<DetectionResponseOutputPortConfig_t>();
 
-    std::string publish_visualization_topic = "out/visualization";
+    std::string publish_input_topic = "/vis/input";
+    std::string publish_detection_result_topic = "/vis/detection_result";
 
     JS_OBJECT_WITH_SUPER(JS_SUPER(common_nodes::StartStopNode::InitConfig_t),
                          JS_MEMBER(input_port_config),
                          JS_MEMBER(detection_request_output_port_config),
                          JS_MEMBER(detection_response_output_port_config),
-                         JS_MEMBER(publish_visualization_topic));
+                         JS_MEMBER(publish_input_topic),
+                         JS_MEMBER(publish_detection_result_topic));
 };
 
 struct DetectionRequestDriverRuntimeConfig : public common_nodes::StartStopNode::RuntimeConfig_t {

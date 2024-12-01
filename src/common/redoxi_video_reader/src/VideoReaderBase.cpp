@@ -400,7 +400,12 @@ void RedoxiVideoReaderBase::_step()
         auto msg_uuid = source_data.get_uuid();
 
         // get qos, controls how to retry and drop frames
-        auto &qos = runtime_config->frame_enqueue_policy;
+        auto qos = runtime_config->frame_enqueue_policy;
+        if (control_signal_code == ControlSignalCode::Flush || control_signal_code == ControlSignalCode::Terminate) {
+            // end of video, flush or terminate signal must be sent reliably
+            qos.set_precondition(DeliveryPrecondition::NoPrecondition);
+            qos.set_drop_strategy(DropStrategy::NoDrop);
+        }
         bool success = m_primary_output_port->push_request(delivery_request, qos);
 
         // auto max_attempts = qos.get_retry_policy().get_number_of_retry(true).value() + 1;

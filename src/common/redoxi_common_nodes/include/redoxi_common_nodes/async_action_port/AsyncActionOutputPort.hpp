@@ -860,7 +860,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         SyncActionSender_t sender(m_parent_node);
         // auto logging_callbacks = sender.template get_logging_callbacks<ActionDataTrait_t>(goal);
         // auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout, logging_callbacks);
-        auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout, send_goal_options);
+        auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout);
 
         return result;
     }
