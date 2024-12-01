@@ -32,6 +32,8 @@ DetectionResponseOutputActionName = "out/detection_response"
 DetectionNodeName = "detector"
 VideoSourceNodeName = "video_source"
 
+DetectionDriverNodeName = "driver"
+
 
 # fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
 fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx"
@@ -53,57 +55,47 @@ det_node_params = {
                 "device_type": "cpu",
                 "device_index": 0,
             },
-            # {
-            #     "model_path": fn_model_medium,
-            #     "device_type": "cuda",
-            #     "device_index": 0,
-            # },
-            # {
-            #     "model_path": fn_model_medium,
-            #     "device_type": "cuda",
-            #     "device_index": 0,
-            # },
         ],
-        # "detection_request_config": {
-        #     "input_port_config": {
-        #         "buffer_capacity": -1,
-        #         "action_name": "in/detection_request",
-        #         "goal_result_expire_time": 1000000,
-        #     }
-        # },
-        "image_request_config": {
+        "detection_request_config": {
             "input_port_config": {
-                "buffer_capacity": InputPortQueueSize,
-                "action_name": FrameInputActionName,
+                "buffer_capacity": 1,
+                "action_name": DetectionRequestInputActionName,
                 "goal_result_expire_time": 1000000,
-            },
-            "output_port_config": {
-                "downstream_specs": [
-                    {
-                        "name": "",
-                        "action_name": f"/{DetectionRelayNodeName}/{DetectionRelayInputActionName}",
-                        "delivery_policy": {
-                            "precondition": "dont_care",
-                            "drop_strategy": "dont_care",
-                        },
-                        "create_debug_pub": False,
-                    }
-                ],
-                "num_buffer_requests": 1,
-                "preserve_request_order": True,
-                "fallback_delivery_precondition": "dont_care",
-            },
-            "output_enqueue_policy": {
-                "precondition": "dont_care",
-                "drop_strategy": "dont_care",
-            },
+            }
         },
+        # "image_request_config": {
+        #     "input_port_config": {
+        #         "buffer_capacity": InputPortQueueSize,
+        #         "action_name": FrameInputActionName,
+        #         "goal_result_expire_time": 1000000,
+        #     },
+        #     "output_port_config": {
+        #         "downstream_specs": [
+        #             {
+        #                 "name": "",
+        #                 "action_name": f"/{DetectionRelayNodeName}/{DetectionRelayInputActionName}",
+        #                 "delivery_policy": {
+        #                     "precondition": "dont_care",
+        #                     "drop_strategy": "dont_care",
+        #                 },
+        #                 "create_debug_pub": False,
+        #             }
+        #         ],
+        #         "num_buffer_requests": 1,
+        #         "preserve_request_order": True,
+        #         "fallback_delivery_precondition": "dont_care",
+        #     },
+        #     "output_enqueue_policy": {
+        #         "precondition": "dont_care",
+        #         "drop_strategy": "dont_care",
+        #     },
+        # },
         "visualization_topic": "debug/visualization",
         "_time_unit": "us(1e-6)",
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
-        "step_interval": StepIntervals.VeryFast,
+        "step_interval": StepIntervals.Fast,
         "enable_blocking_mode": False,
         "model_output_config": {"conf_threshold": 0.1, "iou_threshold": 0.6},
         "enable_visualization": True,
@@ -114,25 +106,34 @@ video_source_params = {
     "declare_params": {},
     "init_config": {
         "video_url": fn_video,
-        "auto_replay": False,
+        "auto_replay": True,
         "primary_output_spec": {
             "_action_goal_type": "redoxi_public_msgs/action/ProcessFrame_Goal",
             "downstream_specs": [
+                # {
+                #     "name": DetectionNodeName,
+                #     "action_name": f"/{DetectionNodeName}/{FrameInputActionName}",
+                #     "delivery_policy": {
+                #         "precondition": "dont_care",
+                #         "drop_strategy": "dont_care",
+                #     },
+                #     "create_debug_pub": False,
+                # },
                 {
-                    "name": DetectionNodeName,
-                    "action_name": f"/{DetectionNodeName}/{FrameInputActionName}",
+                    "name": DetectionDriverNodeName,
+                    "action_name": f"/{DetectionDriverNodeName}/{FrameInputActionName}",
                     "delivery_policy": {
                         "precondition": "dont_care",
                         "drop_strategy": "dont_care",
                     },
                     "create_debug_pub": False,
-                }
+                },
             ],
             "num_buffer_requests": 1,
             "preserve_request_order": True,
             "fallback_delivery_precondition": "dont_care",
         },
-        "create_debug_pub": True,
+        "create_debug_pub": False,
         "debug_pub_queue_size": 10,
         "debug_pub_task_enqueue_name": "debug_port/task_enqueue",
         "debug_pub_task_drop_name": "debug_port/task_drop",
@@ -147,10 +148,10 @@ video_source_params = {
         "publish_to_debug_topic": False,
         "frame_enqueue_policy": {
             "precondition": "any_downstream_ready",
-            "drop_strategy": "drop_as_needed",
+            "drop_strategy": "no_drop",
         },
         "_time_unit": "us(1e-6)",
-        "step_interval": StepIntervals.Fast,
+        "step_interval": StepIntervals.Slow,
     },
 }
 
@@ -180,18 +181,18 @@ detection_driver_params = {
     "init_config": {
         "input_port_config": {
             "_action_goal_type": "redoxi_public_msgs/action/ProcessFrame_Goal",
-            "buffer_capacity": -1,
+            "buffer_capacity": 1,
             "action_name": FrameInputActionName,
             "goal_result_expire_time": 1000000,
         },
         "detection_request_output_port_config": {
             "_action_goal_type": "redoxi_public_msgs/action/ProcessDetectionsByFrame_Goal",
-            "downstream_specs": [
-                {
-                    "name": DetectionNodeName,
-                    "action_name": f"/{DetectionNodeName}/{FrameInputActionName}",
-                }
-            ],
+            # "downstream_specs": [
+            #     {
+            #         "name": DetectionNodeName,
+            #         "action_name": f"/{DetectionNodeName}/{DetectionRequestOutputActionName}",
+            #     }
+            # ],
             "num_buffer_requests": 1,
             "preserve_request_order": True,
             "fallback_delivery_precondition": "dont_care",
@@ -208,25 +209,15 @@ detection_driver_params = {
     },
     "runtime_config": {
         "detection_request_enqueue_policy": {
-            "retry_policy": {
-                "fallback_number_of_retry": 3,
-                "fallback_wait_time_between_retry": 5000,
-                "fallback_wait_time_retry_response": 100000,
-            },
             "precondition": "dont_care",
             "drop_strategy": "dont_care",
         },
         "detection_response_enqueue_policy": {
-            "retry_policy": {
-                "fallback_number_of_retry": 3,
-                "fallback_wait_time_between_retry": 5000,
-                "fallback_wait_time_retry_response": 100000,
-            },
             "precondition": "dont_care",
             "drop_strategy": "dont_care",
         },
         "enable_visualization": True,
-        "enable_blocking_mode": False,
+        "enable_blocking_mode": True,
         "_time_unit": "us(1e-6)",
         "step_interval": StepIntervals.Fast,
     },
@@ -292,6 +283,25 @@ detection_relay_node = Node(
     # arguments=["--ros-args", "--disable-external-lib-logs"],
 )
 
+detection_driver_node = Node(
+    package="test_package",
+    executable="detection_driver_node",
+    name=DetectionDriverNodeName,
+    namespace=DetectionDriverNodeName,
+    output="screen",
+    parameters=[
+        {
+            "param_as_json_string": json.dumps(
+                detection_driver_params, separators=(",", ":")
+            ),
+        },
+    ],
+    prefix=common_prefix,
+    arguments=["--ros-args", "--log-level", [f"{DetectionRelayNodeName}:=", logger]]
+    + common_ros_args,
+    # arguments=["--ros-args", "--disable-external-lib-logs"],
+)
+
 
 def generate_launch_description():
     # Set environment variables for ROS 2 logging format
@@ -310,7 +320,8 @@ def generate_launch_description():
             *env_var_settings,
             log_level_arg,
             video_source_node,
-            detection_node,
-            detection_relay_node,
+            detection_driver_node,
+            # detection_node,
+            # detection_relay_node,
         ]
     )
