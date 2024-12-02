@@ -1,28 +1,53 @@
 #pragma once
 
+#define JS_STD_OPTIONAL
+
 #include <optional>
 #include <json_struct/json_struct.h>
+#include <yolo8_series/yolo8_series.hpp>
 
-#include <yolo8_object_detector/yolo8_object_detector.hpp>
+#include <redoxi_common_cpp/redoxi_concepts.hpp>
 #include <redoxi_common_nodes/detection_ports/DetectionRequestInputPort.hpp>
 #include <redoxi_common_nodes/detection_ports/DetectionResponseOutputPort.hpp>
 #include <redoxi_common_nodes/image_ports/AsyncImageInputPort.hpp>
-#include <redoxi_dnn_models/yolo8/Yolo8DetectionModel.hpp>
+#include <redoxi_dnn_models/yolo8/Yolo8ModelBase.hpp>
+// #include <redoxi_dnn_models/yolo8/Yolo8PoseModel.hpp>
 #include <redoxi_common_nodes/base_nodes/StartStopNode.hpp>
 
-
-namespace redoxi_works::model_nodes::yolo8_object_detector
+namespace redoxi_works::model_nodes::yolo8
 {
 
-using YoloModel_t = inference::yolo8::Yolo8DetectionModel;
-using YoloModelConfig_t = inference::yolo8::Yolo8ModelConfig;
-using YoloModelOutputConfig_t = YoloModel_t::OutputConfig_t;
+//! Concept for a YOLO model
+template <typename T>
+concept YoloModelConcept = requires(T model)
+{
+    requires std::derived_from<T, inference::yolo8::Yolo8ModelBase>;
+
+    typename T::InitConfig_t;
+    requires std::derived_from<typename T::InitConfig_t, inference::yolo8::Yolo8ModelConfig>;
+
+    typename T::OutputConfig_t;
+    requires std::derived_from<typename T::OutputConfig_t, inference::yolo8::PostprocessorConfig>;
+
+    typename T::SingleImageOutput_t;
+    requires std::derived_from<typename T::SingleImageOutput_t, inference::detection::types::SingleImageOutput>;
+
+    typename T::DetectedObject_t;
+    requires std::derived_from<typename T::DetectedObject_t, inference::detection::types::DetectedObject>;
+
+    typename T::Keypoint_t;
+    requires std::derived_from<typename T::Keypoint_t, inference::detection::types::Keypoint>;
+};
 
 // a single inference resource, should be used by one single thread
+template <YoloModelConcept TModel>
 struct InferenceResource {
-    std::shared_ptr<YoloModel_t> model;
+    using Model_t = TModel;
+    using ModelConfig_t = typename Model_t::InitConfig_t;
+
+    std::shared_ptr<Model_t> model;
     inference::InferenceInOutData::Ptr inout_data;
-    inference::yolo8::Yolo8ModelConfig::Ptr model_config;
+    std::shared_ptr<ModelConfig_t> model_config;
 
     // the id of the replica
     int replica_id = 0;
@@ -61,17 +86,18 @@ struct ImageRequestConfig {
               JS_MEMBER(output_enqueue_policy));
 };
 
+template <YoloModelConcept TModel>
 struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
     virtual ~InitConfig() = default;
-    using ModelConfig_t = YoloModelConfig_t;
+    using Model_t = TModel;
+    using ModelConfig_t = typename Model_t::InitConfig_t;
     using DetectionRequestConfig_t = DetectionRequestConfig;
     using ImageRequestConfig_t = ImageRequestConfig;
 
     // yolo8 model configurations, different model will work concurrently
     // if the same model config is pushed multiple times, they are regarded as replicas of the same model
     // and they will share the same model instance but using different inference inout data
-    std::vector<ModelConfig_t::Ptr>
-        model_configs;
+    std::vector<std::shared_ptr<ModelConfig_t>> model_configs;
 
     // detection request config
     std::optional<DetectionRequestConfig_t> detection_request_config;
@@ -94,9 +120,12 @@ struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
         JS_MEMBER(publish_probe_detection_done_topic));
 };
 
+template <YoloModelConcept TModel>
 struct RuntimeConfig : public common_nodes::StartStopNode::RuntimeConfig_t {
+    using Model_t = TModel;
+    using ModelOutputConfig_t = typename Model_t::OutputConfig_t;
+
     virtual ~RuntimeConfig() = default;
-    using ModelOutputConfig_t = YoloModelOutputConfig_t;
 
     // enable blocking mode when reading data from input port
     bool enable_blocking_mode = false;
@@ -118,6 +147,4 @@ struct RuntimeConfig : public common_nodes::StartStopNode::RuntimeConfig_t {
         JS_MEMBER(enable_visualization),
         JS_MEMBER(enable_performance_probe));
 };
-
-
-} // namespace redoxi_works::model_nodes::yolo8_object_detector
+} // namespace redoxi_works::model_nodes::yolo8
