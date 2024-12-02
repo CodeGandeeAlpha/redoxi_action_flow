@@ -12,15 +12,27 @@ usage() {
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 default_install_dir="${script_dir}/../tmp/onnxruntime"
 
+OnnxVersion="1.20.1"
+
 # onnx url
-OnnxPackageName="onnxruntime-linux-x64-gpu-1.20.0"
-OnnxUrl="https://github.com/microsoft/onnxruntime/releases/download/v1.20.0/${OnnxPackageName}.tgz"
+OnnxPackageName_arm64="onnxruntime-linux-aarch64-${OnnxVersion}"
+OnnxPackageName_x64="onnxruntime-win-x64-gpu-${OnnxVersion}"
 
-OnnxPackageName_TensorRT="onnxruntime-linux-x64-gpu-cuda12-1.17.3"
-OnnxUrl_TensorRT="https://github.com/microsoft/onnxruntime/releases/download/v1.17.3/${OnnxPackageName_TensorRT}.tgz"
+# Detect platform
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    if [[ $(uname -m) == "aarch64" ]]; then
+        OnnxPackageName="${OnnxPackageName_arm64}"
+    else
+        OnnxPackageName="onnxruntime-linux-x64-gpu-${OnnxVersion}"
+    fi
+elif [[ "$OSTYPE" == "msys"* ]] || [[ "$OSTYPE" == "cygwin"* ]]; then
+    OnnxPackageName="${OnnxPackageName_x64}"
+else
+    echo "Unsupported platform: $OSTYPE"
+    exit 1
+fi
 
-# OnnxTargetUrl="${OnnxUrl_TensorRT}"
-# OnnxTargetPackageName="${OnnxPackageName_TensorRT}"
+OnnxUrl="https://github.com/microsoft/onnxruntime/releases/download/v${OnnxVersion}/${OnnxPackageName}.tgz"
 
 OnnxTargetUrl="${OnnxUrl}"
 OnnxTargetPackageName="${OnnxPackageName}"
@@ -65,14 +77,14 @@ echo "Extraction complete."
 # echo "Fixing onnxruntime directory structure problems"
 # echo "See github issues: https://github.com/microsoft/onnxruntime/issues/22267"
 
-# OnnxRuntimeDir="${dst_install_dir}/${OnnxPackageName}"
-# echo "OnnxRuntimeDir: ${OnnxRuntimeDir}"
+OnnxRuntimeDir="${dst_install_dir}/${OnnxPackageName}"
+echo "OnnxRuntimeDir: ${OnnxRuntimeDir}"
 
-# echo "Renaming ${OnnxRuntimeDir}/lib to ${OnnxRuntimeDir}/lib64"
-# mv "${OnnxRuntimeDir}/lib" "${OnnxRuntimeDir}/lib64"
+echo "Renaming ${OnnxRuntimeDir}/lib to ${OnnxRuntimeDir}/lib64"
+mv "${OnnxRuntimeDir}/lib" "${OnnxRuntimeDir}/lib64"
 
-# echo "Moving ${OnnxRuntimeDir}/include to ${OnnxRuntimeDir}/include/onnxruntime"
-# mv "${OnnxRuntimeDir}/include" "${OnnxRuntimeDir}/onnxruntime"
-# mkdir -p "${OnnxRuntimeDir}/include"
-# mv "${OnnxRuntimeDir}/onnxruntime" "${OnnxRuntimeDir}/include/onnxruntime"
+echo "Moving ${OnnxRuntimeDir}/include to ${OnnxRuntimeDir}/include/onnxruntime"
+mv "${OnnxRuntimeDir}/include" "${OnnxRuntimeDir}/onnxruntime"
+mkdir -p "${OnnxRuntimeDir}/include"
+mv "${OnnxRuntimeDir}/onnxruntime" "${OnnxRuntimeDir}/include/onnxruntime"
 

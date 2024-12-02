@@ -143,6 +143,7 @@ concept DeliveryRequestConcept = requires(T t)
     typename T::TargetDataType_t;
     typename T::DeliveryPolicy_t;
     typename T::StampType_t;
+    typename T::SendGoalOptions_t;
 
     //! Source data type must satisfy DeliverySourceDataConcept
     requires DeliverySourceDataConcept<typename T::SourceDataType_t>;
@@ -155,6 +156,10 @@ concept DeliveryRequestConcept = requires(T t)
 
     //! Stamp type must satisfy DeliveryStampConcept
     requires DeliveryStampConcept<typename T::StampType_t>;
+
+    //! Send goal options type must satisfy SendGoalOptionsConcept
+    requires std::same_as<typename T::SendGoalOptions_t,
+                          typename rclcpp_action::Client<typename T::TargetDataType_t::ActionType_t>::SendGoalOptions>;
 
     //! Required default constructor
     requires std::is_default_constructible_v<T>;
@@ -201,6 +206,14 @@ concept DeliveryRequestConcept = requires(T t)
     {
         std::declval<T &>().set_control_signal_code(std::declval<ControlSignalCode>())
         } -> std::same_as<void>;
+
+    //! Must have method to get and set send goal options
+    {
+        std::declval<const T &>().send_goal_options
+        } -> std::same_as<const typename T::SendGoalOptions_t &>;
+    {
+        std::declval<T &>().send_goal_options
+        } -> std::same_as<typename T::SendGoalOptions_t &>;
 };
 
 //! A task to deliver to the downstream action

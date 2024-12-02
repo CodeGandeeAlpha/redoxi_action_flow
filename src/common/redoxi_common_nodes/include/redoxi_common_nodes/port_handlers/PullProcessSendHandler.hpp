@@ -106,29 +106,31 @@ class PullProcessSendHandler
 
         // get resource token
         ResourceToken_t resource_token;
-        bool got_resource_token = false;
-        if (m_config->block_resource_acquisition) {
-            got_resource_token = m_resource_token_queue->pop(resource_token);
-        } else {
-            got_resource_token = m_resource_token_queue->try_pop(resource_token);
-        }
-        if (!got_resource_token) {
-            RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] No resource token", msg_uuid_str);
-            // notify the user that no resource token is available
-            if (on_resource_token_not_available) {
-                on_resource_token_not_available(input_data);
+        bool got_resource_token = true;
+        if (m_resource_token_queue) {
+            if (m_config->block_resource_acquisition) {
+                m_resource_token_queue->pop(resource_token);
+                got_resource_token = true;
+            } else {
+                got_resource_token = m_resource_token_queue->try_pop(resource_token);
             }
-            return ProcessResult::NoResourceToken;
+            if (!got_resource_token) {
+                RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] No resource token", msg_uuid_str);
+                // notify the user that no resource token is available
+                if (on_resource_token_not_available) {
+                    on_resource_token_not_available(input_data);
+                }
+                return ProcessResult::NoResourceToken;
+            }
+            RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Got resource token", msg_uuid_str);
         }
-        RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Got resource token", msg_uuid_str);
-
 
         auto release_token = [this, msg_uuid_str](ResourceToken_t &token) {
             bool do_release = true;
             if (on_release_resource_token) {
                 do_release = on_release_resource_token(token) == 0;
             }
-            if (do_release) {
+            if (do_release && m_resource_token_queue) {
                 RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Releasing resource token", msg_uuid_str);
                 m_resource_token_queue->push(token);
             } else {

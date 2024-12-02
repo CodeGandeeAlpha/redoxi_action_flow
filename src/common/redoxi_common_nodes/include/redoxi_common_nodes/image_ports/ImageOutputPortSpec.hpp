@@ -176,7 +176,6 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         }
     }
 
-  public:
     // auxiliary data for easy extension without inheritance
     std::any auxiliary_data;
 };

@@ -1,8 +1,10 @@
 #pragma once
 
 #include <optional>
+#include <typeinfo>
 #include <sensor_msgs/msg/image.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
+#include <rosidl_runtime_cpp/traits.hpp>
 #include <json_struct/json_struct.h>
 
 #include <redoxi_common_nodes/async_action_port/output_port_concepts.hpp>
@@ -214,8 +216,6 @@ class DefaultTargetData
         m_goal = goal;
     }
 
-    virtual DefaultTargetData &operator=(const DefaultTargetData &) = default;
-
     //! Get the underlying ROS message
     const Goal_t &get_goal() const
     {
@@ -350,6 +350,7 @@ class DefaultDeliveryRequest
     using DeliveryPolicy_t = DeliveryPolicyType;
     using StampType_t = StampType;
     using TimeUnit_t = typename DeliveryPolicy_t::RetryPolicyType_t::DurationType_t;
+    using SendGoalOptions_t = typename rclcpp_action::Client<typename TargetDataType_t::ActionType_t>::SendGoalOptions;
 
   private:
     inline static constexpr TimeUnit_t DefaultPingResponseWaitTime{std::chrono::milliseconds(50)};
@@ -442,6 +443,9 @@ class DefaultDeliveryRequest
             m_control_signal_code = code;
         }
     }
+
+    //! Send goal options
+    SendGoalOptions_t send_goal_options;
 
   protected:
     //! Source data for the delivery request
@@ -819,9 +823,11 @@ class DefaultInitConfig
     int num_buffer_requests{1};
     bool preserve_request_order{true};
     DeliveryPrecondition fallback_delivery_precondition{DeliveryPrecondition::DontCare};
+    std::string _action_goal_type = rosidl_generator_traits::name<typename DownstreamSpec_t::ActionType_t::Goal>();
 
   public:
-    JS_OBJECT(JS_MEMBER(downstream_specs),
+    JS_OBJECT(JS_MEMBER(_action_goal_type),
+              JS_MEMBER(downstream_specs),
               JS_MEMBER(num_buffer_requests),
               JS_MEMBER(preserve_request_order),
               JS_MEMBER(fallback_delivery_precondition));

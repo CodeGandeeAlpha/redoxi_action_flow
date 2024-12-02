@@ -131,6 +131,10 @@ concept InitConfigConcept = requires(T t)
     typename T::TimeUnit_t;
     requires TimeDurationConcept<typename T::TimeUnit_t>;
 
+    //! The action type
+    typename T::ActionType_t;
+    requires RosActionConcept<typename T::ActionType_t>;
+
     //! Must have method to get buffer capacity
     {
         std::declval<const T &>().get_buffer_capacity()
@@ -152,7 +156,7 @@ class _SampleInitConfig
 {
   public:
     using TimeUnit_t = _SampleTimeUnit;
-
+    using ActionType_t = _SampleAction;
     //! Get number of buffer requests
     //! If the value is not positive, it means the queue is unbounded
     int64_t get_buffer_capacity() const

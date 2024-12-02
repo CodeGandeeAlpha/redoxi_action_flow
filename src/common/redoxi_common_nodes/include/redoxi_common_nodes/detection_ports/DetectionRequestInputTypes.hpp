@@ -13,7 +13,7 @@ struct DetectionRequestInputPortSpec {
     using ActionDataTrait_t = DetectionRequestActionDataTrait;
     using TimeUnit_t = TimeUnit;
     using ReceiveSourceData_t = DetectionRequestSourceData;
-    using InitConfig_t = input_port_types::DefaultInitConfig<TimeUnit>;
+    using InitConfig_t = input_port_types::DefaultInitConfig<TimeUnit_t, ActionType_t>;
 };
 static_assert(input_port_types::AsyncActionInputPortSpecConcept<DetectionRequestInputPortSpec>,
               "DetectionRequestInputPortSpec must satisfy AsyncActionInputPortSpecConcept");

@@ -36,7 +36,11 @@ ament_target_dependencies(
 )
 
 # configure for onnx runtime
-set(onnxruntime_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/onnxruntime/onnxruntime-linux-x64-gpu-1.20.0/lib64/cmake/onnxruntime)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+  set(onnxruntime_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/onnxruntime/onnxruntime-linux-aarch64-1.20.1/lib64/cmake/onnxruntime)
+else()
+  set(onnxruntime_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/onnxruntime/onnxruntime-linux-x64-gpu-1.20.1/lib64/cmake/onnxruntime) 
+endif()
 find_package(onnxruntime REQUIRED)
 target_link_libraries(redoxi_inference_onnx PUBLIC onnxruntime::onnxruntime)
 

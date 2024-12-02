@@ -3,6 +3,7 @@
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
 #include <redoxi_common_nodes/async_action_port/input_port_concepts.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
+#include <rosidl_runtime_cpp/traits.hpp>
 #include <json_struct/json_struct.h>
 #include <any>
 namespace redoxi_works
@@ -81,9 +82,10 @@ static_assert(ReceiveSourceDataConcept<DefaultReceiveSourceData<_SampleAction>>,
               "DefaultReceiveSourceData does not satisfy ReceiveSourceDataConcept");
 
 //! The init config for the action input port
-template <TimeDurationConcept TTimeUnit>
+template <TimeDurationConcept TTimeUnit, RosActionConcept TAction>
 struct DefaultInitConfig {
     using TimeUnit_t = TTimeUnit;
+    using ActionType_t = TAction;
     inline static constexpr TimeUnit_t DefaultGoalResultExpireTime{std::chrono::milliseconds(1000)};
     virtual ~DefaultInitConfig() = default;
 
@@ -128,13 +130,15 @@ struct DefaultInitConfig {
     int64_t buffer_capacity = -1;
     std::string action_name;
     TimeUnit_t goal_result_expire_time = DefaultGoalResultExpireTime;
+    std::string _action_goal_type = rosidl_generator_traits::name<typename ActionType_t::Goal>();
 
   public:
-    JS_OBJECT(JS_MEMBER(buffer_capacity),
+    JS_OBJECT(JS_MEMBER(_action_goal_type),
+              JS_MEMBER(buffer_capacity),
               JS_MEMBER(action_name),
               JS_MEMBER(goal_result_expire_time));
 };
-static_assert(InitConfigConcept<DefaultInitConfig<_SampleTimeUnit>>);
+static_assert(InitConfigConcept<DefaultInitConfig<_SampleTimeUnit, _SampleAction>>);
 
 //! for quick construction of a specification
 template <RosActionConcept TAction,
@@ -147,7 +151,7 @@ struct DefaultAsyncActionInputPortSpec {
     using TimeUnit_t = TTimeUnit;
 
     using ReceiveSourceData_t = DefaultReceiveSourceData<ActionType_t>;
-    using InitConfig_t = DefaultInitConfig<TTimeUnit>;
+    using InitConfig_t = DefaultInitConfig<TTimeUnit, ActionType_t>;
 };
 static_assert(AsyncActionInputPortSpecConcept<
               DefaultAsyncActionInputPortSpec<_SampleAction,

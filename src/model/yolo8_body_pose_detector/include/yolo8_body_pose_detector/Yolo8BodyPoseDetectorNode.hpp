@@ -65,21 +65,32 @@ class Yolo8BodyPoseDetectorNode : public redoxi_works::common_nodes::StartStopNo
 
   protected:
     // from this class
-    int _extract_image(cv::Mat *output, const std::shared_ptr<ByDetectionRequest::InputSourceData_t> &source_data);
-    int _process_detection_request();
+    virtual int _extract_image(cv::Mat *output, const std::shared_ptr<ByDetectionRequest::InputSourceData_t> &source_data);
 
-    int _extract_image(cv::Mat *output, const std::shared_ptr<ByImageRequest::InputSourceData_t> &source_data);
-    int _process_image_request();
+    virtual int _process_detection_request();
+
+    //! create a new pull process reply handler for detection request
+    virtual int _create_detection_request_handler(const RuntimeConfig_t &runtime_config);
+
+    //! extract image from source data
+    virtual int _extract_image(cv::Mat *output, const std::shared_ptr<ByImageRequest::InputSourceData_t> &source_data);
+
+    //! create a new pull process send handler for image request
+    virtual int _create_image_request_handler(const RuntimeConfig_t &runtime_config);
+
+    //! process image request
+    virtual int _process_image_request();
 
     //! Draw visualization on canvas
-    void _draw_visualization(cv::Mat &canvas,
-                             const DetectionResult_t &detections);
+    virtual void _draw_visualization(cv::Mat &canvas,
+                                     const DetectionResult_t &detections);
 
     //! create a new inference resource, and push it to the concurrent queue
     //! @param replicas: number of replicas to create, replicated resource will share the same model but with different inout data
     //! @return 0 if success, -1 if failed
-    int _create_inference_resource(InitConfig_t::ModelConfig_t::Ptr model_config, int replicas = 1);
-    int _create_all_inference_resources(const std::vector<InitConfig_t::ModelConfig_t::Ptr> &model_configs);
+    virtual int _create_inference_resource(InitConfig_t::ModelConfig_t::Ptr model_config, int replicas = 1);
+    virtual int _create_all_inference_resources(const std::vector<InitConfig_t::ModelConfig_t::Ptr> &model_configs);
+
 
   protected:
     std::shared_ptr<ByDetectionRequest::InputPort_t> m_detection_request_input_port;
@@ -95,6 +106,7 @@ class Yolo8BodyPoseDetectorNode : public redoxi_works::common_nodes::StartStopNo
                       const cv::Mat &input_image,
                       const InferenceResource_t &resource,
                       std::optional<UUIDType> msg_uuid = std::nullopt);
+    void _close_all_ports();
 };
 
 } // namespace redoxi_works::model_nodes

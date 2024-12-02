@@ -21,23 +21,32 @@ class StepIntervals:
     VeryFast = 1000
 
 
-InputPortQueueSize = 10
+InputPortQueueSize = 1
+
+FrameInputActionName = "in/frame"
+DetectionRequestInputActionName = "in/detection_request"
+DetectionRequestOutputActionName = "out/detection_request"
+DetectionResponseInputActionName = "in/detection_response"
+DetectionResponseOutputActionName = "out/detection_response"
 
 DetectionNodeName = "detector"
-DetectionInputActionName = "in/image_request"
+DetectionNodeInputActionName = DetectionRequestInputActionName
 
 VideoSourceNodeName = "video_source"
-fn_model_nano = "/3d/chengxiao/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
+
+DetectionDriverNodeName = "driver"
+
+
+# fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
+fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx"
 fn_model_medium = (
     "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8m-pose-dynbatch.onnx"
 )
-# fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-fn_video = (
-    "/3d/chengxiao/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-)
+fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+# fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
 
 DetectionRelayNodeName = "detection_relay"
-DetectionRelayInputActionName = "in/detections"
+DetectionRelayInputActionName = DetectionResponseInputActionName
 
 det_node_params = {
     "declare_params": {},
@@ -48,28 +57,18 @@ det_node_params = {
                 "device_type": "cuda",
                 "device_index": 0,
             },
-            # {
-            #     "model_path": fn_model_medium,
-            #     "device_type": "cuda",
-            #     "device_index": 0,
-            # },
-            # {
-            #     "model_path": fn_model_medium,
-            #     "device_type": "cuda",
-            #     "device_index": 0,
-            # },
         ],
-        # "detection_request_config": {
-        #     "input_port_config": {
-        #         "buffer_capacity": -1,
-        #         "action_name": "in/detection_request",
-        #         "goal_result_expire_time": 1000000,
-        #     }
-        # },
+        "detection_request_config": {
+            "input_port_config": {
+                "buffer_capacity": 1,
+                "action_name": DetectionNodeInputActionName,
+                "goal_result_expire_time": 1000000,
+            }
+        },
         "image_request_config": {
             "input_port_config": {
                 "buffer_capacity": InputPortQueueSize,
-                "action_name": DetectionInputActionName,
+                "action_name": FrameInputActionName,
                 "goal_result_expire_time": 1000000,
             },
             "output_port_config": {
@@ -79,7 +78,7 @@ det_node_params = {
                         "action_name": f"/{DetectionRelayNodeName}/{DetectionRelayInputActionName}",
                         "delivery_policy": {
                             "precondition": "dont_care",
-                            "drop_strategy": "dont_care",
+                            "drop_strategy": "no_drop",
                         },
                         "create_debug_pub": False,
                     }
@@ -111,27 +110,23 @@ video_source_params = {
         "video_url": fn_video,
         "auto_replay": True,
         "primary_output_spec": {
+            "_action_goal_type": "redoxi_public_msgs/action/ProcessFrame_Goal",
             "downstream_specs": [
                 {
                     "name": DetectionNodeName,
-                    "action_name": f"/{DetectionNodeName}/{DetectionInputActionName}",
+                    "action_name": f"/{DetectionNodeName}/{FrameInputActionName}",
                     "delivery_policy": {
-                        "retry_policy": {
-                            "fallback_number_of_retry": 3,
-                            "fallback_wait_time_between_retry": 5000,
-                            "fallback_wait_time_retry_response": 1000000,
-                        },
                         "precondition": "dont_care",
-                        "drop_strategy": "no_drop",
+                        "drop_strategy": "dont_care",
                     },
                     "create_debug_pub": False,
-                }
+                },
             ],
             "num_buffer_requests": 1,
             "preserve_request_order": True,
             "fallback_delivery_precondition": "dont_care",
         },
-        "create_debug_pub": True,
+        "create_debug_pub": False,
         "debug_pub_queue_size": 10,
         "debug_pub_task_enqueue_name": "debug_port/task_enqueue",
         "debug_pub_task_drop_name": "debug_port/task_drop",
@@ -143,21 +138,12 @@ video_source_params = {
         "frame_interval": 0,
         "output_image_size": {"width": 1024, "height": -1},
         "output_image_encoding": "rgb8",
-        "publish_to_debug_topic": True,
+        "publish_to_debug_topic": False,
         "frame_enqueue_policy": {
-            "retry_policy": {
-                "number_of_retry": 5,
-                "fallback_number_of_retry": 3,
-                "wait_time_between_retry": 5000,
-                "fallback_wait_time_between_retry": 5000,
-                "wait_time_retry_response": 5000,
-                "fallback_wait_time_retry_response": 1000000,
-            },
-            "precondition": "dont_care",
             "drop_strategy": "no_drop",
         },
         "_time_unit": "us(1e-6)",
-        "step_interval": StepIntervals.Fast,
+        "step_interval": StepIntervals.VeryFast,
     },
 }
 
@@ -165,8 +151,9 @@ detection_relay_params = {
     "declare_params": {},
     "init_config": {
         "input_port_config": {
+            "_action_goal_type": "redoxi_public_msgs/action/ProcessDetections_Goal",
             "buffer_capacity": InputPortQueueSize,
-            "action_name": f"{DetectionRelayInputActionName}",
+            "action_name": DetectionRelayInputActionName,
             "goal_result_expire_time": 1000000,
         },
         "publish_detection_topic": "out/relayed_detection",
@@ -198,9 +185,9 @@ detection_node = Node(
             "param_as_json_string": json.dumps(det_node_params, separators=(",", ":")),
         },
     ],
-    # arguments=["--ros-args", "--log-level", [f"{DetectionNodeName}:=", logger]]
-    # + common_ros_args,
-    arguments=["--ros-args", "--disable-external-lib-logs"],
+    arguments=["--ros-args", "--log-level", [f"{DetectionNodeName}:=", logger]]
+    + common_ros_args,
+    # arguments=["--ros-args", "--disable-external-lib-logs"],
 )
 
 video_source_node = Node(
@@ -217,9 +204,9 @@ video_source_node = Node(
         },
     ],
     prefix=common_prefix,
-    # arguments=["--ros-args", "--log-level", [f"{VideoSourceNodeName}:=", logger]]
-    # + common_ros_args,
-    arguments=["--ros-args", "--disable-external-lib-logs"],
+    arguments=["--ros-args", "--log-level", [f"{VideoSourceNodeName}:=", logger]]
+    + common_ros_args,
+    # arguments=["--ros-args", "--disable-external-lib-logs"],
 )
 
 detection_relay_node = Node(
@@ -236,9 +223,9 @@ detection_relay_node = Node(
         },
     ],
     prefix=common_prefix,
-    # arguments=["--ros-args", "--log-level", [f"{DetectionRelayNodeName}:=", logger]]
-    # + common_ros_args,
-    arguments=["--ros-args", "--disable-external-lib-logs"],
+    arguments=["--ros-args", "--log-level", [f"{DetectionRelayNodeName}:=", logger]]
+    + common_ros_args,
+    # arguments=["--ros-args", "--disable-external-lib-logs"],
 )
 
 

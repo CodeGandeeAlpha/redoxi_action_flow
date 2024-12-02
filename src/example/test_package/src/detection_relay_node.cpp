@@ -18,6 +18,8 @@ void print_json()
 
 int main(int argc, char **argv)
 {
+    // print_json();
+    // return 0;
     spdlog::info("Initializing ROS...");
     rclcpp::init(argc, argv);
 

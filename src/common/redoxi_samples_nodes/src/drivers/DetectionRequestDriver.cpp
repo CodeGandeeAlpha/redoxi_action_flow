@@ -1,6 +1,9 @@
 #include <redoxi_samples_nodes/drivers/DetectionRequestDriver.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
+#include <redoxi_common_cpp/image_proc/utils.hpp>
 #include <typeinfo>
+#include <functional>
+#include <fmt/core.h>
 
 namespace redoxi_works::samples_nodes::drivers
 {
@@ -17,6 +20,9 @@ int DetectionRequestDriver::_start()
     if (m_detection_request_output_port) {
         m_detection_request_output_port->start();
     }
+    if (m_detection_response_output_port) {
+        m_detection_response_output_port->start();
+    }
     return 0;
 }
 
@@ -28,6 +34,9 @@ int DetectionRequestDriver::_stop()
     }
     if (m_detection_request_output_port) {
         m_detection_request_output_port->stop();
+    }
+    if (m_detection_response_output_port) {
+        m_detection_response_output_port->stop();
     }
     return 0;
 }
@@ -51,28 +60,106 @@ int DetectionRequestDriver::_update_init_config(std::shared_ptr<BaseInitConfig_t
 
     // create input port
     if (config->input_port_config && !config->input_port_config->get_action_name().empty()) {
-        RDX_INFO_DEV(this, __func__, false, "{}", "Creating input port with action name: {}", config->input_port_config->get_action_name());
+        RDX_INFO_DEV(this, __func__, false, "Creating input port with action name: {}", config->input_port_config->get_action_name());
         m_image_input_port = std::make_shared<ByImageRequest::InputPort_t>(this);
         m_image_input_port->init(config->input_port_config);
     }
 
     // create output port
-    if (config->output_port_config) {
-        RDX_INFO_DEV(this, __func__, false, "{}", "Creating output port");
-        m_detection_request_output_port = std::make_shared<OutputPort_t>(this);
-        m_detection_request_output_port->init(config->output_port_config);
+    if (config->detection_request_output_port_config) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Creating detection request output port");
+        m_detection_request_output_port = std::make_shared<DetectionRequestOutputPort_t>(this);
+        m_detection_request_output_port->init(config->detection_request_output_port_config);
+    }
+
+    // create detection response output port
+    if (config->detection_response_output_port_config) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Creating detection response output port");
+        m_detection_response_output_port = std::make_shared<DetectionResponseOutputPort_t>(this);
+        m_detection_response_output_port->init(config->detection_response_output_port_config);
     }
 
     // create visualization publisher
-    if (!config->publish_visualization_topic.empty()) {
-        RDX_INFO_DEV(this, __func__, false, "{}", "Creating visualization publisher with topic: {}", config->publish_visualization_topic);
-        m_pub_visualization = std::make_shared<StampedImagePub>();
-        m_pub_visualization->init(this, config->publish_visualization_topic);
+    if (!config->publish_input_topic.empty()) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Creating visualization publisher with topic: {}", config->publish_input_topic);
+        m_pub_input = std::make_shared<StampedImagePub>();
+        m_pub_input->init(this, config->publish_input_topic);
+    }
+
+    // create detection result publisher
+    if (!config->publish_detection_result_topic.empty()) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Creating detection result publisher with topic: {}", config->publish_detection_result_topic);
+        m_pub_detection_result = std::make_shared<StampedImagePub>();
+        m_pub_detection_result->init(this, config->publish_detection_result_topic);
     }
 
     RDX_INFO_DEV(this, __func__, false, "{}", "Completed update of initial configuration");
     return 0;
 }
+
+void DetectionRequestDriver::_on_detection_request_sent(DetectionRequestOutputPort_t::TargetData_t &target_data,
+                                                        DetectionRequestOutputPort_t::SendResult_t &send_result,
+                                                        const DetectionRequestOutputPort_t::DeliveryRequest_t &delivery_request,
+                                                        const DetectionRequestOutputPort_t::Downstream_t &downstream)
+{
+    (void)delivery_request;
+    auto msg_uuid = target_data.get_source_data_uuid();
+    auto msg_uuid_str = boost::uuids::to_string(msg_uuid);
+
+    //! Log image size if available
+    if (!target_data.image.empty()) {
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Image size: {}x{}", msg_uuid_str,
+                     target_data.image.cols, target_data.image.rows);
+    } else {
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] No image data available", msg_uuid_str);
+    }
+
+    if (send_result.goal_handle) {
+        auto goal_handle = send_result.goal_handle;
+        if (goal_handle) {
+            auto result = downstream.get_action_client()->async_get_result(goal_handle).get();
+
+            if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
+                RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Got detection request result, sending to detection response output port", msg_uuid_str);
+                auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(get_runtime_config());
+                auto policy = runtime_config->detection_response_enqueue_policy;
+
+                // publish detection result
+                bool do_publish_detection_result = runtime_config->enable_visualization && m_pub_detection_result && !target_data.image.empty();
+                if (do_publish_detection_result) {
+                    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Publishing detection result", msg_uuid_str);
+                    DetectionRequestOutputPort_t::TargetData_t::PublishMessageType_t detection_result_msg;
+                    auto canvas = target_data.image.clone();
+                    image_utils::draw_detections(&canvas, result.result->detections);
+                    m_pub_detection_result->publish(canvas, fmt::format("{} detections", result.result->detections.size()));
+                }
+
+                if (m_detection_response_output_port) {
+                    //! Log: Creating detection response source data
+                    DetectionResponseOutputPort_t::SourceData_t response_source_data;
+                    response_source_data.detections = result.result->detections;
+                    response_source_data.image = target_data.image.clone();
+                    response_source_data.uid = target_data.get_source_data_uuid();
+
+                    //! Log: Creating and pushing detection response request
+                    DetectionResponseOutputPort_t::DeliveryRequest_t response_request;
+                    response_request.set_source_data(response_source_data);
+                    auto sent = m_detection_response_output_port->push_request(response_request, policy);
+                    if (sent) {
+                        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Sent detection response request to output port", msg_uuid_str);
+                    } else {
+                        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to send detection response request to output port", msg_uuid_str);
+                    }
+                }
+            } else {
+                RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to retrieve detection request result", msg_uuid_str);
+            }
+        } else {
+            RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to get goal handle for detection request", msg_uuid_str);
+        }
+    }
+}
+
 
 int DetectionRequestDriver::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config)
 {
@@ -82,6 +169,11 @@ int DetectionRequestDriver::_update_runtime_config(std::shared_ptr<BaseRuntimeCo
     if (!config) {
         RDX_RAISE_ERROR("Invalid runtime config, expected type: {}", typeid(RuntimeConfig_t).name());
     }
+
+    m_detection_request_output_port->set_callback_on_deliver_to_downstream_finish(
+        std::bind(&DetectionRequestDriver::_on_detection_request_sent, this,
+                  std::placeholders::_1, std::placeholders::_2,
+                  std::placeholders::_3, std::placeholders::_4));
 
     // create port handler
     if (m_image_input_port) {
@@ -96,32 +188,35 @@ int DetectionRequestDriver::_update_runtime_config(std::shared_ptr<BaseRuntimeCo
             m_detection_request_output_port.get(),
             nullptr,
             handler_config,
-            config->output_enqueue_policy,
+            config->detection_request_enqueue_policy,
             this);
 
         m_image_request_port_handler->on_process_input_data =
-            [this, config](OutputRequest_t *output_request,
+            [this, config](DetectionRequestOutputPort_t::DeliveryRequest_t *output_request,
                            ByImageRequest::ActionResult_t *output_result,
                            std::shared_ptr<ByImageRequest::SourceData_t> source_data,
                            auto &resource_token) {
                 (void)resource_token;
                 (void)output_result;
 
+                auto msg_uuid = ByImageRequest::ActionDataTrait_t::get_uuid(*source_data->get_goal());
+                auto msg_uuid_str = boost::uuids::to_string(msg_uuid);
+
                 // create request
-                RDX_INFO_DEV(this, __func__, false, "{}", "Creating request from source data");
-                OutputSourceData_t output_source_data;
+                RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Creating request from source data", msg_uuid_str);
+                DetectionRequestOutputPort_t::SourceData_t output_source_data;
                 cv::Mat image;
-                if (_extract_image(&image, *source_data)) {
+                if (_extract_image(&image, *source_data) == 0) {
                     output_source_data.set_image(image);
                 }
                 output_source_data.set_frame_metadata(source_data->get_goal()->frame.metadata);
                 output_request->set_source_data(output_source_data);
 
                 // publish visualization
-                bool do_publish_visualization = config->enable_visualization && m_pub_visualization && !image.empty();
-                if (do_publish_visualization) {
-                    RDX_INFO_DEV(this, __func__, false, "{}", "Publishing visualization");
-                    m_pub_visualization->publish(image);
+                bool do_publish_input = config->enable_visualization && m_pub_input && !image.empty();
+                if (do_publish_input) {
+                    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Publishing input", msg_uuid_str);
+                    m_pub_input->publish(image);
                 }
 
                 return 0;
