@@ -89,21 +89,6 @@ inline constexpr const char *get_default_time_unit_name()
     return _get_time_unit_name<DefaultTimeUnit_t>();
 }
 
-
-namespace DefaultParams
-{
-
-//! maximum timeout for any operation that may block
-constexpr DefaultTimeUnit_t MaxTimeout = std::chrono::seconds(30);
-
-//! interval between each retry for any operation that may fail
-constexpr DefaultTimeUnit_t PingActionRetryInterval = std::chrono::milliseconds(5);
-
-//! goal handle timeout
-constexpr DefaultTimeUnit_t GoalHandleTimeout = std::chrono::milliseconds(3000);
-
-} // namespace DefaultParams
-
 // globally accessible parameters in ROS related to this application
 namespace RosParams
 {

@@ -39,11 +39,6 @@ class PullProcessSendHandler
     using OutputRequest_t = typename OutputPort_t::DeliveryRequest_t;
     using OutputDeliveryPolicy_t = typename OutputPort_t::DeliveryPolicy_t;
 
-    using InputDataProcessCallback_t = std::function<int(OutputRequest_t *output_request,
-                                                         InputActionResult_t *action_result,
-                                                         std::shared_ptr<InputSourceData_t> source_data,
-                                                         ResourceToken_t &resource_token)>;
-
     enum class ProcessResult {
         Success = 0,
         NoData = 1,
@@ -208,22 +203,27 @@ class PullProcessSendHandler
     }
 
   public:
-    //! Callback when processing input data
-    InputDataProcessCallback_t on_process_input_data;
+    //! Alias for callback when processing input data
+    using OnProcessInputDataCallback_t = std::function<int(OutputRequest_t *output_request,
+                                                           InputActionResult_t *action_result,
+                                                           std::shared_ptr<InputSourceData_t> source_data,
+                                                           ResourceToken_t &resource_token)>;
+    OnProcessInputDataCallback_t on_process_input_data;
 
-    //! Callback when input data is processed
-    std::function<void(OutputRequest_t &request,
-                       ResourceToken_t &resource_token)>
-        on_input_data_processed;
+    //! Alias for callback when input data is processed
+    using OnInputDataProcessedCallback_t = std::function<void(OutputRequest_t &request,
+                                                              ResourceToken_t &resource_token)>;
+    OnInputDataProcessedCallback_t on_input_data_processed;
 
-    //! Callback when no resource token is available
-    std::function<void(std::shared_ptr<InputSourceData_t> source_data)>
-        on_resource_token_not_available;
+    //! Alias for callback when no resource token is available
+    using OnResourceTokenNotAvailableCallback_t = std::function<void(std::shared_ptr<InputSourceData_t> source_data)>;
+    OnResourceTokenNotAvailableCallback_t on_resource_token_not_available;
 
-    //! Callback before releasing resource token
+    //! Alias for callback before releasing resource token
     //! Return 0 if success, resource token will be released,
     //! return -1 if failed, resource token will not be released, you handle it yourself
-    std::function<int(ResourceToken_t &resource_token)> on_release_resource_token;
+    using OnReleaseResourceTokenCallback_t = std::function<int(ResourceToken_t &resource_token)>;
+    OnReleaseResourceTokenCallback_t on_release_resource_token;
 
   private:
     rclcpp::Node *m_node = nullptr;

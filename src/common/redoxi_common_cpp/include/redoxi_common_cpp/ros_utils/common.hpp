@@ -41,12 +41,17 @@ constexpr const char *DefaultRDXLoggerName = "rdx_default_logger";
 namespace DefaultParams
 {
 
+//! goal handle timeout
+constexpr DefaultTimeUnit_t GoalHandleTimeout = std::chrono::milliseconds(3000);
+
 //! publisher queue size when the topic is intended to be used for debugging
 constexpr int DebugPublisherQueueSize = 10;
 
-
 //! QoS for the debug publisher
 const rclcpp::QoS DebugPublisherQoS = rclcpp::SensorDataQoS();
+
+// used for performance probing
+const rclcpp::QoS ProbePublisherQoS = rclcpp::RosoutQoS();
 // const rclcpp::QoS DebugPublisherQoS = rclcpp::QoS(DebugPublisherQueueSize).reliable();
 
 } // namespace DefaultParams
@@ -200,11 +205,12 @@ class LogImportanceThreshold
 };
 
 template <typename T>
-concept NodeOrLoggerConcept = requires(T t) {
+concept NodeOrLoggerConcept = requires(T t)
+{
     requires std::is_same_v<std::remove_cvref_t<T>, rclcpp::Logger> ||
-                 std::is_convertible_v<std::remove_cvref_t<T>,
-                                       const rclcpp::Node *> ||
-                 std::is_null_pointer_v<std::remove_cvref_t<T>>;
+        std::is_convertible_v < std::remove_cvref_t<T>,
+    const rclcpp::Node * > ||
+        std::is_null_pointer_v<std::remove_cvref_t<T>>;
 };
 
 //! Log a message using RCLCPP macros with or without thread ID

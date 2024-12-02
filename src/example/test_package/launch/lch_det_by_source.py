@@ -92,7 +92,7 @@ det_node_params = {
                 "drop_strategy": "dont_care",
             },
         },
-        "visualization_topic": "debug/visualization",
+        "publish_visualization_topic": "debug/visualization",
         "_time_unit": "us(1e-6)",
     },
     "runtime_config": {

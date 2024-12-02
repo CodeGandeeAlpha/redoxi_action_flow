@@ -372,12 +372,16 @@ int Yolo8BodyPoseDetectorNode::_update_init_config(std::shared_ptr<BaseInitConfi
     }
 
     // create visualization publisher
-    if (!config->visualization_topic.empty()) {
-        m_impl->pub_visualization = std::make_shared<StampedImagePub>(this, config->visualization_topic);
+    if (!config->publish_visualization_topic.empty()) {
+        m_impl->pub_visualization = std::make_shared<StampedImagePub>(this, config->publish_visualization_topic);
     }
 
     // create detection done publisher
-    m_impl->pub_detection_done = this->create_publisher<std_msgs::msg::String>("probe/detection_done", 1000);
+    if (!config->publish_probe_detection_done_topic.empty()) {
+        m_impl->pub_detection_done = this->create_publisher<std_msgs::msg::String>(
+            config->publish_probe_detection_done_topic,
+            DefaultParams::ProbePublisherQoS);
+    }
 
     return 0;
 }

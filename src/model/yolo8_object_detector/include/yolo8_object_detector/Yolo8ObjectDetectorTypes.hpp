@@ -1,21 +1,20 @@
 #pragma once
 
-#define JS_STD_OPTIONAL
-
 #include <optional>
 #include <json_struct/json_struct.h>
 
-#include <yolo8_body_pose_detector/yolo8_body_pose_detector.hpp>
-#include <redoxi_common_cpp/redoxi_concepts.hpp>
+#include <yolo8_object_detector/yolo8_object_detector.hpp>
 #include <redoxi_common_nodes/detection_ports/DetectionRequestInputPort.hpp>
 #include <redoxi_common_nodes/detection_ports/DetectionResponseOutputPort.hpp>
 #include <redoxi_common_nodes/image_ports/AsyncImageInputPort.hpp>
-#include <redoxi_dnn_models/yolo8/Yolo8PoseModel.hpp>
+#include <redoxi_dnn_models/yolo8/Yolo8DetectionModel.hpp>
 #include <redoxi_common_nodes/base_nodes/StartStopNode.hpp>
 
-namespace redoxi_works::model_nodes::yolo8_body_pose_detector
+
+namespace redoxi_works::model_nodes::yolo8_object_detector
 {
-using YoloModel_t = inference::yolo8::Yolo8PoseModel;
+
+using YoloModel_t = inference::yolo8::Yolo8DetectionModel;
 using YoloModelConfig_t = inference::yolo8::Yolo8ModelConfig;
 using YoloModelOutputConfig_t = YoloModel_t::OutputConfig_t;
 
@@ -83,16 +82,12 @@ struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
     // debug topic
     std::string publish_visualization_topic = "debug/visualization";
 
-    // performance probe topic
-    std::string publish_probe_detection_done_topic = "probe/detection_done";
-
     JS_OBJECT_WITH_SUPER(
         JS_SUPER(common_nodes::StartStopNode::InitConfig_t),
         JS_MEMBER(model_configs),
         JS_MEMBER(detection_request_config),
         JS_MEMBER(image_request_config),
-        JS_MEMBER(publish_visualization_topic),
-        JS_MEMBER(publish_probe_detection_done_topic));
+        JS_MEMBER(publish_visualization_topic));
 };
 
 struct RuntimeConfig : public common_nodes::StartStopNode::RuntimeConfig_t {
@@ -109,14 +104,12 @@ struct RuntimeConfig : public common_nodes::StartStopNode::RuntimeConfig_t {
     // only work if visualization_topic is set in init config
     bool enable_visualization = true;
 
-    // enable performance probe?
-    bool enable_performance_probe = false;
-
     JS_OBJECT_WITH_SUPER(
         JS_SUPER(common_nodes::StartStopNode::RuntimeConfig_t),
         JS_MEMBER(enable_blocking_mode),
         JS_MEMBER(model_output_config),
-        JS_MEMBER(enable_visualization),
-        JS_MEMBER(enable_performance_probe));
+        JS_MEMBER(enable_visualization));
 };
-} // namespace redoxi_works::model_nodes::yolo8_body_pose_detector
+
+
+} // namespace redoxi_works::model_nodes::yolo8_object_detector
