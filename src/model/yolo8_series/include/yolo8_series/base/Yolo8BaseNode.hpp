@@ -292,7 +292,7 @@ int Yolo8BaseNode<TModel>::_create_image_request_handler(const RuntimeConfig_t &
     config->block_input_reading = runtime_config.enable_blocking_mode;
     config->block_resource_acquisition = runtime_config.enable_blocking_mode;
     bool enable_visualization = runtime_config.enable_visualization;
-
+    bool enable_performance_probe = runtime_config.enable_performance_probe;
     auto enqueue_policy = init_config->image_request_config->output_enqueue_policy;
     m_impl->work_then_send_handler = std::make_shared<ProcessHandler_t>();
     auto process_handler = m_impl->work_then_send_handler;
@@ -300,8 +300,8 @@ int Yolo8BaseNode<TModel>::_create_image_request_handler(const RuntimeConfig_t &
                           &m_impl->inference_resource_pool, config, enqueue_policy);
 
     process_handler->on_process_input_data =
-        [this, enable_visualization](auto *output_request, auto *action_result,
-                                     auto source_data, auto &resource) {
+        [this, enable_visualization, enable_performance_probe](auto *output_request, auto *action_result,
+                                                               auto source_data, auto &resource) {
             // extract image
             cv::Mat input_image;
             auto ret_extract_image = _extract_image(&input_image, source_data->get_goal()->frame);
@@ -332,12 +332,10 @@ int Yolo8BaseNode<TModel>::_create_image_request_handler(const RuntimeConfig_t &
                 m_impl->pub_visualization->publish(vis_canvas);
             }
 
-            // publish detection done, used for timing measurement
-            auto frame_num = source_data->get_goal()->frame.metadata.frame_num;
-            RDX_INFO_DEV(this, __func__, false, "Publishing detection done, frame_num={}", frame_num);
-            if (m_impl->pub_detection_done) {
+            //! Print probe message
+            if (enable_performance_probe && m_impl->pub_detection_done) {
                 std_msgs::msg::String msg;
-                msg.data = fmt::format("detection done,frame_num={}", frame_num);
+                msg.data = fmt::format("detection request done, frame_num={}", source_data->get_goal()->frame.metadata.frame_num);
                 m_impl->pub_detection_done->publish(msg);
             }
 
@@ -357,7 +355,7 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
     handler_config->block_input_reading = runtime_config.enable_blocking_mode;
     handler_config->block_resource_acquisition = runtime_config.enable_blocking_mode;
     bool enable_visualization = runtime_config.enable_visualization;
-
+    bool enable_performance_probe = runtime_config.enable_performance_probe;
     m_impl->work_then_reply_handler = std::make_shared<typename Impl::PullProcessReplyHandler_t>();
     auto process_handler = m_impl->work_then_reply_handler;
     process_handler->init(
@@ -366,9 +364,9 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
         handler_config, this);
 
     typename Impl::PullProcessReplyHandler_t::OnProcessInputDataCallback_t process_func =
-        [this, enable_visualization](typename Impl::PullProcessReplyHandler_t::InputActionResult_t *output_action_result,
-                                     std::shared_ptr<typename Impl::PullProcessReplyHandler_t::InputSourceData_t> source_data,
-                                     typename Impl::PullProcessReplyHandler_t::ResourceToken_t &resource_token) {
+        [this, enable_visualization, enable_performance_probe](typename Impl::PullProcessReplyHandler_t::InputActionResult_t *output_action_result,
+                                                               std::shared_ptr<typename Impl::PullProcessReplyHandler_t::InputSourceData_t> source_data,
+                                                               typename Impl::PullProcessReplyHandler_t::ResourceToken_t &resource_token) {
             auto msg_uuid = ActionDataTrait_t::get_uuid(*source_data->get_goal());
             std::string msg_uuid_str = UUIDTrait::to_string(msg_uuid);
 
@@ -401,6 +399,13 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
                 cv::Mat vis_canvas = input_image.clone();
                 _draw_visualization(vis_canvas, det_result);
                 m_impl->pub_visualization->publish(vis_canvas);
+            }
+
+            //! Print probe message
+            if (enable_performance_probe && m_impl->pub_detection_done) {
+                std_msgs::msg::String msg;
+                msg.data = fmt::format("detection request done, frame_num={}", source_data->get_goal()->frame.metadata.frame_num);
+                m_impl->pub_detection_done->publish(msg);
             }
 
             // Mark the goal as succeeded
