@@ -96,6 +96,11 @@ class AsyncActionOutputPort : public IStartStopProtocol
             return false;
         }
 
+        if (!rclcpp::ok()) {
+            RDX_LOG_WARN(m_parent_node, __func__, true, "[{}] node is shutting down, cannot push request", __func__);
+            return false;
+        }
+
         DeliveryTask_t task;
         _create_frame_delivery_task(request, task);
         return m_delivery_task_node->put_data(task);
@@ -121,20 +126,27 @@ class AsyncActionOutputPort : public IStartStopProtocol
         if (drop_frame_strategy == DropStrategy::NoDrop) {
             // Keep trying until success if no drop strategy
             int attempt = 0;
-            while (!try_push_request(request)) {
+            while (!try_push_request(request) && rclcpp::ok()) {
                 attempt++;
                 RDX_INFO_DEV(m_parent_node, __func__, false,
                              "[msg_uuid={}] enqueue attempt {}/inf failed, retrying...",
                              msg_uuid_str, attempt);
                 std::this_thread::sleep_for(interval_between_attempts);
             }
-            RDX_INFO_DEV(m_parent_node, __func__, false,
-                         "[msg_uuid={}] succeeded after {} enqueue attempts",
-                         msg_uuid_str, attempt + 1);
-            success = true;
+            if (rclcpp::ok()) {
+                RDX_INFO_DEV(m_parent_node, __func__, false,
+                             "[msg_uuid={}] succeeded after {} enqueue attempts",
+                             msg_uuid_str, attempt + 1);
+                success = true;
+            } else {
+                RDX_INFO_DEV(m_parent_node, __func__, false,
+                             "[msg_uuid={}] failed to push request, node is shutting down",
+                             msg_uuid_str);
+                success = false;
+            }
         } else if (drop_frame_strategy == DropStrategy::DropAsNeeded) {
             // Try up to max attempts if dropping is allowed
-            for (int attempt = 0; attempt < max_attempts; ++attempt) {
+            for (int attempt = 0; attempt < max_attempts && rclcpp::ok(); ++attempt) {
                 RDX_INFO_DEV(m_parent_node, __func__, false,
                              "[msg_uuid={}] enqueue attempt {}/{}",
                              msg_uuid_str, attempt + 1, max_attempts);

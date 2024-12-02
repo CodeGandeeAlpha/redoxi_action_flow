@@ -198,7 +198,7 @@ detection_driver_params = {
                     "action_name": f"/{DetectionNodeName}/{DetectionNodeInputActionName}",
                     "delivery_policy": {
                         "precondition": "dont_care",
-                        "drop_strategy": "dont_care",
+                        "drop_strategy": "no_drop",
                     },
                     "create_debug_pub": False,
                 },
@@ -215,7 +215,7 @@ detection_driver_params = {
                     "action_name": f"/{DetectionRelayNodeName}/{DetectionRelayInputActionName}",
                     "delivery_policy": {
                         "precondition": "dont_care",
-                        "drop_strategy": "dont_care",
+                        "drop_strategy": "no_drop",
                     },
                     "create_debug_pub": False,
                 },
@@ -236,7 +236,7 @@ detection_driver_params = {
                 "fallback_wait_time_retry_response": 100000,
             },
             "precondition": "dont_care",
-            "drop_strategy": "dont_care",
+            "drop_strategy": "no_drop",
         },
         "detection_response_enqueue_policy": {
             "retry_policy": {
@@ -245,7 +245,7 @@ detection_driver_params = {
                 "fallback_wait_time_retry_response": 100000,
             },
             "precondition": "dont_care",
-            "drop_strategy": "dont_care",
+            "drop_strategy": "no_drop",
         },
         "enable_visualization": True,
         "enable_blocking_mode": True,
