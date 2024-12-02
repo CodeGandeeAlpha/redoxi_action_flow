@@ -10,8 +10,10 @@
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <redoxi_public_msgs/msg/detection.hpp>
 #include <redoxi_dnn_models/message_conversion.hpp>
+#include <redoxi_dnn_models/visualizations.hpp>
 #include <redoxi_common_nodes/base_nodes/StartStopNode.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
+#include <redoxi_common_cpp/image_proc/utils.hpp>
 #include <redoxi_common_nodes/port_handlers/PullProcessSendHandler.hpp>
 #include <redoxi_common_nodes/port_handlers/PullProcessReplyHandler.hpp>
 
@@ -33,6 +35,7 @@ class Yolo8BaseNode : public redoxi_works::common_nodes::StartStopNode
         using InputActionDataTrait_t = typename InputPort_t::ActionDataTrait_t;
         using InputGoalUUID_t = typename InputPort_t::GoalUUID_t;
         using InputSourceData_t = typename InputPort_t::SourceData_t;
+        using InputActionResult_t = typename InputPort_t::ActionResult_t;
     };
 
     struct ByImageRequest {
@@ -78,11 +81,23 @@ class Yolo8BaseNode : public redoxi_works::common_nodes::StartStopNode
     //! create a new pull process reply handler for detection request
     virtual int _create_detection_request_handler(const RuntimeConfig_t &runtime_config);
 
+    //! in image request, convert the detection result to ROS message, for sending into output port
+    virtual int _process_detection_result(typename ByImageRequest::OutputSourceData_t *output_source_data,
+                                          const DetectionResult_t &det_result,
+                                          const typename ByImageRequest::InputSourceData_t &source_data,
+                                          const cv::Mat &input_image);
+
     //! extract image from source data
     virtual int _extract_image(cv::Mat *output, const std::shared_ptr<typename ByImageRequest::InputSourceData_t> &source_data);
 
     //! create a new pull process send handler for image request
     virtual int _create_image_request_handler(const RuntimeConfig_t &runtime_config);
+
+    //! in detection request, convert the detection result to ROS message, for replying to client
+    virtual int _process_detection_result(typename ByDetectionRequest::InputActionResult_t *output_action_result,
+                                          const DetectionResult_t &det_result,
+                                          const typename ByDetectionRequest::InputSourceData_t &source_data,
+                                          const cv::Mat &input_image);
 
     //! process image request
     virtual int _process_image_request();
@@ -227,6 +242,46 @@ int Yolo8BaseNode<TModel>::_extract_image(cv::Mat *output,
 }
 
 template <YoloModelConcept TModel>
+int Yolo8BaseNode<TModel>::_process_detection_result(typename ByImageRequest::OutputSourceData_t *output_source_data,
+                                                     const DetectionResult_t &det_result,
+                                                     const typename ByImageRequest::InputSourceData_t &source_data,
+                                                     const cv::Mat &input_image)
+{
+    // convert detection result to ROS message
+    inference::conversion::to_ros_msg(&output_source_data->detections, det_result);
+
+    // add frame metadata to each detection
+    for (auto &detection : output_source_data->detections) {
+        detection.frame_metadata = source_data.get_goal()->frame.metadata;
+    }
+
+    // set the image
+    output_source_data->image = input_image;
+
+    return 0;
+}
+
+//! in detection request, convert the detection result to ROS message, for replying to client
+template <YoloModelConcept TModel>
+int Yolo8BaseNode<TModel>::_process_detection_result(typename ByDetectionRequest::InputActionResult_t *output_action_result,
+                                                     const DetectionResult_t &det_result,
+                                                     const typename ByDetectionRequest::InputSourceData_t &source_data,
+                                                     const cv::Mat &input_image)
+{
+    // convert detection result to ROS message
+    (void)input_image;
+    (void)source_data;
+    inference::conversion::to_ros_msg(&output_action_result->detections, det_result);
+
+    // add frame metadata to each detection
+    for (auto &detection : output_action_result->detections) {
+        detection.frame_metadata = source_data.get_goal()->frame.metadata;
+    }
+
+    return 0;
+}
+
+template <YoloModelConcept TModel>
 int Yolo8BaseNode<TModel>::_create_image_request_handler(const RuntimeConfig_t &runtime_config)
 {
     using ProcessHandler_t = typename Impl::PullProcessSendHandler_t;
@@ -261,8 +316,9 @@ int Yolo8BaseNode<TModel>::_create_image_request_handler(const RuntimeConfig_t &
 
             // create output request
             typename ByImageRequest::OutputSourceData_t o_source;
-            o_source.image = input_image;
-            inference::conversion::to_ros_msg(&o_source.detections, det_result);
+            // o_source.image = input_image;
+            // inference::conversion::to_ros_msg(&o_source.detections, det_result);
+            _process_detection_result(&o_source, det_result, *source_data, input_image);
 
             typename ByImageRequest::OutputRequest_t request;
             request.set_source_data(o_source);
@@ -276,7 +332,6 @@ int Yolo8BaseNode<TModel>::_create_image_request_handler(const RuntimeConfig_t &
                 m_impl->pub_visualization->publish(vis_canvas);
             }
 
-            // FIXME: add this to config
             // publish detection done, used for timing measurement
             auto frame_num = source_data->get_goal()->frame.metadata.frame_num;
             RDX_INFO_DEV(this, __func__, false, "Publishing detection done, frame_num={}", frame_num);
@@ -339,12 +394,7 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
             }
 
             // Convert detections to ROS message
-            inference::conversion::to_ros_msg(&output_action_result->detections, det_result);
-
-            // Add frame metadata to each detection
-            for (auto &detection : output_action_result->detections) {
-                detection.frame_metadata = source_data->get_goal()->frame.metadata;
-            }
+            _process_detection_result(output_action_result, det_result, *source_data, input_image);
 
             // publish visualization
             if (m_impl->pub_visualization && enable_visualization) {
@@ -519,36 +569,10 @@ template <YoloModelConcept TModel>
 void Yolo8BaseNode<TModel>::_draw_visualization(cv::Mat &canvas,
                                                 const DetectionResult_t &detections)
 {
-    const auto &keypoint_connections = InferenceModel_t::get_keypoint_connections();
-    for (const auto &obj : detections.objects) {
-        //! Draw bounding box
-        cv::rectangle(canvas,
-                      cv::Point(obj.xywh[0], obj.xywh[1]),
-                      cv::Point(obj.xywh[0] + obj.xywh[2], obj.xywh[1] + obj.xywh[3]),
-                      cv::Scalar(0, 255, 0), 2);
-
-        //! Draw keypoints
-        for (size_t i = 0; i < obj.keypoints.size(); i++) {
-            const auto &kp = obj.keypoints[i];
-            if (kp.score > 0) { // Only draw if keypoint is detected
-                cv::circle(canvas,
-                           cv::Point(kp.xy[0], kp.xy[1]),
-                           3, cv::Scalar(255, 0, 0), -1);
-            }
-        }
-
-        //! Draw connections between keypoints to form skeleton
-        for (const auto &connection : keypoint_connections) {
-            const auto &kp1 = obj.keypoints[connection.first];
-            const auto &kp2 = obj.keypoints[connection.second];
-            if (kp1.score > 0 && kp2.score > 0) {
-                cv::line(canvas,
-                         cv::Point(kp1.xy[0], kp1.xy[1]),
-                         cv::Point(kp2.xy[0], kp2.xy[1]),
-                         cv::Scalar(0, 0, 255), 2);
-            }
-        }
-    }
+    using namespace redoxi_works::dnn_models::visualizations;
+    DrawDetectionsOptions options;
+    options.colorization_mode = DrawDetectionsOptions::ColorizationMode::ClassId;
+    draw_detections(&canvas, detections, options);
 }
 
 template <YoloModelConcept TModel>

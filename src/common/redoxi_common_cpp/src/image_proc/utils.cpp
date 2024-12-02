@@ -44,34 +44,49 @@ void draw_detections(cv::Mat *output,
     }
 
     for (const auto &detection : detections) {
+        cv::Scalar box_color = options.default_box_color;
+
+        // Determine color based on colorization mode
+        switch (options.colorization_mode) {
+            case DrawDetectionsOptions::ColorizationMode::ClassId:
+                if (detection.category >= 0) {
+                    box_color = cv::Scalar(detection.category * 10 % 256, 100, 100); // Example colorization by class id
+                }
+                break;
+            case DrawDetectionsOptions::ColorizationMode::Random:
+                box_color = cv::Scalar(rand() % 256, rand() % 256, rand() % 256); // Random color
+                break;
+            default:
+                break;
+        }
+
         // Draw bounding box if enabled
         if (options.draw_bboxes) {
             cv::Rect bbox(detection.bbox.x, detection.bbox.y,
                           detection.bbox.width, detection.bbox.height);
-            cv::Scalar box_color = options.default_box_color;
-
-            // Determine color based on colorization mode
-            switch (options.colorization_mode) {
-                case DrawDetectionsOptions::ColorizationMode::ClassId:
-                    if (detection.category >= 0) {
-                        box_color = cv::Scalar(detection.category * 10 % 256, 100, 100); // Example colorization by class id
-                    }
-                    break;
-                case DrawDetectionsOptions::ColorizationMode::Random:
-                    box_color = cv::Scalar(rand() % 256, rand() % 256, rand() % 256); // Random color
-                    break;
-                default:
-                    break;
-            }
-
             cv::rectangle(*output, bbox, box_color, options.box_thickness);
         }
 
         // Draw keypoints if enabled
         if (options.draw_keypoints) {
-            for (const auto &keypoint : detection.keypoints.keypoints_2) {
-                cv::Point2f pt(keypoint.x, keypoint.y);
-                cv::circle(*output, pt, options.keypoint_radius, cv::Scalar(255, 0, 0), -1);
+            const auto &keypoints = detection.keypoints.keypoints_2;
+            if (keypoints.empty()) {
+                // no keypoints, skip
+                continue;
+            }
+            for (const auto &kp : keypoints) {
+                cv::Point2f pt(kp.x, kp.y);
+                cv::circle(*output, pt, options.keypoint_radius, box_color, -1);
+            }
+
+            const auto &keypoint_edges = detection.keypoints.keypoint_edges;
+            auto num_edges = keypoint_edges.size() / 2;
+            for (size_t i = 0; i < num_edges; ++i) {
+                auto u = keypoint_edges[2 * i];
+                auto v = keypoint_edges[2 * i + 1];
+                auto p_u = keypoints[u];
+                auto p_v = keypoints[v];
+                cv::line(*output, cv::Point(p_u.x, p_u.y), cv::Point(p_v.x, p_v.y), box_color, 2);
             }
         }
     }

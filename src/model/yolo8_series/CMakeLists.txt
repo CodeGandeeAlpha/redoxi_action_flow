@@ -17,7 +17,8 @@ find_package(json_struct REQUIRED)
 # uncomment the following section in order to fill in further dependencies
 # manually. find_package(<dependency> REQUIRED)
 
-add_library(yolo8_series src/yolo8_series.cpp)
+add_library(yolo8_series src/yolo8_series.cpp
+                         src/bodypose/Yolo8BodyPoseNode.cpp)
 add_library(yolo8_series::yolo8_series ALIAS yolo8_series)
 target_compile_features(yolo8_series PUBLIC c_std_99 cxx_std_17) # Require C99
                                                                  # and C++17

@@ -70,6 +70,8 @@ option(BUILD_ONNX_YOLO8DET "Build onnx_yolo8det target" OFF)
 option(BUILD_VIDEO_FROM_URL_NODE "Build video_from_url_node target" ON)
 option(BUILD_YOLO_BODY_POSE_DETECTION_NODE
        "Build yolo_body_pose_detection_node target" ON)
+option(BUILD_YOLO_OBJECT_DETECTION_NODE
+       "Build yolo_object_detection_node target" ON)
 option(BUILD_DETECTION_RELAY_NODE "Build detection_relay_node target" ON)
 option(BUILD_DETECTION_DRIVER_NODE "Build detection_driver_node target" ON)
 
@@ -95,6 +97,10 @@ function(configure_target target_name)
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_YOLO_OBJECT_DETECTION_NODE)
+  configure_target(yolo_object_detection_node)
+endif()
 
 if(BUILD_DETECTION_DRIVER_NODE)
   configure_target(detection_driver_node)
