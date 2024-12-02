@@ -12,3 +12,7 @@ git clone --depth=1 https://github.com/ros-perception/vision_opencv.git -b rolli
 echo "Cloning rosboard..."
 git clone --depth=1 https://github.com/dheera/rosboard.git
 
+# redoxi tracking library
+echo "Cloning redoxi tracking library..."
+git clone https://github.com/CodeGandee/RedoxiTrack.git
+
