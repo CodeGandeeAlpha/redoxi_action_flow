@@ -20,4 +20,4 @@ int64 CLOSE=8
 int64 NO_MATCH=16
 
 # bitmask of track status
-int64 track_status 0
+int64 value 0
