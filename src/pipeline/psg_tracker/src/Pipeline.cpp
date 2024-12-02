@@ -5,7 +5,7 @@
 #include <json_struct/json_struct.h>
 #include <tbb/concurrent_queue.h>
 #include <RedoxiTrack/RedoxiTrack.h>
-
+#include <psg_common/psg_common.hpp>
 // #include <tbb/task_group.h>
 
 #define PRINT_THREAD_ID_IN_LOG (true)
@@ -385,12 +385,14 @@ void PSGTrackerPipelineNode::_step()
 
         if (success) {
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] success to push request",
-                         boost::uuids::to_string(msg_uuid));
+                         "[msg_uuid={}] success to push request to model, frame_num={}",
+                         boost::uuids::to_string(msg_uuid),
+                         document_data->get_goal()->document.frame.metadata.frame_num);
         } else {
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] failed to push request",
-                         boost::uuids::to_string(msg_uuid));
+                         "[msg_uuid={}] failed to push request to model, frame_num={}",
+                         boost::uuids::to_string(msg_uuid),
+                         document_data->get_goal()->document.frame.metadata.frame_num);
         }
 
         // FIXME: debug only
@@ -536,7 +538,7 @@ int PSGTrackerPipelineNode::_on_deliver_to_downstream_finish(TargetDataModel_t &
     return 0;
 }
 
-//! 将document中的raw image转换为带有关键点的debug image
+//! 将document中的raw image转换为带有track targets的debug image
 sensor_msgs::msg::Image PSGTrackerPipelineNode::_create_debug_image(const psg_private_msgs::msg::PsgDocument &document)
 {
     //! 转换raw image到cv::Mat
@@ -550,70 +552,105 @@ sensor_msgs::msg::Image PSGTrackerPipelineNode::_create_debug_image(const psg_pr
         return sensor_msgs::msg::Image(); // 返回空图像
     }
 
-    //! 为关键点设置颜色
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "设置关键点颜色", 0);
-    cv::Scalar keypoint_color(0, 255, 0); // 绿色
-    cv::Scalar line_color(255, 255, 0);   // 黄色
-
     //! 在图像上画关键点和骨架连接
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始在图像上绘制关键点, 共{}个检测结果", document.detections.size());
-    for (const auto &detection : document.detections) {
-        const auto &keypoints = detection.keypoints;
+    for (const auto &person : document.persons) {
+        //! 根据person的track_id设置颜色
+        cv::Scalar color = get_color(person.track_id);
+
+        //! 获取body bbox坐标
+        if (person.body.category == 0) {
+            int x = static_cast<int>(person.body.bbox.x);
+            int y = static_cast<int>(person.body.bbox.y);
+            int width = static_cast<int>(person.body.bbox.width);
+            int height = static_cast<int>(person.body.bbox.height);
+
+            //! 画body bbox
+            cv::rectangle(cv_image,
+                          cv::Point(x, y),
+                          cv::Point(x + width, y + height),
+                          color, 2);
+        }
+
+        //! 画body keypoints
+        const auto &keypoints = person.body.keypoints;
 
         //! 在访问数组或指针前添加检查
-        if (keypoints.keypoints_2.empty() || keypoints.confidence.empty()) {
-            continue;
-        }
+        if (!keypoints.keypoints_2.empty() && !keypoints.confidence.empty()) {
+            //! 画出17个关键点
+            for (size_t i = 0; i < keypoints.keypoints_2.size(); i++) {
+                if (keypoints.confidence[i] > 0.3) { // 只画置信度大于0.3的点
+                    //! 记录关键点的位置和置信度
+                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                                  "绘制关键点[{}] - 位置:[{}, {}], 置信度:{}",
+                                  i, keypoints.keypoints_2[i].x, keypoints.keypoints_2[i].y, keypoints.confidence[i]);
+                    cv::circle(cv_image,
+                               cv::Point(keypoints.keypoints_2[i].x, keypoints.keypoints_2[i].y),
+                               3, color, -1);
+                }
+            }
 
-        //! 画出17个关键点
-        for (size_t i = 0; i < keypoints.keypoints_2.size(); i++) {
-            if (keypoints.confidence[i] > 0.3) { // 只画置信度大于0.3的点
-                //! 记录关键点的位置和置信度
-                RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                              "绘制关键点[{}] - 位置:[{}, {}], 置信度:{}",
-                              i, keypoints.keypoints_2[i].x, keypoints.keypoints_2[i].y, keypoints.confidence[i]);
-                cv::circle(cv_image,
-                           cv::Point(keypoints.keypoints_2[i].x, keypoints.keypoints_2[i].y),
-                           3, keypoint_color, -1);
+            //! 画出骨架连接
+            //! COCO数据集的17个关键点连接对
+            const std::vector<std::pair<int, int>> skeleton = {
+                {5, 7}, {7, 9}, {6, 8}, {8, 10}, // 手臂
+                {11, 13},
+                {13, 15},
+                {12, 14},
+                {14, 16}, // 腿
+                {5, 6},
+                {5, 11},
+                {6, 12},  // 躯干
+                {11, 12}, // 臀部
+                {1, 2},
+                {1, 3},
+                {2, 4},
+                {3, 5},
+                {4, 6} // 头部和肩膀
+            };
+
+            for (const auto &bone : skeleton) {
+                if (keypoints.confidence[bone.first] > 0.3 && keypoints.confidence[bone.second] > 0.3) {
+                    //! 记录骨架连接的起点和终点
+                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                                  "绘制骨架连接 - 从关键点[{},{}]到关键点[{},{}]",
+                                  keypoints.keypoints_2[bone.first].x, keypoints.keypoints_2[bone.first].y,
+                                  keypoints.keypoints_2[bone.second].x, keypoints.keypoints_2[bone.second].y);
+                    cv::line(cv_image,
+                             cv::Point(keypoints.keypoints_2[bone.first].x, keypoints.keypoints_2[bone.first].y),
+                             cv::Point(keypoints.keypoints_2[bone.second].x, keypoints.keypoints_2[bone.second].y),
+                             color, 2);
+                }
             }
         }
 
-        //! 画出骨架连接
-        //! COCO数据集的17个关键点连接对
-        const std::vector<std::pair<int, int>> skeleton = {
-            {5, 7}, {7, 9}, {6, 8}, {8, 10}, // 手臂
-            {11, 13},
-            {13, 15},
-            {12, 14},
-            {14, 16}, // 腿
-            {5, 6},
-            {5, 11},
-            {6, 12},  // 躯干
-            {11, 12}, // 臀部
-            {1, 2},
-            {1, 3},
-            {2, 4},
-            {3, 5},
-            {4, 6} // 头部和肩膀
-        };
+        //! 画head bbox
+        if (person.head.category == 1) {
+            int x = static_cast<int>(person.head.bbox.x);
+            int y = static_cast<int>(person.head.bbox.y);
+            int width = static_cast<int>(person.head.bbox.width);
+            int height = static_cast<int>(person.head.bbox.height);
 
-        for (const auto &bone : skeleton) {
-            if (keypoints.confidence[bone.first] > 0.3 && keypoints.confidence[bone.second] > 0.3) {
-                //! 记录骨架连接的起点和终点
-                RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                              "绘制骨架连接 - 从关键点[{},{}]到关键点[{},{}]",
-                              keypoints.keypoints_2[bone.first].x, keypoints.keypoints_2[bone.first].y,
-                              keypoints.keypoints_2[bone.second].x, keypoints.keypoints_2[bone.second].y);
-                cv::line(cv_image,
-                         cv::Point(keypoints.keypoints_2[bone.first].x, keypoints.keypoints_2[bone.first].y),
-                         cv::Point(keypoints.keypoints_2[bone.second].x, keypoints.keypoints_2[bone.second].y),
-                         line_color, 2);
-            }
+            //! 画head bbox
+            cv::rectangle(cv_image,
+                          cv::Point(x, y),
+                          cv::Point(x + width, y + height),
+                          color, 2);
         }
 
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                      "完成关键点绘制 - 检测框位置:[{}, {}, {}, {}]",
-                      detection.bbox.x, detection.bbox.y, detection.bbox.width, detection.bbox.height);
+        //! 画face bbox
+        if (person.face.category == 2) {
+            int x = static_cast<int>(person.face.bbox.x);
+            int y = static_cast<int>(person.face.bbox.y);
+            int width = static_cast<int>(person.face.bbox.width);
+            int height = static_cast<int>(person.face.bbox.height);
+
+            //! 画face bbox
+            cv::rectangle(cv_image,
+                          cv::Point(x, y),
+                          cv::Point(x + width, y + height),
+                          color, 2);
+        }
     }
 
     //! 转回sensor_msgs/Image
@@ -659,100 +696,107 @@ void PSGTrackerPipelineNode::_get_model_result()
         RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始从document map中删除document", 0);
         m_impl->m_document_map.synchronize()->erase(output_model_result.source_data->get_frame().metadata.frame_num);
 
-        if (result->track_targets.size() > 0) {
-            RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始处理track_targets结果", 0);
-            for (const auto &track_target : result->track_targets) {
-                RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                              "处理track_target - track_id:{}, track_status:{}, uuid:{}",
-                              track_target.track_id, track_target.track_status,
-                              boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
+        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始处理track_targets结果", 0);
+        for (const auto &track_target : result->track_targets) {
+            RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                          "处理track_target - track_id:{}, track_status:{}, uuid:{}",
+                          track_target.track_id, track_target.track_status,
+                          boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
 
-                // 1. 将track_targets中的track_id和person_id进行匹配，并赋予跟踪的id
+            // 1. 将track_targets中的track_id和person_id进行匹配，并赋予跟踪的id
+            {
+                auto lock_ptr_person_map = m_impl->m_person_map.synchronize();
+                if (lock_ptr_person_map->find(track_target.x_group_uid.uuid) != lock_ptr_person_map->end()) {
+                    auto &person = (*lock_ptr_person_map)[track_target.x_group_uid.uuid];
+                    person->track_id = track_target.track_id;
+                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                                  "更新person track_id - uuid:{}, track_id:{}",
+                                  boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)),
+                                  track_target.track_id);
+                }
+            }
+
+            // 2. 将track_target中的track_id写入document中的persons
+            for (auto &person : document->persons) {
+                if (person.x_uid == track_target.x_group_uid) {
+                    person.track_id = track_target.track_id;
+                    break;
+                }
+            }
+
+            // 3. 收集closed trajectory，并写入document中的trajectories
+            // if track_target is new, create a new trajectory
+            if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::New) {
+                m_impl->m_closed_trajectory_map[track_target.track_id] = std::vector<PSGTrackerPipelineImpl::ArrayUUID>();
+                m_impl->m_closed_trajectory_map[track_target.track_id].push_back(track_target.x_group_uid.uuid);
+                RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                              "创建新轨迹 - track_id:{}, uuid:{}",
+                              track_target.track_id,
+                              boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
+            }
+            // if track_target is open, add it to trajectory
+            else if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::Open) {
+                m_impl->m_closed_trajectory_map[track_target.track_id].push_back(track_target.x_group_uid.uuid);
+                RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                              "添加到现有轨迹 - track_id:{}, uuid:{}",
+                              track_target.track_id,
+                              boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
+            }
+            // if track_target is close, get trajectory and remove it from buffer
+            else if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::Close) {
+                // get closed trajectory uuids
+                auto closed_trajectory_uuids = m_impl->m_closed_trajectory_map[track_target.track_id];
+                // remove closed trajectory from buffer
+                m_impl->m_closed_trajectory_map.erase(track_target.track_id);
+                // get closed trajectory
+                psg_private_msgs::msg::PersonTrajectory closed_trajectory;
+                closed_trajectory.track_id = track_target.track_id;
                 {
                     auto lock_ptr_person_map = m_impl->m_person_map.synchronize();
-                    if (lock_ptr_person_map->find(track_target.x_group_uid.uuid) != lock_ptr_person_map->end()) {
-                        auto &person = (*lock_ptr_person_map)[track_target.x_group_uid.uuid];
-                        person->track_id = track_target.track_id;
-                        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                                      "更新person track_id - uuid:{}, track_id:{}",
-                                      boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)),
-                                      track_target.track_id);
-                    }
-                }
-                // 2. 收集closed trajectory，并写入document中的trajectories
-                // if track_target is new, create a new trajectory
-                if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::New) {
-                    m_impl->m_closed_trajectory_map[track_target.track_id] = std::vector<PSGTrackerPipelineImpl::ArrayUUID>();
-                    m_impl->m_closed_trajectory_map[track_target.track_id].push_back(track_target.x_group_uid.uuid);
-                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                                  "创建新轨迹 - track_id:{}, uuid:{}",
-                                  track_target.track_id,
-                                  boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
-                }
-                // if track_target is open, add it to trajectory
-                else if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::Open) {
-                    m_impl->m_closed_trajectory_map[track_target.track_id].push_back(track_target.x_group_uid.uuid);
-                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                                  "添加到现有轨迹 - track_id:{}, uuid:{}",
-                                  track_target.track_id,
-                                  boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
-                }
-                // if track_target is close, get trajectory and remove it from buffer
-                else if (track_target.track_status == RedoxiTrack::TrackPathStateBitmask::Close) {
-                    // get closed trajectory uuids
-                    auto closed_trajectory_uuids = m_impl->m_closed_trajectory_map[track_target.track_id];
-                    // remove closed trajectory from buffer
-                    m_impl->m_closed_trajectory_map.erase(track_target.track_id);
-                    // get closed trajectory
-                    psg_private_msgs::msg::PersonTrajectory closed_trajectory;
-                    closed_trajectory.track_id = track_target.track_id;
-                    {
-                        auto lock_ptr_person_map = m_impl->m_person_map.synchronize();
-                        for (auto &uuid : closed_trajectory_uuids) {
-                            closed_trajectory.persons.push_back(*(*lock_ptr_person_map)[uuid]);
-                            if (lock_ptr_person_map->find(uuid) != lock_ptr_person_map->end()) {
-                                lock_ptr_person_map->erase(uuid);
-                            }
+                    for (auto &uuid : closed_trajectory_uuids) {
+                        closed_trajectory.persons.push_back(*(*lock_ptr_person_map)[uuid]);
+                        if (lock_ptr_person_map->find(uuid) != lock_ptr_person_map->end()) {
+                            lock_ptr_person_map->erase(uuid);
                         }
                     }
-                    // put closed trajectory to document
-                    document->trajectories.push_back(closed_trajectory);
-                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                                  "关闭轨迹 - track_id:{}, 轨迹长度:{}",
-                                  track_target.track_id,
-                                  closed_trajectory.persons.size());
-                } else
-                    continue;
-            }
-            output_pipeline_source_data.set_document(*document);
-
-            // create pipeline delivery request
-            RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始创建delivery request", 0);
-            auto delivery_request = _create_delivery_request(output_pipeline_source_data);
-            // push to output port pipeline
-            // this is used for logging
-            auto msg_uuid = output_pipeline_source_data.get_uuid();
-
-            // get qos, controls how to retry and drop frames
-            RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始获取QoS配置", 0);
-            auto &qos = runtime_config->pipeline_enqueue_policy;
-            auto success = m_primary_output_port_pipeline->push_request(delivery_request, qos);
-
-            if (success) {
-                RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                             "[msg_uuid={}] success to push request",
-                             boost::uuids::to_string(msg_uuid));
-
-                if (init_config->create_debug_pub) {
-                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始创建debug图像", 0);
-                    auto debug_image = _create_debug_image(*document);
-                    m_pub_model_enqueue.publish(debug_image, "");
                 }
-            } else {
-                RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                             "[msg_uuid={}] failed to push request",
-                             boost::uuids::to_string(msg_uuid));
+                // put closed trajectory to document
+                document->trajectories.push_back(closed_trajectory);
+                RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                              "关闭轨迹 - track_id:{}, 轨迹长度:{}",
+                              track_target.track_id,
+                              closed_trajectory.persons.size());
+            } else
+                continue;
+        }
+        output_pipeline_source_data.set_document(*document);
+
+        // create pipeline delivery request
+        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始创建delivery request", 0);
+        auto delivery_request = _create_delivery_request(output_pipeline_source_data);
+        // push to output port pipeline
+        // this is used for logging
+        auto msg_uuid = output_pipeline_source_data.get_uuid();
+
+        // get qos, controls how to retry and drop frames
+        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始获取QoS配置", 0);
+        auto &qos = runtime_config->pipeline_enqueue_policy;
+        auto success = m_primary_output_port_pipeline->push_request(delivery_request, qos);
+
+        if (success) {
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                         "[msg_uuid={}] success to push request",
+                         boost::uuids::to_string(msg_uuid));
+
+            if (init_config->create_debug_pub) {
+                RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始创建debug图像", 0);
+                auto debug_image = _create_debug_image(*document);
+                m_pub_model_enqueue.publish(debug_image, "");
             }
+        } else {
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                         "[msg_uuid={}] failed to push request",
+                         boost::uuids::to_string(msg_uuid));
         }
     }
 }

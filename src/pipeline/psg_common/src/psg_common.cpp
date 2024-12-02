@@ -43,3 +43,10 @@ std::string uuid_to_string(const std::array<uint8_t, 16> &uuid)
     boost::uuids::uuid uuid_ = *reinterpret_cast<const boost::uuids::uuid *>(uuid.data());
     return boost::uuids::to_string(uuid_);
 }
+
+cv::Scalar get_color(const int id)
+{
+    int idx = id * 3;
+    cv::Scalar color((37 * idx) % 255, (17 * idx) % 255, (29 * idx) % 255);
+    return color;
+}

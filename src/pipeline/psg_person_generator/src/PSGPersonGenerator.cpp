@@ -286,16 +286,18 @@ void PSGPersonGenerator::_step()
 
         if (success) {
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] success to push request",
-                         boost::uuids::to_string(msg_uuid));
+                         "[msg_uuid={}] success to push request, frame_num={}",
+                         boost::uuids::to_string(msg_uuid),
+                         document_msg.frame.metadata.frame_num);
             if (init_config->create_debug_pub) {
                 auto debug_image = _create_debug_image(document_msg);
                 m_pub_task_enqueue.publish(debug_image, "");
             }
         } else {
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] failed to push request",
-                         boost::uuids::to_string(msg_uuid));
+                         "[msg_uuid={}] failed to push request, frame_num={}",
+                         boost::uuids::to_string(msg_uuid),
+                         document_msg.frame.metadata.frame_num);
         }
 
         // FIXME: debug only

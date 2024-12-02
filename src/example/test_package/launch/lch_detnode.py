@@ -27,12 +27,14 @@ DetectionNodeName = "detector"
 DetectionInputActionName = "in/image_request"
 
 VideoSourceNodeName = "video_source"
-fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
+fn_model_nano = "/3d/chengxiao/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
 fn_model_medium = (
     "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8m-pose-dynbatch.onnx"
 )
 # fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
+fn_video = (
+    "/3d/chengxiao/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+)
 
 DetectionRelayNodeName = "detection_relay"
 DetectionRelayInputActionName = "in/detections"
@@ -42,7 +44,7 @@ det_node_params = {
     "init_config": {
         "model_configs": [
             {
-                "model_path": fn_model_medium,
+                "model_path": fn_model_nano,
                 "device_type": "cuda",
                 "device_index": 0,
             },
@@ -196,9 +198,9 @@ detection_node = Node(
             "param_as_json_string": json.dumps(det_node_params, separators=(",", ":")),
         },
     ],
-    arguments=["--ros-args", "--log-level", [f"{DetectionNodeName}:=", logger]]
-    + common_ros_args,
-    # arguments=["--ros-args", "--disable-external-lib-logs"],
+    # arguments=["--ros-args", "--log-level", [f"{DetectionNodeName}:=", logger]]
+    # + common_ros_args,
+    arguments=["--ros-args", "--disable-external-lib-logs"],
 )
 
 video_source_node = Node(
@@ -215,9 +217,9 @@ video_source_node = Node(
         },
     ],
     prefix=common_prefix,
-    arguments=["--ros-args", "--log-level", [f"{VideoSourceNodeName}:=", logger]]
-    + common_ros_args,
-    # arguments=["--ros-args", "--disable-external-lib-logs"],
+    # arguments=["--ros-args", "--log-level", [f"{VideoSourceNodeName}:=", logger]]
+    # + common_ros_args,
+    arguments=["--ros-args", "--disable-external-lib-logs"],
 )
 
 detection_relay_node = Node(
@@ -234,9 +236,9 @@ detection_relay_node = Node(
         },
     ],
     prefix=common_prefix,
-    arguments=["--ros-args", "--log-level", [f"{DetectionRelayNodeName}:=", logger]]
-    + common_ros_args,
-    # arguments=["--ros-args", "--disable-external-lib-logs"],
+    # arguments=["--ros-args", "--log-level", [f"{DetectionRelayNodeName}:=", logger]]
+    # + common_ros_args,
+    arguments=["--ros-args", "--disable-external-lib-logs"],
 )
 
 

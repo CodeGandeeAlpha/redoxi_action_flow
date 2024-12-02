@@ -378,12 +378,14 @@ void PSGPoseDetectorNode::_step()
 
         if (success) {
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] success to push request",
-                         boost::uuids::to_string(msg_uuid));
+                         "[msg_uuid={}] success to push request to model, frame_num={}",
+                         boost::uuids::to_string(msg_uuid),
+                         document_data->get_goal()->document.frame.metadata.frame_num);
         } else {
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] failed to push request",
-                         boost::uuids::to_string(msg_uuid));
+                         "[msg_uuid={}] failed to push request to model, frame_num={}",
+                         boost::uuids::to_string(msg_uuid),
+                         document_data->get_goal()->document.frame.metadata.frame_num);
         }
 
         // FIXME: debug only

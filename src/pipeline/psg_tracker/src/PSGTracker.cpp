@@ -17,6 +17,9 @@ struct PSGTrackerImpl {
     //! tracker
     ROSTrackerPtr tracker;
     MyROSTrackEventHandlerPtr ros_track_event_handler;
+
+    //! is begin_track
+    bool is_begin_track = true;
 };
 
 
@@ -321,7 +324,8 @@ std::vector<redoxi_public_msgs::msg::TrackTarget> PSGTracker::_track(const std::
     cv::Mat frame_mat;
     _parse_frame(&frame_mat, *source_data);
 
-    // get detections
+    //! 解析检测结果
+    RDX_INFO_DEV(this, __func__, false, "正在解析第{}帧的检测结果", frame_num);
     auto persons = goal->persons;
     std::vector<redoxi_public_msgs::msg::Detection> detections;
     for (const auto &person : persons) {
@@ -331,8 +335,11 @@ std::vector<redoxi_public_msgs::msg::TrackTarget> PSGTracker::_track(const std::
 
     std::vector<redoxi_public_msgs::msg::TrackTarget> track_targets;
     if (control_signal_code == ControlSignalCode::Flush || control_signal_code == ControlSignalCode::Terminate || frame_num == INT_MAX) { // last frame
+        //! 收到结束信号，清理跟踪器状态
+        RDX_INFO_DEV(this, __func__, false, "收到结束信号，正在清理跟踪器状态，目前第{}帧", frame_num);
         m_impl->ros_track_event_handler->clear();
         m_impl->tracker->finish_track();
+        m_impl->is_begin_track = true;
         // put it in std::map<int, std::tuple<MSG_TrackTargets, MSG_Frame>>
         for (auto &track_target_msg : m_impl->ros_track_event_handler->m_target_closed) {
             track_targets.push_back(track_target_msg);
@@ -341,14 +348,19 @@ std::vector<redoxi_public_msgs::msg::TrackTarget> PSGTracker::_track(const std::
 
     else {
         // track by detections
-        if (frame_num == 0) { // first frame
+        if (m_impl->is_begin_track) { // first frame
+            //! 第一帧，初始化跟踪器
+            RDX_INFO_DEV(this, __func__, false, "处理第{}帧，初始化跟踪器", frame_num);
             m_impl->ros_track_event_handler->clear();
             m_impl->tracker->begin_track(frame_mat, detections, frame_num + 1);
             // put it in std::map<int, std::tuple<MSG_TrackTargets, MSG_Frame>>
             for (auto &track_target_msg : m_impl->ros_track_event_handler->m_target_create) {
                 track_targets.push_back(track_target_msg);
             }
-        } else if (frame_num != INT_MAX) { // track
+            m_impl->is_begin_track = false;
+        } else { // track
+            //! 正在处理第frame_num帧
+            RDX_INFO_DEV(this, __func__, false, "正在处理第{}帧的跟踪结果", frame_num);
             m_impl->ros_track_event_handler->clear();
             m_impl->tracker->track(frame_mat, detections, frame_num + 1);
             // put it in std::map<int, std::tuple<MSG_TrackTargets, MSG_Frame>>
