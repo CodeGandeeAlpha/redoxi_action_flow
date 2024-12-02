@@ -80,14 +80,14 @@ struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
     std::optional<ImageRequestConfig_t> image_request_config;
 
     // debug topic
-    std::string visualization_topic = "debug/visualization";
+    std::string publish_visualization_topic = "debug/visualization";
 
     JS_OBJECT_WITH_SUPER(
         JS_SUPER(common_nodes::StartStopNode::InitConfig_t),
         JS_MEMBER(model_configs),
         JS_MEMBER(detection_request_config),
         JS_MEMBER(image_request_config),
-        JS_MEMBER(visualization_topic));
+        JS_MEMBER(publish_visualization_topic));
 };
 
 struct RuntimeConfig : public common_nodes::StartStopNode::RuntimeConfig_t {

@@ -81,14 +81,18 @@ struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
     std::optional<ImageRequestConfig_t> image_request_config;
 
     // debug topic
-    std::string visualization_topic = "debug/visualization";
+    std::string publish_visualization_topic = "debug/visualization";
+
+    // performance probe topic
+    std::string publish_probe_detection_done_topic = "probe/detection_done";
 
     JS_OBJECT_WITH_SUPER(
         JS_SUPER(common_nodes::StartStopNode::InitConfig_t),
         JS_MEMBER(model_configs),
         JS_MEMBER(detection_request_config),
         JS_MEMBER(image_request_config),
-        JS_MEMBER(visualization_topic));
+        JS_MEMBER(publish_visualization_topic),
+        JS_MEMBER(publish_probe_detection_done_topic));
 };
 
 struct RuntimeConfig : public common_nodes::StartStopNode::RuntimeConfig_t {
@@ -105,10 +109,14 @@ struct RuntimeConfig : public common_nodes::StartStopNode::RuntimeConfig_t {
     // only work if visualization_topic is set in init config
     bool enable_visualization = true;
 
+    // enable performance probe?
+    bool enable_performance_probe = false;
+
     JS_OBJECT_WITH_SUPER(
         JS_SUPER(common_nodes::StartStopNode::RuntimeConfig_t),
         JS_MEMBER(enable_blocking_mode),
         JS_MEMBER(model_output_config),
-        JS_MEMBER(enable_visualization));
+        JS_MEMBER(enable_visualization),
+        JS_MEMBER(enable_performance_probe));
 };
 } // namespace redoxi_works::model_nodes::yolo8_body_pose_detector
