@@ -1,7 +1,10 @@
-redoxi_public_msgs/Frame frame
+# action to do anything with a frame
+
 unique_identifier_msgs/UUID x_uid
 redoxi_public_msgs/Control x_control
 redoxi_public_msgs/TaskMetadata x_task_metadata
+
+redoxi_public_msgs/Frame frame
 ---
 # string return_msg
 # int64 return_code

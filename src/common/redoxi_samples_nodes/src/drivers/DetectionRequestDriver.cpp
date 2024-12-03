@@ -200,6 +200,7 @@ int DetectionRequestDriver::_update_runtime_config(std::shared_ptr<BaseRuntimeCo
                            PortHandler_t::ResourceToken_t &resource_token) {
                 (void)resource_token;
                 (void)output_result;
+                (void)output_enqueue_policy;
 
                 auto msg_uuid = ByImageRequest::ActionDataTrait_t::get_uuid(*source_data->get_goal());
                 auto msg_uuid_str = boost::uuids::to_string(msg_uuid);

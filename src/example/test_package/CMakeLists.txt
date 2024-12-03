@@ -24,7 +24,6 @@ set(DEPENDENCIES
     redoxi_shared_memory
     redoxi_inference
     redoxi_dnn_models
-    yolo8_body_pose_detector
     yolo8_series
     pluginlib)
 

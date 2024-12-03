@@ -10,7 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(RedoxiTrack REQUIRED)
 find_package(redoxi_common_nodes REQUIRED)
-
+find_package(redoxi_public_msgs REQUIRED)
 # uncomment the following section in order to fill in further dependencies
 # manually. find_package(<dependency> REQUIRED)
 
@@ -30,7 +30,8 @@ target_compile_definitions(universal_mot_trackers
                            PRIVATE "UNIVERSAL_MOT_TRACKERS_BUILDING_LIBRARY")
 
 target_link_libraries(universal_mot_trackers PUBLIC RedoxiTrack::RedoxiTrack)
-ament_target_dependencies(universal_mot_trackers PUBLIC redoxi_common_nodes)
+ament_target_dependencies(universal_mot_trackers PUBLIC redoxi_common_nodes
+                          redoxi_public_msgs)
 
 install(DIRECTORY include/ DESTINATION include)
 install(
@@ -53,7 +54,7 @@ if(BUILD_TESTING)
 endif()
 
 ament_target_dependencies(universal_mot_trackers PUBLIC redoxi_common_nodes
-                          RedoxiTrack)
+                          redoxi_public_msgs RedoxiTrack)
 ament_export_include_directories(include)
 ament_export_libraries(universal_mot_trackers)
 ament_export_targets(export_${PROJECT_NAME})

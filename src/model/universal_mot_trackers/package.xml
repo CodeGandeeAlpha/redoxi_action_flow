@@ -13,6 +13,7 @@
   <test_depend>ament_lint_common</test_depend>
   
   <depend>redoxi_common_nodes</depend>
+  <depend>redoxi_public_msgs</depend>
   <depend>RedoxiTrack</depend>
 
   <export>

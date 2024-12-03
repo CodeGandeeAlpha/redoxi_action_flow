@@ -305,6 +305,8 @@ int Yolo8BaseNode<TModel>::_create_image_request_handler(const RuntimeConfig_t &
                                                                typename ProcessHandler_t::InputActionResult_t *action_result,
                                                                std::shared_ptr<typename ByImageRequest::InputSourceData_t> source_data,
                                                                typename ProcessHandler_t::ResourceToken_t &resource) {
+            (void)output_enqueue_policy;
+
             // extract image
             cv::Mat input_image;
             auto ret_extract_image = _extract_image(&input_image, source_data->get_goal()->frame);

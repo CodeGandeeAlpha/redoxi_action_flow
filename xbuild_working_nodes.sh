@@ -21,6 +21,7 @@ PackagesToBuild="redoxi_common_nodes \
                  redoxi_dnn_models \
                  yolo8_series \
                  test_package \
+                 universal_mot_trackers \
                  rosboard"
 
 # PackagesToBuild="universal_mot_trackers \
