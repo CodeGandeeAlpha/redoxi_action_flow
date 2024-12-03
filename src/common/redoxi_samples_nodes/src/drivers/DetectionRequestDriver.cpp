@@ -219,12 +219,12 @@ int DetectionRequestDriver::_update_runtime_config(std::shared_ptr<BaseRuntimeCo
                 output_request->set_control_signal_code(signal_code);
 
                 // special control signal must be delivered reliably
-                if (signal_code != ControlSignalCode::Normal && signal_code != ControlSignalCode::Ping) {
-                    auto qos = (*output_enqueue_policy).value_or(PortHandler_t::OutputDeliveryPolicy_t());
-                    qos.set_precondition(DeliveryPrecondition::NoPrecondition);
-                    qos.set_drop_strategy(DropStrategy::NoDrop);
-                    *output_enqueue_policy = qos;
-                }
+                // if (signal_code != ControlSignalCode::Normal && signal_code != ControlSignalCode::Ping) {
+                //     auto qos = (*output_enqueue_policy).value_or(PortHandler_t::OutputDeliveryPolicy_t());
+                //     qos.set_precondition(DeliveryPrecondition::NoPrecondition);
+                //     qos.set_drop_strategy(DropStrategy::NoDrop);
+                //     *output_enqueue_policy = qos;
+                // }
 
                 // publish visualization
                 bool do_publish_input = config->enable_visualization && m_pub_input && !image.empty();

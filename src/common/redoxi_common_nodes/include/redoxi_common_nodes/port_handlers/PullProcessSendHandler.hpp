@@ -95,9 +95,11 @@ class PullProcessSendHandler
             // goal handle is not found, which means the goal is not accepted, should not happen
             return ProcessResult::Error;
         }
+        auto source_signal_code = InputActionDataTrait_t::get_control_signal_code(*input_data->get_goal());
         auto msg_uuid = InputActionDataTrait_t::get_uuid(*input_data->get_goal());
         auto msg_uuid_str = UUIDTrait::to_string(msg_uuid);
-        RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Got goal handle", msg_uuid_str);
+        RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Got goal handle, signal_code={}",
+                     msg_uuid_str, control_signal_code_to_string(source_signal_code));
 
         // get resource token
         ResourceToken_t resource_token;
@@ -136,6 +138,18 @@ class PullProcessSendHandler
         // work on the input data
         OutputRequest_t output_request;
         auto enqueue_policy = m_output_enqueue_policy;
+
+        if (source_signal_code != ControlSignalCode::Normal && source_signal_code != ControlSignalCode::Ping) {
+            // special control signal must be delivered reliably
+            RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Special control signal ({}), must be delivered reliably",
+                         msg_uuid_str, control_signal_code_to_string(source_signal_code));
+            if (!enqueue_policy.has_value()) {
+                enqueue_policy = OutputDeliveryPolicy_t();
+            }
+            enqueue_policy->set_precondition(DeliveryPrecondition::NoPrecondition);
+            enqueue_policy->set_drop_strategy(DropStrategy::NoDrop);
+        }
+
         auto action_result = std::make_shared<InputActionResult_t>();
         if (on_process_input_data) {
             RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Processing input data", msg_uuid_str);
