@@ -155,6 +155,9 @@ int PSGMasterNode::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> c
     //! set publish to debug topic
     set_publish_to_debug_topic(runtime_config->publish_to_debug_topic);
 
+    RDX_INFO_DEV(this, __func__, false, "{}", "Creating document request handler");
+    _create_document_request_handler(*runtime_config);
+
     return 0;
 }
 
@@ -225,8 +228,11 @@ int PSGMasterNode::_create_document_request_handler(const RuntimeConfig_t &runti
                           nullptr, config, enqueue_policy);
 
     process_handler->on_process_input_data =
-        [this](auto *output_request, auto *action_result,
-               auto source_data, auto &resource) {
+        [this](ProcessHandler_t::OutputRequest_t *output_request,
+               std::optional<ProcessHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
+               ProcessHandler_t::InputActionResult_t *action_result,
+               std::shared_ptr<InputSourceData_t> source_data,
+               ProcessHandler_t::ResourceToken_t &resource) {
             // from input source data to output source data
             OutputSourceData_t output_source_data;
             OutputSourceData_t::DeliverySourceData::PublishMessageType_t msg;
@@ -234,11 +240,19 @@ int PSGMasterNode::_create_document_request_handler(const RuntimeConfig_t &runti
             output_source_data.set_document(msg);
 
             auto goal_handle = source_data->get_goal_handle_future().get();
-            auto control_signal_code = ActionDataTrait_t::get_control_signal_code(*goal_handle->get_goal());
+            auto control_signal_code = InputDataTrait_t::get_control_signal_code(*source_data->get_goal());
 
             // create delivery request
             auto delivery_request = _create_delivery_request(output_source_data, control_signal_code);
             *output_request = delivery_request;
+
+            // special control signal must be delivered reliably
+            if (control_signal_code != ControlSignalCode::Normal && control_signal_code != ControlSignalCode::Ping) {
+                auto qos = (*output_enqueue_policy).value_or(typename ProcessHandler_t::OutputDeliveryPolicy_t());
+                qos.set_precondition(DeliveryPrecondition::NoPrecondition);
+                qos.set_drop_strategy(DropStrategy::NoDrop);
+                *output_enqueue_policy = qos;
+            }
 
             // fill the action result, nothing to do
             (void)action_result;
@@ -249,63 +263,34 @@ int PSGMasterNode::_create_document_request_handler(const RuntimeConfig_t &runti
     return 0;
 }
 
+int PSGMasterNode::_process_document_request()
+{
+    auto ret = m_impl->work_then_send_handler->process_and_send();
+    if (ret == PSGMasterNodeImpl::PullProcessSendHandler_t::ProcessResult::Error) {
+        RDX_INFO_DEV(this, __func__, false, "Failed to process image request, error code: {}", int(ret));
+        return -1;
+    } else if (ret == PSGMasterNodeImpl::PullProcessSendHandler_t::ProcessResult::NoData) {
+        //! No data available, skipping
+        return 0;
+    } else if (ret == PSGMasterNodeImpl::PullProcessSendHandler_t::ProcessResult::Success) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Successfully processed image request");
+        return 0;
+    } else if (ret == PSGMasterNodeImpl::PullProcessSendHandler_t::ProcessResult::NoResourceToken) {
+        //! No resource token, skipping
+        return 0;
+    } else if (ret == PSGMasterNodeImpl::PullProcessSendHandler_t::ProcessResult::FailedToSend) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Failed to send image request to downstream, do you have a downstream?");
+        return 0;
+    } else {
+        RDX_RAISE_ERROR("[f={}] Unexpected process result: {}", __func__, int(ret));
+        return -1;
+    }
+}
+
 void PSGMasterNode::_step()
 {
-    if (get_status() != NodeStatusCode::STARTED) {
-        return;
-    }
-
-    if (m_impl->m_ros_time_token->try_pop_token()) {
-        auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
-
-        std::shared_ptr<InputSourceData_t> frame_data;
-        if (runtime_config->enable_blocking_mode) {
-            // wait until there is data available
-            frame_data = m_input_port->pop_source_data();
-        } else {
-            // try to get data without waiting
-            frame_data = m_input_port->try_pop_source_data();
-        }
-
-        if (!frame_data) {
-            return;
-        }
-
-        // from input source data to output source data
-        OutputSourceData_t output_source_data;
-        OutputSourceData_t::DeliverySourceData::PublishMessageType_t msg;
-        msg.frame = frame_data->m_goal->frame;
-        output_source_data.set_document(msg);
-
-        auto goal_handle = frame_data->get_goal_handle_future().get();
-        auto control_signal_code = ActionDataTrait_t::get_control_signal_code(*goal_handle->get_goal());
-
-        // create delivery request
-        auto delivery_request = _create_delivery_request(output_source_data, control_signal_code);
-
-        // this is used for logging
-        auto msg_uuid = output_source_data.get_uuid();
-
-        // get qos, controls how to retry and drop frames
-        auto &qos = runtime_config->frame_enqueue_policy;
-
-        bool success = m_primary_output_port->push_request(delivery_request, qos);
-
-        if (success) {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] success to push request, frame_num={}",
-                         boost::uuids::to_string(msg_uuid),
-                         frame_data->m_goal->frame.metadata.frame_num);
-        } else {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] failed to push request, frame_num={}",
-                         boost::uuids::to_string(msg_uuid),
-                         frame_data->m_goal->frame.metadata.frame_num);
-        }
-
-        // FIXME: debug only
-        // wait for all requests to be processed, not necessary
-        m_primary_output_port->wait_for_all_requests();
+    if (m_input_port) {
+        _process_document_request();
     }
 }
 

@@ -701,7 +701,7 @@ void PSGTrackerPipelineNode::_get_model_result()
             RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
                           "处理track_target - track_id:{}, track_status:{}, uuid:{}",
                           track_target.track_id,
-                          track_target.track_status.value,
+                          track_target.track_status.bitmask,
                           boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
 
             // 1. 将track_targets中的track_id和person_id进行匹配，并赋予跟踪的id
@@ -727,7 +727,7 @@ void PSGTrackerPipelineNode::_get_model_result()
 
             // 3. 收集closed trajectory，并写入document中的trajectories
             // if track_target is new, create a new trajectory
-            if (track_target.track_status.value == redoxi_public_msgs::msg::TrackObjectStatus::NEW) {
+            if (track_target.track_status.bitmask & redoxi_public_msgs::msg::TrackObjectStatus::NEW_BIT) {
                 m_impl->m_closed_trajectory_map[track_target.track_id] = std::vector<PSGTrackerPipelineImpl::ArrayUUID>();
                 m_impl->m_closed_trajectory_map[track_target.track_id].push_back(track_target.x_group_uid.uuid);
                 RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
@@ -736,7 +736,7 @@ void PSGTrackerPipelineNode::_get_model_result()
                               boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
             }
             // if track_target is open, add it to trajectory
-            else if (track_target.track_status.value == redoxi_public_msgs::msg::TrackObjectStatus::OPEN) {
+            else if (track_target.track_status.bitmask & redoxi_public_msgs::msg::TrackObjectStatus::OPEN_BIT) {
                 m_impl->m_closed_trajectory_map[track_target.track_id].push_back(track_target.x_group_uid.uuid);
                 RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
                               "添加到现有轨迹 - track_id:{}, uuid:{}",
@@ -744,7 +744,7 @@ void PSGTrackerPipelineNode::_get_model_result()
                               boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
             }
             // if track_target is close, get trajectory and remove it from buffer
-            else if (track_target.track_status.value == redoxi_public_msgs::msg::TrackObjectStatus::CLOSE) {
+            else if (track_target.track_status.bitmask & redoxi_public_msgs::msg::TrackObjectStatus::CLOSE_BIT) {
                 // get closed trajectory uuids
                 auto closed_trajectory_uuids = m_impl->m_closed_trajectory_map[track_target.track_id];
                 // remove closed trajectory from buffer

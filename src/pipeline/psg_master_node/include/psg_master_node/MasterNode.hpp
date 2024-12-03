@@ -96,6 +96,9 @@ class PSGMasterNode : public common_nodes::StartStopNode
     //! create document request handler
     virtual int _create_document_request_handler(const RuntimeConfig_t &runtime_config);
 
+    //! process document request
+    virtual int _process_document_request();
+
     //! do periodic step operation
     virtual void _step2();
 
