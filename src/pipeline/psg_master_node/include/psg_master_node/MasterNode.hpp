@@ -93,6 +93,9 @@ class PSGMasterNode : public common_nodes::StartStopNode
     //! @note this must be called before any other operations, so it cannot access any member variables
     virtual std::shared_ptr<PSGMasterNodeImpl> _create_impl();
 
+    //! create document request handler
+    virtual int _create_document_request_handler(const RuntimeConfig_t &runtime_config);
+
     //! do periodic step operation
     virtual void _step2();
 

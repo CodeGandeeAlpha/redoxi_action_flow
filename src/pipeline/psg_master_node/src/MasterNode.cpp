@@ -17,9 +17,8 @@ struct PSGMasterNodeImpl {
     std::shared_ptr<RosTimeToken> m_ros_time_token;
 
     // pull input, work on it and then send output
-    using PullProcessSendHandler_t = redoxi_works::port_handlers::PullProcessSendHandler<Node_t::ByImageRequest::InputPort_t::MasterSpec_t,
-                                                                                         Node_t::ByImageRequest::OutputPort_t::MasterSpec_t,
-                                                                                         InferenceResource_t>;
+    using PullProcessSendHandler_t = redoxi_works::port_handlers::PullProcessSendHandler<Node_t::InputPort_t::MasterSpec_t,
+                                                                                         Node_t::OutputPort_t::MasterSpec_t>;
     std::shared_ptr<PullProcessSendHandler_t> work_then_send_handler;
 };
 
@@ -207,6 +206,47 @@ std::shared_ptr<PSGMasterNode::OutputPort_t>
     // });
 
     return port;
+}
+
+int PSGMasterNode::_create_document_request_handler(const RuntimeConfig_t &runtime_config)
+{
+    using ProcessHandler_t = PSGMasterNodeImpl::PullProcessSendHandler_t;
+    using InputDataTrait_t = PSGMasterNode::InputPort_t::ActionDataTrait_t;
+    auto config = std::make_shared<ProcessHandler_t::InitConfig_t>();
+    auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
+
+    config->block_input_reading = runtime_config.enable_blocking_mode;
+    config->block_resource_acquisition = runtime_config.enable_blocking_mode;
+
+    auto enqueue_policy = runtime_config.frame_enqueue_policy;
+    m_impl->work_then_send_handler = std::make_shared<ProcessHandler_t>();
+    auto process_handler = m_impl->work_then_send_handler;
+    process_handler->init(m_input_port.get(), m_primary_output_port.get(),
+                          nullptr, config, enqueue_policy);
+
+    process_handler->on_process_input_data =
+        [this](auto *output_request, auto *action_result,
+               auto source_data, auto &resource) {
+            // from input source data to output source data
+            OutputSourceData_t output_source_data;
+            OutputSourceData_t::DeliverySourceData::PublishMessageType_t msg;
+            msg.frame = source_data->m_goal->frame;
+            output_source_data.set_document(msg);
+
+            auto goal_handle = source_data->get_goal_handle_future().get();
+            auto control_signal_code = ActionDataTrait_t::get_control_signal_code(*goal_handle->get_goal());
+
+            // create delivery request
+            auto delivery_request = _create_delivery_request(output_source_data, control_signal_code);
+            *output_request = delivery_request;
+
+            // fill the action result, nothing to do
+            (void)action_result;
+
+            (void)resource;
+            return 0;
+        };
+    return 0;
 }
 
 void PSGMasterNode::_step()
