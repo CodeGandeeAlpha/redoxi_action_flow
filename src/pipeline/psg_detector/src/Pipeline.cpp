@@ -1,5 +1,7 @@
 #include <psg_detector/Pipeline.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
+#include <redoxi_common_nodes/port_handlers/PullProcessSendHandler.hpp>
+#include <redoxi_common_nodes/port_handlers/PullProcessReplyHandler.hpp>
 #include <redoxi_samples_lib/random_image.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 #include <json_struct/json_struct.h>
@@ -31,6 +33,11 @@ struct PSGDetectorImpl {
 
     //! task group for model result
     tbb::task_group m_model_result_task_group;
+
+    // pull input, work on it and then send output
+    using PullProcessSendHandler_t = redoxi_works::port_handlers::PullProcessSendHandler<PSGDetectorNode::InputPort_t::MasterSpec_t,
+                                                                                         PSGDetectorNode::OutputPortModel_t::MasterSpec_t>;
+    std::shared_ptr<PullProcessSendHandler_t> work_then_send_to_model_handler;
 };
 
 PSGDetectorNode::PSGDetectorNode(const std::string &name, const rclcpp::NodeOptions &options)
@@ -227,6 +234,9 @@ int PSGDetectorNode::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t>
     //! set publish to debug topic
     set_publish_to_debug_topic(runtime_config->publish_to_debug_topic);
 
+    RDX_INFO_DEV(this, __func__, false, "{}", "Creating frame request handler");
+    _create_frame_request_handler(*runtime_config);
+
     return 0;
 }
 
@@ -239,7 +249,8 @@ std::shared_ptr<PSGDetectorImpl> PSGDetectorNode::_create_impl()
 }
 
 PSGDetectorNode::DeliveryRequestPipeline_t
-    PSGDetectorNode::_create_delivery_request(const OutputSourceDataPipeline_t &source_data)
+    PSGDetectorNode::_create_delivery_request(const OutputSourceDataPipeline_t &source_data,
+                                              std::optional<ControlSignalCode> control_signal_code)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     //! Create delivery request
@@ -248,12 +259,16 @@ PSGDetectorNode::DeliveryRequestPipeline_t
     if (runtime_config->pipeline_request_policy.has_value()) {
         req.set_delivery_policy(*runtime_config->pipeline_request_policy);
     }
+    if (control_signal_code.has_value()) {
+        req.set_control_signal_code(*control_signal_code);
+    }
 
     return req;
 }
 
 PSGDetectorNode::DeliveryRequestModel_t
-    PSGDetectorNode::_create_delivery_request(const OutputSourceDataModel_t &source_data)
+    PSGDetectorNode::_create_delivery_request(const OutputSourceDataModel_t &source_data,
+                                              std::optional<ControlSignalCode> control_signal_code)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     //! Create delivery request
@@ -262,7 +277,9 @@ PSGDetectorNode::DeliveryRequestModel_t
     if (runtime_config->model_request_policy.has_value()) {
         req.set_delivery_policy(*runtime_config->model_request_policy);
     }
-
+    if (control_signal_code.has_value()) {
+        req.set_control_signal_code(*control_signal_code);
+    }
     return req;
 }
 
@@ -321,60 +338,76 @@ std::shared_ptr<PSGDetectorNode::OutputPortModel_t>
     return port;
 }
 
+int PSGDetectorNode::_create_frame_request_handler(const RuntimeConfig_t &runtime_config)
+{
+    using ProcessHandler_t = PSGDetectorImpl::PullProcessSendHandler_t;
+    using InputDataTrait_t = PSGDetectorNode::InputPort_t::ActionDataTrait_t;
+    auto config = std::make_shared<ProcessHandler_t::InitConfig_t>();
+
+    config->block_input_reading = runtime_config.enable_blocking_mode;
+    config->block_resource_acquisition = runtime_config.enable_blocking_mode;
+
+    auto enqueue_policy = runtime_config.model_enqueue_policy;
+    m_impl->work_then_send_to_model_handler = std::make_shared<ProcessHandler_t>();
+    auto process_handler = m_impl->work_then_send_to_model_handler;
+    process_handler->init(m_input_port.get(), m_primary_output_port_model.get(),
+                          nullptr, config, enqueue_policy);
+
+    process_handler->on_process_input_data =
+        [this](ProcessHandler_t::OutputRequest_t *output_request,
+               std::optional<ProcessHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
+               ProcessHandler_t::InputActionResult_t *action_result,
+               std::shared_ptr<InputSourceData_t> source_data,
+               ProcessHandler_t::ResourceToken_t &resource) {
+            // from input source data to output source data
+            OutputSourceDataModel_t output_source_data;
+            output_source_data.set_document(source_data->get_goal()->document);
+
+            auto goal_handle = source_data->get_goal_handle_future().get();
+            auto control_signal_code = InputDataTrait_t::get_control_signal_code(*source_data->get_goal());
+
+            // create delivery request
+            auto delivery_request = _create_delivery_request(output_source_data, control_signal_code);
+            *output_request = delivery_request;
+
+            // fill the action result, nothing to do
+            (void)action_result;
+
+            (void)output_enqueue_policy;
+            (void)resource;
+            return 0;
+        };
+    return 0;
+}
+
+int PSGDetectorNode::_process_frame_request()
+{
+    auto ret = m_impl->work_then_send_to_model_handler->process_and_send();
+    if (ret == PSGDetectorImpl::PullProcessSendHandler_t::ProcessResult::Error) {
+        RDX_INFO_DEV(this, __func__, false, "Failed to process image request, error code: {}", int(ret));
+        return -1;
+    } else if (ret == PSGDetectorImpl::PullProcessSendHandler_t::ProcessResult::NoData) {
+        //! No data available, skipping
+        return 0;
+    } else if (ret == PSGDetectorImpl::PullProcessSendHandler_t::ProcessResult::Success) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Successfully processed image request");
+        return 0;
+    } else if (ret == PSGDetectorImpl::PullProcessSendHandler_t::ProcessResult::NoResourceToken) {
+        //! No resource token, skipping
+        return 0;
+    } else if (ret == PSGDetectorImpl::PullProcessSendHandler_t::ProcessResult::FailedToSend) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Failed to send image request to downstream, do you have a downstream?");
+        return 0;
+    } else {
+        RDX_RAISE_ERROR("[f={}] Unexpected process result: {}", __func__, int(ret));
+        return -1;
+    }
+}
+
 void PSGDetectorNode::_step()
 {
-    // 从input port pipeline获取数据，创建delivery request，并推送到output port model,
-    // 从input port model获取数据，放到detections buffer中去
-    if (get_status() != NodeStatusCode::STARTED) {
-        return;
-    }
-
-    if (m_impl->m_ros_time_token->try_pop_token()) {
-        auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
-
-        std::shared_ptr<InputSourceData_t> document_data;
-        if (runtime_config->enable_blocking_mode) {
-            // wait until there is data available
-            document_data = m_input_port->pop_source_data();
-        } else {
-            // try to get data without waiting
-            document_data = m_input_port->try_pop_source_data();
-        }
-
-        if (!document_data) {
-            return;
-        }
-
-        // 创建delivery request，并推送到output port model
-        // from input source data to output source data
-        OutputSourceDataModel_t output_model_source_data;
-        output_model_source_data.set_document(document_data->get_goal()->document);
-
-        // TODO: 加上signal code
-
-        // create delivery request
-        auto delivery_request = _create_delivery_request(output_model_source_data);
-
-        // this is used for logging
-        auto msg_uuid = output_model_source_data.get_uuid();
-
-        // get qos, controls how to retry and drop frames
-        auto &qos = runtime_config->model_enqueue_policy;
-        auto success = m_primary_output_port_model->push_request(delivery_request, qos);
-
-        if (success) {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] success to push request",
-                         boost::uuids::to_string(msg_uuid));
-        } else {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] failed to push request",
-                         boost::uuids::to_string(msg_uuid));
-        }
-
-        // FIXME: debug only
-        // wait for all requests to be processed, not necessary
-        m_primary_output_port_model->wait_for_all_requests();
+    if (m_input_port) {
+        _process_frame_request();
     }
 
     // // 自己读取图片往后发送
@@ -533,8 +566,10 @@ void PSGDetectorNode::_get_model_result()
         auto document = output_model_result.source_data->get_document();
         document.detections = result->detections;
         output_pipeline_source_data.set_document(document);
+
         // create pipeline delivery request
-        auto delivery_request = _create_delivery_request(output_pipeline_source_data);
+        // FIXME: 不设置control signal code对model node会不会有问题
+        auto delivery_request = _create_delivery_request(output_pipeline_source_data, std::nullopt);
         // push to output port pipeline
         // this is used for logging
         auto msg_uuid = output_pipeline_source_data.get_uuid();

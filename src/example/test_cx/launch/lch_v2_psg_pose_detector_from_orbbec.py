@@ -8,7 +8,7 @@ import json
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
     "log_level",
-    default_value="info",
+    default_value="debug",
     description="Logging level",
 )
 
@@ -49,7 +49,7 @@ source_node_json_params = {
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
-        "step_interval": 1000,
+        "step_interval": 10000000,
         "frame_interval": 0,
         "output_image_encoding": "bgr8",
         "publish_to_debug_topic": True,
@@ -257,7 +257,7 @@ psg_detector_node = Node(
             ),
         },
     ],
-    arguments=["--ros-args", "--log-level", ["psg_detector:=", logger]]
+    arguments=["--ros-args", "--log-level", ["detector_node:=", logger]]
     + common_ros_args,
 )
 

@@ -246,17 +246,10 @@ int PSGMasterNode::_create_document_request_handler(const RuntimeConfig_t &runti
             auto delivery_request = _create_delivery_request(output_source_data, control_signal_code);
             *output_request = delivery_request;
 
-            // special control signal must be delivered reliably
-            if (control_signal_code != ControlSignalCode::Normal && control_signal_code != ControlSignalCode::Ping) {
-                auto qos = (*output_enqueue_policy).value_or(typename ProcessHandler_t::OutputDeliveryPolicy_t());
-                qos.set_precondition(DeliveryPrecondition::NoPrecondition);
-                qos.set_drop_strategy(DropStrategy::NoDrop);
-                *output_enqueue_policy = qos;
-            }
-
             // fill the action result, nothing to do
             (void)action_result;
 
+            (void)output_enqueue_policy;
             (void)resource;
             return 0;
         };

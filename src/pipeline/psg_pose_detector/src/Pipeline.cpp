@@ -1,5 +1,6 @@
 #include <psg_pose_detector/Pipeline.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
+#include <redoxi_common_nodes/port_handlers/PullProcessSendHandler.hpp>
 #include <redoxi_samples_lib/random_image.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 #include <json_struct/json_struct.h>
@@ -35,6 +36,11 @@ struct PSGPoseDetectorImpl {
     //! 记录document的异步字典
     using DocumentMap_t = boost::synchronized_value<std::map<int, std::shared_ptr<psg_private_msgs::msg::PsgDocument>>>;
     DocumentMap_t m_document_map;
+
+    // pull input, work on it and then send output
+    using PullProcessSendHandler_t = redoxi_works::port_handlers::PullProcessSendHandler<PSGPoseDetectorNode::InputPort_t::MasterSpec_t,
+                                                                                         PSGPoseDetectorNode::OutputPortModel_t::MasterSpec_t>;
+    std::shared_ptr<PullProcessSendHandler_t> work_then_send_to_model_handler;
 };
 
 PSGPoseDetectorNode::PSGPoseDetectorNode(const std::string &name, const rclcpp::NodeOptions &options)
@@ -105,6 +111,8 @@ int PSGPoseDetectorNode::_start()
             _get_model_result();
         }
     });
+
+    RDX_INFO_DEV(this, __func__, false, "{}", "psg pose detector node started");
 
     return 0;
 }
@@ -230,6 +238,10 @@ int PSGPoseDetectorNode::_update_runtime_config(std::shared_ptr<BaseRuntimeConfi
     //! set publish to debug topic
     set_publish_to_debug_topic(runtime_config->publish_to_debug_topic);
 
+
+    RDX_INFO_DEV(this, __func__, false, "{}", "Creating detections request handler");
+    _create_detections_request_handler(*runtime_config);
+
     return 0;
 }
 
@@ -242,7 +254,8 @@ std::shared_ptr<PSGPoseDetectorImpl> PSGPoseDetectorNode::_create_impl()
 }
 
 PSGPoseDetectorNode::DeliveryRequestPipeline_t
-    PSGPoseDetectorNode::_create_delivery_request(const OutputSourceDataPipeline_t &source_data)
+    PSGPoseDetectorNode::_create_delivery_request(const OutputSourceDataPipeline_t &source_data,
+                                                  std::optional<ControlSignalCode> control_signal_code)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     //! Create delivery request
@@ -251,12 +264,15 @@ PSGPoseDetectorNode::DeliveryRequestPipeline_t
     if (runtime_config->pipeline_request_policy.has_value()) {
         req.set_delivery_policy(*runtime_config->pipeline_request_policy);
     }
-
+    if (control_signal_code.has_value()) {
+        req.set_control_signal_code(*control_signal_code);
+    }
     return req;
 }
 
 PSGPoseDetectorNode::DeliveryRequestModel_t
-    PSGPoseDetectorNode::_create_delivery_request(const OutputSourceDataModel_t &source_data)
+    PSGPoseDetectorNode::_create_delivery_request(const OutputSourceDataModel_t &source_data,
+                                                  std::optional<ControlSignalCode> control_signal_code)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     //! Create delivery request
@@ -264,6 +280,9 @@ PSGPoseDetectorNode::DeliveryRequestModel_t
     req.set_source_data(source_data);
     if (runtime_config->model_request_policy.has_value()) {
         req.set_delivery_policy(*runtime_config->model_request_policy);
+    }
+    if (control_signal_code.has_value()) {
+        req.set_control_signal_code(*control_signal_code);
     }
     return req;
 }
@@ -323,74 +342,98 @@ std::shared_ptr<PSGPoseDetectorNode::OutputPortModel_t>
     return port;
 }
 
+int PSGPoseDetectorNode::_create_detections_request_handler(const RuntimeConfig_t &runtime_config)
+{
+    using ProcessHandler_t = PSGPoseDetectorImpl::PullProcessSendHandler_t;
+    using InputDataTrait_t = PSGPoseDetectorNode::InputPort_t::ActionDataTrait_t;
+    auto config = std::make_shared<ProcessHandler_t::InitConfig_t>();
+
+    config->block_input_reading = runtime_config.enable_blocking_mode;
+    config->block_resource_acquisition = runtime_config.enable_blocking_mode;
+
+    auto enqueue_policy = runtime_config.model_enqueue_policy;
+    m_impl->work_then_send_to_model_handler = std::make_shared<ProcessHandler_t>();
+    auto process_handler = m_impl->work_then_send_to_model_handler;
+    process_handler->init(m_input_port.get(), m_primary_output_port_model.get(),
+                          nullptr, config, enqueue_policy);
+
+    process_handler->on_process_input_data =
+        [this](ProcessHandler_t::OutputRequest_t *output_request,
+               std::optional<ProcessHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
+               ProcessHandler_t::InputActionResult_t *action_result,
+               std::shared_ptr<InputSourceData_t> source_data,
+               ProcessHandler_t::ResourceToken_t &resource) {
+            // 将document数据放入document map中
+            m_impl->m_document_map.synchronize()->insert({source_data->get_goal()->document.frame.metadata.frame_num,
+                                                          std::make_shared<psg_private_msgs::msg::PsgDocument>(source_data->get_goal()->document)});
+
+            //! 从输入数据创建输出数据
+            RDX_INFO_DEV(this, __func__, true, "{}", "开始从输入数据创建输出数据");
+            OutputSourceDataModel_t output_model_source_data;
+            output_model_source_data.set_frame(source_data->get_goal()->document.frame);
+            output_model_source_data.set_detections(source_data->get_goal()->document.detections);
+
+            //! 根据种类挑选出body的detections，并记录其在document中的索引
+            RDX_INFO_DEV(this, __func__, true, "{}", "开始筛选body类型的检测框");
+            std::vector<size_t> body_detections_indices;
+            for (size_t i = 0; i < source_data->get_goal()->document.detections.size(); ++i) {
+                if (source_data->get_goal()->document.detections[i].category == 0) { // 0: body, 1: head, 2: face
+                    body_detections_indices.push_back(i);
+                }
+            }
+            RDX_INFO_DEV(this, __func__, true, "找到{}个body检测框", body_detections_indices.size());
+            output_model_source_data.set_detections_indices(body_detections_indices);
+
+            //! 获取控制信号
+            RDX_INFO_DEV(this, __func__, true, "{}", "获取控制信号");
+            auto goal_handle = source_data->get_goal_handle_future().get();
+            auto control_signal_code = InputDataTrait_t::get_control_signal_code(*source_data->get_goal());
+
+            //! 创建传输请求
+            RDX_INFO_DEV(this, __func__, true, "{}", "创建传输请求");
+            auto delivery_request = _create_delivery_request(output_model_source_data, control_signal_code);
+            *output_request = delivery_request;
+
+            //! 填充动作结果(无需操作)
+            (void)action_result;
+
+            (void)output_enqueue_policy;
+            (void)resource;
+            RDX_INFO_DEV(this, __func__, true, "{}", "处理完成");
+            return 0;
+        };
+    return 0;
+}
+
+int PSGPoseDetectorNode::_process_detections_request()
+{
+    auto ret = m_impl->work_then_send_to_model_handler->process_and_send();
+    if (ret == PSGPoseDetectorImpl::PullProcessSendHandler_t::ProcessResult::Error) {
+        RDX_INFO_DEV(this, __func__, false, "Failed to process image request, error code: {}", int(ret));
+        return -1;
+    } else if (ret == PSGPoseDetectorImpl::PullProcessSendHandler_t::ProcessResult::NoData) {
+        //! No data available, skipping
+        // RDX_INFO_DEV(this, __func__, false, "{}", "No data available, skipping");
+        return 0;
+    } else if (ret == PSGPoseDetectorImpl::PullProcessSendHandler_t::ProcessResult::Success) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Successfully processed image request");
+        return 0;
+    } else if (ret == PSGPoseDetectorImpl::PullProcessSendHandler_t::ProcessResult::NoResourceToken) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "No resource token, skipping");
+        return 0;
+    } else if (ret == PSGPoseDetectorImpl::PullProcessSendHandler_t::ProcessResult::FailedToSend) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Failed to send image request to downstream, do you have a downstream?");
+        return 0;
+    } else {
+        RDX_RAISE_ERROR("[f={}] Unexpected process result: {}", __func__, int(ret));
+        return -1;
+    }
+}
+
 void PSGPoseDetectorNode::_step()
 {
-    // 从input port pipeline获取数据，创建delivery request，并推送到output port model,
-    // 从input port model获取数据，放到detections buffer中去
-    if (get_status() != NodeStatusCode::STARTED) {
-        return;
-    }
-
-    if (m_impl->m_ros_time_token->try_pop_token()) {
-        auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
-
-        std::shared_ptr<InputSourceData_t> document_data;
-        if (runtime_config->enable_blocking_mode) {
-            // wait until there is data available
-            document_data = m_input_port->pop_source_data();
-        } else {
-            // try to get data without waiting
-            document_data = m_input_port->try_pop_source_data();
-        }
-
-        if (!document_data) {
-            return;
-        }
-
-        // 将document数据放入document map中
-        m_impl->m_document_map.synchronize()->insert({document_data->get_goal()->document.frame.metadata.frame_num,
-                                                      std::make_shared<psg_private_msgs::msg::PsgDocument>(document_data->get_goal()->document)});
-
-        // 创建delivery request，并推送到output port model
-        // from input source data to output source data
-        OutputSourceDataModel_t output_model_source_data;
-        output_model_source_data.set_frame(document_data->get_goal()->document.frame);
-        output_model_source_data.set_detections(document_data->get_goal()->document.detections);
-
-        // 根据种类挑选出body的detections，并记录其在document中的索引
-        std::vector<size_t> body_detections_indices;
-        for (size_t i = 0; i < document_data->get_goal()->document.detections.size(); ++i) {
-            if (document_data->get_goal()->document.detections[i].category == 0) { // 0: body, 1: head, 2: face
-                body_detections_indices.push_back(i);
-            }
-        }
-        output_model_source_data.set_detections_indices(body_detections_indices);
-
-        // create delivery request
-        auto delivery_request = _create_delivery_request(output_model_source_data);
-
-        // this is used for logging
-        auto msg_uuid = output_model_source_data.get_uuid();
-
-        // get qos, controls how to retry and drop frames
-        auto &qos = runtime_config->model_enqueue_policy;
-        auto success = m_primary_output_port_model->push_request(delivery_request, qos);
-
-        if (success) {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] success to push request to model, frame_num={}",
-                         boost::uuids::to_string(msg_uuid),
-                         document_data->get_goal()->document.frame.metadata.frame_num);
-        } else {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] failed to push request to model, frame_num={}",
-                         boost::uuids::to_string(msg_uuid),
-                         document_data->get_goal()->document.frame.metadata.frame_num);
-        }
-
-        // FIXME: debug only
-        // wait for all requests to be processed, not necessary
-        m_primary_output_port_model->wait_for_all_requests();
+    if (m_input_port) {
+        _process_detections_request();
     }
 }
 
@@ -536,35 +579,35 @@ sensor_msgs::msg::Image PSGPoseDetectorNode::_create_debug_image(const psg_priva
 void PSGPoseDetectorNode::_get_model_result()
 {
     //! 1. 从buffer中取出model result, 如果buffer为空，则等待
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始从buffer中取出model result", 0);
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "开始从buffer中取出model result");
     PSGPoseDetectorImpl::OutputModelResult output_model_result;
     m_impl->m_model_result_buffer.pop(output_model_result);
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "成功从buffer中取出model result", 0);
+    RDX_LOG_DEBUG(this, __func__, "{}", "成功从buffer中取出model result");
 
     //! 2. 等待结果
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始等待model result future", 0);
+    RDX_LOG_DEBUG(this, __func__, "{}", "开始等待model result future");
     auto result = output_model_result.future.get();
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "got model result, size: {}", result->keypoints.size());
+    RDX_LOG_DEBUG(this, __func__, "got model result, size: {}", result->keypoints.size());
 
     //! 3. 如果结果不为空，则构造output source data，并推送到output port pipeline
     if (result) {
         auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
         auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
 
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始构造output source data", 0);
+        RDX_LOG_DEBUG(this, __func__, "{}", "开始构造output source data");
         // create output source data
         OutputSourceDataPipeline_t output_pipeline_source_data;
         // 根据frame_number获取document
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始从document map中获取document", 0);
+        RDX_LOG_DEBUG(this, __func__, "{}", "开始从document map中获取document");
         auto document = m_impl->m_document_map.synchronize()->at(output_model_result.source_data->get_frame().metadata.frame_num);
         // 删掉字典中的document
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始从document map中删除document", 0);
+        RDX_LOG_DEBUG(this, __func__, "{}", "开始从document map中删除document");
         m_impl->m_document_map.synchronize()->erase(output_model_result.source_data->get_frame().metadata.frame_num);
 
         if (result->keypoints.size() > 0) {
-            RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始处理keypoints结果", 0);
+            RDX_LOG_DEBUG(this, __func__, "{}", "开始处理keypoints结果");
             if (result->is_matched_by_uid) { // 如果是基于x_group_id匹配的
-                RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "基于x_group_id匹配keypoints", 0);
+                RDX_LOG_DEBUG(this, __func__, "{}", "基于x_group_id匹配keypoints");
                 for (size_t i = 0; i < result->keypoints.size(); ++i) {
                     for (size_t j = 0; j < document->detections.size(); ++j) {
                         if (document->detections[j].x_uid == result->keypoints[i].x_group_uid) {
@@ -574,7 +617,7 @@ void PSGPoseDetectorNode::_get_model_result()
                     }
                 }
             } else { // 如果是按顺序保存的
-                RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "按顺序保存keypoints", 0);
+                RDX_LOG_DEBUG(this, __func__, "{}", "按顺序保存keypoints");
                 for (size_t i = 0; i < result->keypoints.size(); ++i) {
                     document->detections[output_model_result.source_data->get_detections_indices()[i]].keypoints = result->keypoints[i];
                 }
@@ -582,14 +625,15 @@ void PSGPoseDetectorNode::_get_model_result()
         }
         output_pipeline_source_data.set_document(*document);
         // create pipeline delivery request
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始创建delivery request", 0);
-        auto delivery_request = _create_delivery_request(output_pipeline_source_data);
+        // FIXME: 不添加control signal code，不知道会不会对model node产生影响
+        RDX_LOG_DEBUG(this, __func__, "{}", "开始创建delivery request");
+        auto delivery_request = _create_delivery_request(output_pipeline_source_data, std::nullopt);
         // push to output port pipeline
         // this is used for logging
         auto msg_uuid = output_pipeline_source_data.get_uuid();
 
         // get qos, controls how to retry and drop frames
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始获取QoS配置", 0);
+        RDX_LOG_DEBUG(this, __func__, "{}", "开始获取QoS配置");
         auto &qos = runtime_config->pipeline_enqueue_policy;
         auto success = m_primary_output_port_pipeline->push_request(delivery_request, qos);
 
@@ -599,12 +643,12 @@ void PSGPoseDetectorNode::_get_model_result()
                          boost::uuids::to_string(msg_uuid));
 
             if (init_config->create_debug_pub) {
-                RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始创建debug图像", 0);
+                RDX_LOG_DEBUG(this, __func__, "{}", "开始创建debug图像");
                 auto debug_image = _create_debug_image(*document);
                 m_pub_model_enqueue.publish(debug_image, "");
             }
         } else {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+            RDX_INFO_DEV(this, __func__,
                          "[msg_uuid={}] failed to push request",
                          boost::uuids::to_string(msg_uuid));
         }
