@@ -146,12 +146,12 @@ int Yolo8BodyPoseDetectorNode::_create_image_request_handler(const RuntimeConfig
             *output_request = request;
 
             // special control signal must be delivered reliably
-            if (signal_code != ControlSignalCode::Normal && signal_code != ControlSignalCode::Ping) {
-                auto qos = (*output_enqueue_policy).value_or(ProcessHandler_t::OutputDeliveryPolicy_t());
-                qos.set_precondition(DeliveryPrecondition::NoPrecondition);
-                qos.set_drop_strategy(DropStrategy::NoDrop);
-                *output_enqueue_policy = qos;
-            }
+            // if (signal_code != ControlSignalCode::Normal && signal_code != ControlSignalCode::Ping) {
+            //     auto qos = (*output_enqueue_policy).value_or(ProcessHandler_t::OutputDeliveryPolicy_t());
+            //     qos.set_precondition(DeliveryPrecondition::NoPrecondition);
+            //     qos.set_drop_strategy(DropStrategy::NoDrop);
+            //     *output_enqueue_policy = qos;
+            // }
 
             // publish visualization
             if (m_impl->pub_visualization && enable_visualization && ret_extract_image == 0) {
