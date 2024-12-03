@@ -56,13 +56,13 @@ class PullProcessSendHandler
         OutputPort_t *output_port,
         ResourceTokenQueue_t *resource_token_queue,
         std::shared_ptr<PullProcessSendHandlerConfig> config,
-        std::optional<OutputDeliveryPolicy_t> output_delivery_policy = std::nullopt,
+        std::optional<OutputDeliveryPolicy_t> output_enqueue_policy = std::nullopt,
         rclcpp::Node *node = nullptr)
     {
         m_resource_token_queue = resource_token_queue;
         m_input_port = input_port;
         m_output_port = output_port;
-        m_output_delivery_policy = output_delivery_policy;
+        m_output_enqueue_policy = output_enqueue_policy;
         m_config = config;
         m_node = node;
     }
@@ -135,10 +135,12 @@ class PullProcessSendHandler
 
         // work on the input data
         OutputRequest_t output_request;
+        auto enqueue_policy = m_output_enqueue_policy;
         auto action_result = std::make_shared<InputActionResult_t>();
         if (on_process_input_data) {
             RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Processing input data", msg_uuid_str);
             int process_result = on_process_input_data(&output_request,
+                                                       &enqueue_policy,
                                                        action_result.get(),
                                                        input_data,
                                                        resource_token);
@@ -165,8 +167,8 @@ class PullProcessSendHandler
         if (m_output_port) {
             RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Sending data to output port", msg_uuid_str);
             bool sent = false;
-            if (m_output_delivery_policy.has_value()) {
-                sent = m_output_port->push_request(output_request, *m_output_delivery_policy);
+            if (enqueue_policy.has_value()) {
+                sent = m_output_port->push_request(output_request, *enqueue_policy);
             } else {
                 sent = m_output_port->try_push_request(output_request);
             }
@@ -204,7 +206,19 @@ class PullProcessSendHandler
 
   public:
     //! Alias for callback when processing input data
+    /**
+     * @brief Callback type for processing input data.
+     *
+     * @param output_request Pointer to the output request, modify it to change the request content.
+     * @param output_enqueue_policy Optional output enqueue policy, used to push request to output port.
+     * It is a copy of what you put in init(), any modification will only affect this request.
+     * @param action_result Pointer to the action result, modify it to change the result content.
+     * @param source_data Shared pointer to the input source data.
+     * @param resource_token Reference to the resource token.
+     * @return int Status code indicating success or failure.
+     */
     using OnProcessInputDataCallback_t = std::function<int(OutputRequest_t *output_request,
+                                                           std::optional<OutputDeliveryPolicy_t> *output_enqueue_policy,
                                                            InputActionResult_t *action_result,
                                                            std::shared_ptr<InputSourceData_t> source_data,
                                                            ResourceToken_t &resource_token)>;
@@ -230,7 +244,7 @@ class PullProcessSendHandler
     ResourceTokenQueue_t *m_resource_token_queue = nullptr;
     InputPort_t *m_input_port = nullptr;
     OutputPort_t *m_output_port = nullptr;
-    std::optional<OutputDeliveryPolicy_t> m_output_delivery_policy;
+    std::optional<OutputDeliveryPolicy_t> m_output_enqueue_policy;
     std::shared_ptr<PullProcessSendHandlerConfig> m_config = nullptr;
 };
 

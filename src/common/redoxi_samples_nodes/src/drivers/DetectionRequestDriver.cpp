@@ -177,10 +177,11 @@ int DetectionRequestDriver::_update_runtime_config(std::shared_ptr<BaseRuntimeCo
 
     // create port handler
     if (m_image_input_port) {
-        auto handler_config = std::make_shared<port_handlers::PullProcessSendHandlerConfig>();
+        using PortHandler_t = ImageRequestPortHandler_t;
+        auto handler_config = std::make_shared<PortHandler_t::InitConfig_t>();
         handler_config->block_input_reading = config->enable_blocking_mode;
         handler_config->block_resource_acquisition = config->enable_blocking_mode;
-        m_image_request_port_handler = std::make_shared<ImageRequestPortHandler_t>();
+        m_image_request_port_handler = std::make_shared<PortHandler_t>();
 
         RDX_INFO_DEV(this, __func__, false, "{}", "Initializing port handler");
         m_image_request_port_handler->init(
@@ -192,10 +193,11 @@ int DetectionRequestDriver::_update_runtime_config(std::shared_ptr<BaseRuntimeCo
             this);
 
         m_image_request_port_handler->on_process_input_data =
-            [this, config](DetectionRequestOutputPort_t::DeliveryRequest_t *output_request,
-                           ByImageRequest::ActionResult_t *output_result,
+            [this, config](PortHandler_t::OutputRequest_t *output_request,
+                           std::optional<PortHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
+                           PortHandler_t::InputActionResult_t *output_result,
                            std::shared_ptr<ByImageRequest::SourceData_t> source_data,
-                           auto &resource_token) {
+                           PortHandler_t::ResourceToken_t &resource_token) {
                 (void)resource_token;
                 (void)output_result;
 
@@ -211,6 +213,18 @@ int DetectionRequestDriver::_update_runtime_config(std::shared_ptr<BaseRuntimeCo
                 }
                 output_source_data.set_frame_metadata(source_data->get_goal()->frame.metadata);
                 output_request->set_source_data(output_source_data);
+
+                // get signal code
+                auto signal_code = ByImageRequest::ActionDataTrait_t::get_control_signal_code(*source_data->get_goal());
+                output_request->set_control_signal_code(signal_code);
+
+                // special control signal must be delivered reliably
+                if (signal_code != ControlSignalCode::Normal && signal_code != ControlSignalCode::Ping) {
+                    auto qos = (*output_enqueue_policy).value_or(PortHandler_t::OutputDeliveryPolicy_t());
+                    qos.set_precondition(DeliveryPrecondition::NoPrecondition);
+                    qos.set_drop_strategy(DropStrategy::NoDrop);
+                    *output_enqueue_policy = qos;
+                }
 
                 // publish visualization
                 bool do_publish_input = config->enable_visualization && m_pub_input && !image.empty();

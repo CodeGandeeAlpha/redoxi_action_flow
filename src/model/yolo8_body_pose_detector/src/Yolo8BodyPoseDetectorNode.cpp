@@ -116,8 +116,11 @@ int Yolo8BodyPoseDetectorNode::_create_image_request_handler(const RuntimeConfig
                           &m_impl->inference_resource_pool, config, enqueue_policy);
 
     process_handler->on_process_input_data =
-        [this, enable_visualization](auto *output_request, auto *action_result,
-                                     auto source_data, auto &resource) {
+        [this, enable_visualization](ProcessHandler_t::OutputRequest_t *output_request,
+                                     std::optional<ProcessHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
+                                     ProcessHandler_t::InputActionResult_t *action_result,
+                                     std::shared_ptr<ByImageRequest::InputSourceData_t> source_data,
+                                     ProcessHandler_t::ResourceToken_t &resource) {
             // extract image
             cv::Mat input_image;
             auto ret_extract_image = _extract_image(&input_image, source_data->get_goal()->frame);
@@ -137,8 +140,18 @@ int Yolo8BodyPoseDetectorNode::_create_image_request_handler(const RuntimeConfig
 
             ByImageRequest::OutputRequest_t request;
             request.set_source_data(o_source);
-            request.set_control_signal_code(InputDataTrait_t::get_control_signal_code(*source_data->get_goal()));
+
+            auto signal_code = InputDataTrait_t::get_control_signal_code(*source_data->get_goal());
+            request.set_control_signal_code(signal_code);
             *output_request = request;
+
+            // special control signal must be delivered reliably
+            if (signal_code != ControlSignalCode::Normal && signal_code != ControlSignalCode::Ping) {
+                auto qos = (*output_enqueue_policy).value_or(ProcessHandler_t::OutputDeliveryPolicy_t());
+                qos.set_precondition(DeliveryPrecondition::NoPrecondition);
+                qos.set_drop_strategy(DropStrategy::NoDrop);
+                *output_enqueue_policy = qos;
+            }
 
             // publish visualization
             if (m_impl->pub_visualization && enable_visualization && ret_extract_image == 0) {
