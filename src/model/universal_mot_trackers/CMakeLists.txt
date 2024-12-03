@@ -14,7 +14,9 @@ find_package(redoxi_public_msgs REQUIRED)
 # uncomment the following section in order to fill in further dependencies
 # manually. find_package(<dependency> REQUIRED)
 
-add_library(universal_mot_trackers src/universal_mot_trackers.cpp)
+set(srcfiles src/universal_mot_trackers.cpp src/UniversalMotTrackerNode.cpp)
+
+add_library(universal_mot_trackers ${srcfiles})
 add_library(universal_mot_trackers::universal_mot_trackers ALIAS
             universal_mot_trackers)
 target_compile_features(universal_mot_trackers PUBLIC c_std_99 cxx_std_17

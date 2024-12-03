@@ -42,8 +42,16 @@ class UniversalMotTrackerNode : public common_nodes::OpenCloseNode
     std::shared_ptr<InputPort_t> m_input_port;
     std::shared_ptr<StampedImagePub> m_pub_visualization;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr m_pub_probe;
+    std::shared_ptr<InputPortHandler_t> m_input_port_handler;
 
   private:
     int _create_tracker(const InitConfig_t &init_config);
+    int _create_input_port_handler(
+        const InitConfig_t &init_config,
+        const RuntimeConfig_t &runtime_config);
+    int _extract_image(cv::Mat *output_image, const InputSourceData_t *source_data);
+    int _handle_input_data(InputPortHandler_t::InputActionResult_t *output_action_result,
+                           std::shared_ptr<InputPortHandler_t::InputSourceData_t> source_data,
+                           InputPortHandler_t::ResourceToken_t &resource_token);
 };
 } // namespace redoxi_works::model_nodes::universal_mot_trackers
