@@ -228,6 +228,7 @@ void RDX_LOG_GENERIC_(NodeOrLogger node_or_logger, const char *func_name, _Stric
     // Get the logger based on input type
     auto logger = [&node_or_logger]() -> rclcpp::Logger {
         if constexpr (std::is_null_pointer_v<std::remove_cvref_t<NodeOrLogger>>) {
+            (void)node_or_logger;
             return rclcpp::get_logger(DefaultRDXLoggerName);
         } else if constexpr (std::is_same_v<NodeOrLogger, rclcpp::Logger>) {
             return node_or_logger;

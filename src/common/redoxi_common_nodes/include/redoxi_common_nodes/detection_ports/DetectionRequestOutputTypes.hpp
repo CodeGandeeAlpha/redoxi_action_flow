@@ -92,6 +92,7 @@ class DeliveryRequest : public DeliveryRequestBase
         const auto &source_data = this->m_source_data;
         const auto &image_msg = source_data.get_image();
         target_data.image = image_msg;
+        goal.frame.metadata = source_data.get_frame_metadata();
 
         if (!image_msg.empty()) {
             std_msgs::msg::Header header;

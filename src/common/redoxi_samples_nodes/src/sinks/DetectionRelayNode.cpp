@@ -126,13 +126,19 @@ int DetectionRelayNode::_parse_detection(cv::Mat *output,
         RDX_INFO_DEV(this, __func__, false, "{}", "cv_bridge exception: {}, ignoring the error", e.what());
     }
 
-    // parse detections
-    auto output_detections = inference::conversion::from_ros_msg(source_data.get_goal()->detections);
-    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Got {} detections",
-                 boost::uuids::to_string(msg_uuid), output_detections.objects.size());
+    image_utils::DrawDetectionsOptions options;
+    options.colorization_mode = image_utils::DrawDetectionsOptions::ColorizationMode::ClassId;
+    image_utils::draw_detections(output,
+                                 source_data.get_goal()->detections,
+                                 options);
 
-    // draw detections
-    dnn_models::visualizations::draw_detections(output, output_detections);
+    // // parse detections
+    // auto output_detections = inference::conversion::from_ros_msg(source_data.get_goal()->detections);
+    // RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Got {} detections",
+    //              boost::uuids::to_string(msg_uuid), output_detections.objects.size());
+
+    // // draw detections
+    // dnn_models::visualizations::draw_detections(output, output_detections);
 
     // RDX_INFO_DEV(this, __func__, false, "Output image size: {}x{}", output->cols, output->rows);
 

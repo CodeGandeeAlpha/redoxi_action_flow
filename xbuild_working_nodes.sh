@@ -15,17 +15,16 @@ display_help() {
     echo "  $0 --verbose --debug"
 }
 
-PackagesToBuild="redoxi_common_nodes \
-                 redoxi_inference \
-                 redoxi_inference_onnx \
-                 redoxi_dnn_models \
-                 yolo8_body_pose_detector \
-                 yolo8_object_detector \
-                 test_package \
-                 rosboard"
-
-# PackagesToBuild="test_tracking \
+# PackagesToBuild="redoxi_common_nodes \
+#                  redoxi_inference \
+#                  redoxi_inference_onnx \
+#                  redoxi_dnn_models \
+#                  yolo8_series \
+#                  test_package \
 #                  rosboard"
+
+PackagesToBuild="universal_mot_trackers \
+                 rosboard"
 
 # Check if --help flag is provided
 if [[ "$*" == *"--help"* ]]; then

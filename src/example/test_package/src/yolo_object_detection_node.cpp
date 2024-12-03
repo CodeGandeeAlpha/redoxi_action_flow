@@ -1,14 +1,14 @@
 // #include <yolo8_body_pose_detector/Yolo8BodyPoseDetectorNode.hpp>
-#include <yolo8_series/bodypose/Yolo8BodyPoseNode.hpp>
+#include <yolo8_series/detection/Yolo8ObjectDetNode.hpp>
 #include <spdlog/spdlog.h>
 #include <filesystem>
 namespace fs = std::filesystem;
 
 namespace rdx = redoxi_works;
 namespace rdx_models = redoxi_works::model_nodes;
-using RosNode_t = rdx_models::yolo8::Yolo8BodyPoseNode;
+using RosNode_t = rdx_models::yolo8::detection::Yolo8ObjectDetNode;
 
-const fs::path model_path = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx";
+const fs::path model_path = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx";
 
 void print_config_jsons();
 
