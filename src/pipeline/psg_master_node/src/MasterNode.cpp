@@ -1,6 +1,7 @@
 #include <psg_master_node/MasterNodeTypes.hpp>
 #include <psg_master_node/MasterNode.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
+#include <redoxi_common_nodes/port_handlers/PullProcessSendHandler.hpp>
 #include <redoxi_samples_lib/random_image.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 #include <json_struct/json_struct.h>
@@ -11,8 +12,15 @@ namespace redoxi_works
 {
 
 struct PSGMasterNodeImpl {
+    using Node_t = PSGMasterNode;
     //! ros time token
     std::shared_ptr<RosTimeToken> m_ros_time_token;
+
+    // pull input, work on it and then send output
+    using PullProcessSendHandler_t = redoxi_works::port_handlers::PullProcessSendHandler<Node_t::ByImageRequest::InputPort_t::MasterSpec_t,
+                                                                                         Node_t::ByImageRequest::OutputPort_t::MasterSpec_t,
+                                                                                         InferenceResource_t>;
+    std::shared_ptr<PullProcessSendHandler_t> work_then_send_handler;
 };
 
 PSGMasterNode::PSGMasterNode(const std::string &name, const rclcpp::NodeOptions &options)
@@ -229,8 +237,11 @@ void PSGMasterNode::_step()
         msg.frame = frame_data->m_goal->frame;
         output_source_data.set_document(msg);
 
+        auto goal_handle = frame_data->get_goal_handle_future().get();
+        auto control_signal_code = ActionDataTrait_t::get_control_signal_code(*goal_handle->get_goal());
+
         // create delivery request
-        auto delivery_request = _create_delivery_request(output_source_data); // TODO:确定是否需要加上signal code
+        auto delivery_request = _create_delivery_request(output_source_data, control_signal_code);
 
         // this is used for logging
         auto msg_uuid = output_source_data.get_uuid();

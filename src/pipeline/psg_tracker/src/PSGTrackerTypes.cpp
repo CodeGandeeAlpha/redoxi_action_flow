@@ -230,7 +230,7 @@ redoxi_public_msgs::msg::TrackTarget ROSTracker::_track_target_with_msg_det_to_m
     redoxi_public_msgs::msg::TrackTarget track_target_msg;
     track_target_msg.x_group_uid = detection.x_group_uid;
     track_target_msg.frame_metadata = detection.frame_metadata;
-    track_target_msg.detection = detection;
+    track_target_msg.true_detection = detection;
     track_target_msg.track_id = track_target->get_path_id();
     track_target_msg.confidence = track_target->get_confidence();
     auto track_bbox = track_target->get_bbox();
@@ -238,7 +238,7 @@ redoxi_public_msgs::msg::TrackTarget ROSTracker::_track_target_with_msg_det_to_m
     track_target_msg.track_bbox.y = track_bbox.y;
     track_target_msg.track_bbox.width = track_bbox.width;
     track_target_msg.track_bbox.height = track_bbox.height;
-    track_target_msg.track_status = track_target->get_path_state();
+    track_target_msg.track_status.value = track_target->get_path_state();
 
     return track_target_msg;
 }
@@ -253,7 +253,7 @@ redoxi_public_msgs::msg::TrackTarget ROSTracker::_track_target_to_msg(RedoxiTrac
     track_target_msg.track_bbox.y = track_bbox.y;
     track_target_msg.track_bbox.width = track_bbox.width;
     track_target_msg.track_bbox.height = track_bbox.height;
-    track_target_msg.track_status = track_target->get_path_state();
+    track_target_msg.track_status.value = track_target->get_path_state();
     track_target_msg.frame_metadata.frame_num = track_target->get_end_frame_number();
 
     return track_target_msg;

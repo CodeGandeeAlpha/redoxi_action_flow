@@ -350,6 +350,8 @@ void PSGDetectorNode::_step()
         OutputSourceDataModel_t output_model_source_data;
         output_model_source_data.set_document(document_data->get_goal()->document);
 
+        // TODO: 加上signal code
+
         // create delivery request
         auto delivery_request = _create_delivery_request(output_model_source_data);
 
