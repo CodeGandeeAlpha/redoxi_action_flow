@@ -1,4 +1,4 @@
-#include <redoxi_common_nodes/driver_nodes/CallActionDriverNode.hpp>
+#include <redoxi_common_nodes/driver_nodes/DetectionDriver.hpp>
 #include <json_struct/json_struct.h>
 #include <spdlog/spdlog.h>
 #include <redoxi_public_msgs/action/process_detections.hpp>
@@ -7,7 +7,7 @@
 namespace rdx = redoxi_works;
 namespace rdx_nodes = redoxi_works::common_nodes;
 
-using NodeType = rdx_nodes::driver_nodes::CallActionDriverNode;
+using NodeType = rdx_nodes::drivers::DetectionDriver;
 using NodeInitConfig = NodeType::InitConfig_t;
 using NodeRuntimeConfig = NodeType::RuntimeConfig_t;
 using NodeConfigTemplate = rdx::NodeConfigTemplate<NodeInitConfig, NodeRuntimeConfig>;

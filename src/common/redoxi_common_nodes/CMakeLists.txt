@@ -26,9 +26,13 @@ endforeach()
 set(cpp_required_to_link Boost::boost json_struct::json_struct)
 
 set(srcfiles
-    src/redoxi_common_nodes.cpp src/AsyncActionOutputPort.cpp
-    src/AsyncActionInputPort.cpp src/base_nodes/BaseRosNode.cpp
-    src/base_nodes/StartStopNode.cpp src/base_nodes/OpenCloseNode.cpp)
+    src/redoxi_common_nodes.cpp
+    src/AsyncActionOutputPort.cpp
+    src/AsyncActionInputPort.cpp
+    src/base_nodes/BaseRosNode.cpp
+    src/base_nodes/StartStopNode.cpp
+    src/base_nodes/OpenCloseNode.cpp
+    src/driver_nodes/DetectionDriver.cpp)
 
 add_library(redoxi_common_nodes ${srcfiles})
 add_library(redoxi_common_nodes::redoxi_common_nodes ALIAS redoxi_common_nodes)

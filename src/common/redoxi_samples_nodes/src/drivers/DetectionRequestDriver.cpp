@@ -196,7 +196,7 @@ int DetectionRequestDriver::_update_runtime_config(std::shared_ptr<BaseRuntimeCo
             [this, config](PortHandler_t::OutputRequest_t *output_request,
                            std::optional<PortHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
                            PortHandler_t::InputActionResult_t *output_result,
-                           std::shared_ptr<ByImageRequest::SourceData_t> source_data,
+                           std::shared_ptr<const ByImageRequest::SourceData_t> source_data,
                            PortHandler_t::ResourceToken_t &resource_token) {
                 (void)resource_token;
                 (void)output_result;

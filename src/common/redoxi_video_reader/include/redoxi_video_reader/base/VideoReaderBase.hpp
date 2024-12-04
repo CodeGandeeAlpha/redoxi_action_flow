@@ -106,6 +106,16 @@ class RedoxiVideoReaderBase : public common_nodes::OpenCloseNode
         return _read_frame(source_data, m_last_read_frame_number);
     }
 
+    //! callback before a delivery request is enqueued, about to send to any downstream
+    //! you can modify the request or enqueue policy here
+    //! return 0 if success, otherwise error code
+    virtual int _on_before_request_enqueue(DeliveryRequest_t &request, DeliveryPolicy_t &enqueue_policy)
+    {
+        (void)request;
+        (void)enqueue_policy;
+        return 0;
+    }
+
     /**
      * @brief Create a delivery request from source data
      * @param source_data the source data to be filled with the read frame

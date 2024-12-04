@@ -300,13 +300,14 @@ int Yolo8BaseNode<TModel>::_create_image_request_handler(const RuntimeConfig_t &
                           &m_impl->inference_resource_pool, config, enqueue_policy);
 
     process_handler->on_process_input_data =
-        [this, enable_visualization, enable_performance_probe](typename ProcessHandler_t::OutputRequest_t *output_request,
-                                                               std::optional<typename ProcessHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
-                                                               typename ProcessHandler_t::InputActionResult_t *action_result,
-                                                               std::shared_ptr<typename ByImageRequest::InputSourceData_t> source_data,
-                                                               typename ProcessHandler_t::ResourceToken_t &resource) {
+        [this,
+         enable_visualization,
+         enable_performance_probe](typename ProcessHandler_t::OutputRequest_t *output_request,
+                                   std::optional<typename ProcessHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
+                                   typename ProcessHandler_t::InputActionResult_t *action_result,
+                                   std::shared_ptr<const typename ByImageRequest::InputSourceData_t> source_data,
+                                   typename ProcessHandler_t::ResourceToken_t &resource) {
             (void)output_enqueue_policy;
-
             // extract image
             cv::Mat input_image;
             auto ret_extract_image = _extract_image(&input_image, source_data->get_goal()->frame);

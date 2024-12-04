@@ -10,13 +10,19 @@
 #include <redoxi_common_nodes/detection_ports/DetectionResponseOutputPort.hpp>
 
 
-namespace redoxi_works::common_nodes::driver_nodes
+namespace redoxi_works::common_nodes::drivers
 {
 
 struct CallActionDriverInitConfig;
 struct CallActionDriverRuntimeConfig;
 
-class CallActionDriverNode : public OpenCloseNode
+/*
+ * CallActionDriverBase is a base class for driver nodes that call an action server to process requests.
+ * It provides a framework for setting up the input port, callee port, and output port,
+ * as well as defining the callbacks for processing input requests and callee results.
+ * It can also be used as a standalone node, using callback functions to execute the processing.
+ */
+class CallActionDriverBase : public OpenCloseNode
 {
   public:
     using InitConfig_t = CallActionDriverInitConfig;
@@ -25,8 +31,9 @@ class CallActionDriverNode : public OpenCloseNode
     using BaseNode_t = OpenCloseNode;
     using BaseInitConfig_t = BaseNode_t::InitConfig_t;
     using BaseRuntimeConfig_t = BaseNode_t::RuntimeConfig_t;
+    using OpenCloseNode::OpenCloseNode;
 
-    CallActionDriverNode(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+    // CallActionDriverBase(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
 
   public:
     //! types of the input port of this node, which accepts incoming requests
@@ -51,6 +58,7 @@ class CallActionDriverNode : public OpenCloseNode
         using RequestOutputActionGoal_t = typename RequestOutputAction_t::Goal;
         using RequestOutputActionResult_t = typename RequestOutputAction_t::Result;
         using RequestOutputDeliveryPolicy_t = typename RequestOutputPort_t::DeliveryPolicy_t;
+        using Downstream_t = typename RequestOutputPort_t::Downstream_t;
     };
 
     //! types of the output port of this node, which sends out actions to downstream nodes
@@ -70,6 +78,26 @@ class CallActionDriverNode : public OpenCloseNode
         port_handlers::PullProcessSendHandler<typename InputTypes::InputPortSpec_t,
                                               typename CalleeTypes::RequestOutputPortSpec_t>;
 
+    //! Type alias for the data-processing callback of the input port handler
+    using OnProcessInputRequestCallback_t = std::function<int(InputRequestHandler_t::OutputRequest_t *,
+                                                              std::optional<InputRequestHandler_t::OutputDeliveryPolicy_t> *,
+                                                              InputRequestHandler_t::InputActionResult_t *,
+                                                              std::shared_ptr<const InputTypes::SourceData_t>,
+                                                              InputRequestHandler_t::ResourceToken_t &)>;
+
+    //! user defined callback for processing input request, called after the internal processing is done
+    OnProcessInputRequestCallback_t on_process_input_request;
+
+    //! Type alias for creating output request after receiving result from the callee
+    using OnProcessCalleeResultCallback_t = std::function<int(OutputTypes::OutputRequest_t *,
+                                                              OutputTypes::OutputDeliveryPolicy_t *,
+                                                              std::shared_ptr<const CalleeTypes::RequestOutputActionResult_t>,
+                                                              const CalleeTypes::RequestOutputRequest_t &,
+                                                              const CalleeTypes::Downstream_t &)>;
+
+    //! user defined callback for processing callee result, called after the internal processing is done
+    OnProcessCalleeResultCallback_t on_process_callee_result;
+
   protected:
     int _open() override;
     int _close() override;
@@ -79,21 +107,21 @@ class CallActionDriverNode : public OpenCloseNode
     int _update_init_config(std::shared_ptr<BaseInitConfig_t> init_config) override;
     int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config) override;
 
-    //! after the request is sent to the callee
-    //! if you want to get result from goal handle, do it here
-    //! you can async_get_result() and then choose to wait synchronously or asynchronously
-    virtual void _on_request_sent_to_callee(typename CalleeTypes::RequestOutputPort_t::TargetData_t &target_data,
-                                            typename CalleeTypes::RequestOutputPort_t::SendResult_t &send_result,
-                                            const typename CalleeTypes::RequestOutputPort_t::DeliveryRequest_t &delivery_request,
-                                            const typename CalleeTypes::RequestOutputPort_t::Downstream_t &downstream);
-
     //! after the request is received from the input port
     //! this is the data-processing callback of the input port handler
-    virtual int _on_input_request_received(InputRequestHandler_t::OutputRequest_t *output_request,
-                                           std::optional<InputRequestHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
-                                           InputRequestHandler_t::InputActionResult_t *output_result,
-                                           std::shared_ptr<InputTypes::SourceData_t> source_data,
-                                           InputRequestHandler_t::ResourceToken_t &resource_token);
+    virtual int _on_process_input_request(InputRequestHandler_t::OutputRequest_t *output_request,
+                                          std::optional<InputRequestHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
+                                          InputRequestHandler_t::InputActionResult_t *output_result,
+                                          std::shared_ptr<const InputTypes::SourceData_t> source_data,
+                                          InputRequestHandler_t::ResourceToken_t &resource_token);
+
+    //! after the result is received from the callee, create output request for sending to output port
+    //! you can also modify the output request enqueue policy here, or just leave it unchanged
+    virtual int _on_process_callee_result(OutputTypes::OutputRequest_t *output_request,
+                                          OutputTypes::OutputDeliveryPolicy_t *output_enqueue_policy,
+                                          std::shared_ptr<const CalleeTypes::RequestOutputActionResult_t> callee_result,
+                                          const CalleeTypes::RequestOutputRequest_t &callee_request,
+                                          const CalleeTypes::Downstream_t &downstream);
 
   protected:
     // for accepting incoming requests
@@ -104,12 +132,77 @@ class CallActionDriverNode : public OpenCloseNode
     std::shared_ptr<CalleeTypes::RequestOutputPort_t> m_callee_port;
     // for doing the work of pulling input and send it to callee
     std::shared_ptr<InputRequestHandler_t> m_input_request_handler;
+
+  private:
+    //! after the request is sent to the callee
+    //! if you want to get result from goal handle, do it here
+    //! you can async_get_result() and then choose to wait synchronously or asynchronously
+    void _internal_request_sent_to_callee(typename CalleeTypes::RequestOutputPort_t::TargetData_t &target_data,
+                                          typename CalleeTypes::RequestOutputPort_t::SendResult_t &send_result,
+                                          const typename CalleeTypes::RequestOutputPort_t::DeliveryRequest_t &delivery_request,
+                                          const typename CalleeTypes::RequestOutputPort_t::Downstream_t &downstream);
+
+    //! after the request is received from the input port
+    //! this is the data-processing callback of the input port handler
+    int _internal_process_input_request(InputRequestHandler_t::OutputRequest_t *output_request,
+                                        std::optional<InputRequestHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
+                                        InputRequestHandler_t::InputActionResult_t *output_result,
+                                        std::shared_ptr<const InputTypes::SourceData_t> source_data,
+                                        InputRequestHandler_t::ResourceToken_t &resource_token)
+    {
+        // call class member function
+        auto ret_member = _on_process_input_request(output_request, output_enqueue_policy, output_result, source_data, resource_token);
+        if (ret_member != 0) {
+            RDX_INFO_DEV(this, __func__, false, "Error in internal processing of input request, ret={}", ret_member);
+            return ret_member;
+        }
+
+        // then call user-defined callback
+        int ret_user = 0;
+        if (on_process_input_request) {
+            ret_user = on_process_input_request(output_request, output_enqueue_policy, output_result, source_data, resource_token);
+        }
+        if (ret_user != 0) {
+            RDX_INFO_DEV(this, __func__, false, "Error in user-defined processing of input request, ret={}", ret_user);
+            return ret_user;
+        }
+
+        return 0;
+    }
+
+    //! after the result is received from the callee, create output request for sending to output port
+    //! you can also modify the output request enqueue policy here, or just leave it unchanged
+    int _internal_process_callee_result(OutputTypes::OutputRequest_t *output_request,
+                                        OutputTypes::OutputDeliveryPolicy_t *output_enqueue_policy,
+                                        std::shared_ptr<const CalleeTypes::RequestOutputActionResult_t> callee_result,
+                                        const CalleeTypes::RequestOutputRequest_t &callee_request,
+                                        const CalleeTypes::Downstream_t &downstream)
+    {
+        // call class member function
+        auto ret_member = _on_process_callee_result(output_request, output_enqueue_policy, callee_result, callee_request, downstream);
+        if (ret_member != 0) {
+            RDX_INFO_DEV(this, __func__, false, "Error in internal processing of callee result, ret={}", ret_member);
+            return ret_member;
+        }
+
+        // then call user-defined callback
+        int ret_user = 0;
+        if (on_process_callee_result) {
+            ret_user = on_process_callee_result(output_request, output_enqueue_policy, callee_result, callee_request, downstream);
+        }
+        if (ret_user != 0) {
+            RDX_INFO_DEV(this, __func__, false, "Error in user-defined processing of callee result, ret={}", ret_user);
+            return ret_user;
+        }
+
+        return 0;
+    }
 };
 
 struct CallActionDriverInitConfig : public OpenCloseNode::InitConfig_t {
-    using DriverInputPortConfig_t = CallActionDriverNode::InputTypes::InputPort_t::InitConfig_t;
-    using DriverOutputPortConfig_t = CallActionDriverNode::OutputTypes::OutputPort_t::InitConfig_t;
-    using CalleeRequestPortConfig_t = CallActionDriverNode::CalleeTypes::RequestOutputPort_t::InitConfig_t;
+    using DriverInputPortConfig_t = CallActionDriverBase::InputTypes::InputPort_t::InitConfig_t;
+    using DriverOutputPortConfig_t = CallActionDriverBase::OutputTypes::OutputPort_t::InitConfig_t;
+    using CalleeRequestPortConfig_t = CallActionDriverBase::CalleeTypes::RequestOutputPort_t::InitConfig_t;
 
     //! config for the driver's input port
     std::shared_ptr<DriverInputPortConfig_t> input_port_config = std::make_shared<DriverInputPortConfig_t>();
@@ -125,8 +218,8 @@ struct CallActionDriverInitConfig : public OpenCloseNode::InitConfig_t {
 };
 
 struct CallActionDriverRuntimeConfig : public OpenCloseNode::RuntimeConfig_t {
-    using CalleeRequestEnqueuePolicy_t = CallActionDriverNode::CalleeTypes::RequestOutputPort_t::DeliveryPolicy_t;
-    using DriverOutputEnqueuePolicy_t = CallActionDriverNode::OutputTypes::OutputPort_t::DeliveryPolicy_t;
+    using CalleeRequestEnqueuePolicy_t = CallActionDriverBase::CalleeTypes::RequestOutputPort_t::DeliveryPolicy_t;
+    using DriverOutputEnqueuePolicy_t = CallActionDriverBase::OutputTypes::OutputPort_t::DeliveryPolicy_t;
 
     //! policy when enqueueing to the callee's request port
     CalleeRequestEnqueuePolicy_t callee_request_enqueue_policy;
@@ -143,19 +236,19 @@ struct CallActionDriverRuntimeConfig : public OpenCloseNode::RuntimeConfig_t {
                          JS_MEMBER(enable_blocking_mode));
 };
 
-inline CallActionDriverNode::CallActionDriverNode(const std::string &name, const rclcpp::NodeOptions &options)
-    : OpenCloseNode(name, options)
-{
-}
+// inline CallActionDriverBase::CallActionDriverBase(const std::string &name, const rclcpp::NodeOptions &options)
+//     : OpenCloseNode(name, options)
+// {
+// }
 
-inline int CallActionDriverNode::_open()
+inline int CallActionDriverBase::_open()
 {
     RDX_INFO_DEV(this, __func__, false, "Opening driver node, class={}", typeid(*this).name());
     RDX_INFO_DEV(this, __func__, false, "Driver node opened, class={}", typeid(*this).name());
     return 0;
 }
 
-inline int CallActionDriverNode::_start()
+inline int CallActionDriverBase::_start()
 {
     RDX_INFO_DEV(this, __func__, false, "Starting driver node, class={}", typeid(*this).name());
     if (m_input_port) {
@@ -171,7 +264,7 @@ inline int CallActionDriverNode::_start()
     return 0;
 }
 
-inline int CallActionDriverNode::_stop()
+inline int CallActionDriverBase::_stop()
 {
     RDX_INFO_DEV(this, __func__, false, "Stopping driver node, class={}", typeid(*this).name());
     if (m_input_port) {
@@ -187,21 +280,21 @@ inline int CallActionDriverNode::_stop()
     return 0;
 }
 
-inline int CallActionDriverNode::_close()
+inline int CallActionDriverBase::_close()
 {
     RDX_INFO_DEV(this, __func__, false, "Closing driver node, class={}", typeid(*this).name());
     RDX_INFO_DEV(this, __func__, false, "Driver node closed, class={}", typeid(*this).name());
     return 0;
 }
 
-inline void CallActionDriverNode::_step()
+inline void CallActionDriverBase::_step()
 {
     if (m_input_request_handler) {
         m_input_request_handler->process_and_send();
     }
 }
 
-inline int CallActionDriverNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> init_config)
+inline int CallActionDriverBase::_update_init_config(std::shared_ptr<BaseInitConfig_t> init_config)
 {
     //! Update initial configuration
     RDX_INFO_DEV(this, __func__, false, "{}", "Starting update of initial configuration");
@@ -235,7 +328,7 @@ inline int CallActionDriverNode::_update_init_config(std::shared_ptr<BaseInitCon
     return 0;
 }
 
-inline int CallActionDriverNode::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config)
+inline int CallActionDriverBase::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config)
 {
 
     RDX_INFO_DEV(this, __func__, false, "{}", "Updating runtime configuration");
@@ -247,7 +340,7 @@ inline int CallActionDriverNode::_update_runtime_config(std::shared_ptr<BaseRunt
 
     if (m_callee_port) {
         m_callee_port->set_callback_on_deliver_to_downstream_finish(
-            std::bind(&CallActionDriverNode::_on_request_sent_to_callee, this,
+            std::bind(&CallActionDriverBase::_internal_request_sent_to_callee, this,
                       std::placeholders::_1, std::placeholders::_2,
                       std::placeholders::_3, std::placeholders::_4));
     }
@@ -270,7 +363,7 @@ inline int CallActionDriverNode::_update_runtime_config(std::shared_ptr<BaseRunt
             this);
 
         m_input_request_handler->on_process_input_data =
-            std::bind(&CallActionDriverNode::_on_input_request_received, this,
+            std::bind(&CallActionDriverBase::_internal_process_input_request, this,
                       std::placeholders::_1, std::placeholders::_2,
                       std::placeholders::_3, std::placeholders::_4,
                       std::placeholders::_5);
@@ -280,7 +373,30 @@ inline int CallActionDriverNode::_update_runtime_config(std::shared_ptr<BaseRunt
     return 0;
 }
 
-inline void CallActionDriverNode::_on_request_sent_to_callee(
+inline int CallActionDriverBase::_on_process_callee_result(OutputTypes::OutputRequest_t *output_request,
+                                                           OutputTypes::OutputDeliveryPolicy_t *output_enqueue_policy,
+                                                           std::shared_ptr<const CalleeTypes::RequestOutputActionResult_t> callee_result,
+                                                           const CalleeTypes::RequestOutputRequest_t &callee_request,
+                                                           const CalleeTypes::Downstream_t &downstream)
+{
+    (void)downstream;
+    (void)output_enqueue_policy;
+
+    OutputTypes::OutputSourceData_t output_source_data;
+    output_source_data.detections = callee_result->detections;
+    output_source_data.image = callee_request.get_source_data().get_image();
+    output_source_data.uid = callee_request.get_source_data().get_uuid();
+    output_request->set_source_data(output_source_data);
+
+    int return_code = 0;
+    if (on_process_callee_result) {
+        return_code = on_process_callee_result(output_request, output_enqueue_policy, callee_result, callee_request, downstream);
+    }
+
+    return return_code;
+}
+
+inline void CallActionDriverBase::_internal_request_sent_to_callee(
     typename CalleeTypes::RequestOutputPort_t::TargetData_t &target_data,
     typename CalleeTypes::RequestOutputPort_t::SendResult_t &send_result,
     const typename CalleeTypes::RequestOutputPort_t::DeliveryRequest_t &delivery_request,
@@ -299,22 +415,26 @@ inline void CallActionDriverNode::_on_request_sent_to_callee(
                 RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Got request result, sending to output port", msg_uuid_str);
                 auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(get_runtime_config());
                 auto policy = runtime_config->driver_output_enqueue_policy;
+                auto signal_code = delivery_request.get_control_signal_code();
+
+                // abnormal signal must be delivered reliably
+                if (signal_code != ControlSignalCode::Normal && signal_code != ControlSignalCode::Ping) {
+                    policy.set_precondition(DeliveryPrecondition::NoPrecondition);
+                    policy.set_drop_strategy(DropStrategy::NoDrop);
+                }
 
                 if (m_output_port) {
-                    //! Log: Creating output source data
-                    OutputTypes::OutputSourceData_t response_source_data;
-                    response_source_data.detections = result.result->detections;
-                    response_source_data.image = target_data.image.clone();
-                    response_source_data.uid = target_data.get_source_data_uuid();
-
-                    //! Log: Creating and pushing detection response request
                     OutputTypes::OutputRequest_t response_request;
-                    response_request.set_source_data(response_source_data);
-                    auto sent = m_output_port->push_request(response_request, policy);
-                    if (sent) {
-                        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Sent output request to output port", msg_uuid_str);
+                    auto ret = _internal_process_callee_result(&response_request, &policy, result.result, delivery_request, downstream);
+                    if (ret == 0) {
+                        auto sent = m_output_port->push_request(response_request, policy);
+                        if (sent) {
+                            RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Sent output request to output port", msg_uuid_str);
+                        } else {
+                            RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to send output request to output port", msg_uuid_str);
+                        }
                     } else {
-                        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to send output request to output port", msg_uuid_str);
+                        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to process callee result, skip sending", msg_uuid_str);
                     }
                 }
             } else {
@@ -326,11 +446,11 @@ inline void CallActionDriverNode::_on_request_sent_to_callee(
     }
 }
 
-inline int CallActionDriverNode::_on_input_request_received(InputRequestHandler_t::OutputRequest_t *output_request,
-                                                            std::optional<InputRequestHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
-                                                            InputRequestHandler_t::InputActionResult_t *output_result,
-                                                            std::shared_ptr<InputTypes::SourceData_t> source_data,
-                                                            InputRequestHandler_t::ResourceToken_t &resource_token)
+inline int CallActionDriverBase::_on_process_input_request(InputRequestHandler_t::OutputRequest_t *output_request,
+                                                           std::optional<InputRequestHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
+                                                           InputRequestHandler_t::InputActionResult_t *output_result,
+                                                           std::shared_ptr<const InputTypes::SourceData_t> source_data,
+                                                           InputRequestHandler_t::ResourceToken_t &resource_token)
 {
     (void)resource_token;
     (void)output_result;
@@ -360,9 +480,14 @@ inline int CallActionDriverNode::_on_input_request_received(InputRequestHandler_
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Set control signal code to {}",
                  msg_uuid_str, control_signal_code_to_string(signal_code));
 
+    auto return_code = 0;
+    if (on_process_input_request) {
+        return_code = on_process_input_request(output_request, output_enqueue_policy, output_result, source_data, resource_token);
+    }
+
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Done, created request from source data", msg_uuid_str);
 
-    return 0;
+    return return_code;
 }
 
-} // namespace redoxi_works::common_nodes::driver_nodes
+} // namespace redoxi_works::common_nodes::drivers

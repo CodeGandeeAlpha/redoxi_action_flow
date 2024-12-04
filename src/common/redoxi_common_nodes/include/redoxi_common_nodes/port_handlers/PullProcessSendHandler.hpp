@@ -139,15 +139,30 @@ class PullProcessSendHandler
         OutputRequest_t output_request;
         auto enqueue_policy = m_output_enqueue_policy;
 
+        // get the delivery policy from the output request
+        // if not set, use the default one
+        // this is used for reliably sending special control signal, in other cases we will leave the user-defined policy unchanged
         if (source_signal_code != ControlSignalCode::Normal && source_signal_code != ControlSignalCode::Ping) {
             // special control signal must be delivered reliably
             RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Special control signal ({}), must be delivered reliably",
                          msg_uuid_str, control_signal_code_to_string(source_signal_code));
+
+            // make sure enqueue policy is reliable
             if (!enqueue_policy.has_value()) {
                 enqueue_policy = OutputDeliveryPolicy_t();
             }
             enqueue_policy->set_precondition(DeliveryPrecondition::NoPrecondition);
             enqueue_policy->set_drop_strategy(DropStrategy::NoDrop);
+
+            // make sure request policy is reliable
+            // FIXME: downstream policy timing settings is ignored here, should we care?
+            OutputDeliveryPolicy_t request_policy;
+            if (output_request.get_delivery_policy()) {
+                request_policy = *output_request.get_delivery_policy();
+            }
+            request_policy.set_precondition(DeliveryPrecondition::NoPrecondition);
+            request_policy.set_drop_strategy(DropStrategy::NoDrop);
+            output_request.set_delivery_policy(request_policy);
         }
 
         auto action_result = std::make_shared<InputActionResult_t>();
@@ -243,7 +258,7 @@ class PullProcessSendHandler
     using OnProcessInputDataCallback_t = std::function<int(OutputRequest_t *output_request,
                                                            std::optional<OutputDeliveryPolicy_t> *output_enqueue_policy,
                                                            InputActionResult_t *action_result,
-                                                           std::shared_ptr<InputSourceData_t> source_data,
+                                                           std::shared_ptr<const InputSourceData_t> source_data,
                                                            ResourceToken_t &resource_token)>;
     OnProcessInputDataCallback_t on_process_input_data;
 
@@ -253,7 +268,7 @@ class PullProcessSendHandler
     OnInputDataProcessedCallback_t on_input_data_processed;
 
     //! Alias for callback when no resource token is available
-    using OnResourceTokenNotAvailableCallback_t = std::function<void(std::shared_ptr<InputSourceData_t> source_data)>;
+    using OnResourceTokenNotAvailableCallback_t = std::function<void(std::shared_ptr<const InputSourceData_t> source_data)>;
     OnResourceTokenNotAvailableCallback_t on_resource_token_not_available;
 
     //! Alias for callback before releasing resource token
