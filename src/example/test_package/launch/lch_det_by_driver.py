@@ -39,8 +39,8 @@ DetectionDriverNodeName = "driver"
 
 # fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
 fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx"
-fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-# fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
+# fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
 
 DetectionRelayNodeName = "detection_relay"
 DetectionRelayInputActionName = DetectionResponseInputActionName
@@ -190,24 +190,7 @@ detection_driver_params = {
             "action_name": FrameInputActionName,
             "goal_result_expire_time": 1000000,
         },
-        "output_port_config": {
-            "_action_goal_type": "redoxi_public_msgs/action/ProcessDetections_Goal",
-            "downstream_specs": [
-                {
-                    "name": DetectionRelayNodeName,
-                    "action_name": f"/{DetectionRelayNodeName}/{DetectionRelayInputActionName}",
-                    "delivery_policy": {
-                        "precondition": "dont_care",
-                        "drop_strategy": "no_drop",
-                    },
-                    "create_debug_pub": False,
-                },
-            ],
-            "num_buffer_requests": 1,
-            "preserve_request_order": True,
-            "fallback_delivery_precondition": "dont_care",
-        },
-        "callee_request_port_config": {
+        "detection_request_output_port_config": {
             "_action_goal_type": "redoxi_public_msgs/action/ProcessDetectionsByFrame_Goal",
             "downstream_specs": [
                 {
@@ -224,10 +207,29 @@ detection_driver_params = {
             "preserve_request_order": True,
             "fallback_delivery_precondition": "dont_care",
         },
+        "detection_response_output_port_config": {
+            "_action_goal_type": "redoxi_public_msgs/action/ProcessDetections_Goal",
+            "downstream_specs": [
+                {
+                    "name": DetectionRelayNodeName,
+                    "action_name": f"/{DetectionRelayNodeName}/{DetectionRelayInputActionName}",
+                    "delivery_policy": {
+                        "precondition": "dont_care",
+                        "drop_strategy": "no_drop",
+                    },
+                    "create_debug_pub": False,
+                },
+            ],
+            "num_buffer_requests": 1,
+            "preserve_request_order": True,
+            "fallback_delivery_precondition": "dont_care",
+        },
+        "publish_input_topic": "/vis/input",
+        "publish_detection_result_topic": "/vis/detection_result",
         "_time_unit": "us(1e-6)",
     },
     "runtime_config": {
-        "callee_request_enqueue_policy": {
+        "detection_request_enqueue_policy": {
             "retry_policy": {
                 "fallback_number_of_retry": 3,
                 "fallback_wait_time_between_retry": 5000,
@@ -236,7 +238,7 @@ detection_driver_params = {
             "precondition": "dont_care",
             "drop_strategy": "no_drop",
         },
-        "driver_output_enqueue_policy": {
+        "detection_response_enqueue_policy": {
             "retry_policy": {
                 "fallback_number_of_retry": 3,
                 "fallback_wait_time_between_retry": 5000,
@@ -245,7 +247,8 @@ detection_driver_params = {
             "precondition": "dont_care",
             "drop_strategy": "no_drop",
         },
-        "enable_blocking_mode": False,
+        "enable_visualization": True,
+        "enable_blocking_mode": True,
         "_time_unit": "us(1e-6)",
         "step_interval": StepIntervals.Fast,
     },
@@ -313,7 +316,7 @@ detection_relay_node = Node(
 
 detection_driver_node = Node(
     package="test_package",
-    executable="test_driver_node",
+    executable="detection_driver_node",
     name=DetectionDriverNodeName,
     namespace=DetectionDriverNodeName,
     output="screen",

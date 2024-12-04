@@ -406,37 +406,23 @@ void RedoxiVideoReaderBase::_step()
             qos.set_precondition(DeliveryPrecondition::NoPrecondition);
             qos.set_drop_strategy(DropStrategy::NoDrop);
         }
-        bool success = m_primary_output_port->push_request(delivery_request, qos);
 
-        // auto max_attempts = qos.get_retry_policy().get_number_of_retry(true).value() + 1;
-        // auto interval_between_attempts = qos.get_retry_policy().get_wait_time_between_retry(true).value();
-        // auto drop_frame_strategy = qos.get_drop_strategy();
+        // call callback before enqueue
+        bool user_reject = false;
+        {
+            auto ret = _on_before_request_enqueue(delivery_request, qos);
+            if (ret != 0) {
+                RDX_INFO_DEV(this, __func__, "[msg_uuid={}] User rejected the request, error code={}",
+                             boost::uuids::to_string(msg_uuid), ret);
+                user_reject = true;
+            }
+        }
 
-        // // start pushing request to output port
-        // RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-        //              "try to push request in {} attempts, retry interval={}ms",
-        //              max_attempts, interval_between_attempts.count());
-
-        // bool success = false;
-        // if (drop_frame_strategy == DropStrategy::NoDrop) {
-        //     // Keep trying until success if no drop strategy
-        //     while (!m_primary_output_port->try_push_request(delivery_request)) {
-        //         std::this_thread::sleep_for(interval_between_attempts);
-        //     }
-        //     success = true;
-        // } else if (drop_frame_strategy == DropStrategy::DropAsNeeded) {
-        //     // Try up to max attempts if dropping is allowed
-        //     for (int attempt = 0; attempt < max_attempts; ++attempt) {
-        //         if (m_primary_output_port->try_push_request(delivery_request)) {
-        //             success = true;
-        //             break;
-        //         }
-        //         // wait for next attempt
-        //         std::this_thread::sleep_for(interval_between_attempts);
-        //     }
-        // } else {
-        //     RDX_RAISE_ERROR("[{}] invalid drop strategy, got {}", __func__, int(drop_frame_strategy));
-        // }
+        // push request to output port
+        bool success = false;
+        if (!user_reject) {
+            success = m_primary_output_port->push_request(delivery_request, qos);
+        }
 
         if (success) {
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,

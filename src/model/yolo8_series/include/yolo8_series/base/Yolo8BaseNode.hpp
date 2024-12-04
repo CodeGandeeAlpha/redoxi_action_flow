@@ -300,11 +300,14 @@ int Yolo8BaseNode<TModel>::_create_image_request_handler(const RuntimeConfig_t &
                           &m_impl->inference_resource_pool, config, enqueue_policy);
 
     process_handler->on_process_input_data =
-        [this, enable_visualization, enable_performance_probe](typename ProcessHandler_t::OutputRequest_t *output_request,
-                                                               std::optional<typename ProcessHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
-                                                               typename ProcessHandler_t::InputActionResult_t *action_result,
-                                                               std::shared_ptr<typename ByImageRequest::InputSourceData_t> source_data,
-                                                               typename ProcessHandler_t::ResourceToken_t &resource) {
+        [this,
+         enable_visualization,
+         enable_performance_probe](typename ProcessHandler_t::OutputRequest_t *output_request,
+                                   std::optional<typename ProcessHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
+                                   typename ProcessHandler_t::InputActionResult_t *action_result,
+                                   std::shared_ptr<const typename ByImageRequest::InputSourceData_t> source_data,
+                                   typename ProcessHandler_t::ResourceToken_t &resource) {
+            (void)output_enqueue_policy;
             // extract image
             cv::Mat input_image;
             auto ret_extract_image = _extract_image(&input_image, source_data->get_goal()->frame);
@@ -386,13 +389,14 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
             cv::Mat input_image;
             auto ret_extract_image = _extract_image(&input_image, source_data);
             if (ret_extract_image != 0) {
-                RDX_RAISE_ERROR("[f={}] [msg_uid={}] Failed to extract image from input data, error code: {}",
-                                __func__, msg_uuid_str, ret_extract_image);
+                RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Failed to extract image from input data, error code: {}",
+                             msg_uuid_str, ret_extract_image);
+                return -1;
             }
 
             if (input_image.empty()) {
-                RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Empty image, aborting goal", msg_uuid_str);
-                return -1;
+                RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Extracted empty image, no detection will be done", msg_uuid_str);
+                return 0;
             }
 
             // Perform inference

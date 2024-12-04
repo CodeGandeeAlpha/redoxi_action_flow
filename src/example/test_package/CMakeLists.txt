@@ -24,7 +24,6 @@ set(DEPENDENCIES
     redoxi_shared_memory
     redoxi_inference
     redoxi_dnn_models
-    yolo8_body_pose_detector
     yolo8_series
     pluginlib)
 
@@ -74,6 +73,7 @@ option(BUILD_YOLO_OBJECT_DETECTION_NODE
        "Build yolo_object_detection_node target" ON)
 option(BUILD_DETECTION_RELAY_NODE "Build detection_relay_node target" ON)
 option(BUILD_DETECTION_DRIVER_NODE "Build detection_driver_node target" ON)
+option(BUILD_TEST_DRIVER_NODE "Build test_driver_node target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -97,6 +97,10 @@ function(configure_target target_name)
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_TEST_DRIVER_NODE)
+  configure_target(test_driver_node)
+endif()
 
 if(BUILD_YOLO_OBJECT_DETECTION_NODE)
   configure_target(yolo_object_detection_node)

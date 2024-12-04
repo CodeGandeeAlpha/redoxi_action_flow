@@ -16,7 +16,6 @@
   <depend>redoxi_inference</depend>
   <depend>redoxi_dnn_models</depend>
   <depend>yolo8_series</depend>
-  <depend>yolo8_body_pose_detector</depend>
 
   <depend>psg_private_msgs</depend>
   <depend>pluginlib</depend>
