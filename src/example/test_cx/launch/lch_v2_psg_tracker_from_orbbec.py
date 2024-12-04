@@ -49,7 +49,7 @@ source_node_json_params = {
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
-        "step_interval": 10000000,
+        "step_interval": 50000,
         "frame_interval": 0,
         "output_image_encoding": "bgr8",
         "publish_to_debug_topic": True,

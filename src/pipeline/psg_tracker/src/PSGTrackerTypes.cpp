@@ -63,6 +63,7 @@ void ROSTracker::track(const cv::Mat &img, const std::vector<redoxi_public_msgs:
 {
     std::vector<RedoxiTrack::DetectionPtr> det_bodies;
     std::map<RedoxiTrack::DetectionPtr, std::pair<int, redoxi_public_msgs::msg::Detection>> det_bodies2msg_detections;
+    RDX_INFO_DEV(nullptr, __func__, false, "{}", "正在将检测结果转换为内部格式");
     _msg_dets_to_body_dets(detections, det_bodies, det_bodies2msg_detections);
 
     // // test log
@@ -71,9 +72,15 @@ void ROSTracker::track(const cv::Mat &img, const std::vector<redoxi_public_msgs:
     //                 psg_detection_to_string(det_body).c_str());
     // }
 
+    RDX_INFO_DEV(nullptr, __func__, false, "{}", "清除上一帧的事件处理器");
     m_track_event_handler->clear();
+
+    RDX_INFO_DEV(nullptr, __func__, false, "{}", "开始跟踪处理");
+    RDX_INFO_DEV(nullptr, __func__, false, "det_bodies.size() = {}", det_bodies.size());
+    RDX_INFO_DEV(nullptr, __func__, false, "frame_number = {}", frame_number);
     m_tracker->track(img, det_bodies, frame_number);
 
+    RDX_INFO_DEV(nullptr, __func__, false, "{}", "处理新创建的跟踪目标");
     for (auto &iter : m_track_event_handler->m_det2target_create) {
         auto track_det = iter.first;
         auto track_target = iter.second;
@@ -96,6 +103,7 @@ void ROSTracker::track(const cv::Mat &img, const std::vector<redoxi_public_msgs:
         }
     }
 
+    RDX_INFO_DEV(nullptr, __func__, false, "{}", "处理关联的跟踪目标");
     for (auto &iter : m_track_event_handler->m_det2target_associate) {
         auto track_det = iter.first;
         auto track_target = iter.second;
@@ -118,6 +126,7 @@ void ROSTracker::track(const cv::Mat &img, const std::vector<redoxi_public_msgs:
         }
     }
 
+    RDX_INFO_DEV(nullptr, __func__, false, "{}", "处理已关闭的跟踪目标");
     for (auto &target : m_track_event_handler->m_target_closed) {
         // create track target msg
         redoxi_public_msgs::msg::TrackTarget track_target_msg = _track_target_to_msg(target);
@@ -134,6 +143,7 @@ void ROSTracker::track(const cv::Mat &img, const std::vector<redoxi_public_msgs:
         }
     }
 
+    RDX_INFO_DEV(nullptr, __func__, false, "{}", "更新当前活跃的跟踪目标");
     m_tracked_targets = m_tracker->get_all_open_targets();
 }
 
