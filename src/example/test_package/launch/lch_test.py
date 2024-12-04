@@ -128,6 +128,11 @@ video_source_params = {
                     "name": DetectionDriverNodeName,
                     "action_name": f"/{DetectionDriverNodeName}/{FrameInputActionName}",
                     "delivery_policy": {
+                        "retry_policy": {
+                            "fallback_number_of_retry": 3,
+                            "fallback_wait_time_between_retry": 5000,
+                            "fallback_wait_time_retry_response": 10000000,
+                        },
                         "precondition": "dont_care",
                         "drop_strategy": "no_drop",
                     },
@@ -152,11 +157,11 @@ video_source_params = {
         "output_image_encoding": "rgb8",
         "publish_to_debug_topic": True,
         "frame_enqueue_policy": {
-            "precondition": "any_downstream_ready",
+            "precondition": "dont_care",
             "drop_strategy": "no_drop",
         },
         "_time_unit": "us(1e-6)",
-        "step_interval": StepIntervals.Fast,
+        "step_interval": StepIntervals.VeryFast,
     },
 }
 

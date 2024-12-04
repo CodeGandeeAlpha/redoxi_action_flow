@@ -73,6 +73,9 @@ class SyncActionSender
     using Goal_t = typename ActionType_t::Goal;
     using TimeUnit_t = DurationType;
 
+    //! time value to wait indefinitely
+    inline static constexpr TimeUnit_t InfiniteWaitTime = TimeUnit_t(-1);
+
     /**
      * @brief The result of sending a goal to downstream action server
      * @details If response_code is set to ACCEPTED, it means the goal is accepted,
@@ -211,7 +214,7 @@ class SyncActionSender
         SendResult_t send(
             const Goal_t &goal,
             ActionClient_t &client,
-            DurationType timeout = DurationType(-1),
+            DurationType timeout = InfiniteWaitTime,
             std::optional<typename ActionClient_t::SendGoalOptions> callbacks = std::nullopt,
             std::optional<WaitTimeoutCallback_t> timeout_callback = std::nullopt)
     const
@@ -247,10 +250,10 @@ class SyncActionSender
         std::string msg_uuid_str = has_data_trait ? fmt::format("[msg_uuid={}]{}", boost::uuids::to_string(msg_uuid), is_ping ? "[PING] " : " ") : "";
 
         //! Handle waiting behavior
-        if (timeout > DurationType::zero()) {
+        if (timeout >= DurationType::zero()) {
             //! try to wait for the goal response, if timeout, handle the timeout until we get a definite response
             //! or the user decides to abort
-            while (true) {
+            while (true && rclcpp::ok()) {
                 // wait once
                 RDX_LOG_DEBUG(m_node, __func__, "{}start waiting for goal response for {} {}",
                               msg_uuid_str, timeout.count(), _get_time_unit_name<TimeUnit_t>());

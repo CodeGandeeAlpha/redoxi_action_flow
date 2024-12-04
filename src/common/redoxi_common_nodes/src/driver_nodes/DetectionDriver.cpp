@@ -33,6 +33,9 @@ int DetectionDriver::_on_process_input_request(InputRequestHandler_t::OutputRequ
     auto msg_uuid = InputTypes::ActionDataTrait_t::get_uuid(*source_data->get_goal());
     auto msg_uuid_str = boost::uuids::to_string(msg_uuid);
 
+    const auto frame_number = source_data->get_goal()->frame.metadata.frame_num;
+    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Processing frame number {}", msg_uuid_str, frame_number);
+
     // create request
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Creating request from source data", msg_uuid_str);
     CalleeTypes::RequestOutputSourceData_t output_source_data;
