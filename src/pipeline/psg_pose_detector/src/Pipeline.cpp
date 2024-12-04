@@ -22,6 +22,7 @@ struct PSGPoseDetectorImpl {
         std::shared_ptr<ModelResultPromise> promise;
         ModelResultFuture future;
         std::shared_ptr<PSGPoseDetectorNode::OutputSourceDataModel_t> source_data;
+        ControlSignalCode control_signal_code;
     };
 
     //! ros time token
@@ -388,7 +389,9 @@ int PSGPoseDetectorNode::_create_detections_request_handler(const RuntimeConfig_
             RDX_INFO_DEV(this, __func__, true, "{}", "获取控制信号");
             auto goal_handle = source_data->get_goal_handle_future().get();
             auto control_signal_code = InputDataTrait_t::get_control_signal_code(*source_data->get_goal());
-
+            RDX_INFO_DEV(this, __func__, true,
+                         "on_process_input_data()中frame num: {}, control signal code: {}",
+                         source_data->get_goal()->document.frame.metadata.frame_num, int(control_signal_code));
             //! 创建传输请求
             RDX_INFO_DEV(this, __func__, true, "{}", "创建传输请求");
             auto delivery_request = _create_delivery_request(output_model_source_data, control_signal_code);
@@ -451,6 +454,7 @@ int PSGPoseDetectorNode::_on_deliver_to_downstream_finish(TargetDataModel_t &tar
     output_model_result.promise = std::make_shared<ModelResultPromise>();
     output_model_result.future = output_model_result.promise->get_future().share();
     output_model_result.source_data = std::make_shared<OutputSourceDataModel_t>(request.get_source_data());
+    output_model_result.control_signal_code = request.get_control_signal_code();
 
     //! 3. 将output_model_result推送到buffer中
     m_impl->m_model_result_buffer.push(output_model_result);
@@ -625,12 +629,19 @@ void PSGPoseDetectorNode::_get_model_result()
         }
         output_pipeline_source_data.set_document(*document);
         // create pipeline delivery request
-        // FIXME: 不添加control signal code，不知道会不会对model node产生影响
+        auto control_signal_code = output_model_result.control_signal_code;
         RDX_LOG_DEBUG(this, __func__, "{}", "开始创建delivery request");
-        auto delivery_request = _create_delivery_request(output_pipeline_source_data, std::nullopt);
+        auto delivery_request = _create_delivery_request(output_pipeline_source_data, control_signal_code);
         // push to output port pipeline
         // this is used for logging
         auto msg_uuid = output_pipeline_source_data.get_uuid();
+
+        // test log
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                     "control signal code: {}", int(control_signal_code));
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                     "document frame num: {}, control signal code: {}",
+                     document->frame.metadata.frame_num, int(document->x_control.code));
 
         // get qos, controls how to retry and drop frames
         RDX_LOG_DEBUG(this, __func__, "{}", "开始获取QoS配置");

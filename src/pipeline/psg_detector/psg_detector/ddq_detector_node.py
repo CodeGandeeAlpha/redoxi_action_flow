@@ -577,6 +577,18 @@ class DetectorNode(Node, IOpenCloseProtocol):
             result.x_return.code = ReturnResponse.SUCCESS
             return result
 
+        # # flush or terminate, 返回一个空的detection但是带上control code
+        # if x_control.code != 0:
+        #     goal_handle.succeed()
+        #     result = ProcessDetectionsByFrame.Result()
+        #     result.x_return.message = "Flush or Terminate or Reset accepted"
+        #     result.x_return.code = ReturnResponse.SUCCESS
+
+        #     detection = Detection()
+        #     detection.x_control.code = x_control.code
+        #     result.detections = [detection]
+        #     return result
+
         frame_msg = goal_handle.request.frame
         self.m_logger.info(
             f"---TIME LOG: framenum {frame_msg.metadata.frame_num} node ddq_detector_node type IN time {self.get_clock().now().nanoseconds}"

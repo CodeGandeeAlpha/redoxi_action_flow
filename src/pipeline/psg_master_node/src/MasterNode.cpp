@@ -237,10 +237,16 @@ int PSGMasterNode::_create_document_request_handler(const RuntimeConfig_t &runti
             OutputSourceData_t output_source_data;
             OutputSourceData_t::DeliverySourceData::PublishMessageType_t msg;
             msg.frame = source_data->m_goal->frame;
-            output_source_data.set_document(msg);
 
             auto goal_handle = source_data->get_goal_handle_future().get();
             auto control_signal_code = InputDataTrait_t::get_control_signal_code(*source_data->get_goal());
+            RDX_INFO_DEV(this, __func__, true,
+                         "on_process_input_data()中frame num: {}, control signal code: {}",
+                         msg.frame.metadata.frame_num, int(control_signal_code));
+            msg.frame.x_control.code = static_cast<int32_t>(control_signal_code);
+            msg.x_control.code = static_cast<int32_t>(control_signal_code);
+            output_source_data.set_document(msg);
+
 
             // create delivery request
             auto delivery_request = _create_delivery_request(output_source_data, control_signal_code);

@@ -39,7 +39,7 @@ video_source_params = {
             ],
             "num_buffer_requests": 1,
             "preserve_request_order": True,
-            "fallback_delivery_precondition": "dont_care",
+            "fallback_delivery_precondition": "no_precondition",
         },
         "create_debug_pub": False,
         "debug_pub_queue_size": 10,
@@ -63,7 +63,7 @@ video_source_params = {
                 "wait_time_retry_response": 5000,
                 "fallback_wait_time_retry_response": 1000000,
             },
-            "precondition": "dont_care",
+            "precondition": "no_precondition",
             "drop_strategy": "no_drop",
         },
         "frame_request_policy": {
@@ -75,7 +75,7 @@ video_source_params = {
                 "wait_time_retry_response": 5000,
                 "fallback_wait_time_retry_response": 1000000,
             },
-            "precondition": "dont_care",
+            "precondition": "no_precondition",
             "drop_strategy": "no_drop",
         },
         "_time_unit": "us(1e-6)",
@@ -105,7 +105,7 @@ psg_master_node_json_params = {
             ],
             "num_buffer_requests": 1,
             "preserve_request_order": True,
-            "fallback_delivery_precondition": "dont_care",
+            "fallback_delivery_precondition": "no_precondition",
         },
         "create_debug_pub": False,
         "_time_unit": "us(1e-6)",
@@ -117,7 +117,7 @@ psg_master_node_json_params = {
         "publish_to_debug_topic": False,
         "enable_blocking_mode": False,
         "frame_request_policy": {
-            "precondition": "dont_care",
+            "precondition": "no_precondition",
             "drop_strategy": "no_drop",
         },
     },
@@ -144,7 +144,7 @@ psg_detector_node_pipeline_json_params = {
             ],
             "num_buffer_requests": 1,
             "preserve_request_order": True,
-            "fallback_delivery_precondition": "any_downstream_ready",
+            "fallback_delivery_precondition": "no_precondition",
         },
         "output_port_model_config": {
             "downstream_specs": [
@@ -161,6 +161,7 @@ psg_detector_node_pipeline_json_params = {
                     },
                 }
             ],
+            "fallback_delivery_precondition": "no_precondition",
         },
         "create_debug_pub": True,
         "_time_unit": "us(1e-6)",
@@ -172,7 +173,7 @@ psg_detector_node_pipeline_json_params = {
         "enable_blocking_mode": False,
         "publish_to_debug_topic": False,
         "frame_request_policy": {
-            "precondition": "dont_care",
+            "precondition": "no_precondition",
             "drop_strategy": "no_drop",
         },
     },
@@ -199,7 +200,7 @@ psg_pose_detector_node_pipeline_json_params = {
             ],
             "num_buffer_requests": 1,
             "preserve_request_order": True,
-            "fallback_delivery_precondition": "any_downstream_ready",
+            "fallback_delivery_precondition": "no_precondition",
         },
         "output_port_model_config": {
             "downstream_specs": [
@@ -227,7 +228,7 @@ psg_pose_detector_node_pipeline_json_params = {
         "enable_blocking_mode": False,
         "publish_to_debug_topic": False,
         "frame_request_policy": {
-            "precondition": "dont_care",
+            "precondition": "no_precondition",
             "drop_strategy": "no_drop",
         },
     },
@@ -254,7 +255,7 @@ psg_person_generator_node_json_params = {
             ],
             "num_buffer_requests": 1,
             "preserve_request_order": True,
-            "fallback_delivery_precondition": "any_downstream_ready",
+            "fallback_delivery_precondition": "no_precondition",
         },
         "create_debug_pub": True,
         "_time_unit": "us(1e-6)",
@@ -266,7 +267,7 @@ psg_person_generator_node_json_params = {
         "frame_interval": 0,
         "publish_to_debug_topic": False,
         "frame_request_policy": {
-            "precondition": "dont_care",
+            "precondition": "no_precondition",
             "drop_strategy": "no_drop",
         },
     },
@@ -293,7 +294,7 @@ psg_tracker_node_pipeline_json_params = {
             ],
             "num_buffer_requests": 1,
             "preserve_request_order": True,
-            "fallback_delivery_precondition": "any_downstream_ready",
+            "fallback_delivery_precondition": "no_precondition",
         },
         "output_port_model_config": {
             "downstream_specs": [
@@ -321,7 +322,7 @@ psg_tracker_node_pipeline_json_params = {
         "enable_blocking_mode": False,
         "publish_to_debug_topic": False,
         "frame_request_policy": {
-            "precondition": "dont_care",
+            "precondition": "no_precondition",
             "drop_strategy": "no_drop",
         },
     },
@@ -342,7 +343,7 @@ psg_tracker_node_json_params = {
         "enable_debug_topics": False,
         "publish_to_debug_topic": False,
         "frame_request_policy": {
-            "precondition": "dont_care",
+            "precondition": "no_precondition",
             "drop_strategy": "no_drop",
         },
     },
