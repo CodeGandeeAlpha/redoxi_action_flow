@@ -161,12 +161,15 @@ class PullProcessSendHandler
             if (process_result != 0) {
                 RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Processing input data failed, releasing resource token", msg_uuid_str);
                 release_token(resource_token);
-                try {
-                    // FIXME: this might throw an exception if the goal on the client side is terminated
-                    // saying: asked to send result for goal that does not exist
-                    goal_handle->abort(action_result);
-                } catch (const std::exception &e) {
-                    RDX_LOG_ERROR(nullptr, __func__, true, "[msg_uuid={}] Failed to mark goal as aborted: {}", msg_uuid_str, e.what());
+                if (rclcpp::ok()) {
+                    // only abort the goal if the node is still running
+                    try {
+                        // FIXME: this might throw an exception if the goal on the client side is terminated
+                        // saying: asked to send result for goal that does not exist
+                        goal_handle->abort(action_result);
+                    } catch (const std::exception &e) {
+                        RDX_LOG_ERROR(nullptr, __func__, true, "[msg_uuid={}] Failed to mark goal as aborted: {}", msg_uuid_str, e.what());
+                    }
                 }
                 return ProcessResult::Error;
             }
@@ -189,13 +192,16 @@ class PullProcessSendHandler
             if (!sent) {
                 RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Failed to send data to output port, releasing resource token", msg_uuid_str);
                 release_token(resource_token);
-                try {
-                    // FIXME: this might throw an exception if the goal on the client side is terminated
-                    // saying: asked to send result for goal that does not exist
-                    goal_handle->succeed(action_result);
-                } catch (const std::exception &e) {
-                    RDX_LOG_ERROR(nullptr, __func__, true, "[msg_uuid={}] Failed to mark goal as success: {}", msg_uuid_str, e.what());
-                    return ProcessResult::Error;
+                if (rclcpp::ok()) {
+                    // only succeed the goal if the node is still running
+                    try {
+                        // FIXME: this might throw an exception if the goal on the client side is terminated
+                        // saying: asked to send result for goal that does not exist
+                        goal_handle->succeed(action_result);
+                    } catch (const std::exception &e) {
+                        RDX_LOG_ERROR(nullptr, __func__, true, "[msg_uuid={}] Failed to mark goal as success: {}", msg_uuid_str, e.what());
+                        return ProcessResult::Error;
+                    }
                 }
                 return ProcessResult::FailedToSend;
             } else {
@@ -209,11 +215,14 @@ class PullProcessSendHandler
 
         // done
         RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Done, marking goal as success", msg_uuid_str);
-        try {
-            goal_handle->succeed(action_result);
-        } catch (const std::exception &e) {
-            RDX_LOG_ERROR(nullptr, __func__, true, "[msg_uuid={}] Failed to mark goal as success: {}", msg_uuid_str, e.what());
-            return ProcessResult::Error;
+        if (rclcpp::ok()) {
+            // only succeed the goal if the node is still running
+            try {
+                goal_handle->succeed(action_result);
+            } catch (const std::exception &e) {
+                RDX_LOG_ERROR(nullptr, __func__, true, "[msg_uuid={}] Failed to mark goal as success: {}", msg_uuid_str, e.what());
+                return ProcessResult::Error;
+            }
         }
         return ProcessResult::Success;
     }

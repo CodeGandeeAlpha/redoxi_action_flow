@@ -17,15 +17,6 @@ int UniversalMotTrackerNode::_update_init_config(std::shared_ptr<BaseInitConfig_
 {
     auto init_config = std::static_pointer_cast<InitConfig_t>(config);
 
-    // create tracker
-    {
-        RDX_INFO_DEV(this, __func__, "{}", "Creating tracker");
-        auto ret = _create_tracker(*init_config);
-        if (ret != 0) {
-            RDX_RAISE_ERROR("{}", "Failed to create tracker");
-        }
-    }
-
     // create port
     {
         RDX_INFO_DEV(this, __func__, "{}", "Creating port");
@@ -54,14 +45,15 @@ int UniversalMotTrackerNode::_update_init_config(std::shared_ptr<BaseInitConfig_
 
 int UniversalMotTrackerNode::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config)
 {
-    auto runtime_config = std::static_pointer_cast<RuntimeConfig_t>(config);
-    auto init_config = std::static_pointer_cast<InitConfig_t>(m_init_config);
-    {
-        auto ret = _create_input_port_handler(*init_config, *runtime_config);
-        if (ret != 0) {
-            RDX_RAISE_ERROR("{}", "Failed to create input port handler");
-        }
-    }
+    (void)config;
+    // auto runtime_config = std::static_pointer_cast<RuntimeConfig_t>(config);
+    // auto init_config = std::static_pointer_cast<InitConfig_t>(m_init_config);
+    // {
+    //     auto ret = _create_input_port_handler(*init_config, *runtime_config);
+    //     if (ret != 0) {
+    //         RDX_RAISE_ERROR("{}", "Failed to create input port handler");
+    //     }
+    // }
     // nothing to do
     return 0;
 }
@@ -298,4 +290,63 @@ int UniversalMotTrackerNode::_create_tracker(const InitConfig_t &init_config)
     return 0;
 }
 
+void UniversalMotTrackerNode::_step()
+{
+    if (m_input_port_handler) {
+        m_input_port_handler->process_and_reply();
+    }
+}
+
+int UniversalMotTrackerNode::_open()
+{
+    auto init_config = std::static_pointer_cast<InitConfig_t>(m_init_config);
+
+    // recreate tracker on each open
+    {
+        RDX_INFO_DEV(this, __func__, "{}", "Creating tracker");
+        auto ret = _create_tracker(*init_config);
+        if (ret != 0) {
+            RDX_RAISE_ERROR("{}", "Failed to create tracker");
+        }
+    }
+    return 0;
+}
+
+int UniversalMotTrackerNode::_start()
+{
+    // recreate input port handler on each start
+    auto runtime_config = std::static_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+    auto init_config = std::static_pointer_cast<InitConfig_t>(m_init_config);
+    {
+        RDX_INFO_DEV(this, __func__, "{}", "Creating input port handler");
+        auto ret = _create_input_port_handler(*init_config, *runtime_config);
+        if (ret != 0) {
+            RDX_RAISE_ERROR("{}", "Failed to create input port handler");
+        }
+    }
+
+    // start input port
+    if (m_input_port) {
+        m_input_port->start();
+    }
+    return 0;
+}
+
+int UniversalMotTrackerNode::_stop()
+{
+    // stop input port
+    if (m_input_port) {
+        m_input_port->stop();
+    }
+    return 0;
+}
+
+int UniversalMotTrackerNode::_close()
+{
+    // finish all tracking tasks
+    if (m_impl->m_tracker_impl && m_impl->m_tracker_impl->m_tracker) {
+        m_impl->m_tracker_impl->m_tracker->finish_track();
+    }
+    return 0;
+}
 } // namespace redoxi_works::model_nodes::universal_mot_trackers

@@ -388,13 +388,14 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
             cv::Mat input_image;
             auto ret_extract_image = _extract_image(&input_image, source_data);
             if (ret_extract_image != 0) {
-                RDX_RAISE_ERROR("[f={}] [msg_uid={}] Failed to extract image from input data, error code: {}",
-                                __func__, msg_uuid_str, ret_extract_image);
+                RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Failed to extract image from input data, error code: {}",
+                             msg_uuid_str, ret_extract_image);
+                return -1;
             }
 
             if (input_image.empty()) {
-                RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Empty image, aborting goal", msg_uuid_str);
-                return -1;
+                RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Extracted empty image, no detection will be done", msg_uuid_str);
+                return 0;
             }
 
             // Perform inference

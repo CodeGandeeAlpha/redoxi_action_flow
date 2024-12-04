@@ -178,6 +178,12 @@ class AsyncActionInputPort : public IStartStopProtocol
         return data;
     }
 
+    //! Get the action server for custom usage
+    auto get_action_server() const
+    {
+        return m_action_server;
+    }
+
   protected:
     //! Reset the queue, clear all data and wake up all waiting threads
     void _reset_queue()
