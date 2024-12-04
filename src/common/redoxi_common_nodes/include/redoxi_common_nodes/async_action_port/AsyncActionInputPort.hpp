@@ -528,4 +528,13 @@ class AsyncActionInputPort : public IStartStopProtocol
     std::atomic<int> m_status = NodeStatusCode::BEFORE_INIT;
 };
 
+
+//! Concept to enforce a type to be convertible to AsyncActionInputPort
+template <typename T>
+concept AsyncActionInputPortConcept = requires(T a)
+{
+    {std::is_base_of_v<AsyncActionInputPort<typename T::MasterSpec_t>, T>};
+};
+
+
 } // namespace redoxi_works

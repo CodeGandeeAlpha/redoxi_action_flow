@@ -131,21 +131,33 @@ static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
               "DeliveryTask must satisfy DeliveryTaskConcept");
 
 //! Downstream debug publisher type for detection request output port
-using DownstreamDebugPublisher = redoxi_works::image_ports::types::DownstreamDebugPublisher;
+// using DownstreamDebugPublisher = redoxi_works::image_ports::types::DownstreamDebugPublisher;
+
+//! Downstream spec type with image publisher for detection request output port
+// using DownstreamSpec = redoxi_works::image_ports::types::DownstreamSpecWithImagePub<
+//     DetectionRequestActionType, DeliveryPolicy>;
+// static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
+//               "DownstreamSpec must satisfy DownstreamSpecConcept");
+
+
+using Downstream = image_ports::types::DownstreamBaseWithImagePub<
+    DetectionRequestActionType, DeliveryPolicy>;
+// using DownstreamDebugPublisher = Downstream::SourcePublisherType_t;
+using DownstreamSpec = Downstream::DownstreamSpec_t;
 
 //! Downstream spec type for detection request output port
-using DownstreamSpec = output_port_types::DefaultDownstreamSpec<DetectionRequestActionType,
-                                                                DeliveryPolicy,
-                                                                DownstreamDebugPublisher,
-                                                                DownstreamDebugPublisher>;
-static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
-              "DownstreamSpec must satisfy DownstreamSpecConcept");
+// using DownstreamSpec = output_port_types::DefaultDownstreamSpec<DetectionRequestActionType,
+//                                                                 DeliveryPolicy,
+//                                                                 DownstreamDebugPublisher,
+//                                                                 DownstreamDebugPublisher>;
+// static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
+//               "DownstreamSpec must satisfy DownstreamSpecConcept");
 
 //! Init config type for detection request output port
 using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;
 
 //! Downstream type for detection request output port
-using Downstream = output_port_types::DefaultDownstream<DownstreamSpec>;
+// using Downstream = output_port_types::DefaultDownstream<DownstreamSpec>;
 
 //! Detection request output port spec
 struct DetectionRequestOutputPortSpec {
@@ -175,7 +187,7 @@ struct DetectionRequestOutputPortSpec {
     using SourcePublishMessageType_t = DeliverySourceData::PublishMessageType_t;
 
     //! Source data publisher type
-    using SourcePublisherType_t = DownstreamDebugPublisher;
+    using SourcePublisherType_t = DownstreamSpec::SourcePublisherType_t;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
@@ -184,7 +196,7 @@ struct DetectionRequestOutputPortSpec {
     using TargetPublishMessageType_t = DeliveryTargetData::PublishMessageType_t;
 
     //! Target data publisher type
-    using TargetPublisherType_t = DownstreamDebugPublisher;
+    using TargetPublisherType_t = DownstreamSpec::TargetPublisherType_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;

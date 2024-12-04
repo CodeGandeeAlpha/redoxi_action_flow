@@ -11,7 +11,6 @@
 #include <redoxi_public_msgs/action/process_frame.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 
-
 // default types for the async action output port
 namespace redoxi_works
 {

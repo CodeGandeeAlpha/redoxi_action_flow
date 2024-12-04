@@ -307,97 +307,196 @@ class DownstreamDebugPublisher
     double m_header_scale = DefaultHeaderScale;
 };
 
-//! Downstream spec type for image output port
-using DownstreamSpec = output_port_types::DefaultDownstreamSpec<
-    DeliveryActionType,
-    DeliveryPolicy,
-    DownstreamDebugPublisher,
-    DownstreamDebugPublisher>;
+//! Downstream spec type with image publisher for image output port
+template <RosActionConcept ActionType,
+          output_port_types::DeliveryPolicyConcept DeliveryPolicyType>
+class DownstreamSpecWithImagePub : public output_port_types::DefaultDownstreamSpec<
+                                       ActionType,
+                                       DeliveryPolicyType,
+                                       DownstreamDebugPublisher,
+                                       DownstreamDebugPublisher>
+{
+};
+static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpecWithImagePub<DeliveryActionType, DeliveryPolicy>>,
+              "DownstreamSpecWithImagePub must satisfy DownstreamSpecConcept");
+
+//! Downstream spec type with image publisher for image output port
+using DownstreamSpec = DownstreamSpecWithImagePub<DeliveryActionType, DeliveryPolicy>;
 static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
               "DownstreamSpec must satisfy DefaultDownstreamSpecConcept");
 
-//! Init config type for image output port
-using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;
-
-//! Downstream type for image output port
-using DownstreamBase = output_port_types::DefaultDownstream<DownstreamSpec>;
-class Downstream : public DownstreamBase
+//! Downstream base type with image publisher for image output port
+template <RosActionConcept ActionType,
+          output_port_types::DeliveryPolicyConcept DeliveryPolicyType>
+class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
+                                       DownstreamSpecWithImagePub<ActionType, DeliveryPolicyType>>
 {
   public:
-    Downstream()
-    {
-        static_assert(output_port_types::DownstreamConcept<Downstream>,
-                      "DownstreamSpec must satisfy DefaultDownstreamSpecConcept");
-    }
+    using DownstreamBase_t = output_port_types::DefaultDownstream<DownstreamSpecWithImagePub<ActionType, DeliveryPolicyType>>;
+    using typename DownstreamBase_t::DownstreamSpec_t;
 
-    virtual int init_by_spec(const DownstreamSpec &spec, rclcpp::Node *node)
+    virtual int init_by_spec(const DownstreamSpec_t &spec, rclcpp::Node *node)
     {
-        auto ret = DownstreamBase::init_by_spec(spec, node);
+        auto ret = DownstreamBase_t::init_by_spec(spec, node);
         if (ret != 0) {
             RDX_RAISE_ERROR("[{}] failed to initialize downstream", __func__);
         }
-        auto qos_source = DownstreamSpec::SourcePublisherType_t::DefaultQoS;
-        auto qos_target = DownstreamSpec::TargetPublisherType_t::DefaultQoS;
-        using SourceInnerPublisherType = DownstreamSpec::SourcePublisherType_t::Publisher_t;
-        using TargetInnerPublisherType = DownstreamSpec::TargetPublisherType_t::Publisher_t;
+        auto qos_source = DownstreamSpec_t::SourcePublisherType_t::DefaultQoS;
+        auto qos_target = DownstreamSpec_t::TargetPublisherType_t::DefaultQoS;
+        using SourceInnerPublisherType = typename DownstreamSpec_t::SourcePublisherType_t::Publisher_t;
+        using TargetInnerPublisherType = typename DownstreamSpec_t::TargetPublisherType_t::Publisher_t;
 
         {
             auto topic = spec.get_debug_topic_source_data_failed();
-            if (topic.has_value()) {
-                m_debug_pub_source_data_failed = std::make_shared<DownstreamDebugPublisher>();
+            if (topic.has_value() && spec.get_use_debug_publish()) {
+                this->m_debug_pub_source_data_failed = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<SourceInnerPublisherType>(node, topic.value(), qos_source);
-                m_debug_pub_source_data_failed->init(pub);
+                this->m_debug_pub_source_data_failed->init(pub);
             }
         }
 
         {
             auto topic = spec.get_debug_topic_source_data_sending();
-            if (topic.has_value()) {
-                m_debug_pub_source_data_sending = std::make_shared<DownstreamDebugPublisher>();
+            if (topic.has_value() && spec.get_use_debug_publish()) {
+                this->m_debug_pub_source_data_sending = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<SourceInnerPublisherType>(node, topic.value(), qos_source);
-                m_debug_pub_source_data_sending->init(pub);
+                this->m_debug_pub_source_data_sending->init(pub);
             }
         }
 
         {
             auto topic = spec.get_debug_topic_source_data_succeeded();
-            if (topic.has_value()) {
-                m_debug_pub_source_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
+            if (topic.has_value() && spec.get_use_debug_publish()) {
+                this->m_debug_pub_source_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<SourceInnerPublisherType>(node, topic.value(), qos_source);
-                m_debug_pub_source_data_succeeded->init(pub);
+                this->m_debug_pub_source_data_succeeded->init(pub);
             }
         }
 
         {
             auto topic = spec.get_debug_topic_target_data_sending();
-            if (topic.has_value()) {
-                m_debug_pub_target_data_sending = std::make_shared<DownstreamDebugPublisher>();
+            if (topic.has_value() && spec.get_use_debug_publish()) {
+                this->m_debug_pub_target_data_sending = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<TargetInnerPublisherType>(node, topic.value(), qos_target);
-                m_debug_pub_target_data_sending->init(pub);
+                this->m_debug_pub_target_data_sending->init(pub);
             }
         }
 
         {
             auto topic = spec.get_debug_topic_target_data_succeeded();
-            if (topic.has_value()) {
-                m_debug_pub_target_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
+            if (topic.has_value() && spec.get_use_debug_publish()) {
+                this->m_debug_pub_target_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<TargetInnerPublisherType>(node, topic.value(), qos_target);
-                m_debug_pub_target_data_succeeded->init(pub);
+                this->m_debug_pub_target_data_succeeded->init(pub);
             }
         }
 
         {
             auto topic = spec.get_debug_topic_target_data_failed();
-            if (topic.has_value()) {
-                m_debug_pub_target_data_failed = std::make_shared<DownstreamDebugPublisher>();
+            if (topic.has_value() && spec.get_use_debug_publish()) {
+                this->m_debug_pub_target_data_failed = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<TargetInnerPublisherType>(node, topic.value(), qos_target);
-                m_debug_pub_target_data_failed->init(pub);
+                this->m_debug_pub_target_data_failed->init(pub);
             }
         }
 
         return 0;
     }
 };
+using Downstream = DownstreamBaseWithImagePub<DeliveryActionType, DeliveryPolicy>;
+static_assert(output_port_types::DownstreamConcept<Downstream>,
+              "DownstreamSpec must satisfy DefaultDownstreamSpecConcept");
+
+//! Downstream spec type for image output port
+// using DownstreamSpec = output_port_types::DefaultDownstreamSpec<
+//     DeliveryActionType,
+//     DeliveryPolicy,
+//     DownstreamDebugPublisher,
+//     DownstreamDebugPublisher>;
+
+
+//! Init config type for image output port
+using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;
+
+//! Downstream type for image output port
+// using DownstreamBase = output_port_types::DefaultDownstream<DownstreamSpec>;
+// class Downstream : public DownstreamBase
+// {
+//   public:
+//     Downstream()
+//     {
+//         static_assert(output_port_types::DownstreamConcept<Downstream>,
+//                       "DownstreamSpec must satisfy DefaultDownstreamSpecConcept");
+//     }
+
+//     virtual int init_by_spec(const DownstreamSpec &spec, rclcpp::Node *node)
+//     {
+//         auto ret = DownstreamBase::init_by_spec(spec, node);
+//         if (ret != 0) {
+//             RDX_RAISE_ERROR("[{}] failed to initialize downstream", __func__);
+//         }
+//         auto qos_source = DownstreamSpec::SourcePublisherType_t::DefaultQoS;
+//         auto qos_target = DownstreamSpec::TargetPublisherType_t::DefaultQoS;
+//         using SourceInnerPublisherType = DownstreamSpec::SourcePublisherType_t::Publisher_t;
+//         using TargetInnerPublisherType = DownstreamSpec::TargetPublisherType_t::Publisher_t;
+
+//         {
+//             auto topic = spec.get_debug_topic_source_data_failed();
+//             if (topic.has_value()) {
+//                 m_debug_pub_source_data_failed = std::make_shared<DownstreamDebugPublisher>();
+//                 auto pub = std::make_shared<SourceInnerPublisherType>(node, topic.value(), qos_source);
+//                 m_debug_pub_source_data_failed->init(pub);
+//             }
+//         }
+
+//         {
+//             auto topic = spec.get_debug_topic_source_data_sending();
+//             if (topic.has_value()) {
+//                 m_debug_pub_source_data_sending = std::make_shared<DownstreamDebugPublisher>();
+//                 auto pub = std::make_shared<SourceInnerPublisherType>(node, topic.value(), qos_source);
+//                 m_debug_pub_source_data_sending->init(pub);
+//             }
+//         }
+
+//         {
+//             auto topic = spec.get_debug_topic_source_data_succeeded();
+//             if (topic.has_value()) {
+//                 m_debug_pub_source_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
+//                 auto pub = std::make_shared<SourceInnerPublisherType>(node, topic.value(), qos_source);
+//                 m_debug_pub_source_data_succeeded->init(pub);
+//             }
+//         }
+
+//         {
+//             auto topic = spec.get_debug_topic_target_data_sending();
+//             if (topic.has_value()) {
+//                 m_debug_pub_target_data_sending = std::make_shared<DownstreamDebugPublisher>();
+//                 auto pub = std::make_shared<TargetInnerPublisherType>(node, topic.value(), qos_target);
+//                 m_debug_pub_target_data_sending->init(pub);
+//             }
+//         }
+
+//         {
+//             auto topic = spec.get_debug_topic_target_data_succeeded();
+//             if (topic.has_value()) {
+//                 m_debug_pub_target_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
+//                 auto pub = std::make_shared<TargetInnerPublisherType>(node, topic.value(), qos_target);
+//                 m_debug_pub_target_data_succeeded->init(pub);
+//             }
+//         }
+
+//         {
+//             auto topic = spec.get_debug_topic_target_data_failed();
+//             if (topic.has_value()) {
+//                 m_debug_pub_target_data_failed = std::make_shared<DownstreamDebugPublisher>();
+//                 auto pub = std::make_shared<TargetInnerPublisherType>(node, topic.value(), qos_target);
+//                 m_debug_pub_target_data_failed->init(pub);
+//             }
+//         }
+
+//         return 0;
+//     }
+// };
 
 //! Image output port spec
 //! This type must satisfy the AsyncActionOutputPortSpecConcept
