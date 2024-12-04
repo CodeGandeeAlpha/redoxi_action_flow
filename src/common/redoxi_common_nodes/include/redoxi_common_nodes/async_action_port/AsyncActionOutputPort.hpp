@@ -862,6 +862,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                                             __func__, ds.get_downstream_spec().get_name());
                     }
                 } else {
+                    // TODO: this branch is not necessary anymore, it should never reach here
                     // may or maynot have a response code, check the goal handle future
                     if (wait_indefinitely) {
                         //! Wait indefinitely for the goal handle future
