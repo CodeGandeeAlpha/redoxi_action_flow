@@ -823,6 +823,10 @@ class AsyncActionOutputPort : public IStartStopProtocol
                         case ActionDownstreamResponse::TIMEOUT:
                             RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while sending frame to downstream {}",
                                          boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
+
+                            // FIXME: should not resend if timeout, we should wait again until we get a definite response
+                            // BUG: should not resend if timeout, we should wait again until we get a definite response
+                            // otherwise, downstream may receive overlapping messages
                             break;
                     }
                 } else {
