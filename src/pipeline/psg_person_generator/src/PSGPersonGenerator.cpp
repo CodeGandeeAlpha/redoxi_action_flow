@@ -241,7 +241,7 @@ int PSGPersonGenerator::_create_document_request_handler(const RuntimeConfig_t &
         [this](ProcessHandler_t::OutputRequest_t *output_request,
                std::optional<ProcessHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
                ProcessHandler_t::InputActionResult_t *action_result,
-               std::shared_ptr<InputSourceData_t> source_data,
+               std::shared_ptr<const InputSourceData_t> source_data,
                ProcessHandler_t::ResourceToken_t &resource) {
             // process document, copy the document msg because the original one is const, cannot be modified
             psg_private_msgs::msg::PsgDocument document_msg;

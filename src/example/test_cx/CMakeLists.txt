@@ -30,6 +30,7 @@ set(DEPENDENCIES
     psg_person_generator
     psg_pose_detector
     video_reader_orbbec
+    video_reader_from_url
     psg_tracker
     pluginlib)
 
@@ -73,6 +74,7 @@ option(BUILD_TEST_V2_PSG_POSE_DETECTOR "Build test_v2_psg_pose_detector target" 
 option(BUILD_TEST_V2_ORBBEC_VIDEO_SOURCE "Build test_v2_orbbec_video_source target" ON)
 option(BUILD_TEST_V2_PSG_TRACKER_PIPELINE "Build test_v2_psg_tracker_pipeline target" ON)
 option(BUILD_TEST_V2_PSG_TRACKER "Build test_v2_psg_tracker target" ON)
+option(BUILD_TEST_V2_VIDEO_URL_FLUSH "Build test_v2_video_url_flush target" ON)
 # Function to configure a target
 function(configure_target target_name)
   add_executable(${target_name} src/${target_name}.cpp)
@@ -191,6 +193,10 @@ endif()
 
 if(BUILD_TEST_V2_PSG_TRACKER)
   configure_target(v2_psg_tracker)
+endif()
+
+if(BUILD_TEST_V2_VIDEO_URL_FLUSH)
+  configure_target(v2_video_url_flush)
 endif()
 
 # Install targets

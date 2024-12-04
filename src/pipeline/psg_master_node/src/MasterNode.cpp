@@ -231,7 +231,7 @@ int PSGMasterNode::_create_document_request_handler(const RuntimeConfig_t &runti
         [this](ProcessHandler_t::OutputRequest_t *output_request,
                std::optional<ProcessHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
                ProcessHandler_t::InputActionResult_t *action_result,
-               std::shared_ptr<InputSourceData_t> source_data,
+               std::shared_ptr<const InputSourceData_t> source_data,
                ProcessHandler_t::ResourceToken_t &resource) {
             // from input source data to output source data
             OutputSourceData_t output_source_data;
@@ -251,6 +251,10 @@ int PSGMasterNode::_create_document_request_handler(const RuntimeConfig_t &runti
             // create delivery request
             auto delivery_request = _create_delivery_request(output_source_data, control_signal_code);
             *output_request = delivery_request;
+
+            RDX_INFO_DEV(this, __func__, true,
+                         "output_request signal code: {}",
+                         control_signal_code_to_string(output_request->get_control_signal_code()));
 
             // fill the action result, nothing to do
             (void)action_result;

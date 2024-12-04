@@ -362,7 +362,7 @@ int PSGPoseDetectorNode::_create_detections_request_handler(const RuntimeConfig_
         [this](ProcessHandler_t::OutputRequest_t *output_request,
                std::optional<ProcessHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
                ProcessHandler_t::InputActionResult_t *action_result,
-               std::shared_ptr<InputSourceData_t> source_data,
+               std::shared_ptr<const InputSourceData_t> source_data,
                ProcessHandler_t::ResourceToken_t &resource) {
             // 将document数据放入document map中
             m_impl->m_document_map.synchronize()->insert({source_data->get_goal()->document.frame.metadata.frame_num,

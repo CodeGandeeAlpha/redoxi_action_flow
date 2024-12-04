@@ -79,7 +79,7 @@ video_source_params = {
             "drop_strategy": "no_drop",
         },
         "_time_unit": "us(1e-6)",
-        "step_interval": 50000,
+        "step_interval": 10000000,
     },
 }
 
@@ -369,8 +369,8 @@ common_prefix = None
 common_ros_args = []
 
 video_source_node = Node(
-    package="test_package",
-    executable="video_from_url_node",
+    package="test_cx",
+    executable="v2_video_url_flush",
     name="video_source",
     namespace="video_source",
     output="screen",

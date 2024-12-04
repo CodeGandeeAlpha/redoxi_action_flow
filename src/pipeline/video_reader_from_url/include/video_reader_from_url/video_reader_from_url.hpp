@@ -7,14 +7,13 @@
 namespace redoxi_works
 {
 
-class VideoReaderFromUrl : public VideoSourceFromUrl
+class VideoReaderFromUrl : public video_readers::VideoSourceFromUrl
 {
   public:
     using VideoSourceFromUrl::VideoSourceFromUrl;
 
   protected:
-    virtual ReadFrameResult _read_frame(SourceData_t &source_data,
-                                        std::atomic<int64_t> &frame_number) override;
+    virtual int _on_before_request_enqueue(DeliveryRequest_t &request, DeliveryPolicy_t &enqueue_policy) override;
 };
 
 } // namespace redoxi_works

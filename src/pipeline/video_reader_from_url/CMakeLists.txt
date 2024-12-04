@@ -8,6 +8,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
+find_package(redoxi_video_reader REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -22,6 +23,11 @@ target_include_directories(video_reader_from_url PUBLIC
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
 target_compile_definitions(video_reader_from_url PRIVATE "VIDEO_READER_FROM_URL_BUILDING_LIBRARY")
+
+ament_target_dependencies(
+  video_reader_from_url PUBLIC
+  redoxi_video_reader
+)
 
 install(
   DIRECTORY include/
@@ -55,6 +61,11 @@ ament_export_libraries(
 )
 ament_export_targets(
   export_${PROJECT_NAME}
+)
+
+ament_export_dependencies(
+  rclcpp
+  redoxi_video_reader
 )
 
 ament_package()

@@ -20,7 +20,6 @@ PackagesToBuild="redoxi_common_nodes \
                  redoxi_shm_v6d \
                  redoxi_inference \
                  test_cx \
-                 test_package \
                  rosboard \
                  psg_common \
                  psg_master_node \
@@ -31,7 +30,8 @@ PackagesToBuild="redoxi_common_nodes \
                  psg_pose_detector \
                  psg_tracker \
                  video_reader_orbbec \
-                 redoxi_video_reader"
+                 redoxi_video_reader \
+                 video_reader_from_url"
 
 
 # PackagesToBuild="
