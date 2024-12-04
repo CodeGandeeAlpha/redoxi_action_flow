@@ -158,7 +158,7 @@ video_source_params = {
             "drop_strategy": "no_drop",
         },
         "_time_unit": "us(1e-6)",
-        "step_interval": StepIntervals.VeryFast,
+        "step_interval": StepIntervals.Fast,
     },
 }
 
@@ -192,24 +192,7 @@ detection_driver_params = {
             "action_name": FrameInputActionName,
             "goal_result_expire_time": 1000000,
         },
-        "detection_request_output_port_config": {
-            "_action_goal_type": "redoxi_public_msgs/action/ProcessDetectionsByFrame_Goal",
-            "downstream_specs": [
-                {
-                    "name": DetectionNodeName,
-                    "action_name": f"/{DetectionNodeName}/{DetectionNodeInputActionName}",
-                    "delivery_policy": {
-                        "precondition": "dont_care",
-                        "drop_strategy": "dont_care",
-                    },
-                    "create_debug_pub": False,
-                },
-            ],
-            "num_buffer_requests": 1,
-            "preserve_request_order": True,
-            "fallback_delivery_precondition": "dont_care",
-        },
-        "detection_response_output_port_config": {
+        "output_port_config": {
             "_action_goal_type": "redoxi_public_msgs/action/ProcessDetections_Goal",
             "downstream_specs": [
                 {
@@ -217,7 +200,7 @@ detection_driver_params = {
                     "action_name": f"/{DetectionRelayNodeName}/{DetectionRelayInputActionName}",
                     "delivery_policy": {
                         "precondition": "dont_care",
-                        "drop_strategy": "dont_care",
+                        "drop_strategy": "no_drop",
                     },
                     "create_debug_pub": False,
                 },
@@ -226,31 +209,45 @@ detection_driver_params = {
             "preserve_request_order": True,
             "fallback_delivery_precondition": "dont_care",
         },
-        "publish_input_topic": "/vis/input",
-        "publish_detection_result_topic": "/vis/detection_result",
+        "callee_request_port_config": {
+            "_action_goal_type": "redoxi_public_msgs/action/ProcessDetectionsByFrame_Goal",
+            "downstream_specs": [
+                {
+                    "name": DetectionNodeName,
+                    "action_name": f"/{DetectionNodeName}/{DetectionNodeInputActionName}",
+                    "delivery_policy": {
+                        "precondition": "dont_care",
+                        "drop_strategy": "no_drop",
+                    },
+                    "create_debug_pub": False,
+                },
+            ],
+            "num_buffer_requests": 1,
+            "preserve_request_order": True,
+            "fallback_delivery_precondition": "dont_care",
+        },
         "_time_unit": "us(1e-6)",
     },
     "runtime_config": {
-        "detection_request_enqueue_policy": {
+        "callee_request_enqueue_policy": {
             "retry_policy": {
                 "fallback_number_of_retry": 3,
                 "fallback_wait_time_between_retry": 5000,
                 "fallback_wait_time_retry_response": 100000,
             },
             "precondition": "dont_care",
-            "drop_strategy": "dont_care",
+            "drop_strategy": "no_drop",
         },
-        "detection_response_enqueue_policy": {
+        "driver_output_enqueue_policy": {
             "retry_policy": {
                 "fallback_number_of_retry": 3,
                 "fallback_wait_time_between_retry": 5000,
                 "fallback_wait_time_retry_response": 100000,
             },
             "precondition": "dont_care",
-            "drop_strategy": "dont_care",
+            "drop_strategy": "no_drop",
         },
-        "enable_visualization": True,
-        "enable_blocking_mode": True,
+        "enable_blocking_mode": False,
         "_time_unit": "us(1e-6)",
         "step_interval": StepIntervals.Fast,
     },

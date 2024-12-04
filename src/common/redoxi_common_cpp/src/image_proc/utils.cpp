@@ -4,6 +4,7 @@
 #include <numeric>
 
 static const std::vector<cv::Scalar> color_palette_rgb = {
+    cv::Scalar(255, 10, 0),    // red
     cv::Scalar(47, 79, 79),    // darkslategray
     cv::Scalar(85, 107, 47),   // darkolivegreen
     cv::Scalar(139, 69, 19),   // saddlebrown

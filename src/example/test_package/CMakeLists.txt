@@ -73,7 +73,7 @@ option(BUILD_YOLO_OBJECT_DETECTION_NODE
        "Build yolo_object_detection_node target" ON)
 option(BUILD_DETECTION_RELAY_NODE "Build detection_relay_node target" ON)
 option(BUILD_DETECTION_DRIVER_NODE "Build detection_driver_node target" ON)
-option(BUILD_TEST_DRIVER_NODE "Build test_driver_node target" ON)
+option(BUILD_TEST_DRIVER_NODE "Build test_driver_node target" OFF)
 
 # Function to configure a target
 function(configure_target target_name)

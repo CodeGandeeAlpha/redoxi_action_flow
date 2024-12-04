@@ -313,7 +313,7 @@ detection_relay_node = Node(
 
 detection_driver_node = Node(
     package="test_package",
-    executable="test_driver_node",
+    executable="detection_driver_node",
     name=DetectionDriverNodeName,
     namespace=DetectionDriverNodeName,
     output="screen",

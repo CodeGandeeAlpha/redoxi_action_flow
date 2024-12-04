@@ -13,7 +13,13 @@
 namespace redoxi_works::common_nodes::drivers
 {
 
+template <AsyncActionInputPortConcept InputPortType,
+          AsyncActionOutputPortConcept OutputPortType,
+          AsyncActionOutputPortConcept CalleeRequestPortType>
 struct CallActionDriverInitConfig;
+
+template <AsyncActionOutputPortConcept OutputPortType,
+          AsyncActionOutputPortConcept CalleeRequestPortType>
 struct CallActionDriverRuntimeConfig;
 
 /*
@@ -22,11 +28,14 @@ struct CallActionDriverRuntimeConfig;
  * as well as defining the callbacks for processing input requests and callee results.
  * It can also be used as a standalone node, using callback functions to execute the processing.
  */
+template <AsyncActionInputPortConcept InputPortType,
+          AsyncActionOutputPortConcept OutputPortType,
+          AsyncActionOutputPortConcept CalleeRequestPortType>
 class CallActionDriverBase : public OpenCloseNode
 {
   public:
-    using InitConfig_t = CallActionDriverInitConfig;
-    using RuntimeConfig_t = CallActionDriverRuntimeConfig;
+    using InitConfig_t = CallActionDriverInitConfig<InputPortType, OutputPortType, CalleeRequestPortType>;
+    using RuntimeConfig_t = CallActionDriverRuntimeConfig<OutputPortType, CalleeRequestPortType>;
 
     using BaseNode_t = OpenCloseNode;
     using BaseInitConfig_t = BaseNode_t::InitConfig_t;
@@ -38,8 +47,8 @@ class CallActionDriverBase : public OpenCloseNode
   public:
     //! types of the input port of this node, which accepts incoming requests
     struct InputTypes {
-        using InputPortSpec_t = redoxi_works::image_ports::types::ImageActionInputPortSpec;
-        using InputPort_t = redoxi_works::image_ports::AsyncImageInputPort;
+        using InputPortSpec_t = typename InputPortType::MasterSpec_t;
+        using InputPort_t = InputPortType;
         using Action_t = typename InputPortSpec_t::ActionType_t;
         using ActionDataTrait_t = typename InputPortSpec_t::ActionDataTrait_t;
         using ActionGoal_t = typename Action_t::Goal;
@@ -49,7 +58,7 @@ class CallActionDriverBase : public OpenCloseNode
 
     //! Types for the callee, that is, the node with action server that processes the request
     struct CalleeTypes {
-        using RequestOutputPort_t = detection_ports::request_response::DetectionRequestOutputPort;
+        using RequestOutputPort_t = CalleeRequestPortType;
         using RequestOutputPortSpec_t = typename RequestOutputPort_t::MasterSpec_t;
         using RequestOutputSourceData_t = typename RequestOutputPort_t::SourceData_t;
         using RequestOutputRequest_t = typename RequestOutputPort_t::DeliveryRequest_t;
@@ -63,12 +72,12 @@ class CallActionDriverBase : public OpenCloseNode
 
     //! types of the output port of this node, which sends out actions to downstream nodes
     struct OutputTypes {
-        using OutputPort_t = detection_ports::response_only::DetectionResponseOutputPort;
+        using OutputPort_t = OutputPortType;
         using OutputPortSpec_t = typename OutputPort_t::MasterSpec_t;
         using OutputSourceData_t = typename OutputPort_t::SourceData_t;
         using OutputRequest_t = typename OutputPort_t::DeliveryRequest_t;
         using OutputAction_t = typename OutputPortSpec_t::ActionType_t;
-        using OutputActionDataTrait_t = OutputPortSpec_t::ActionDataTrait_t;
+        using OutputActionDataTrait_t = typename OutputPortSpec_t::ActionDataTrait_t;
         using OutputActionGoal_t = typename OutputAction_t::Goal;
         using OutputActionResult_t = typename OutputAction_t::Result;
         using OutputDeliveryPolicy_t = typename OutputPort_t::DeliveryPolicy_t;
@@ -79,21 +88,21 @@ class CallActionDriverBase : public OpenCloseNode
                                               typename CalleeTypes::RequestOutputPortSpec_t>;
 
     //! Type alias for the data-processing callback of the input port handler
-    using OnProcessInputRequestCallback_t = std::function<int(InputRequestHandler_t::OutputRequest_t *,
-                                                              std::optional<InputRequestHandler_t::OutputDeliveryPolicy_t> *,
-                                                              InputRequestHandler_t::InputActionResult_t *,
-                                                              std::shared_ptr<const InputTypes::SourceData_t>,
-                                                              InputRequestHandler_t::ResourceToken_t &)>;
+    using OnProcessInputRequestCallback_t = std::function<int(typename InputRequestHandler_t::OutputRequest_t *,
+                                                              std::optional<typename InputRequestHandler_t::OutputDeliveryPolicy_t> *,
+                                                              typename InputRequestHandler_t::InputActionResult_t *,
+                                                              std::shared_ptr<const typename InputTypes::SourceData_t>,
+                                                              typename InputRequestHandler_t::ResourceToken_t &)>;
 
     //! user defined callback for processing input request, called after the internal processing is done
     OnProcessInputRequestCallback_t on_process_input_request;
 
     //! Type alias for creating output request after receiving result from the callee
-    using OnProcessCalleeResultCallback_t = std::function<int(OutputTypes::OutputRequest_t *,
-                                                              OutputTypes::OutputDeliveryPolicy_t *,
-                                                              std::shared_ptr<const CalleeTypes::RequestOutputActionResult_t>,
-                                                              const CalleeTypes::RequestOutputRequest_t &,
-                                                              const CalleeTypes::Downstream_t &)>;
+    using OnProcessCalleeResultCallback_t = std::function<int(typename OutputTypes::OutputRequest_t *,
+                                                              typename OutputTypes::OutputDeliveryPolicy_t *,
+                                                              std::shared_ptr<const typename CalleeTypes::RequestOutputActionResult_t>,
+                                                              const typename CalleeTypes::RequestOutputRequest_t &,
+                                                              const typename CalleeTypes::Downstream_t &)>;
 
     //! user defined callback for processing callee result, called after the internal processing is done
     OnProcessCalleeResultCallback_t on_process_callee_result;
@@ -109,27 +118,27 @@ class CallActionDriverBase : public OpenCloseNode
 
     //! after the request is received from the input port
     //! this is the data-processing callback of the input port handler
-    virtual int _on_process_input_request(InputRequestHandler_t::OutputRequest_t *output_request,
-                                          std::optional<InputRequestHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
-                                          InputRequestHandler_t::InputActionResult_t *output_result,
-                                          std::shared_ptr<const InputTypes::SourceData_t> source_data,
-                                          InputRequestHandler_t::ResourceToken_t &resource_token);
+    virtual int _on_process_input_request(typename InputRequestHandler_t::OutputRequest_t *output_request,
+                                          std::optional<typename InputRequestHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
+                                          typename InputRequestHandler_t::InputActionResult_t *output_result,
+                                          std::shared_ptr<const typename InputTypes::SourceData_t> source_data,
+                                          typename InputRequestHandler_t::ResourceToken_t &resource_token);
 
     //! after the result is received from the callee, create output request for sending to output port
     //! you can also modify the output request enqueue policy here, or just leave it unchanged
-    virtual int _on_process_callee_result(OutputTypes::OutputRequest_t *output_request,
-                                          OutputTypes::OutputDeliveryPolicy_t *output_enqueue_policy,
-                                          std::shared_ptr<const CalleeTypes::RequestOutputActionResult_t> callee_result,
-                                          const CalleeTypes::RequestOutputRequest_t &callee_request,
-                                          const CalleeTypes::Downstream_t &downstream);
+    virtual int _on_process_callee_result(typename OutputTypes::OutputRequest_t *output_request,
+                                          typename OutputTypes::OutputDeliveryPolicy_t *output_enqueue_policy,
+                                          std::shared_ptr<const typename CalleeTypes::RequestOutputActionResult_t> callee_result,
+                                          const typename CalleeTypes::RequestOutputRequest_t &callee_request,
+                                          const typename CalleeTypes::Downstream_t &downstream);
 
   protected:
     // for accepting incoming requests
-    std::shared_ptr<InputTypes::InputPort_t> m_input_port;
+    std::shared_ptr<typename InputTypes::InputPort_t> m_input_port;
     // for sending out actions
-    std::shared_ptr<OutputTypes::OutputPort_t> m_output_port;
+    std::shared_ptr<typename OutputTypes::OutputPort_t> m_output_port;
     // for sending requests to the callee
-    std::shared_ptr<CalleeTypes::RequestOutputPort_t> m_callee_port;
+    std::shared_ptr<typename CalleeTypes::RequestOutputPort_t> m_callee_port;
     // for doing the work of pulling input and send it to callee
     std::shared_ptr<InputRequestHandler_t> m_input_request_handler;
 
@@ -144,11 +153,11 @@ class CallActionDriverBase : public OpenCloseNode
 
     //! after the request is received from the input port
     //! this is the data-processing callback of the input port handler
-    int _internal_process_input_request(InputRequestHandler_t::OutputRequest_t *output_request,
-                                        std::optional<InputRequestHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
-                                        InputRequestHandler_t::InputActionResult_t *output_result,
-                                        std::shared_ptr<const InputTypes::SourceData_t> source_data,
-                                        InputRequestHandler_t::ResourceToken_t &resource_token)
+    int _internal_process_input_request(typename InputRequestHandler_t::OutputRequest_t *output_request,
+                                        std::optional<typename InputRequestHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
+                                        typename InputRequestHandler_t::InputActionResult_t *output_result,
+                                        std::shared_ptr<const typename InputTypes::SourceData_t> source_data,
+                                        typename InputRequestHandler_t::ResourceToken_t &resource_token)
     {
         // call class member function
         auto ret_member = _on_process_input_request(output_request, output_enqueue_policy, output_result, source_data, resource_token);
@@ -172,11 +181,11 @@ class CallActionDriverBase : public OpenCloseNode
 
     //! after the result is received from the callee, create output request for sending to output port
     //! you can also modify the output request enqueue policy here, or just leave it unchanged
-    int _internal_process_callee_result(OutputTypes::OutputRequest_t *output_request,
-                                        OutputTypes::OutputDeliveryPolicy_t *output_enqueue_policy,
-                                        std::shared_ptr<const CalleeTypes::RequestOutputActionResult_t> callee_result,
-                                        const CalleeTypes::RequestOutputRequest_t &callee_request,
-                                        const CalleeTypes::Downstream_t &downstream)
+    int _internal_process_callee_result(typename OutputTypes::OutputRequest_t *output_request,
+                                        typename OutputTypes::OutputDeliveryPolicy_t *output_enqueue_policy,
+                                        std::shared_ptr<const typename CalleeTypes::RequestOutputActionResult_t> callee_result,
+                                        const typename CalleeTypes::RequestOutputRequest_t &callee_request,
+                                        const typename CalleeTypes::Downstream_t &downstream)
     {
         // call class member function
         auto ret_member = _on_process_callee_result(output_request, output_enqueue_policy, callee_result, callee_request, downstream);
@@ -199,10 +208,13 @@ class CallActionDriverBase : public OpenCloseNode
     }
 };
 
+template <AsyncActionInputPortConcept InputPortType,
+          AsyncActionOutputPortConcept OutputPortType,
+          AsyncActionOutputPortConcept CalleeRequestPortType>
 struct CallActionDriverInitConfig : public OpenCloseNode::InitConfig_t {
-    using DriverInputPortConfig_t = CallActionDriverBase::InputTypes::InputPort_t::InitConfig_t;
-    using DriverOutputPortConfig_t = CallActionDriverBase::OutputTypes::OutputPort_t::InitConfig_t;
-    using CalleeRequestPortConfig_t = CallActionDriverBase::CalleeTypes::RequestOutputPort_t::InitConfig_t;
+    using DriverInputPortConfig_t = typename InputPortType::InitConfig_t;
+    using DriverOutputPortConfig_t = typename OutputPortType::InitConfig_t;
+    using CalleeRequestPortConfig_t = typename CalleeRequestPortType::InitConfig_t;
 
     //! config for the driver's input port
     std::shared_ptr<DriverInputPortConfig_t> input_port_config = std::make_shared<DriverInputPortConfig_t>();
@@ -217,9 +229,11 @@ struct CallActionDriverInitConfig : public OpenCloseNode::InitConfig_t {
                          JS_MEMBER(callee_request_port_config));
 };
 
+template <AsyncActionOutputPortConcept OutputPortType,
+          AsyncActionOutputPortConcept CalleeRequestPortType>
 struct CallActionDriverRuntimeConfig : public OpenCloseNode::RuntimeConfig_t {
-    using CalleeRequestEnqueuePolicy_t = CallActionDriverBase::CalleeTypes::RequestOutputPort_t::DeliveryPolicy_t;
-    using DriverOutputEnqueuePolicy_t = CallActionDriverBase::OutputTypes::OutputPort_t::DeliveryPolicy_t;
+    using CalleeRequestEnqueuePolicy_t = typename CalleeRequestPortType::DeliveryPolicy_t;
+    using DriverOutputEnqueuePolicy_t = typename OutputPortType::DeliveryPolicy_t;
 
     //! policy when enqueueing to the callee's request port
     CalleeRequestEnqueuePolicy_t callee_request_enqueue_policy;
@@ -241,14 +255,22 @@ struct CallActionDriverRuntimeConfig : public OpenCloseNode::RuntimeConfig_t {
 // {
 // }
 
-inline int CallActionDriverBase::_open()
+template <AsyncActionInputPortConcept InputPortType,
+          AsyncActionOutputPortConcept OutputPortType,
+          AsyncActionOutputPortConcept CalleeRequestPortType>
+int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+    _open()
 {
     RDX_INFO_DEV(this, __func__, false, "Opening driver node, class={}", typeid(*this).name());
     RDX_INFO_DEV(this, __func__, false, "Driver node opened, class={}", typeid(*this).name());
     return 0;
 }
 
-inline int CallActionDriverBase::_start()
+template <AsyncActionInputPortConcept InputPortType,
+          AsyncActionOutputPortConcept OutputPortType,
+          AsyncActionOutputPortConcept CalleeRequestPortType>
+int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+    _start()
 {
     RDX_INFO_DEV(this, __func__, false, "Starting driver node, class={}", typeid(*this).name());
     if (m_input_port) {
@@ -264,7 +286,11 @@ inline int CallActionDriverBase::_start()
     return 0;
 }
 
-inline int CallActionDriverBase::_stop()
+template <AsyncActionInputPortConcept InputPortType,
+          AsyncActionOutputPortConcept OutputPortType,
+          AsyncActionOutputPortConcept CalleeRequestPortType>
+int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+    _stop()
 {
     RDX_INFO_DEV(this, __func__, false, "Stopping driver node, class={}", typeid(*this).name());
     if (m_input_port) {
@@ -280,21 +306,33 @@ inline int CallActionDriverBase::_stop()
     return 0;
 }
 
-inline int CallActionDriverBase::_close()
+template <AsyncActionInputPortConcept InputPortType,
+          AsyncActionOutputPortConcept OutputPortType,
+          AsyncActionOutputPortConcept CalleeRequestPortType>
+int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+    _close()
 {
     RDX_INFO_DEV(this, __func__, false, "Closing driver node, class={}", typeid(*this).name());
     RDX_INFO_DEV(this, __func__, false, "Driver node closed, class={}", typeid(*this).name());
     return 0;
 }
 
-inline void CallActionDriverBase::_step()
+template <AsyncActionInputPortConcept InputPortType,
+          AsyncActionOutputPortConcept OutputPortType,
+          AsyncActionOutputPortConcept CalleeRequestPortType>
+void CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+    _step()
 {
     if (m_input_request_handler) {
         m_input_request_handler->process_and_send();
     }
 }
 
-inline int CallActionDriverBase::_update_init_config(std::shared_ptr<BaseInitConfig_t> init_config)
+template <AsyncActionInputPortConcept InputPortType,
+          AsyncActionOutputPortConcept OutputPortType,
+          AsyncActionOutputPortConcept CalleeRequestPortType>
+int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+    _update_init_config(std::shared_ptr<BaseInitConfig_t> init_config)
 {
     //! Update initial configuration
     RDX_INFO_DEV(this, __func__, false, "{}", "Starting update of initial configuration");
@@ -306,21 +344,21 @@ inline int CallActionDriverBase::_update_init_config(std::shared_ptr<BaseInitCon
     //! Create input port
     if (config->input_port_config && !config->input_port_config->get_action_name().empty()) {
         RDX_INFO_DEV(this, __func__, false, "Creating input port with action name: {}", config->input_port_config->get_action_name());
-        m_input_port = std::make_shared<InputTypes::InputPort_t>(this);
+        m_input_port = std::make_shared<typename InputTypes::InputPort_t>(this);
         m_input_port->init(config->input_port_config);
     }
 
     //! Create callee port
     if (config->callee_request_port_config) {
         RDX_INFO_DEV(this, __func__, false, "{}", "Creating callee request output port");
-        m_callee_port = std::make_shared<CalleeTypes::RequestOutputPort_t>(this);
+        m_callee_port = std::make_shared<typename CalleeTypes::RequestOutputPort_t>(this);
         m_callee_port->init(config->callee_request_port_config);
     }
 
     //! Create output port
     if (config->output_port_config) {
         RDX_INFO_DEV(this, __func__, false, "{}", "Creating output port");
-        m_output_port = std::make_shared<OutputTypes::OutputPort_t>(this);
+        m_output_port = std::make_shared<typename OutputTypes::OutputPort_t>(this);
         m_output_port->init(config->output_port_config);
     }
 
@@ -328,7 +366,11 @@ inline int CallActionDriverBase::_update_init_config(std::shared_ptr<BaseInitCon
     return 0;
 }
 
-inline int CallActionDriverBase::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config)
+template <AsyncActionInputPortConcept InputPortType,
+          AsyncActionOutputPortConcept OutputPortType,
+          AsyncActionOutputPortConcept CalleeRequestPortType>
+int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+    _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config)
 {
 
     RDX_INFO_DEV(this, __func__, false, "{}", "Updating runtime configuration");
@@ -348,7 +390,7 @@ inline int CallActionDriverBase::_update_runtime_config(std::shared_ptr<BaseRunt
     // create port handler
     if (m_input_port && m_callee_port) {
         using PortHandler_t = InputRequestHandler_t;
-        auto handler_config = std::make_shared<PortHandler_t::InitConfig_t>();
+        auto handler_config = std::make_shared<typename PortHandler_t::InitConfig_t>();
         handler_config->block_input_reading = config->enable_blocking_mode;
         handler_config->block_resource_acquisition = config->enable_blocking_mode;
         m_input_request_handler = std::make_shared<PortHandler_t>();
@@ -373,11 +415,15 @@ inline int CallActionDriverBase::_update_runtime_config(std::shared_ptr<BaseRunt
     return 0;
 }
 
-inline int CallActionDriverBase::_on_process_callee_result(OutputTypes::OutputRequest_t *output_request,
-                                                           OutputTypes::OutputDeliveryPolicy_t *output_enqueue_policy,
-                                                           std::shared_ptr<const CalleeTypes::RequestOutputActionResult_t> callee_result,
-                                                           const CalleeTypes::RequestOutputRequest_t &callee_request,
-                                                           const CalleeTypes::Downstream_t &downstream)
+template <AsyncActionInputPortConcept InputPortType,
+          AsyncActionOutputPortConcept OutputPortType,
+          AsyncActionOutputPortConcept CalleeRequestPortType>
+int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+    _on_process_callee_result(typename OutputTypes::OutputRequest_t *output_request,
+                              typename OutputTypes::OutputDeliveryPolicy_t *output_enqueue_policy,
+                              std::shared_ptr<const typename CalleeTypes::RequestOutputActionResult_t> callee_result,
+                              const typename CalleeTypes::RequestOutputRequest_t &callee_request,
+                              const typename CalleeTypes::Downstream_t &downstream)
 {
     (void)output_request;
     (void)output_enqueue_policy;
@@ -387,11 +433,15 @@ inline int CallActionDriverBase::_on_process_callee_result(OutputTypes::OutputRe
     return 0;
 }
 
-inline void CallActionDriverBase::_internal_request_sent_to_callee(
-    typename CalleeTypes::RequestOutputPort_t::TargetData_t &target_data,
-    typename CalleeTypes::RequestOutputPort_t::SendResult_t &send_result,
-    const typename CalleeTypes::RequestOutputPort_t::DeliveryRequest_t &delivery_request,
-    const typename CalleeTypes::RequestOutputPort_t::Downstream_t &downstream)
+template <AsyncActionInputPortConcept InputPortType,
+          AsyncActionOutputPortConcept OutputPortType,
+          AsyncActionOutputPortConcept CalleeRequestPortType>
+void CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+    _internal_request_sent_to_callee(
+        typename CalleeTypes::RequestOutputPort_t::TargetData_t &target_data,
+        typename CalleeTypes::RequestOutputPort_t::SendResult_t &send_result,
+        const typename CalleeTypes::RequestOutputPort_t::DeliveryRequest_t &delivery_request,
+        const typename CalleeTypes::RequestOutputPort_t::Downstream_t &downstream)
 {
     (void)delivery_request;
     auto msg_uuid = target_data.get_source_data_uuid();
@@ -415,7 +465,7 @@ inline void CallActionDriverBase::_internal_request_sent_to_callee(
                 }
 
                 if (m_output_port) {
-                    OutputTypes::OutputRequest_t response_request;
+                    typename OutputTypes::OutputRequest_t response_request;
                     auto ret = _internal_process_callee_result(&response_request, &policy, result.result, delivery_request, downstream);
                     if (ret == 0) {
                         auto sent = m_output_port->push_request(response_request, policy);
@@ -437,11 +487,15 @@ inline void CallActionDriverBase::_internal_request_sent_to_callee(
     }
 }
 
-inline int CallActionDriverBase::_on_process_input_request(InputRequestHandler_t::OutputRequest_t *output_request,
-                                                           std::optional<InputRequestHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
-                                                           InputRequestHandler_t::InputActionResult_t *output_result,
-                                                           std::shared_ptr<const InputTypes::SourceData_t> source_data,
-                                                           InputRequestHandler_t::ResourceToken_t &resource_token)
+template <AsyncActionInputPortConcept InputPortType,
+          AsyncActionOutputPortConcept OutputPortType,
+          AsyncActionOutputPortConcept CalleeRequestPortType>
+int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+    _on_process_input_request(typename InputRequestHandler_t::OutputRequest_t *output_request,
+                              std::optional<typename InputRequestHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
+                              typename InputRequestHandler_t::InputActionResult_t *output_result,
+                              std::shared_ptr<const typename InputTypes::SourceData_t> source_data,
+                              typename InputRequestHandler_t::ResourceToken_t &resource_token)
 {
     (void)output_request;
     (void)output_enqueue_policy;

@@ -994,5 +994,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
     tbb::task_group m_task_group; // all async tasks
 };
 
+//! Concept to enforce a type to be convertible to AsyncActionOutputPort
+template <typename T>
+concept AsyncActionOutputPortConcept = requires(T a)
+{
+    {std::is_base_of_v<AsyncActionOutputPort<typename T::MasterSpec_t>, T>};
+};
+
 
 } // namespace redoxi_works

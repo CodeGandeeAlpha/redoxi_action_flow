@@ -1,13 +1,21 @@
 #pragma once
 
 #include <redoxi_common_nodes/driver_nodes/CallActionDriverBase.hpp>
+#include <redoxi_common_nodes/image_ports/AsyncImageInputPort.hpp>
+#include <redoxi_common_nodes/detection_ports/DetectionRequestOutputPort.hpp>
+#include <redoxi_common_nodes/detection_ports/DetectionResponseOutputPort.hpp>
 
 namespace redoxi_works::common_nodes::drivers
 {
-class DetectionDriver : public CallActionDriverBase
+class DetectionDriver : public CallActionDriverBase<image_ports::AsyncImageInputPort,
+                                                    detection_ports::response_only::DetectionResponseOutputPort,
+                                                    detection_ports::request_response::DetectionRequestOutputPort>
 {
   public:
-    using CallActionDriverBase::CallActionDriverBase;
+    using BaseNode_t = CallActionDriverBase<image_ports::AsyncImageInputPort,
+                                            detection_ports::response_only::DetectionResponseOutputPort,
+                                            detection_ports::request_response::DetectionRequestOutputPort>;
+    using BaseNode_t::CallActionDriverBase;
 
   protected:
     int _on_process_callee_result(OutputTypes::OutputRequest_t *output_request,

@@ -121,7 +121,7 @@ video_source_params = {
                         "precondition": "dont_care",
                         "drop_strategy": "dont_care",
                     },
-                    "create_debug_pub": False,
+                    "create_debug_pub": True,
                 },
             ],
             "num_buffer_requests": 1,
