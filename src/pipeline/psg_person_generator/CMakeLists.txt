@@ -77,9 +77,9 @@ ament_export_targets(
 # use these so that downstream packages can find the dependencies without explicitly listing them
 ament_export_dependencies(
   rclcpp
-  redoxi_common_nodes
   psg_document_sink
   psg_common
+  redoxi_common_nodes
 )
 
 ament_package()

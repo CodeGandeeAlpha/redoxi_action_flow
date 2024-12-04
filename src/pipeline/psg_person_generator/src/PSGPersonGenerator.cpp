@@ -1,6 +1,7 @@
 #include <psg_person_generator/PSGPersonGenerator.hpp>
 #include <psg_common/msg_converter.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
+#include <redoxi_common_nodes/port_handlers/PullProcessSendHandler.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 #include <json_struct/json_struct.h>
 #include <PassengerFlow/utils/util_functions.h>
@@ -20,6 +21,11 @@ struct PSGPersonGeneratorImpl {
                                                            const std::vector<PassengerFlow::DetectionPtr> &face_dets,
                                                            const std::vector<std::map<PassengerFlow::KeyPointSemanticType, PassengerFlow::Keypoint>>
                                                                &body_keypoints);
+
+    // pull input, work on it and then send output
+    using PullProcessSendHandler_t = redoxi_works::port_handlers::PullProcessSendHandler<PSGPersonGenerator::InputPort_t::MasterSpec_t,
+                                                                                         PSGPersonGenerator::OutputPort_t::MasterSpec_t>;
+    std::shared_ptr<PullProcessSendHandler_t> work_then_send_handler;
 };
 
 PSGPersonGenerator::PSGPersonGenerator(const std::string &name, const rclcpp::NodeOptions &options)
@@ -159,6 +165,9 @@ int PSGPersonGenerator::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig
     //! set publish to debug topic
     set_publish_to_debug_topic(runtime_config->publish_to_debug_topic);
 
+    RDX_INFO_DEV(this, __func__, false, "{}", "Creating document request handler");
+    _create_document_request_handler(*runtime_config);
+
     return 0;
 }
 
@@ -171,7 +180,8 @@ std::shared_ptr<PSGPersonGeneratorImpl> PSGPersonGenerator::_create_impl()
 }
 
 PSGPersonGenerator::DeliveryRequest_t
-    PSGPersonGenerator::_create_delivery_request(const OutputSourceData_t &source_data)
+    PSGPersonGenerator::_create_delivery_request(const OutputSourceData_t &source_data,
+                                                 std::optional<ControlSignalCode> control_signal_code)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
 
@@ -180,6 +190,9 @@ PSGPersonGenerator::DeliveryRequest_t
     req.set_source_data(source_data);
     if (runtime_config->frame_request_policy.has_value()) {
         req.set_delivery_policy(*runtime_config->frame_request_policy);
+    }
+    if (control_signal_code.has_value()) {
+        req.set_control_signal_code(control_signal_code.value());
     }
 
     return req;
@@ -209,100 +222,116 @@ std::shared_ptr<PSGPersonGenerator::OutputPort_t>
     return port;
 }
 
-void PSGPersonGenerator::_step()
+int PSGPersonGenerator::_create_document_request_handler(const RuntimeConfig_t &runtime_config)
 {
-    if (get_status() != NodeStatusCode::STARTED) {
-        return;
-    }
+    using ProcessHandler_t = PSGPersonGeneratorImpl::PullProcessSendHandler_t;
+    using InputDataTrait_t = PSGPersonGenerator::InputPort_t::ActionDataTrait_t;
+    auto config = std::make_shared<ProcessHandler_t::InitConfig_t>();
 
-    // get input document msg
-    if (m_impl->m_ros_time_token->try_pop_token()) {
-        auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
-        auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
+    config->block_input_reading = runtime_config.enable_blocking_mode;
+    config->block_resource_acquisition = runtime_config.enable_blocking_mode;
 
-        std::shared_ptr<InputSourceData_t> document_in_data;
-        if (runtime_config->enable_blocking_mode) {
-            // wait until there is data available
-            document_in_data = m_input_port->pop_source_data();
-        } else {
-            // try to get data without waiting
-            document_in_data = m_input_port->try_pop_source_data();
-        }
+    auto enqueue_policy = runtime_config.frame_enqueue_policy;
+    m_impl->work_then_send_handler = std::make_shared<ProcessHandler_t>();
+    auto process_handler = m_impl->work_then_send_handler;
+    process_handler->init(m_input_port.get(), m_primary_output_port.get(),
+                          nullptr, config, enqueue_policy);
 
-        if (!document_in_data) {
-            return;
-        }
+    process_handler->on_process_input_data =
+        [this](ProcessHandler_t::OutputRequest_t *output_request,
+               std::optional<ProcessHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
+               ProcessHandler_t::InputActionResult_t *action_result,
+               std::shared_ptr<InputSourceData_t> source_data,
+               ProcessHandler_t::ResourceToken_t &resource) {
+            // process document, copy the document msg because the original one is const, cannot be modified
+            psg_private_msgs::msg::PsgDocument document_msg;
+            document_msg = source_data->m_goal->document;
 
-        // process document, copy the document msg because the original one is const, cannot be modified
-        psg_private_msgs::msg::PsgDocument document_msg;
-        document_msg = document_in_data->m_goal->document;
-
-        std::vector<PassengerFlow::DetectionPtr> v_heads, v_bodies, v_faces;
-        std::vector<std::map<PassengerFlow::KeyPointSemanticType, PassengerFlow::Keypoint>> v_body_keypoints;
-        // msg Detection {0: body, 1: head, 2: face}
-        for (auto &msg_det : document_msg.detections) {
-            if (msg_det.category == 0) {
-                v_bodies.push_back(std::make_shared<PassengerFlow::Detection>());
-                FlowRos2Pipeline::convert_msg_to_detection(msg_det, v_bodies.back());
-                v_body_keypoints.push_back(std::map<PassengerFlow::KeyPointSemanticType, PassengerFlow::Keypoint>());
-                FlowRos2Pipeline::convert_msg_to_keypoints(msg_det.keypoints, v_body_keypoints.back());
-            } else if (msg_det.category == 1) {
-                v_heads.push_back(std::make_shared<PassengerFlow::Detection>());
-                FlowRos2Pipeline::convert_msg_to_detection(msg_det, v_heads.back());
-            } else if (msg_det.category == 2) {
-                v_faces.push_back(std::make_shared<PassengerFlow::Detection>());
-                FlowRos2Pipeline::convert_msg_to_detection(msg_det, v_faces.back());
+            std::vector<PassengerFlow::DetectionPtr> v_heads, v_bodies, v_faces;
+            std::vector<std::map<PassengerFlow::KeyPointSemanticType, PassengerFlow::Keypoint>> v_body_keypoints;
+            // msg Detection {0: body, 1: head, 2: face}
+            for (auto &msg_det : document_msg.detections) {
+                if (msg_det.category == 0) {
+                    v_bodies.push_back(std::make_shared<PassengerFlow::Detection>());
+                    FlowRos2Pipeline::convert_msg_to_detection(msg_det, v_bodies.back());
+                    v_body_keypoints.push_back(std::map<PassengerFlow::KeyPointSemanticType, PassengerFlow::Keypoint>());
+                    FlowRos2Pipeline::convert_msg_to_keypoints(msg_det.keypoints, v_body_keypoints.back());
+                } else if (msg_det.category == 1) {
+                    v_heads.push_back(std::make_shared<PassengerFlow::Detection>());
+                    FlowRos2Pipeline::convert_msg_to_detection(msg_det, v_heads.back());
+                } else if (msg_det.category == 2) {
+                    v_faces.push_back(std::make_shared<PassengerFlow::Detection>());
+                    FlowRos2Pipeline::convert_msg_to_detection(msg_det, v_faces.back());
+                }
             }
-        }
 
-        // extract person
-        auto v_persons = m_impl->_extract_persons(v_heads, v_bodies, v_faces, v_body_keypoints);
+            // extract person
+            auto v_persons = m_impl->_extract_persons(v_heads, v_bodies, v_faces, v_body_keypoints);
 
-        // convert to msg
-        for (auto &person : v_persons) {
-            psg_private_msgs::msg::Person msg_person;
-            msg_person.frame_metadata = document_msg.frame.metadata;
-            FlowRos2Pipeline::convert_person_to_msg(person, document_msg.frame, msg_person);
-            msg_person.x_uid = to_ros_uuid_msg(boost::uuids::random_generator()()); // 不加这个会导致tracker无法匹配
-            document_msg.persons.push_back(msg_person);
-        }
+            // convert to msg
+            for (auto &person : v_persons) {
+                psg_private_msgs::msg::Person msg_person;
+                msg_person.frame_metadata = document_msg.frame.metadata;
+                FlowRos2Pipeline::convert_person_to_msg(person, document_msg.frame, msg_person);
+                msg_person.x_uid = to_ros_uuid_msg(boost::uuids::random_generator()()); // 不加这个会导致tracker无法匹配
+                document_msg.persons.push_back(msg_person);
+            }
 
-        // create tasks
-        // document_msg.persons = persons_msg;
+            // from input source data to output source data
+            OutputSourceData_t output_source_data;
+            output_source_data.set_document(document_msg);
 
-        // from input source data to output source data
-        OutputSourceData_t output_source_data;
-        output_source_data.set_document(document_msg);
+            auto goal_handle = source_data->get_goal_handle_future().get();
+            auto control_signal_code = InputDataTrait_t::get_control_signal_code(*source_data->get_goal());
 
-        // create delivery request
-        auto delivery_request = _create_delivery_request(output_source_data);
+            // create delivery request
+            auto delivery_request = _create_delivery_request(output_source_data, control_signal_code);
+            *output_request = delivery_request;
 
-        // this is used for logging
-        auto msg_uuid = output_source_data.get_uuid();
-
-        // get qos, controls how to retry and drop frames
-        auto &qos = runtime_config->frame_enqueue_policy;
-        bool success = m_primary_output_port->push_request(delivery_request, qos);
-
-        if (success) {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] success to push request, frame_num={}",
-                         boost::uuids::to_string(msg_uuid),
-                         document_msg.frame.metadata.frame_num);
+            auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
             if (init_config->create_debug_pub) {
                 auto debug_image = _create_debug_image(document_msg);
                 m_pub_task_enqueue.publish(debug_image, "");
             }
-        } else {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] failed to push request, frame_num={}",
-                         boost::uuids::to_string(msg_uuid),
-                         document_msg.frame.metadata.frame_num);
-        }
 
-        // FIXME: debug only
-        // wait for all requests to be processed, not necessary
-        m_primary_output_port->wait_for_all_requests();
+            // fill the action result, nothing to do
+            (void)action_result;
+
+            (void)output_enqueue_policy;
+            (void)resource;
+            return 0;
+        };
+    return 0;
+}
+
+int PSGPersonGenerator::_process_document_request()
+{
+    auto ret = m_impl->work_then_send_handler->process_and_send();
+    if (ret == PSGPersonGeneratorImpl::PullProcessSendHandler_t::ProcessResult::Error) {
+        RDX_INFO_DEV(this, __func__, false, "Failed to process image request, error code: {}", int(ret));
+        return -1;
+    } else if (ret == PSGPersonGeneratorImpl::PullProcessSendHandler_t::ProcessResult::NoData) {
+        //! No data available, skipping
+        return 0;
+    } else if (ret == PSGPersonGeneratorImpl::PullProcessSendHandler_t::ProcessResult::Success) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Successfully processed image request");
+        return 0;
+    } else if (ret == PSGPersonGeneratorImpl::PullProcessSendHandler_t::ProcessResult::NoResourceToken) {
+        //! No resource token, skipping
+        return 0;
+    } else if (ret == PSGPersonGeneratorImpl::PullProcessSendHandler_t::ProcessResult::FailedToSend) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Failed to send image request to downstream, do you have a downstream?");
+        return 0;
+    } else {
+        RDX_RAISE_ERROR("[f={}] Unexpected process result: {}", __func__, int(ret));
+        return -1;
+    }
+}
+
+void PSGPersonGenerator::_step()
+{
+    if (m_input_port) {
+        _process_document_request();
     }
 }
 

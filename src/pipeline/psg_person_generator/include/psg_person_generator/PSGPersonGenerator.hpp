@@ -77,7 +77,8 @@ class PSGPersonGenerator : public common_nodes::StartStopNode
      * @param source_data the source data to be filled with the read frame
      * @return the delivery request
      */
-    virtual DeliveryRequest_t _create_delivery_request(const OutputSourceData_t &source_data);
+    virtual DeliveryRequest_t _create_delivery_request(const OutputSourceData_t &source_data,
+                                                       std::optional<ControlSignalCode> control_signal_code);
 
     //! create primary output port
     virtual std::shared_ptr<OutputPort_t> _create_primary_output_port(const InitConfig_t &init_config);
@@ -88,6 +89,12 @@ class PSGPersonGenerator : public common_nodes::StartStopNode
 
     //! create debug image
     virtual sensor_msgs::msg::Image _create_debug_image(const psg_private_msgs::msg::PsgDocument &document);
+
+    //! create document request handler
+    virtual int _create_document_request_handler(const RuntimeConfig_t &runtime_config);
+
+    //! process document request
+    virtual int _process_document_request();
 
   protected:
     // input port
