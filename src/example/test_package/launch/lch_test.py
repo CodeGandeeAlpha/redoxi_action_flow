@@ -150,7 +150,7 @@ video_source_params = {
         "frame_interval": 0,
         "output_image_size": {"width": 1024, "height": -1},
         "output_image_encoding": "rgb8",
-        "publish_to_debug_topic": False,
+        "publish_to_debug_topic": True,
         "frame_enqueue_policy": {
             "precondition": "any_downstream_ready",
             "drop_strategy": "no_drop",

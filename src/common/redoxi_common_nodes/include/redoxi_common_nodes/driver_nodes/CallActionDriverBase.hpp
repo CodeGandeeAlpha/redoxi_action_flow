@@ -379,21 +379,12 @@ inline int CallActionDriverBase::_on_process_callee_result(OutputTypes::OutputRe
                                                            const CalleeTypes::RequestOutputRequest_t &callee_request,
                                                            const CalleeTypes::Downstream_t &downstream)
 {
-    (void)downstream;
+    (void)output_request;
     (void)output_enqueue_policy;
-
-    OutputTypes::OutputSourceData_t output_source_data;
-    output_source_data.detections = callee_result->detections;
-    output_source_data.image = callee_request.get_source_data().get_image();
-    output_source_data.uid = callee_request.get_source_data().get_uuid();
-    output_request->set_source_data(output_source_data);
-
-    int return_code = 0;
-    if (on_process_callee_result) {
-        return_code = on_process_callee_result(output_request, output_enqueue_policy, callee_result, callee_request, downstream);
-    }
-
-    return return_code;
+    (void)callee_result;
+    (void)callee_request;
+    (void)downstream;
+    return 0;
 }
 
 inline void CallActionDriverBase::_internal_request_sent_to_callee(
@@ -452,42 +443,12 @@ inline int CallActionDriverBase::_on_process_input_request(InputRequestHandler_t
                                                            std::shared_ptr<const InputTypes::SourceData_t> source_data,
                                                            InputRequestHandler_t::ResourceToken_t &resource_token)
 {
-    (void)resource_token;
-    (void)output_result;
+    (void)output_request;
     (void)output_enqueue_policy;
-
-    auto msg_uuid = InputTypes::ActionDataTrait_t::get_uuid(*source_data->get_goal());
-    auto msg_uuid_str = boost::uuids::to_string(msg_uuid);
-
-    // create request
-    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Creating request from source data", msg_uuid_str);
-    CalleeTypes::RequestOutputSourceData_t output_source_data;
-    const auto &raw_image = source_data->get_goal()->frame.raw_image;
-    if (!raw_image.data.empty()) {
-        cv::Mat image;
-        image = cv_bridge::toCvCopy(raw_image)->image;
-
-        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Extracted image from source data, width={}, height={}",
-                     msg_uuid_str, image.cols, image.rows);
-        output_source_data.set_image(image);
-    }
-    output_source_data.set_frame_metadata(source_data->get_goal()->frame.metadata);
-    output_request->set_source_data(output_source_data);
-
-    // get signal code
-    auto signal_code = InputTypes::ActionDataTrait_t::get_control_signal_code(*source_data->get_goal());
-    output_request->set_control_signal_code(signal_code);
-    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Set control signal code to {}",
-                 msg_uuid_str, control_signal_code_to_string(signal_code));
-
-    auto return_code = 0;
-    if (on_process_input_request) {
-        return_code = on_process_input_request(output_request, output_enqueue_policy, output_result, source_data, resource_token);
-    }
-
-    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Done, created request from source data", msg_uuid_str);
-
-    return return_code;
+    (void)output_result;
+    (void)source_data;
+    (void)resource_token;
+    return 0;
 }
 
 } // namespace redoxi_works::common_nodes::drivers

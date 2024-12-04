@@ -218,6 +218,15 @@ class AsyncActionOutputPort : public IStartStopProtocol
             }
         }
 
+        // if any downstream says to publish to debug topic, enable it
+        {
+            bool enable_debug_publish = false;
+            for (auto &ds : m_downstreams) {
+                enable_debug_publish |= ds.get_downstream_spec().get_use_debug_publish();
+            }
+            m_publish_to_debug_topic = enable_debug_publish;
+        }
+
         // state transition: BEFORE_INIT -> STOPPED
         _set_status_code(NodeStatusCode::STOPPED);
 
@@ -912,7 +921,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
     std::atomic<int> m_status = NodeStatusCode::BEFORE_INIT;
 
     // publish to debug topics?
-    std::atomic<bool> m_publish_to_debug_topic = false;
+    std::atomic<bool> m_publish_to_debug_topic{false};
 
     // init config
     std::shared_ptr<InitConfig_t> m_init_config;
