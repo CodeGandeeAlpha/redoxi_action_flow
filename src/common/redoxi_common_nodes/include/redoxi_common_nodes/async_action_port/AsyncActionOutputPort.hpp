@@ -804,6 +804,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                              boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
             } else {
                 bool wait_indefinitely = timeout_each_attempt < DefaultTimeUnit_t::zero();
+                bool need_to_wait = false;
 
                 if (result.response_code.has_value()) {
                     // it has a response code, check it
@@ -823,10 +824,10 @@ class AsyncActionOutputPort : public IStartStopProtocol
                         case ActionDownstreamResponse::TIMEOUT:
                             RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while sending frame to downstream {}",
                                          boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
-
                             // FIXME: should not resend if timeout, we should wait again until we get a definite response
                             // BUG: should not resend if timeout, we should wait again until we get a definite response
                             // otherwise, downstream may receive overlapping messages
+                            need_to_wait = true;
                             break;
                     }
                 } else {
@@ -842,6 +843,53 @@ class AsyncActionOutputPort : public IStartStopProtocol
                         //! Regard as failure without additional waiting
                         RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while waiting for goal handle from downstream {}",
                                      boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
+                        need_to_wait = true;
+                    }
+                }
+
+                // if we need to wait, wait until we have a definite response
+                if (need_to_wait) {
+                    RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Doing additional waiting for goal handle from downstream {}",
+                                 boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
+                    while (true) {
+                        if (timeout_each_attempt > DefaultTimeUnit_t::zero()) {
+                            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Waiting for goal handle from downstream {} for {} us",
+                                         boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name(),
+                                         std::chrono::duration_cast<std::chrono::microseconds>(timeout_each_attempt).count());
+                            auto status = result.goal_handle_future.wait_for(timeout_each_attempt);
+                            if (status == std::future_status::ready) {
+                                auto goal_handle = result.goal_handle_future.get();
+                                if (goal_handle != nullptr) {
+                                    RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Goal handle received from downstream {}",
+                                                 boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
+                                    result.goal_handle = goal_handle;
+                                    return 0; // Success
+                                } else {
+                                    RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Goal handle is nullptr from downstream {}, request rejected",
+                                                 boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
+                                    break;
+                                }
+                            } else {
+                                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while waiting for goal handle from downstream {}, do it again",
+                                             boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
+                                continue;
+                            }
+                        } else {
+                            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Waiting for goal handle from downstream {}",
+                                         boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
+                            auto goal_handle = result.goal_handle_future.get();
+                            if (goal_handle != nullptr) {
+                                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Goal handle received from downstream {}",
+                                             boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
+                                result.goal_handle = goal_handle;
+                                return 0; // Success
+                            } else {
+                                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Goal handle is nullptr from downstream {}, request rejected",
+                                             boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
+                                result.response_code = ActionDownstreamResponse::REJECTED;
+                                break;
+                            }
+                        }
                     }
                 }
             }
