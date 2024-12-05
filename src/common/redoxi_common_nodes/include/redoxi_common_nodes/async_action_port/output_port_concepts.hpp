@@ -74,9 +74,9 @@ concept DeliveryTargetDataConcept = requires(T t)
     //! Must have method to save/read source data UUID
     {
         std::declval<const T &>().get_source_data_uuid()
-        } -> std::same_as<boost::uuids::uuid>;
+        } -> std::same_as<UUIDType>;
     {
-        std::declval<T &>().set_source_data_uuid(std::declval<boost::uuids::uuid>())
+        std::declval<T &>().set_source_data_uuid(std::declval<UUIDType>())
         } -> std::same_as<void>;
 
     //! Must have method to get the control signal code
@@ -91,6 +91,14 @@ concept DeliveryTargetDataConcept = requires(T t)
     {
         std::declval<const T &>().to_publish_message(std::declval<typename T::PublishMessageType_t &>())
         } -> std::same_as<int>;
+
+    //! Get/set task metadata
+    {
+        std::declval<const T &>().get_source_task_metadata()
+        } -> std::same_as<RosActionTaskMetadata>;
+    {
+        std::declval<T &>().set_source_task_metadata(std::declval<const RosActionTaskMetadata &>())
+        } -> std::same_as<void>;
 };
 
 //! data collected during the delivery process
@@ -177,9 +185,6 @@ concept DeliveryRequestConcept = requires(T t)
     {
         std::declval<const T &>().get_stamp()
         } -> std::same_as<const typename T::StampType_t &>;
-    // {
-    //     t.is_ping_request()
-    //     } -> std::same_as<bool>;
     {
         t.get_delivery_policy()
         } -> std::same_as<typename T::DeliveryPolicy_t *>;
@@ -187,11 +192,6 @@ concept DeliveryRequestConcept = requires(T t)
         std::declval<const T &>().get_delivery_policy()
         } -> std::same_as<const typename T::DeliveryPolicy_t *>;
 
-    //! Must have method to convert this to a ping request
-    //! To create a ping request, you do T().as_ping()
-    {
-        t.as_ping()
-        } -> std::same_as<void>;
 
     //! must be able to convert to target data
     //! @return 0 if success, -1 if failed
@@ -214,6 +214,14 @@ concept DeliveryRequestConcept = requires(T t)
     {
         std::declval<T &>().send_goal_options
         } -> std::same_as<typename T::SendGoalOptions_t &>;
+
+    //! get/set source task metadata
+    {
+        std::declval<const T &>().get_source_task_metadata()
+        } -> std::same_as<const RosActionTaskMetadata &>;
+    {
+        std::declval<T &>().set_source_task_metadata(std::declval<const RosActionTaskMetadata &>())
+        } -> std::same_as<void>;
 };
 
 //! A task to deliver to the downstream action

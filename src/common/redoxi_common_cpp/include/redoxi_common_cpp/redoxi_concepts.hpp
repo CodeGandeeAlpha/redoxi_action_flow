@@ -179,39 +179,22 @@ struct RedoxiActionDataTrait {
      * @param goal The goal from which to extract the source task id
      * @return The source task id as a boost UUID
      */
-    static boost::uuids::uuid get_source_task_id(const Goal_t &goal)
+    static RosActionTaskMetadata get_source_task_metadata(const Goal_t &goal)
     {
-        return to_boost_uuid(goal.x_task_metadata.source_task_uid);
+        return RosActionTaskMetadata{
+            .source_task_id = to_boost_uuid(goal.x_task_metadata.source_task_uid),
+            .source_task_info = goal.x_task_metadata.source_task_info};
     }
 
     /**
-     * @brief Set the source task id in the goal.
-     * @param goal The goal in which to set the source task id
-     * @param source_task_id The source task id to set
+     * @brief Set the source task metadata in the goal.
+     * @param goal The goal in which to set the source task metadata
+     * @param metadata The source task metadata to set
      */
-    static void set_source_task_id(Goal_t &goal, const boost::uuids::uuid &source_task_id)
+    static void set_source_task_metadata(Goal_t &goal, const RosActionTaskMetadata &metadata)
     {
-        goal.x_task_metadata.source_task_uid = to_ros_uuid_msg(source_task_id);
-    }
-
-    /**
-     * @brief Get the source task info from the goal.
-     * @param goal The goal from which to extract the source task info
-     * @return The source task info string
-     */
-    static std::string get_source_task_info(const Goal_t &goal)
-    {
-        return goal.x_task_metadata.source_task_info;
-    }
-
-    /**
-     * @brief Set the source task info in the goal.
-     * @param goal The goal in which to set the source task info
-     * @param source_task_info The source task info to set
-     */
-    static void set_source_task_info(Goal_t &goal, const std::string &source_task_info)
-    {
-        goal.x_task_metadata.source_task_info = source_task_info;
+        goal.x_task_metadata.source_task_info = metadata.source_task_info;
+        goal.x_task_metadata.source_task_uid = to_ros_uuid_msg(metadata.source_task_id);
     }
 };
 
