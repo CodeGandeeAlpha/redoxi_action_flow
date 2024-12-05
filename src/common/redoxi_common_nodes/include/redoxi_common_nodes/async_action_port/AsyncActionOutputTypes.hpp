@@ -228,13 +228,13 @@ class DefaultTargetData
     }
 
     //! Get the source data UUID
-    virtual boost::uuids::uuid get_source_data_uuid() const
+    virtual UUIDType get_source_data_uuid() const
     {
         return ActionDataTrait_t::get_uuid(m_goal);
     }
 
     //! Set the source data UUID
-    virtual void set_source_data_uuid(boost::uuids::uuid uuid)
+    virtual void set_source_data_uuid(UUIDType uuid)
     {
         // mark the goal with the source data UUID
         ActionDataTrait_t::set_uuid(m_goal, uuid);
@@ -256,6 +256,30 @@ class DefaultTargetData
     virtual int to_publish_message(PublishMessageType_t &) const
     {
         return 0;
+    }
+
+    //! Get the source task info
+    virtual std::string get_source_task_info() const
+    {
+        return ActionDataTrait_t::get_source_task_info(m_goal);
+    }
+
+    //! Set the source task info
+    virtual void set_source_task_info(const std::string &info)
+    {
+        ActionDataTrait_t::set_source_task_info(m_goal, info);
+    }
+
+    //! Get the source task id
+    virtual UUIDType get_source_task_id() const
+    {
+        return ActionDataTrait_t::get_source_task_id(m_goal);
+    }
+
+    //! Set the source task id
+    virtual void set_source_task_id(UUIDType uuid)
+    {
+        ActionDataTrait_t::set_source_task_id(m_goal, uuid);
     }
 
   protected:
@@ -443,12 +467,27 @@ class DefaultDeliveryRequest
         }
     }
 
+    //! Get the source task id
+    virtual const UUIDType &get_source_task_id() const
+    {
+        return m_source_task_id;
+    }
+
+    //! Set the source task id
+    virtual void set_source_task_id(const UUIDType &source_task_id)
+    {
+        m_source_task_id = source_task_id;
+    }
+
     //! Send goal options
     SendGoalOptions_t send_goal_options;
 
   protected:
     //! Source data for the delivery request
     SourceDataType_t m_source_data;
+
+    //! Source task id, which is the task that triggers this source data request
+    UUIDType m_source_task_id;
 
     //! Stamp data for getting delivery in-progress status
     StampType_t m_stamp;
