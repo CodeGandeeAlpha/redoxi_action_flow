@@ -192,8 +192,8 @@ static_assert(output_port_types::DeliveryPolicyConcept<DeliveryPolicy>, "Deliver
 using DeliveryRequestBase = output_port_types::DefaultDeliveryRequest<DeliverySourceData, DeliveryTargetData, DeliveryPolicy, DeliveryStampData>;
 class DeliveryRequest : public DeliveryRequestBase
 {
-  public:
-    virtual int to_target_data(DeliveryTargetData &target_data) const
+  protected:
+    virtual int _to_target_data(DeliveryTargetData &target_data) const override
     {
         // apply custom function if set
         if (custom_to_target_data) {
@@ -217,17 +217,10 @@ class DeliveryRequest : public DeliveryRequestBase
         goal.frame.metadata.width = image.cols;
         goal.frame.metadata.height = image.rows;
 
-        // set additional information into the goal
-        using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
-
-        // set the source data UUID
-        ActionTrait::set_uuid(goal, this->m_source_data.get_uuid());
-
-        // set the control signal code
-        // if (this->get_control_signal_code() == ControlSignalCode::Ping) {
-        //     ActionTrait::mark_with_control_signal(goal, ControlSignalCode::Ping);
-        // }
-        ActionTrait::mark_with_control_signal(goal, this->get_control_signal_code());
+        // no longer needed, base class will handle standard information
+        // using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
+        // ActionTrait::set_uuid(goal, this->m_source_data.get_uuid());
+        // ActionTrait::mark_with_control_signal(goal, this->get_control_signal_code());
 
         return 0;
     }

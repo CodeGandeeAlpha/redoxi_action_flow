@@ -79,8 +79,8 @@ using DeliveryRequestBase = output_port_types::DefaultDeliveryRequest<DeliverySo
 
 class DeliveryRequest : public DeliveryRequestBase
 {
-  public:
-    virtual int to_target_data(DeliveryTargetData &target_data) const
+  protected:
+    virtual int _to_target_data(DeliveryTargetData &target_data) const override
     {
         // apply custom function if set
         if (custom_to_target_data) {
@@ -102,18 +102,20 @@ class DeliveryRequest : public DeliveryRequestBase
             goal.frame.metadata.height = image_msg.rows;
         }
 
-        // set additional information into the goal
-        using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
+        // no longer needed, base class will handle standard information
+        // // set additional information into the goal
+        // using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
 
-        // set the source data UUID
-        ActionTrait::set_uuid(goal, source_data.get_uuid());
+        // // set the source data UUID
+        // ActionTrait::set_uuid(goal, source_data.get_uuid());
 
-        // set the control signal code
-        ActionTrait::mark_with_control_signal(goal, get_control_signal_code());
+        // // set the control signal code
+        // ActionTrait::mark_with_control_signal(goal, get_control_signal_code());
 
         return 0;
     }
 
+  public:
     // auxiliary data for easy extension without inheritance
     std::any auxiliary_data;
 

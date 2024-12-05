@@ -258,28 +258,15 @@ class DefaultTargetData
         return 0;
     }
 
-    //! Get the source task info
-    virtual std::string get_source_task_info() const
+    //! Get/set source task metadata
+    virtual RosActionTaskMetadata get_source_task_metadata() const
     {
-        return ActionDataTrait_t::get_source_task_info(m_goal);
+        return ActionDataTrait_t::get_source_task_metadata(m_goal);
     }
 
-    //! Set the source task info
-    virtual void set_source_task_info(const std::string &info)
+    virtual void set_source_task_metadata(const RosActionTaskMetadata &metadata)
     {
-        ActionDataTrait_t::set_source_task_info(m_goal, info);
-    }
-
-    //! Get the source task id
-    virtual UUIDType get_source_task_id() const
-    {
-        return ActionDataTrait_t::get_source_task_id(m_goal);
-    }
-
-    //! Set the source task id
-    virtual void set_source_task_id(UUIDType uuid)
-    {
-        ActionDataTrait_t::set_source_task_id(m_goal, uuid);
+        ActionDataTrait_t::set_source_task_metadata(m_goal, metadata);
     }
 
   protected:
@@ -443,10 +430,16 @@ class DefaultDeliveryRequest
     }
 
     //! Convert to target data
-    virtual int to_target_data(TargetDataType_t &) const
+    //! This function is final, to customize, override _to_target_data() instead
+    int to_target_data(TargetDataType_t &target_data) const
     {
-        // we have default implementation here so that static_assert can be used to check all concepts are satisfied
-        throw std::runtime_error("to_target_data() not implemented");
+        // mark signal code
+        target_data.set_source_data_uuid(m_source_data.get_uuid());
+        target_data.set_control_signal_code(m_control_signal_code);
+        target_data.set_source_task_metadata(m_source_task_metadata);
+
+        // pass to derived class to implement custom conversion
+        return _to_target_data(target_data);
     }
 
     //! Get the control signal code
@@ -467,27 +460,43 @@ class DefaultDeliveryRequest
         }
     }
 
-    //! Get the source task id
-    virtual const UUIDType &get_source_task_id() const
+    //! Get the source task metadata
+    virtual const RosActionTaskMetadata &get_source_task_metadata() const
     {
-        return m_source_task_id;
+        return m_source_task_metadata;
     }
 
-    //! Set the source task id
-    virtual void set_source_task_id(const UUIDType &source_task_id)
+    //! Get the source task metadata
+    RosActionTaskMetadata &get_source_task_metadata()
     {
-        m_source_task_id = source_task_id;
+        return m_source_task_metadata;
+    }
+
+    //! Set the source task metadata
+    virtual void set_source_task_metadata(const RosActionTaskMetadata &metadata)
+    {
+        m_source_task_metadata = metadata;
     }
 
     //! Send goal options
     SendGoalOptions_t send_goal_options;
 
   protected:
+    // convert source data to target data
+    // the target data is first converted using default implementation,
+    // then passed here to the derived class to implement custom conversion
+    virtual int _to_target_data(TargetDataType_t &) const
+    {
+        throw std::runtime_error("to_target_data() not implemented");
+        return 0;
+    }
+
+  protected:
     //! Source data for the delivery request
     SourceDataType_t m_source_data;
 
-    //! Source task id, which is the task that triggers this source data request
-    UUIDType m_source_task_id;
+    //! Source task metadata, which is the task that triggers this source data request
+    RosActionTaskMetadata m_source_task_metadata;
 
     //! Stamp data for getting delivery in-progress status
     StampType_t m_stamp;

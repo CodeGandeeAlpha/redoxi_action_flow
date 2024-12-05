@@ -92,20 +92,12 @@ concept DeliveryTargetDataConcept = requires(T t)
         std::declval<const T &>().to_publish_message(std::declval<typename T::PublishMessageType_t &>())
         } -> std::same_as<int>;
 
-    //! Must have method to get/set source task id
+    //! Get/set task metadata
     {
-        std::declval<const T &>().get_source_task_id()
-        } -> std::same_as<UUIDType>;
+        std::declval<const T &>().get_source_task_metadata()
+        } -> std::same_as<RosActionTaskMetadata>;
     {
-        std::declval<T &>().set_source_task_id(std::declval<UUIDType>())
-        } -> std::same_as<void>;
-
-    //! Must have method to get source task info
-    {
-        std::declval<const T &>().get_source_task_info()
-        } -> std::same_as<std::string>;
-    {
-        std::declval<T &>().set_source_task_info(std::declval<const std::string &>())
+        std::declval<T &>().set_source_task_metadata(std::declval<const RosActionTaskMetadata &>())
         } -> std::same_as<void>;
 };
 
@@ -193,9 +185,6 @@ concept DeliveryRequestConcept = requires(T t)
     {
         std::declval<const T &>().get_stamp()
         } -> std::same_as<const typename T::StampType_t &>;
-    // {
-    //     t.is_ping_request()
-    //     } -> std::same_as<bool>;
     {
         t.get_delivery_policy()
         } -> std::same_as<typename T::DeliveryPolicy_t *>;
@@ -203,11 +192,6 @@ concept DeliveryRequestConcept = requires(T t)
         std::declval<const T &>().get_delivery_policy()
         } -> std::same_as<const typename T::DeliveryPolicy_t *>;
 
-    //! Must have method to convert this to a ping request
-    //! To create a ping request, you do T().as_ping()
-    {
-        t.as_ping()
-        } -> std::same_as<void>;
 
     //! must be able to convert to target data
     //! @return 0 if success, -1 if failed
@@ -223,14 +207,6 @@ concept DeliveryRequestConcept = requires(T t)
         std::declval<T &>().set_control_signal_code(std::declval<ControlSignalCode>())
         } -> std::same_as<void>;
 
-    //! Must have method to get and set source task id, which is the task associated with the source data
-    {
-        std::declval<const T &>().get_source_task_id()
-        } -> std::same_as<UUIDType>;
-    {
-        std::declval<T &>().set_source_task_id(std::declval<UUIDType>())
-        } -> std::same_as<void>;
-
     //! Must have method to get and set send goal options
     {
         std::declval<const T &>().send_goal_options
@@ -238,6 +214,14 @@ concept DeliveryRequestConcept = requires(T t)
     {
         std::declval<T &>().send_goal_options
         } -> std::same_as<typename T::SendGoalOptions_t &>;
+
+    //! get/set source task metadata
+    {
+        std::declval<const T &>().get_source_task_metadata()
+        } -> std::same_as<const RosActionTaskMetadata &>;
+    {
+        std::declval<T &>().set_source_task_metadata(std::declval<const RosActionTaskMetadata &>())
+        } -> std::same_as<void>;
 };
 
 //! A task to deliver to the downstream action
