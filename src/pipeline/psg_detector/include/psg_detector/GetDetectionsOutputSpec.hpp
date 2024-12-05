@@ -128,8 +128,8 @@ static_assert(output_port_types::DeliveryPolicyConcept<DeliveryPolicy>, "Deliver
 using DeliveryRequestBase = output_port_types::DefaultDeliveryRequest<DeliverySourceData, DeliveryTargetData, DeliveryPolicy, DeliveryStampData>;
 class DeliveryRequest : public DeliveryRequestBase
 {
-  public:
-    virtual int to_target_data(DeliveryTargetData &target_data) const
+  protected:
+    virtual int _to_target_data(DeliveryTargetData &target_data) const override
     {
         // apply custom function if set
         if (custom_to_target_data) {
@@ -143,13 +143,13 @@ class DeliveryRequest : public DeliveryRequestBase
         auto document = this->m_source_data.get_document();
         goal.frame = document.frame;
 
-        // set additional information into the goal
-        using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
+        // // set additional information into the goal
+        // using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
 
-        // set the source data UUID
-        ActionTrait::set_uuid(goal, this->m_source_data.get_uuid());
+        // // set the source data UUID
+        // ActionTrait::set_uuid(goal, this->m_source_data.get_uuid());
 
-        ActionTrait::mark_with_control_signal(goal, get_control_signal_code());
+        // ActionTrait::mark_with_control_signal(goal, get_control_signal_code());
 
         return 0;
     }
