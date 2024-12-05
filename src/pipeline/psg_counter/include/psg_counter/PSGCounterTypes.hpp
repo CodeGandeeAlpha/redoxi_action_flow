@@ -79,7 +79,7 @@ using OutputPortSpec = OutputPortType::MasterSpec_t;
 //! The delivery policy for making frame delivery request
 using RequestPolicy = OutputPortSpec::DeliveryPolicy_t;
 
-//! The init config for PSGPersonGenerator
+//! The init config for PSGCounter
 struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
     virtual ~InitConfig() = default;
     InitConfig()
@@ -96,6 +96,8 @@ struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
     std::shared_ptr<OutputPortSpec::InitConfig_t> output_port_config =
         std::make_shared<OutputPortSpec::InitConfig_t>();
 
+    //! passengerflow config path
+    std::string passengerflow_config_path;
 
     //! create the debug publish topic for this node?
     bool create_debug_pub = true;
@@ -118,7 +120,8 @@ struct InitConfig : public common_nodes::StartStopNode::InitConfig_t {
                          JS_MEMBER(create_debug_pub),
                          JS_MEMBER(debug_pub_queue_size),
                          JS_MEMBER(debug_pub_task_enqueue_name),
-                         JS_MEMBER(debug_pub_task_drop_name));
+                         JS_MEMBER(debug_pub_task_drop_name),
+                         JS_MEMBER(passengerflow_config_path));
 };
 
 //! The runtime config for PSGPersonGenerator

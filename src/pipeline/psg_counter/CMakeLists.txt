@@ -11,6 +11,7 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(redoxi_common_nodes REQUIRED)
 find_package(psg_document_sink REQUIRED)
+find_package(psg_common REQUIRED)
 find_package(PassengerFlow REQUIRED)
 
 add_library(psg_counter src/PSGCounter.cpp)
@@ -20,17 +21,18 @@ target_include_directories(psg_counter PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(
-  psg_counter
+  psg_counter PUBLIC
   "rclcpp"
   redoxi_common_nodes
   psg_document_sink
+  psg_common
 )
+target_link_libraries(psg_counter PUBLIC PassengerFlow::PassengerFlow)
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
 target_compile_definitions(psg_counter PRIVATE "PSG_COUNTER_BUILDING_LIBRARY")
 
-target_link_libraries(psg_counter PUBLIC PassengerFlow::PassengerFlow)
 install(
   DIRECTORY include/
   DESTINATION include
@@ -69,6 +71,7 @@ ament_export_dependencies(
   rclcpp
   redoxi_common_nodes
   psg_document_sink
+  psg_common
 )
 
 ament_package()
