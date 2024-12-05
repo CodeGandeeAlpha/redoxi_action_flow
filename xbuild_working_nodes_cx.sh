@@ -31,7 +31,8 @@ PackagesToBuild="redoxi_common_nodes \
                  psg_tracker \
                  video_reader_orbbec \
                  redoxi_video_reader \
-                 video_reader_from_url"
+                 video_reader_from_url \
+                 psg_counter"
 
 
 # PackagesToBuild="
