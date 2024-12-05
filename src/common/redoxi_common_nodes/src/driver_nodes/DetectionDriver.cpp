@@ -34,7 +34,11 @@ int DetectionDriver::_on_process_input_request(InputRequestHandler_t::OutputRequ
     auto msg_uuid_str = boost::uuids::to_string(msg_uuid);
 
     const auto frame_number = source_data->get_goal()->frame.metadata.frame_num;
-    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Processing frame number {}", msg_uuid_str, frame_number);
+    const auto source_frame_index = source_data->get_goal()->frame.metadata.source_frame_index;
+    const auto source_frame_timestamp = source_data->get_goal()->frame.metadata.source_timestamp;
+    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Driver got frame number={}, source_frame_index={}, source_frame_timestamp={}",
+                 msg_uuid_str, frame_number, source_frame_index,
+                 fmt::format("{}.{:06d} sec", source_frame_timestamp.sec, source_frame_timestamp.nanosec));
 
     // create request
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Creating request from source data", msg_uuid_str);

@@ -8,13 +8,13 @@
 namespace redoxi_works::common_nodes::drivers
 {
 class DetectionDriver : public CallActionDriverBase<image_ports::AsyncImageInputPort,
-                                                    detection_ports::response_only::DetectionResponseOutputPort,
-                                                    detection_ports::request_response::DetectionRequestOutputPort>
+                                                    detection_ports::request_response::DetectionRequestOutputPort,
+                                                    detection_ports::response_only::DetectionResponseOutputPort>
 {
   public:
     using BaseNode_t = CallActionDriverBase<image_ports::AsyncImageInputPort,
-                                            detection_ports::response_only::DetectionResponseOutputPort,
-                                            detection_ports::request_response::DetectionRequestOutputPort>;
+                                            detection_ports::request_response::DetectionRequestOutputPort,
+                                            detection_ports::response_only::DetectionResponseOutputPort>;
     using BaseNode_t::CallActionDriverBase;
 
   protected:

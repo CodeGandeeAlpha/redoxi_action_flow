@@ -156,7 +156,9 @@ VideoSourceFromUrl::ReadFrameResult VideoSourceFromUrl::_read_frame(SourceData_t
 
     // update metedata
     SourceData_t::FrameMetadata_t metadata;
-    metadata.frame_num = _increment_frame_number_by(frame_number, 1);
+    auto fno = _increment_frame_number_by(frame_number, 1);
+    metadata.frame_num = fno;
+    metadata.source_frame_index = fno;
     metadata.width = frame.cols;
     metadata.height = frame.rows;
     auto timestamp_ms = m_video_capture->get(cv::CAP_PROP_POS_MSEC);
