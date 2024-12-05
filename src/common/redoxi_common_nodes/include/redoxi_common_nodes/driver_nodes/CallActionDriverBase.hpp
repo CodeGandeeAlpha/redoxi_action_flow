@@ -14,12 +14,12 @@ namespace redoxi_works::common_nodes::drivers
 {
 
 template <AsyncActionInputPortConcept InputPortType,
-          AsyncActionOutputPortConcept OutputPortType,
-          AsyncActionOutputPortConcept CalleeRequestPortType>
+          AsyncActionOutputPortConcept CalleeRequestPortType,
+          AsyncActionOutputPortConcept OutputPortType>
 struct CallActionDriverInitConfig;
 
-template <AsyncActionOutputPortConcept OutputPortType,
-          AsyncActionOutputPortConcept CalleeRequestPortType>
+template <AsyncActionOutputPortConcept CalleeRequestPortType,
+          AsyncActionOutputPortConcept OutputPortType>
 struct CallActionDriverRuntimeConfig;
 
 /*
@@ -29,13 +29,13 @@ struct CallActionDriverRuntimeConfig;
  * It can also be used as a standalone node, using callback functions to execute the processing.
  */
 template <AsyncActionInputPortConcept InputPortType,
-          AsyncActionOutputPortConcept OutputPortType,
-          AsyncActionOutputPortConcept CalleeRequestPortType>
+          AsyncActionOutputPortConcept CalleeRequestPortType,
+          AsyncActionOutputPortConcept OutputPortType>
 class CallActionDriverBase : public OpenCloseNode
 {
   public:
-    using InitConfig_t = CallActionDriverInitConfig<InputPortType, OutputPortType, CalleeRequestPortType>;
-    using RuntimeConfig_t = CallActionDriverRuntimeConfig<OutputPortType, CalleeRequestPortType>;
+    using InitConfig_t = CallActionDriverInitConfig<InputPortType, CalleeRequestPortType, OutputPortType>;
+    using RuntimeConfig_t = CallActionDriverRuntimeConfig<CalleeRequestPortType, OutputPortType>;
 
     using BaseNode_t = OpenCloseNode;
     using BaseInitConfig_t = BaseNode_t::InitConfig_t;
@@ -209,8 +209,8 @@ class CallActionDriverBase : public OpenCloseNode
 };
 
 template <AsyncActionInputPortConcept InputPortType,
-          AsyncActionOutputPortConcept OutputPortType,
-          AsyncActionOutputPortConcept CalleeRequestPortType>
+          AsyncActionOutputPortConcept CalleeRequestPortType,
+          AsyncActionOutputPortConcept OutputPortType>
 struct CallActionDriverInitConfig : public OpenCloseNode::InitConfig_t {
     using DriverInputPortConfig_t = typename InputPortType::InitConfig_t;
     using DriverOutputPortConfig_t = typename OutputPortType::InitConfig_t;
@@ -229,8 +229,8 @@ struct CallActionDriverInitConfig : public OpenCloseNode::InitConfig_t {
                          JS_MEMBER(callee_request_port_config));
 };
 
-template <AsyncActionOutputPortConcept OutputPortType,
-          AsyncActionOutputPortConcept CalleeRequestPortType>
+template <AsyncActionOutputPortConcept CalleeRequestPortType,
+          AsyncActionOutputPortConcept OutputPortType>
 struct CallActionDriverRuntimeConfig : public OpenCloseNode::RuntimeConfig_t {
     using CalleeRequestEnqueuePolicy_t = typename CalleeRequestPortType::DeliveryPolicy_t;
     using DriverOutputEnqueuePolicy_t = typename OutputPortType::DeliveryPolicy_t;
@@ -256,9 +256,9 @@ struct CallActionDriverRuntimeConfig : public OpenCloseNode::RuntimeConfig_t {
 // }
 
 template <AsyncActionInputPortConcept InputPortType,
-          AsyncActionOutputPortConcept OutputPortType,
-          AsyncActionOutputPortConcept CalleeRequestPortType>
-int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+          AsyncActionOutputPortConcept CalleeRequestPortType,
+          AsyncActionOutputPortConcept OutputPortType>
+int CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
     _open()
 {
     RDX_INFO_DEV(this, __func__, false, "Opening driver node, class={}", typeid(*this).name());
@@ -267,9 +267,9 @@ int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
 }
 
 template <AsyncActionInputPortConcept InputPortType,
-          AsyncActionOutputPortConcept OutputPortType,
-          AsyncActionOutputPortConcept CalleeRequestPortType>
-int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+          AsyncActionOutputPortConcept CalleeRequestPortType,
+          AsyncActionOutputPortConcept OutputPortType>
+int CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
     _start()
 {
     RDX_INFO_DEV(this, __func__, false, "Starting driver node, class={}", typeid(*this).name());
@@ -287,9 +287,9 @@ int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
 }
 
 template <AsyncActionInputPortConcept InputPortType,
-          AsyncActionOutputPortConcept OutputPortType,
-          AsyncActionOutputPortConcept CalleeRequestPortType>
-int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+          AsyncActionOutputPortConcept CalleeRequestPortType,
+          AsyncActionOutputPortConcept OutputPortType>
+int CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
     _stop()
 {
     RDX_INFO_DEV(this, __func__, false, "Stopping driver node, class={}", typeid(*this).name());
@@ -307,9 +307,9 @@ int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
 }
 
 template <AsyncActionInputPortConcept InputPortType,
-          AsyncActionOutputPortConcept OutputPortType,
-          AsyncActionOutputPortConcept CalleeRequestPortType>
-int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+          AsyncActionOutputPortConcept CalleeRequestPortType,
+          AsyncActionOutputPortConcept OutputPortType>
+int CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
     _close()
 {
     RDX_INFO_DEV(this, __func__, false, "Closing driver node, class={}", typeid(*this).name());
@@ -318,9 +318,9 @@ int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
 }
 
 template <AsyncActionInputPortConcept InputPortType,
-          AsyncActionOutputPortConcept OutputPortType,
-          AsyncActionOutputPortConcept CalleeRequestPortType>
-void CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+          AsyncActionOutputPortConcept CalleeRequestPortType,
+          AsyncActionOutputPortConcept OutputPortType>
+void CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
     _step()
 {
     if (m_input_request_handler) {
@@ -329,9 +329,9 @@ void CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>:
 }
 
 template <AsyncActionInputPortConcept InputPortType,
-          AsyncActionOutputPortConcept OutputPortType,
-          AsyncActionOutputPortConcept CalleeRequestPortType>
-int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+          AsyncActionOutputPortConcept CalleeRequestPortType,
+          AsyncActionOutputPortConcept OutputPortType>
+int CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
     _update_init_config(std::shared_ptr<BaseInitConfig_t> init_config)
 {
     //! Update initial configuration
@@ -367,9 +367,9 @@ int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
 }
 
 template <AsyncActionInputPortConcept InputPortType,
-          AsyncActionOutputPortConcept OutputPortType,
-          AsyncActionOutputPortConcept CalleeRequestPortType>
-int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+          AsyncActionOutputPortConcept CalleeRequestPortType,
+          AsyncActionOutputPortConcept OutputPortType>
+int CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
     _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config)
 {
 
@@ -416,9 +416,9 @@ int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
 }
 
 template <AsyncActionInputPortConcept InputPortType,
-          AsyncActionOutputPortConcept OutputPortType,
-          AsyncActionOutputPortConcept CalleeRequestPortType>
-int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+          AsyncActionOutputPortConcept CalleeRequestPortType,
+          AsyncActionOutputPortConcept OutputPortType>
+int CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
     _on_process_callee_result(typename OutputTypes::OutputRequest_t *output_request,
                               typename OutputTypes::OutputDeliveryPolicy_t *output_enqueue_policy,
                               std::shared_ptr<const typename CalleeTypes::RequestOutputActionResult_t> callee_result,
@@ -434,9 +434,9 @@ int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
 }
 
 template <AsyncActionInputPortConcept InputPortType,
-          AsyncActionOutputPortConcept OutputPortType,
-          AsyncActionOutputPortConcept CalleeRequestPortType>
-void CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+          AsyncActionOutputPortConcept CalleeRequestPortType,
+          AsyncActionOutputPortConcept OutputPortType>
+void CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
     _internal_request_sent_to_callee(
         typename CalleeTypes::RequestOutputPort_t::TargetData_t &target_data,
         typename CalleeTypes::RequestOutputPort_t::SendResult_t &send_result,
@@ -488,9 +488,9 @@ void CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>:
 }
 
 template <AsyncActionInputPortConcept InputPortType,
-          AsyncActionOutputPortConcept OutputPortType,
-          AsyncActionOutputPortConcept CalleeRequestPortType>
-int CallActionDriverBase<InputPortType, OutputPortType, CalleeRequestPortType>::
+          AsyncActionOutputPortConcept CalleeRequestPortType,
+          AsyncActionOutputPortConcept OutputPortType>
+int CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
     _on_process_input_request(typename InputRequestHandler_t::OutputRequest_t *output_request,
                               std::optional<typename InputRequestHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
                               typename InputRequestHandler_t::InputActionResult_t *output_result,

@@ -421,6 +421,13 @@ void RedoxiVideoReaderBase::_step()
         // push request to output port
         bool success = false;
         if (!user_reject) {
+            auto frame_number = source_data.get_frame_metadata().frame_num;
+            auto source_frame_index = source_data.get_frame_metadata().source_frame_index;
+            auto source_frame_timestamp = source_data.get_frame_metadata().source_timestamp;
+
+            RDX_INFO_DEV(this, __func__, "[msg_uuid={}] sending frame_number={}, source_frame_index={}, source_frame_timestamp={}",
+                         boost::uuids::to_string(msg_uuid), frame_number, source_frame_index,
+                         fmt::format("{}.{:06d} sec", source_frame_timestamp.sec, source_frame_timestamp.nanosec));
             success = m_primary_output_port->push_request(delivery_request, qos);
         }
 

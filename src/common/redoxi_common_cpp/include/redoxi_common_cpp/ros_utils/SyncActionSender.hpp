@@ -69,7 +69,12 @@ class SyncActionSender
     using ActionType_t = ActionType;
     using ActionClient_t = rclcpp_action::Client<ActionType_t>;
     using GoalHandle_t = rclcpp_action::ClientGoalHandle<ActionType_t>;
+    using GoalHandleFuture_t = std::shared_future<typename GoalHandle_t::SharedPtr>;
     using Goal_t = typename ActionType_t::Goal;
+    using TimeUnit_t = DurationType;
+
+    //! time value to wait indefinitely
+    inline static constexpr TimeUnit_t InfiniteWaitTime = TimeUnit_t(-1);
 
     /**
      * @brief The result of sending a goal to downstream action server
@@ -94,7 +99,7 @@ class SyncActionSender
          * @details If the send action does not execute (downstream not ready), then it can be empty.
          *          Can be resolved to get the goal handle
          */
-        std::shared_future<typename GoalHandle_t::SharedPtr> goal_handle_future;
+        GoalHandleFuture_t goal_handle_future;
 
         /**
          * @brief The goal handle, obtained from the ROS action, if goal is accepted
@@ -105,6 +110,17 @@ class SyncActionSender
 
     // just for consistency
     using SendResult_t = _SendResult;
+
+    // wait event handler
+    enum class ActionAfterTimeout {
+        NoAction,        // leave it as is, do nothing
+        TreatAsRejected, // treat it as rejected
+        WaitAgain,       // wait again
+    };
+    using WaitTimeoutCallback_t = std::function<ActionAfterTimeout(const Goal_t &goal,
+                                                                   ActionClient_t &client,
+                                                                   TimeUnit_t time_waited,
+                                                                   GoalHandleFuture_t &goal_handle_future)>;
 
     // get callbacks for logging purposes, can be used with send()
     template <ActionDataTraitConcept ActionDataTrait>
@@ -198,8 +214,9 @@ class SyncActionSender
         SendResult_t send(
             const Goal_t &goal,
             ActionClient_t &client,
-            DurationType timeout = DurationType(-1),
-            std::optional<typename ActionClient_t::SendGoalOptions> callbacks = std::nullopt)
+            DurationType timeout = InfiniteWaitTime,
+            std::optional<typename ActionClient_t::SendGoalOptions> callbacks = std::nullopt,
+            std::optional<WaitTimeoutCallback_t> timeout_callback = std::nullopt)
     const
     {
         SendResult_t result;
@@ -233,24 +250,54 @@ class SyncActionSender
         std::string msg_uuid_str = has_data_trait ? fmt::format("[msg_uuid={}]{}", boost::uuids::to_string(msg_uuid), is_ping ? "[PING] " : " ") : "";
 
         //! Handle waiting behavior
-        if (timeout > DurationType::zero()) {
-            //! Wait for the specified duration or until goal response is received
-            RDX_LOG_DEBUG(m_node, __func__, "{}start waiting for goal response for {} ms",
-                          msg_uuid_str, timeout.count());
+        if (timeout >= DurationType::zero()) {
+            //! try to wait for the goal response, if timeout, handle the timeout until we get a definite response
+            //! or the user decides to abort
+            while (true && rclcpp::ok()) {
+                // wait once
+                RDX_LOG_DEBUG(m_node, __func__, "{}start waiting for goal response for {} {}",
+                              msg_uuid_str, timeout.count(), _get_time_unit_name<TimeUnit_t>());
+                auto status = goal_handle_future.wait_for(timeout);
+                if (status == std::future_status::timeout) {
+                    //! Timeout occurred, ask the user what to do
+                    RDX_LOG_DEBUG(m_node, __func__, "{}wait for goal response timeout", msg_uuid_str);
+                    result.response_code = ActionDownstreamResponse::TIMEOUT;
 
-            auto status = goal_handle_future.wait_for(timeout);
-            if (status == std::future_status::timeout) {
-                //! Timeout occurred
-                RDX_LOG_DEBUG(m_node, __func__, "{}wait for goal response timeout", msg_uuid_str);
-                result.response_code = ActionDownstreamResponse::TIMEOUT;
-            } else {
-                //! Goal response received within timeout
-                auto goal_handle = goal_handle_future.get();
-                if (goal_handle) {
-                    result.response_code = ActionDownstreamResponse::ACCEPTED;
-                    result.goal_handle = goal_handle;
+                    //! Check for a timeout callback and execute it if available, if yes, call it
+                    ActionAfterTimeout action_after_timeout = ActionAfterTimeout::NoAction;
+                    if (timeout_callback.has_value()) {
+                        action_after_timeout = (*timeout_callback)(goal, client, timeout, goal_handle_future);
+                    }
+
+                    //! Handle action after timeout if necessary
+                    switch (action_after_timeout) {
+                        case ActionAfterTimeout::WaitAgain:
+                            RDX_LOG_DEBUG(m_node, __func__, "{}wait again as requested by user", msg_uuid_str);
+                            continue; // Retry waiting
+                        case ActionAfterTimeout::TreatAsRejected:
+                            // Got definite response, exit the loop and function
+                            RDX_LOG_DEBUG(m_node, __func__, "{}treat as rejected as requested by user", msg_uuid_str);
+                            result.response_code = ActionDownstreamResponse::REJECTED;
+                            return result;
+                        case ActionAfterTimeout::NoAction:
+                            // No more waiting, exit the loop, let the user handle the indefinite result
+                            RDX_LOG_DEBUG(m_node, __func__, "{}no action taken, let the user handle the waiting later", msg_uuid_str);
+                            result.response_code = ActionDownstreamResponse::TIMEOUT;
+                            return result;
+                    }
                 } else {
-                    result.response_code = ActionDownstreamResponse::REJECTED;
+                    //! Goal response received within timeout
+                    auto goal_handle = goal_handle_future.get();
+                    if (goal_handle) {
+                        RDX_LOG_DEBUG(m_node, __func__, "{}goal response received", msg_uuid_str);
+                        result.response_code = ActionDownstreamResponse::ACCEPTED;
+                        result.goal_handle = goal_handle;
+                        return result;
+                    } else {
+                        RDX_LOG_DEBUG(m_node, __func__, "{}goal rejected", msg_uuid_str);
+                        result.response_code = ActionDownstreamResponse::REJECTED;
+                        return result;
+                    }
                 }
             }
         } else {
@@ -259,13 +306,15 @@ class SyncActionSender
 
             auto goal_handle = goal_handle_future.get();
             if (goal_handle) {
+                RDX_LOG_DEBUG(m_node, __func__, "{}goal accepted", msg_uuid_str);
                 result.response_code = ActionDownstreamResponse::ACCEPTED;
                 result.goal_handle = goal_handle;
+                return result;
             } else {
+                RDX_LOG_DEBUG(m_node, __func__, "{}goal rejected", msg_uuid_str);
                 result.response_code = ActionDownstreamResponse::REJECTED;
+                return result;
             }
-
-            RDX_LOG_DEBUG(m_node, __func__, "{}goal response received", msg_uuid_str);
         }
 
         RDX_LOG_DEBUG(m_node, __func__, "{}async sender done, returning result", msg_uuid_str);

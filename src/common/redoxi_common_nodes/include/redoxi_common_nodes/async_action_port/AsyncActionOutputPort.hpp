@@ -56,10 +56,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
     using RetryPolicy_t = typename DeliveryPolicy_t::RetryPolicyType_t;
 
     // synchronous action sender
-    using SyncActionSender_t = SyncActionSender<ActionType_t>;
+    using SyncActionSender_t = SyncActionSender<ActionType_t, TimeUnit_t>;
 
     // returned by sync action sender
     using SendResult_t = typename SyncActionSender_t::SendResult_t;
+    using SendTimeoutCallback_t = typename SyncActionSender_t::WaitTimeoutCallback_t;
+    using ActionAfterTimeout = typename SyncActionSender_t::ActionAfterTimeout;
 
     //! Result of a delivery task
     struct DeliveryResult_t {
@@ -777,6 +779,23 @@ class AsyncActionOutputPort : public IStartStopProtocol
                      ds.get_downstream_spec().get_name(), max_attempts,
                      timeout_each_attempt.count(), interval_between_attempts.count());
 
+        // in case of timeout, we will wait again until we get a definite response
+        SendTimeoutCallback_t timeout_callback =
+            [this, msg_uuid, &ds](const typename SyncActionSender_t::Goal_t &goal,
+                                  typename SyncActionSender_t::ActionClient_t &client,
+                                  TimeUnit_t time_waited,
+                                  typename SyncActionSender_t::GoalHandleFuture_t &goal_handle_future) {
+                (void)goal;
+                (void)client;
+                (void)time_waited;
+                (void)goal_handle_future;
+                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
+                             "[msg_uuid={}] Timeout after waiting for {} {} for downstream {}, do it again",
+                             boost::uuids::to_string(msg_uuid), time_waited.count(),
+                             _get_time_unit_name<TimeUnit_t>(), ds.get_downstream_spec().get_name());
+                return ActionAfterTimeout::WaitAgain;
+            };
+
         while (attempts < max_attempts || no_drop) {
             if (!rclcpp::ok()) {
                 // system is shutting down, get out
@@ -794,7 +813,20 @@ class AsyncActionOutputPort : public IStartStopProtocol
                          boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name(),
                          attempts + 1, max_attempts, no_drop ? "true" : "false");
 
-            auto result = _send_data_to_downstream(target_data, ds, timeout_each_attempt, request.send_goal_options);
+            SendResult_t result;
+            if (timeout_each_attempt < DefaultTimeUnit_t::zero()) {
+                // wait indefinitely, until we get a definite response
+                result = _send_data_to_downstream(target_data, ds,
+                                                  SyncActionSender_t::InfiniteWaitTime,
+                                                  request.send_goal_options,
+                                                  timeout_callback);
+            } else {
+                // wait for a certain amount of time, do it again and again until we get a definite response
+                result = _send_data_to_downstream(target_data, ds,
+                                                  timeout_each_attempt, request.send_goal_options,
+                                                  timeout_callback);
+            }
+
             if (output_result != nullptr) {
                 *output_result = result;
             }
@@ -821,23 +853,34 @@ class AsyncActionOutputPort : public IStartStopProtocol
                                          boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
                             break;
                         case ActionDownstreamResponse::TIMEOUT:
-                            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while sending frame to downstream {}",
-                                         boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
-                            break;
+                            // RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while sending frame to downstream {}",
+                            //              boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
+                            // should not resend if timeout, we should wait again until we get a definite response
+                            // otherwise, downstream may receive overlapping messages
+                            // we have retried waiting if timeout until we get a definite response, so it is impossible to get here
+                            RDX_RAISE_ERROR("{}: Unexpected outcome: timeout while sending frame to downstream {}",
+                                            __func__, ds.get_downstream_spec().get_name());
                     }
                 } else {
+                    // TODO: this branch is not necessary anymore, it should never reach here
                     // may or maynot have a response code, check the goal handle future
                     if (wait_indefinitely) {
                         //! Wait indefinitely for the goal handle future
-                        result.goal_handle_future.wait();
+                        RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Waiting indefinitely for the goal handle future from downstream {}",
+                                     boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
                         auto goal_handle = result.goal_handle_future.get();
                         if (goal_handle) {
+                            result.response_code = ActionDownstreamResponse::ACCEPTED;
+                            result.goal_handle = goal_handle;
+                            if (output_result != nullptr) {
+                                *output_result = result;
+                            }
                             return 0; // Success
                         }
                     } else {
                         //! Regard as failure without additional waiting
-                        RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Timeout while waiting for goal handle from downstream {}",
-                                     boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
+                        RDX_RAISE_ERROR("{}: Unexpected outcome: timeout while waiting for goal handle from downstream {}",
+                                        __func__, ds.get_downstream_spec().get_name());
                     }
                 }
             }
@@ -863,7 +906,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
     virtual SendResult_t _send_data_to_downstream(const TargetData_t &target_data,
                                                   const Downstream_t &ds,
                                                   TimeUnit_t timeout,
-                                                  std::optional<typename DeliveryRequest_t::SendGoalOptions_t> send_goal_options = std::nullopt)
+                                                  std::optional<typename DeliveryRequest_t::SendGoalOptions_t> send_goal_options = std::nullopt,
+                                                  std::optional<SendTimeoutCallback_t> timeout_callback = std::nullopt)
     {
         //! Get the action client for the downstream
         auto client = ds.get_action_client();
@@ -881,7 +925,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         SyncActionSender_t sender(m_parent_node);
         // auto logging_callbacks = sender.template get_logging_callbacks<ActionDataTrait_t>(goal);
         // auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout, logging_callbacks);
-        auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout, send_goal_options);
+        auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout, send_goal_options, timeout_callback);
 
         return result;
     }
