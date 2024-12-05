@@ -30,7 +30,7 @@ video_source_params = {
                         "retry_policy": {
                             "fallback_number_of_retry": 3,
                             "fallback_wait_time_between_retry": 5000,
-                            "fallback_wait_time_retry_response": 1000000,
+                            "fallback_wait_time_retry_response": -1,
                         },
                         "drop_strategy": "no_drop",
                     },
@@ -60,8 +60,7 @@ video_source_params = {
                 "fallback_number_of_retry": 3,
                 "wait_time_between_retry": 5000,
                 "fallback_wait_time_between_retry": 5000,
-                "wait_time_retry_response": 5000,
-                "fallback_wait_time_retry_response": 1000000,
+                "fallback_wait_time_retry_response": -1,
             },
             "precondition": "no_precondition",
             "drop_strategy": "no_drop",
@@ -72,8 +71,7 @@ video_source_params = {
                 "fallback_number_of_retry": 3,
                 "wait_time_between_retry": 5000,
                 "fallback_wait_time_between_retry": 5000,
-                "wait_time_retry_response": 5000,
-                "fallback_wait_time_retry_response": 1000000,
+                "fallback_wait_time_retry_response": -1,
             },
             "precondition": "no_precondition",
             "drop_strategy": "no_drop",
@@ -97,7 +95,7 @@ psg_master_node_json_params = {
                         "retry_policy": {
                             "fallback_number_of_retry": 3,
                             "fallback_wait_time_between_retry": 5000,
-                            "fallback_wait_time_retry_response": 1000000,
+                            "fallback_wait_time_retry_response": -1,
                         },
                         "drop_strategy": "no_drop",
                     },
@@ -136,7 +134,7 @@ psg_detector_node_pipeline_json_params = {
                         "retry_policy": {
                             "fallback_number_of_retry": 3,
                             "fallback_wait_time_between_retry": 5000,
-                            "fallback_wait_time_retry_response": 1000000,
+                            "fallback_wait_time_retry_response": -1,
                         },
                         "drop_strategy": "no_drop",
                     },
@@ -155,7 +153,7 @@ psg_detector_node_pipeline_json_params = {
                         "retry_policy": {
                             "fallback_number_of_retry": 3,
                             "fallback_wait_time_between_retry": 5000,
-                            "fallback_wait_time_retry_response": 1000000,
+                            "fallback_wait_time_retry_response": -1,
                         },
                         "drop_strategy": "no_drop",
                     },
@@ -192,7 +190,7 @@ psg_pose_detector_node_pipeline_json_params = {
                         "retry_policy": {
                             "fallback_number_of_retry": 3,
                             "fallback_wait_time_between_retry": 5000,
-                            "fallback_wait_time_retry_response": 1000000,
+                            "fallback_wait_time_retry_response": -1,
                         },
                         "drop_strategy": "no_drop",
                     },
@@ -211,7 +209,7 @@ psg_pose_detector_node_pipeline_json_params = {
                         "retry_policy": {
                             "fallback_number_of_retry": 3,
                             "fallback_wait_time_between_retry": 5000,
-                            "fallback_wait_time_retry_response": 1000000,
+                            "fallback_wait_time_retry_response": -1,
                         },
                         "drop_strategy": "no_drop",
                     },
@@ -247,7 +245,7 @@ psg_person_generator_node_json_params = {
                         "retry_policy": {
                             "fallback_number_of_retry": 3,
                             "fallback_wait_time_between_retry": 5000,
-                            "fallback_wait_time_retry_response": 1000000,
+                            "fallback_wait_time_retry_response": -1,
                         },
                         "drop_strategy": "no_drop",
                     },
@@ -286,7 +284,7 @@ psg_tracker_node_pipeline_json_params = {
                         "retry_policy": {
                             "fallback_number_of_retry": 3,
                             "fallback_wait_time_between_retry": 5000,
-                            "fallback_wait_time_retry_response": 1000000,
+                            "fallback_wait_time_retry_response": -1,
                         },
                         "drop_strategy": "no_drop",
                     },
@@ -305,7 +303,7 @@ psg_tracker_node_pipeline_json_params = {
                         "retry_policy": {
                             "fallback_number_of_retry": 3,
                             "fallback_wait_time_between_retry": 5000,
-                            "fallback_wait_time_retry_response": 1000000,
+                            "fallback_wait_time_retry_response": -1,
                         },
                         "drop_strategy": "no_drop",
                     },
@@ -369,8 +367,8 @@ common_prefix = None
 common_ros_args = []
 
 video_source_node = Node(
-    package="test_package",
-    executable="video_from_url_node",
+    package="test_cx",
+    executable="v2_video_url_flush",
     name="video_source",
     namespace="video_source",
     output="screen",
