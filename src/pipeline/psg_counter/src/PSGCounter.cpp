@@ -61,6 +61,9 @@ struct PSGCounterImpl {
     PassengerFlow::EventZonePtr _gen_passing_zone(const PassingRegionInfo *region_info, const PassengerFlow::CameraModelPtr &cam,
                                                   const PassengerFlow::GroundPtr &ground);
 
+    void _draw_region_points(cv::Mat &img, const cv::Scalar &region_color, const std::string &region_name,
+                             const std::vector<PassengerFlow::POINT> &region_points,
+                             const PassengerFlow::GroundPtr &ground, const PassengerFlow::CameraModelPtr &camera);
     // pull input, work on it and then send output
     using PullProcessSendHandler_t = redoxi_works::port_handlers::PullProcessSendHandler<PSGCounter::InputPort_t::MasterSpec_t,
                                                                                          PSGCounter::OutputPort_t::MasterSpec_t>;
@@ -159,14 +162,21 @@ int PSGCounter::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
     m_impl = _create_impl();
 
     // setup analyzers
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始解析乘客流配置文件: {}", init_config->passengerflow_config_path);
     auto param = m_impl->_parse_config_file(init_config->passengerflow_config_path);
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "完成解析乘客流配置文件");
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "开始设置场景");
     m_impl->_set_scene(param, m_impl->m_scene, m_impl->m_camera, m_impl->m_ground, m_impl->m_event_zones);
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "完成设置场景");
     m_impl->m_spatial_analyzer->set_scene(m_impl->m_scene);
     m_impl->m_spatial_analyzer->set_ground(m_impl->m_ground);
 
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始设置事件区域到轨迹分析器, 共{}个区域", m_impl->m_event_zones.size());
     for (auto &iter : m_impl->m_event_zones) {
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "设置事件区域: {}", iter.first);
         m_impl->m_trajectory_analyzer->set_event_zone(iter.first, iter.second);
     }
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "完成设置所有事件区域到轨迹分析器");
 
     //! config must have some downstream
     // RDX_ASSERT_CHECK_TRUE(!config->primary_output_spec.get_downstream_specs().empty(),
@@ -337,8 +347,11 @@ int PSGCounter::_create_document_request_handler(const RuntimeConfig_t &runtime_
                         PassengerFlow::POINT3 foot_position;
                         bool position_valid;
                         person->get_foot_position(&foot_position, &position_valid);
-                        // RCLCPP_DEBUG(m_impl->logger, "_process_step(): person id: %d, person height: %lf, foot position: (%lf, %lf, %lf)",
-                        //              person->get_person_id(), person->get_body_height().m_body_height, foot_position.x, foot_position.y, foot_position.z);
+                        RDX_INFO_DEV(this, __func__, false,
+                                     "person id: {}, person height: {}, foot position: ({}, {}, {})",
+                                     person->get_person_id(),
+                                     person->get_body_height().m_body_height,
+                                     foot_position.x, foot_position.y, foot_position.z);
                     }
 
                     // has_traj = true;
@@ -346,10 +359,10 @@ int PSGCounter::_create_document_request_handler(const RuntimeConfig_t &runtime_
 
                 for (auto &iter : events) {
                     for (auto &event : iter.second) {
-                        // RCLCPP_DEBUG(m_impl->logger, "_process_step(): event id: %d, id: %d, event type: %d, start time: %f, end time: %f, \
-                    //             event info: %s, speed_x: %f, speed_y: %f",
-                        //              event.m_person_id, event.m_person_id, event.m_event_type, event.m_start_time,
-                        //              event.m_end_time, event.m_matched_trajectory.c_str(), event.m_speed.x, event.m_speed.y);
+                        RDX_INFO_DEV(this, __func__, false, "event id: {}, id: {}, event type: {}, start time: {}, end time: {}, \
+                                event info: {}, speed_x: {}, speed_y: {}",
+                                     event.m_person_id, event.m_person_id, event.m_event_type, event.m_start_time,
+                                     event.m_end_time, event.m_matched_trajectory.c_str(), event.m_speed.x, event.m_speed.y);
                         v_traj_event.push_back(event);
                     }
                 }
@@ -636,123 +649,186 @@ PassengerFlow::EventZonePtr PSGCounterImpl::_gen_passing_zone(const PassingRegio
     return passing_in_out_event_zone;
 }
 
+void PSGCounterImpl::_draw_region_points(cv::Mat &img, const cv::Scalar &region_color, const std::string &region_name,
+                                         const std::vector<PassengerFlow::POINT> &region_points,
+                                         const PassengerFlow::GroundPtr &ground, const PassengerFlow::CameraModelPtr &camera)
+{
+    std::vector<cv::Point2i> region_points_on_img;
+    int center_u = 0, center_v = 0;
+    for (auto &point : region_points) {
+        auto point_in_world = ground->ground_to_world(point);
+        PassengerFlow::fVECTOR_3 point_in_world_vec(point_in_world.x, point_in_world.y, point_in_world.z);
+        auto point_on_img = camera->project_points(point_in_world_vec);
+        int u = point_on_img[0], v = point_on_img[1];
+        center_u += u;
+        center_v += v;
+        region_points_on_img.push_back({u, v});
+    }
+
+    center_u /= region_points_on_img.size();
+    center_v /= region_points_on_img.size();
+    PassengerFlow::POINT pre_point = region_points_on_img[0], next_point;
+    for (size_t i = 1; i < region_points_on_img.size(); ++i) {
+        //! 获取下一个点
+        next_point = region_points_on_img[i];
+        RDX_INFO_DEV(nullptr, __func__, false, "绘制区域线段 - 从点[{},{}]到点[{},{}]",
+                     pre_point.x, pre_point.y, next_point.x, next_point.y);
+        //! 绘制线段
+        cv::line(img, pre_point, next_point, region_color);
+        //! 更新前一个点
+        pre_point = next_point;
+    }
+    next_point = region_points_on_img[0];
+    RDX_INFO_DEV(nullptr, __func__, false, "绘制区域线段 - 从点[{},{}]到点[{},{}]",
+                 pre_point.x, pre_point.y, next_point.x, next_point.y);
+    cv::line(img, pre_point, next_point, region_color);
+    cv::putText(img, region_name, cv::Point2i(center_u, center_v), cv::FONT_HERSHEY_SIMPLEX, 1, region_color, 2);
+}
+
 //! 将document中的raw image转换为带有检测框和body keypoints的debug image
 sensor_msgs::msg::Image PSGCounter::_create_debug_image(const psg_private_msgs::msg::PsgDocument &document)
 {
     //! 转换raw image到cv::Mat
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换raw image到cv::Mat", 0);
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换raw image到cv::Mat", 0);
     cv::Mat cv_image;
     try {
         cv_image = cv_bridge::toCvCopy(document.frame.raw_image, sensor_msgs::image_encodings::BGR8)->image;
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "成功转换raw image, 大小: {}x{}", cv_image.cols, cv_image.rows);
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "成功转换raw image, 大小: {}x{}", cv_image.cols, cv_image.rows);
     } catch (const cv_bridge::Exception &e) {
         RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID_IN_LOG, "cv_bridge转换失败: {}", e.what());
         return sensor_msgs::msg::Image(); // 返回空图像
     }
 
-    //! 在图像上画person相关的框和keypoints
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始在图像上绘制person相关的框和keypoints, 共{}个person", document.persons.size());
-    for (const auto &person : document.persons) {
-        //! 随机生成颜色
-        cv::Scalar color = cv::Scalar(rand() % 256, rand() % 256, rand() % 256);
+    // //! 在图像上画person相关的框和keypoints
+    // RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始在图像上绘制person相关的框和keypoints, 共{}个person", document.persons.size());
+    // for (const auto &person : document.persons) {
+    //     //! 随机生成颜色
+    //     cv::Scalar color = cv::Scalar(rand() % 256, rand() % 256, rand() % 256);
 
-        //! 获取body bbox坐标
-        if (person.body.category == 0) {
-            int x = static_cast<int>(person.body.bbox.x);
-            int y = static_cast<int>(person.body.bbox.y);
-            int width = static_cast<int>(person.body.bbox.width);
-            int height = static_cast<int>(person.body.bbox.height);
+    //     //! 获取body bbox坐标
+    //     if (person.body.category == 0) {
+    //         int x = static_cast<int>(person.body.bbox.x);
+    //         int y = static_cast<int>(person.body.bbox.y);
+    //         int width = static_cast<int>(person.body.bbox.width);
+    //         int height = static_cast<int>(person.body.bbox.height);
 
-            //! 画body bbox
-            cv::rectangle(cv_image,
-                          cv::Point(x, y),
-                          cv::Point(x + width, y + height),
-                          color, 2);
+    //         //! 画body bbox
+    //         cv::rectangle(cv_image,
+    //                       cv::Point(x, y),
+    //                       cv::Point(x + width, y + height),
+    //                       color, 2);
+    //     }
+
+    //     //! 画body keypoints
+    //     const auto &keypoints = person.body.keypoints;
+
+    //     //! 在访问数组或指针前添加检查
+    //     if (!keypoints.keypoints_2.empty() && !keypoints.confidence.empty()) {
+    //         //! 画出17个关键点
+    //         for (size_t i = 0; i < keypoints.keypoints_2.size(); i++) {
+    //             if (keypoints.confidence[i] > 0.3) { // 只画置信度大于0.3的点
+    //                 //! 记录关键点的位置和置信度
+    //                 RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+    //                              "绘制关键点[{}] - 位置:[{}, {}], 置信度:{}",
+    //                              i, keypoints.keypoints_2[i].x, keypoints.keypoints_2[i].y, keypoints.confidence[i]);
+    //                 cv::circle(cv_image,
+    //                            cv::Point(keypoints.keypoints_2[i].x, keypoints.keypoints_2[i].y),
+    //                            3, color, -1);
+    //             }
+    //         }
+
+    //         //! 画出骨架连接
+    //         //! COCO数据集的17个关键点连接对
+    //         const std::vector<std::pair<int, int>> skeleton = {
+    //             {5, 7}, {7, 9}, {6, 8}, {8, 10}, // 手臂
+    //             {11, 13},
+    //             {13, 15},
+    //             {12, 14},
+    //             {14, 16}, // 腿
+    //             {5, 6},
+    //             {5, 11},
+    //             {6, 12},  // 躯干
+    //             {11, 12}, // 臀部
+    //             {1, 2},
+    //             {1, 3},
+    //             {2, 4},
+    //             {3, 5},
+    //             {4, 6} // 头部和肩膀
+    //         };
+
+    //         for (const auto &bone : skeleton) {
+    //             if (keypoints.confidence[bone.first] > 0.3 && keypoints.confidence[bone.second] > 0.3) {
+    //                 //! 记录骨架连接的起点和终点
+    //                 RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+    //                              "绘制骨架连接 - 从关键点[{},{}]到关键点[{},{}]",
+    //                              keypoints.keypoints_2[bone.first].x, keypoints.keypoints_2[bone.first].y,
+    //                              keypoints.keypoints_2[bone.second].x, keypoints.keypoints_2[bone.second].y);
+    //                 cv::line(cv_image,
+    //                          cv::Point(keypoints.keypoints_2[bone.first].x, keypoints.keypoints_2[bone.first].y),
+    //                          cv::Point(keypoints.keypoints_2[bone.second].x, keypoints.keypoints_2[bone.second].y),
+    //                          color, 2);
+    //             }
+    //         }
+    //     }
+
+    //     //! 画head bbox
+    //     if (person.head.category == 1) {
+    //         int x = static_cast<int>(person.head.bbox.x);
+    //         int y = static_cast<int>(person.head.bbox.y);
+    //         int width = static_cast<int>(person.head.bbox.width);
+    //         int height = static_cast<int>(person.head.bbox.height);
+
+    //         //! 画head bbox
+    //         cv::rectangle(cv_image,
+    //                       cv::Point(x, y),
+    //                       cv::Point(x + width, y + height),
+    //                       color, 2);
+    //     }
+
+    //     //! 画face bbox
+    //     if (person.face.category == 2) {
+    //         int x = static_cast<int>(person.face.bbox.x);
+    //         int y = static_cast<int>(person.face.bbox.y);
+    //         int width = static_cast<int>(person.face.bbox.width);
+    //         int height = static_cast<int>(person.face.bbox.height);
+
+    //         //! 画face bbox
+    //         cv::rectangle(cv_image,
+    //                       cv::Point(x, y),
+    //                       cv::Point(x + width, y + height),
+    //                       color, 2);
+    //     }
+    // }
+
+    //! 画事件区域
+    int rand_seed = 0;
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始绘制事件区域, 共{}个区域", m_impl->m_event_zones.size());
+    for (auto &iter : m_impl->m_event_zones) {
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始绘制区域: {}", iter.first);
+
+        //! 生成随机颜色
+        srand(rand_seed);
+        rand_seed += 10;
+        int r = rand() % 255;
+        int b = rand() % 255;
+        cv::Scalar event_zone_color(b, 0, r);
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "区域颜色: B={}, R={}", b, r);
+
+        //! 获取区域点集
+        auto event_regions = iter.second->get_region_points();
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "区域包含{}个子区域", event_regions.size());
+
+        //! 绘制每个子区域
+        for (auto &region : event_regions) {
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "绘制子区域: {}", region.first);
+            m_impl->_draw_region_points(cv_image, event_zone_color, region.first, region.second, m_impl->m_ground, m_impl->m_camera);
         }
-
-        //! 画body keypoints
-        const auto &keypoints = person.body.keypoints;
-
-        //! 在访问数组或指针前添加检查
-        if (!keypoints.keypoints_2.empty() && !keypoints.confidence.empty()) {
-            //! 画出17个关键点
-            for (size_t i = 0; i < keypoints.keypoints_2.size(); i++) {
-                if (keypoints.confidence[i] > 0.3) { // 只画置信度大于0.3的点
-                    //! 记录关键点的位置和置信度
-                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                                  "绘制关键点[{}] - 位置:[{}, {}], 置信度:{}",
-                                  i, keypoints.keypoints_2[i].x, keypoints.keypoints_2[i].y, keypoints.confidence[i]);
-                    cv::circle(cv_image,
-                               cv::Point(keypoints.keypoints_2[i].x, keypoints.keypoints_2[i].y),
-                               3, color, -1);
-                }
-            }
-
-            //! 画出骨架连接
-            //! COCO数据集的17个关键点连接对
-            const std::vector<std::pair<int, int>> skeleton = {
-                {5, 7}, {7, 9}, {6, 8}, {8, 10}, // 手臂
-                {11, 13},
-                {13, 15},
-                {12, 14},
-                {14, 16}, // 腿
-                {5, 6},
-                {5, 11},
-                {6, 12},  // 躯干
-                {11, 12}, // 臀部
-                {1, 2},
-                {1, 3},
-                {2, 4},
-                {3, 5},
-                {4, 6} // 头部和肩膀
-            };
-
-            for (const auto &bone : skeleton) {
-                if (keypoints.confidence[bone.first] > 0.3 && keypoints.confidence[bone.second] > 0.3) {
-                    //! 记录骨架连接的起点和终点
-                    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                                  "绘制骨架连接 - 从关键点[{},{}]到关键点[{},{}]",
-                                  keypoints.keypoints_2[bone.first].x, keypoints.keypoints_2[bone.first].y,
-                                  keypoints.keypoints_2[bone.second].x, keypoints.keypoints_2[bone.second].y);
-                    cv::line(cv_image,
-                             cv::Point(keypoints.keypoints_2[bone.first].x, keypoints.keypoints_2[bone.first].y),
-                             cv::Point(keypoints.keypoints_2[bone.second].x, keypoints.keypoints_2[bone.second].y),
-                             color, 2);
-                }
-            }
-        }
-
-        //! 画head bbox
-        if (person.head.category == 1) {
-            int x = static_cast<int>(person.head.bbox.x);
-            int y = static_cast<int>(person.head.bbox.y);
-            int width = static_cast<int>(person.head.bbox.width);
-            int height = static_cast<int>(person.head.bbox.height);
-
-            //! 画head bbox
-            cv::rectangle(cv_image,
-                          cv::Point(x, y),
-                          cv::Point(x + width, y + height),
-                          color, 2);
-        }
-
-        //! 画face bbox
-        if (person.face.category == 2) {
-            int x = static_cast<int>(person.face.bbox.x);
-            int y = static_cast<int>(person.face.bbox.y);
-            int width = static_cast<int>(person.face.bbox.width);
-            int height = static_cast<int>(person.face.bbox.height);
-
-            //! 画face bbox
-            cv::rectangle(cv_image,
-                          cv::Point(x, y),
-                          cv::Point(x + width, y + height),
-                          color, 2);
-        }
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "完成区域{}的绘制", iter.first);
     }
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "完成所有事件区域的绘制");
 
     //! 转回sensor_msgs/Image
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换回sensor_msgs/Image", 0);
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换回sensor_msgs/Image", 0);
     sensor_msgs::msg::Image debug_image;
     debug_image.header = document.frame.raw_image.header;
     debug_image.height = cv_image.rows;
@@ -762,7 +838,7 @@ sensor_msgs::msg::Image PSGCounter::_create_debug_image(const psg_private_msgs::
     debug_image.step = cv_image.cols * 3;
     debug_image.data.assign(cv_image.data, cv_image.data + cv_image.total() * cv_image.elemSize());
 
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "完成debug图像创建, 大小: {}x{}", debug_image.width, debug_image.height);
+    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "完成debug图像创建, 大小: {}x{}", debug_image.width, debug_image.height);
     return debug_image;
 }
 

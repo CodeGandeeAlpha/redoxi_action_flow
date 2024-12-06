@@ -333,6 +333,14 @@ std::vector<redoxi_public_msgs::msg::TrackTarget> PSGTracker::_track(const std::
         detections.back().x_group_uid = person.x_uid; // 方便后面把track_targets和persons关联起来
     }
 
+    // // 保存frame和detections用以复现跟踪结果
+    // // frame保存成图片，detections保存成json
+    // std::string frame_img_path = fmt::format("/tmp/test_track/frame_{}.png", frame_num);
+    // cv::imwrite(frame_img_path, frame_mat);
+    // std::string detections_json_path = fmt::format("/tmp/test_track/detections_{}.json", frame_num);
+    // std::ofstream fout(detections_json_path);
+    // fout << detections;
+
     std::vector<redoxi_public_msgs::msg::TrackTarget> track_targets;
     if (control_signal_code == ControlSignalCode::Flush || control_signal_code == ControlSignalCode::Terminate || frame_num == INT_MAX) { // last frame
         //! 收到结束信号，清理跟踪器状态
