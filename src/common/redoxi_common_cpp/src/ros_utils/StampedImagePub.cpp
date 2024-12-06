@@ -52,7 +52,7 @@ int StampedImagePub::publish(const sensor_msgs::msg::Image &image_msg,
     //! Convert sensor_msgs::msg::Image to cv::Mat
     cv_bridge::CvImageConstPtr cv_ptr;
     try {
-        cv_ptr = cv_bridge::toCvCopy(image_msg, "bgr8");
+        cv_ptr = cv_bridge::toCvCopy(image_msg, DefaultColorImageEncoding.data());
     } catch (cv_bridge::Exception &e) {
         RDX_RAISE_ERROR("cv_bridge exception in {}: {}", __func__, e.what());
         return -1;
@@ -87,7 +87,11 @@ int StampedImagePub::publish(const cv::Mat &image,
         stamped_image = stamper.stamp(false);
     }
 
-    sensor_msgs::msg::Image::SharedPtr msg = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", stamped_image).toImageMsg();
+    sensor_msgs::msg::Image::SharedPtr msg =
+        cv_bridge::CvImage(std_msgs::msg::Header(),
+                           DefaultColorImageEncoding.data(),
+                           stamped_image)
+            .toImageMsg();
     msg->header.stamp = m_node->now();
     m_pub->publish(*msg);
 

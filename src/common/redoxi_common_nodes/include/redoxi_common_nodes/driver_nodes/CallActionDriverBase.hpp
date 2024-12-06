@@ -88,9 +88,9 @@ class CallActionDriverBase : public OpenCloseNode
                                               typename CalleeTypes::RequestOutputPortSpec_t>;
 
     //! Type alias for the data-processing callback of the input port handler
-    using OnProcessInputRequestCallback_t = std::function<int(typename InputRequestHandler_t::OutputRequest_t *,
-                                                              std::optional<typename InputRequestHandler_t::OutputDeliveryPolicy_t> *,
-                                                              typename InputRequestHandler_t::InputActionResult_t *,
+    using OnProcessInputRequestCallback_t = std::function<int(typename CalleeTypes::RequestOutputRequest_t *,
+                                                              std::optional<typename CalleeTypes::RequestOutputDeliveryPolicy_t> *,
+                                                              typename InputTypes::ActionResult_t *,
                                                               std::shared_ptr<const typename InputTypes::SourceData_t>,
                                                               typename InputRequestHandler_t::ResourceToken_t &)>;
 
@@ -118,16 +118,16 @@ class CallActionDriverBase : public OpenCloseNode
 
     //! after the request is received from the input port
     //! this is the data-processing callback of the input port handler
-    virtual int _on_process_input_request(typename InputRequestHandler_t::OutputRequest_t *output_request,
-                                          std::optional<typename InputRequestHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
-                                          typename InputRequestHandler_t::InputActionResult_t *output_result,
+    virtual int _on_process_input_request(typename CalleeTypes::RequestOutputRequest_t *out_callee_request,
+                                          std::optional<typename CalleeTypes::RequestOutputDeliveryPolicy_t> *out_callee_enqueue_policy,
+                                          typename InputTypes::ActionResult_t *out_upstream_result,
                                           std::shared_ptr<const typename InputTypes::SourceData_t> source_data,
                                           typename InputRequestHandler_t::ResourceToken_t &resource_token);
 
     //! after the result is received from the callee, create output request for sending to output port
     //! you can also modify the output request enqueue policy here, or just leave it unchanged
-    virtual int _on_process_callee_result(typename OutputTypes::OutputRequest_t *output_request,
-                                          typename OutputTypes::OutputDeliveryPolicy_t *output_enqueue_policy,
+    virtual int _on_process_callee_result(typename OutputTypes::OutputRequest_t *out_downstream_request,
+                                          typename OutputTypes::OutputDeliveryPolicy_t *out_downstream_enqueue_policy,
                                           std::shared_ptr<const typename CalleeTypes::RequestOutputActionResult_t> callee_result,
                                           const typename CalleeTypes::RequestOutputRequest_t &callee_request,
                                           const typename CalleeTypes::Downstream_t &downstream);
@@ -153,14 +153,18 @@ class CallActionDriverBase : public OpenCloseNode
 
     //! after the request is received from the input port
     //! this is the data-processing callback of the input port handler
-    int _internal_process_input_request(typename InputRequestHandler_t::OutputRequest_t *output_request,
-                                        std::optional<typename InputRequestHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
-                                        typename InputRequestHandler_t::InputActionResult_t *output_result,
+    int _internal_process_input_request(typename CalleeTypes::RequestOutputRequest_t *out_callee_request,
+                                        std::optional<typename CalleeTypes::RequestOutputDeliveryPolicy_t> *out_callee_enqueue_policy,
+                                        typename InputTypes::ActionResult_t *out_upstream_result,
                                         std::shared_ptr<const typename InputTypes::SourceData_t> source_data,
                                         typename InputRequestHandler_t::ResourceToken_t &resource_token)
     {
         // call class member function
-        auto ret_member = _on_process_input_request(output_request, output_enqueue_policy, output_result, source_data, resource_token);
+        auto ret_member = _on_process_input_request(out_callee_request,
+                                                    out_callee_enqueue_policy,
+                                                    out_upstream_result,
+                                                    source_data,
+                                                    resource_token);
         if (ret_member != 0) {
             RDX_INFO_DEV(this, __func__, false, "Error in internal processing of input request, ret={}", ret_member);
             return ret_member;
@@ -169,7 +173,11 @@ class CallActionDriverBase : public OpenCloseNode
         // then call user-defined callback
         int ret_user = 0;
         if (on_process_input_request) {
-            ret_user = on_process_input_request(output_request, output_enqueue_policy, output_result, source_data, resource_token);
+            ret_user = on_process_input_request(out_callee_request,
+                                                out_callee_enqueue_policy,
+                                                out_upstream_result,
+                                                source_data,
+                                                resource_token);
         }
         if (ret_user != 0) {
             RDX_INFO_DEV(this, __func__, false, "Error in user-defined processing of input request, ret={}", ret_user);
@@ -181,14 +189,18 @@ class CallActionDriverBase : public OpenCloseNode
 
     //! after the result is received from the callee, create output request for sending to output port
     //! you can also modify the output request enqueue policy here, or just leave it unchanged
-    int _internal_process_callee_result(typename OutputTypes::OutputRequest_t *output_request,
-                                        typename OutputTypes::OutputDeliveryPolicy_t *output_enqueue_policy,
+    int _internal_process_callee_result(typename OutputTypes::OutputRequest_t *out_downstream_request,
+                                        typename OutputTypes::OutputDeliveryPolicy_t *out_downstream_enqueue_policy,
                                         std::shared_ptr<const typename CalleeTypes::RequestOutputActionResult_t> callee_result,
                                         const typename CalleeTypes::RequestOutputRequest_t &callee_request,
                                         const typename CalleeTypes::Downstream_t &downstream)
     {
         // call class member function
-        auto ret_member = _on_process_callee_result(output_request, output_enqueue_policy, callee_result, callee_request, downstream);
+        auto ret_member = _on_process_callee_result(out_downstream_request,
+                                                    out_downstream_enqueue_policy,
+                                                    callee_result,
+                                                    callee_request,
+                                                    downstream);
         if (ret_member != 0) {
             RDX_INFO_DEV(this, __func__, false, "Error in internal processing of callee result, ret={}", ret_member);
             return ret_member;
@@ -197,7 +209,11 @@ class CallActionDriverBase : public OpenCloseNode
         // then call user-defined callback
         int ret_user = 0;
         if (on_process_callee_result) {
-            ret_user = on_process_callee_result(output_request, output_enqueue_policy, callee_result, callee_request, downstream);
+            ret_user = on_process_callee_result(out_downstream_request,
+                                                out_downstream_enqueue_policy,
+                                                callee_result,
+                                                callee_request,
+                                                downstream);
         }
         if (ret_user != 0) {
             RDX_INFO_DEV(this, __func__, false, "Error in user-defined processing of callee result, ret={}", ret_user);
@@ -419,14 +435,14 @@ template <AsyncActionInputPortConcept InputPortType,
           AsyncActionOutputPortConcept CalleeRequestPortType,
           AsyncActionOutputPortConcept OutputPortType>
 int CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
-    _on_process_callee_result(typename OutputTypes::OutputRequest_t *output_request,
-                              typename OutputTypes::OutputDeliveryPolicy_t *output_enqueue_policy,
+    _on_process_callee_result(typename OutputTypes::OutputRequest_t *out_downstream_request,
+                              typename OutputTypes::OutputDeliveryPolicy_t *out_downstream_enqueue_policy,
                               std::shared_ptr<const typename CalleeTypes::RequestOutputActionResult_t> callee_result,
                               const typename CalleeTypes::RequestOutputRequest_t &callee_request,
                               const typename CalleeTypes::Downstream_t &downstream)
 {
-    (void)output_request;
-    (void)output_enqueue_policy;
+    (void)out_downstream_request;
+    (void)out_downstream_enqueue_policy;
     (void)callee_result;
     (void)callee_request;
     (void)downstream;
@@ -491,15 +507,15 @@ template <AsyncActionInputPortConcept InputPortType,
           AsyncActionOutputPortConcept CalleeRequestPortType,
           AsyncActionOutputPortConcept OutputPortType>
 int CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
-    _on_process_input_request(typename InputRequestHandler_t::OutputRequest_t *output_request,
-                              std::optional<typename InputRequestHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
-                              typename InputRequestHandler_t::InputActionResult_t *output_result,
+    _on_process_input_request(typename CalleeTypes::RequestOutputRequest_t *out_callee_request,
+                              std::optional<typename CalleeTypes::RequestOutputDeliveryPolicy_t> *out_callee_enqueue_policy,
+                              typename InputTypes::ActionResult_t *out_upstream_result,
                               std::shared_ptr<const typename InputTypes::SourceData_t> source_data,
                               typename InputRequestHandler_t::ResourceToken_t &resource_token)
 {
-    (void)output_request;
-    (void)output_enqueue_policy;
-    (void)output_result;
+    (void)out_callee_request;
+    (void)out_callee_enqueue_policy;
+    (void)out_upstream_result;
     (void)source_data;
     (void)resource_token;
     return 0;

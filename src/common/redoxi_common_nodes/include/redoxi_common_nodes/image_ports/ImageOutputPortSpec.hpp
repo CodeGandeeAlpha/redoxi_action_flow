@@ -7,6 +7,7 @@
 #include <sensor_msgs/image_encodings.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 
+#include <redoxi_common_cpp/image_proc/utils.hpp>
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
@@ -47,7 +48,6 @@ class DeliverySourceData
   public:
     using FrameMetadata_t = redoxi_public_msgs::msg::FrameMetadata;
     using PublishMessageType_t = sensor_msgs::msg::Image;
-    inline static constexpr const char *DefaultEncoding = sensor_msgs::image_encodings::BGR8;
 
     DeliverySourceData()
     {
@@ -55,18 +55,6 @@ class DeliverySourceData
         m_uuid = boost::uuids::random_generator()();
     }
     virtual ~DeliverySourceData() = default;
-
-    //! Get the encoding of the image
-    virtual const std::string &get_encoding() const
-    {
-        return m_encoding;
-    }
-
-    //! Set the encoding of the image
-    virtual void set_encoding(const std::string &encoding)
-    {
-        m_encoding = encoding;
-    }
 
     //! Get the image
     virtual const cv::Mat &get_image() const
@@ -81,9 +69,20 @@ class DeliverySourceData
     }
 
     //! Set the image
-    virtual void set_image(const cv::Mat &image)
+    virtual void set_image(const cv::Mat &image, std::string encoding = "")
     {
         m_image = image;
+        if (encoding.empty()) {
+            m_encoding = image_utils::get_default_image_encoding(image);
+        } else {
+            m_encoding = encoding;
+        }
+    }
+
+    //! Get the image encoding
+    virtual const std::string &get_image_encoding() const
+    {
+        return m_encoding;
     }
 
     //! Get the frame number
@@ -142,8 +141,8 @@ class DeliverySourceData
 
   protected:
     cv::Mat m_image;
-    std::string m_encoding = DefaultEncoding;
-    boost::uuids::uuid m_uuid;
+    std::string m_encoding; // empty means infer from image type
+    UUIDType m_uuid;
 
     // source timestamp and frame index
     FrameMetadata_t m_frame_metadata;
@@ -210,7 +209,7 @@ class DeliveryRequest : public DeliveryRequestBase
         if (!image.empty()) {
             cv_bridge::CvImage cv_bridge_image;
             cv_bridge_image.image = image;
-            cv_bridge_image.encoding = sensor_msgs::image_encodings::BGR8;
+            cv_bridge_image.encoding = m_source_data.get_image_encoding();
             cv_bridge_image.toImageMsg(goal.frame.raw_image);
         }
         goal.frame.metadata = this->m_source_data.get_frame_metadata();

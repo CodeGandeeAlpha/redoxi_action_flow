@@ -10,6 +10,7 @@
 #include <redoxi_common_nodes/detection_ports/DetectionResponseCommon.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
 #include <redoxi_common_nodes/image_ports/ImageOutputPortSpec.hpp>
+#include <redoxi_common_cpp/image_proc/utils.hpp>
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 
@@ -25,7 +26,6 @@ class DeliverySourceData
   public:
     using PublishMessageType_t = sensor_msgs::msg::Image;
     using ActionDataTrait_t = DetectionResponseActionDataTrait;
-    inline static constexpr const char *DefaultPublishEncoding = sensor_msgs::image_encodings::BGR8;
 
     DeliverySourceData()
     {
@@ -52,6 +52,11 @@ class DeliverySourceData
 
         cv::Mat output_image = image->clone();
 
+        auto encoding = image_encoding;
+        if (encoding.empty()) {
+            encoding = image_utils::get_default_image_encoding(output_image);
+        }
+
         //! Draw detections on the image
         for (const auto &detection : detections) {
             // Draw bounding box
@@ -66,10 +71,11 @@ class DeliverySourceData
             }
         }
 
+
         //! Convert to ROS message using cv_bridge
         std_msgs::msg::Header header;
         header.stamp = rclcpp::Clock().now();
-        cv_bridge::CvImage cv_bridge_img(header, DefaultPublishEncoding, output_image);
+        cv_bridge::CvImage cv_bridge_img(header, encoding, output_image);
         msg = *cv_bridge_img.toImageMsg();
         return 0;
     }
@@ -81,6 +87,7 @@ class DeliverySourceData
 
     // the image is for publish only
     std::optional<cv::Mat> image;
+    std::string image_encoding; // empty means infer from image type
 };
 
 //! Delivery target data type for detection output port
@@ -115,6 +122,7 @@ class DeliveryTargetData : public DeliveryTargetDataBase
 
     // the original image, used for visualization
     cv::Mat image;
+    std::string image_encoding{DefaultColorImageEncoding};
 };
 
 //! Stamp data type for detection output port
@@ -147,25 +155,19 @@ class DeliveryRequest : public DeliveryRequestBase
         goal.detections = source_data.detections;
         if (source_data.image.has_value()) {
             target_data.image = source_data.image.value();
+            target_data.image_encoding = source_data.image_encoding;
+
             std_msgs::msg::Header header;
             header.stamp = rclcpp::Clock().now();
             goal.frame.raw_image = *cv_bridge::CvImage(header,
-                                                       DeliverySourceData::DefaultPublishEncoding,
+                                                       target_data.image_encoding,
                                                        target_data.image)
                                         .toImageMsg();
             goal.frame.metadata.width = target_data.image.cols;
             goal.frame.metadata.height = target_data.image.rows;
         }
 
-        // no longer needed, base class will handle standard information
-        // // set additional information into the goal
-        // using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
-
-        // // set the source data UUID
-        // ActionTrait::set_uuid(goal, source_data.get_uuid());
-
-        // // set the control signal code
-        // ActionTrait::mark_with_control_signal(goal, get_control_signal_code());
+        // standard information is handled by base class
 
         return 0;
     }

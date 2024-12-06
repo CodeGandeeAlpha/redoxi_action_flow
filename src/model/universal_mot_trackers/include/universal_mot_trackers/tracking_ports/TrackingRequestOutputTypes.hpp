@@ -1,29 +1,121 @@
 #pragma once
 
 #include <any>
-#include <sensor_msgs/msg/image.hpp>
-#include <sensor_msgs/image_encodings.hpp>
-#include <opencv2/opencv.hpp>
-#include <cv_bridge/cv_bridge.hpp>
+#include <variant>
 #include <redoxi_common_cpp/image_proc/utils.hpp>
-#include <redoxi_common_nodes/detection_ports/DetectionRequestCommon.hpp>
-#include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
 #include <redoxi_common_nodes/image_ports/ImageOutputPortSpec.hpp>
+#include <redoxi_common_nodes/detection_ports/DetectionResponseCommon.hpp>
+#include <universal_mot_trackers/tracking_ports/TrackingRequestCommon.hpp>
+#include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
+#include <redoxi_common_nodes/detection_ports/DetectionResponseOutputTypes.hpp>
+#include <redoxi_common_cpp/redoxi_concepts.hpp>
 
-namespace redoxi_works::detection_ports::request_response::types
+namespace redoxi_works::model_nodes::tracking_ports::request_response::types
 {
 
 //! Retry policy type implementing the RetryPolicyConcept
-using RetryPolicy = output_port_types::DefaultRetryPolicy<TimeUnit>;
+using RetryPolicy = redoxi_works::output_port_types::DefaultRetryPolicy<TimeUnit>;
 
-//! Source data type for detection request output port
-using DeliverySourceData = image_ports::types::DeliverySourceData;
+//! Source data type for tracking request output port
+//! It encapsulates the frame image and detections which will be sent to tracking nodes to perform tracking
+class DeliverySourceData
+{
+  public:
+    using PublishMessageType_t = sensor_msgs::msg::Image;
+    using Detection_t = redoxi_public_msgs::msg::Detection;
+    using FrameMetadata_t = redoxi_public_msgs::msg::FrameMetadata;
+
+  public:
+    virtual ~DeliverySourceData() = default;
+
+    // get/set uuid
+    UUIDType get_uuid() const
+    {
+        return this->uid;
+    }
+
+    void set_uuid(const UUIDType &uid)
+    {
+        this->uid = uid;
+    }
+
+    // to publish message
+    virtual int to_publish_message(PublishMessageType_t &msg) const
+    {
+        if (frame_image.empty()) {
+            return -1;
+        }
+
+        cv::Mat output_image = frame_image.clone();
+        image_utils::draw_detections(&output_image, detections);
+
+        //! Convert to ROS message using cv_bridge
+        std_msgs::msg::Header header;
+        header.stamp = rclcpp::Clock().now();
+        cv_bridge::CvImage cv_bridge_img(header, get_image_encoding(), output_image);
+        msg = *cv_bridge_img.toImageMsg();
+        return 0;
+    }
+
+
+    //! Get the frame image
+    virtual const cv::Mat &get_image() const
+    {
+        return frame_image;
+    }
+
+    //! Get the frame image, mutable version
+    virtual cv::Mat &get_image()
+    {
+        return frame_image;
+    }
+
+    //! Set the frame image
+    virtual void set_image(const cv::Mat &image, const std::string &encoding = "")
+    {
+        frame_image = image;
+        if (!encoding.empty()) {
+            frame_metadata.encoding = encoding;
+        } else {
+            frame_metadata.encoding = image_utils::get_default_image_encoding(image);
+        }
+        frame_metadata.width = image.cols;
+        frame_metadata.height = image.rows;
+    }
+
+    //! Get the image encoding
+    virtual const std::string &get_image_encoding() const
+    {
+        return frame_metadata.encoding;
+    }
+
+    //! Get the frame metadata
+    virtual const FrameMetadata_t &get_frame_metadata() const
+    {
+        return frame_metadata;
+    }
+
+    //! Get the frame metadata, mutable version
+    virtual FrameMetadata_t &get_frame_metadata()
+    {
+        return frame_metadata;
+    }
+
+  protected:
+    UUIDType uid;
+    cv::Mat frame_image; // the frame data
+    FrameMetadata_t frame_metadata;
+    std::vector<Detection_t> detections; // the detections
+    std::any auxiliary_data;             // any auxiliary data
+};
+static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>,
+              "DeliverySourceData must satisfy DeliverySourceDataConcept");
 
 //! Delivery target data type for detection request output port
-using DeliveryTargetDataBase = output_port_types::DefaultTargetData<DetectionRequestActionType,
-                                                                    DetectionRequestActionDataTrait,
+using DeliveryTargetDataBase = output_port_types::DefaultTargetData<TrackingRequestActionType,
+                                                                    TrackingRequestActionDataTrait,
                                                                     DeliverySourceData::PublishMessageType_t>;
-
+//! TODO: finish this
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
   public:
@@ -40,62 +132,31 @@ class DeliveryTargetData : public DeliveryTargetDataBase
 
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        auto canvas = image.clone();
-        image_utils::draw_detections(&canvas, detections);
-        if (canvas.empty()) {
-            // cannot convert, return error
-            return -1;
+        cv::Mat canvas;
+        if (!frame_image.empty()) {
+            canvas = frame_image.clone();
+        } else {
+            const auto &raw_image = m_goal.frame.raw_image;
+            if (raw_image.data.empty()) {
+                return -1;
+            }
+            canvas = cv_bridge::toCvCopy(raw_image)->image;
         }
+        image_utils::draw_detections(&canvas, m_goal.detections);
 
         //! Convert drawn image to ROS message using cv_bridge
         std_msgs::msg::Header header;
         header.stamp = rclcpp::Clock().now();
-        cv_bridge::CvImage cv_bridge_img(header, get_image_encoding(), canvas);
+        cv_bridge::CvImage cv_bridge_img(header, DeliverySourceData::DefaultEncoding, canvas);
         msg = *cv_bridge_img.toImageMsg();
         return 0;
-    }
-
-
-    //! Get the image
-    virtual const cv::Mat &get_image() const
-    {
-        return image;
-    }
-
-    //! Get the image, mutable version
-    virtual cv::Mat &get_image()
-    {
-        return image;
-    }
-
-    //! Set the image
-    virtual void set_image(const cv::Mat &img, const std::string &encoding = "")
-    {
-        image = img;
-        std::string image_encoding;
-        if (encoding.empty()) {
-            image_encoding = image_utils::get_default_image_encoding(image);
-        } else {
-            image_encoding = encoding;
-        }
-        m_goal.frame.metadata.encoding = image_encoding;
-        m_goal.frame.metadata.width = image.cols;
-        m_goal.frame.metadata.height = image.rows;
-    }
-
-    //! Get the image encoding
-    virtual const std::string &get_image_encoding() const
-    {
-        return m_goal.frame.metadata.encoding;
     }
 
     // auxiliary data for easy extension without inheritance
     std::any auxiliary_data;
 
-  protected:
-    // the original image, used for visualization
-    cv::Mat image;
-    std::vector<redoxi_public_msgs::msg::Detection> detections;
+    // the frame image used for visualization, if not set, will use the raw image in the goal
+    cv::Mat frame_image;
 };
 
 //! Stamp data type for detection request output port
@@ -125,17 +186,16 @@ class DeliveryRequest : public DeliveryRequestBase
 
         auto &goal = target_data.get_goal();
         const auto &source_data = this->m_source_data;
-        const auto &image_data = source_data.get_image();
-        const auto &image_encoding = source_data.get_image_encoding();
-        target_data.set_image(image_data, image_encoding);
+        const auto &image_msg = source_data.get_image();
+        target_data.image = image_msg;
         goal.frame.metadata = source_data.get_frame_metadata();
 
-        if (!image_data.empty()) {
+        if (!image_msg.empty()) {
             std_msgs::msg::Header header;
             header.stamp = rclcpp::Clock().now();
             source_data.to_publish_message(goal.frame.raw_image);
-            goal.frame.metadata.width = image_data.cols;
-            goal.frame.metadata.height = image_data.rows;
+            goal.frame.metadata.width = image_msg.cols;
+            goal.frame.metadata.height = image_msg.rows;
         }
 
         // standard properties will be set by the base class
@@ -229,5 +289,4 @@ struct DetectionRequestOutputPortSpec {
     using Downstream_t = Downstream;
 };
 
-
-} // namespace redoxi_works::detection_ports::request_response::types
+} // namespace redoxi_works::model_nodes::tracking_ports::request_response::types
