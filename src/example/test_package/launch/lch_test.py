@@ -51,14 +51,9 @@ det_node_params = {
         "model_configs": [
             {
                 "model_path": fn_model,
-                "device_type": "cpu",
+                "device_type": "cuda",
                 "device_index": 0,
             },
-            # {
-            #     "model_path": fn_model_nano,
-            #     "device_type": "cpu",
-            #     "device_index": 0,
-            # },
         ],
         "detection_request_config": {
             "input_port_config": {
@@ -134,7 +129,7 @@ video_source_params = {
                             "fallback_wait_time_retry_response": 10000,
                         },
                         "precondition": "dont_care",
-                        "drop_strategy": "no_drop",
+                        "drop_strategy": "drop_as_needed",
                     },
                     "create_debug_pub": False,
                 },
@@ -161,7 +156,7 @@ video_source_params = {
             "drop_strategy": "no_drop",
         },
         "_time_unit": "us(1e-6)",
-        "step_interval": StepIntervals.VeryFast,
+        "step_interval": StepIntervals.Fast,
     },
 }
 

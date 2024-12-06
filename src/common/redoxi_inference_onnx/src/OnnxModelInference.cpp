@@ -257,9 +257,11 @@ int OnnxModelInference::open(KeyValueStore::Ptr params)
         return -1;
     }
 
+    auto device_index = config->device_index;
+
     // create the environment and session
     m_env = std::make_shared<Ort::Env>((OrtLoggingLevel)logging_level, config->log_id.c_str());
-    m_session = create_onnx_session(model_path, provider_type, *m_env);
+    m_session = create_onnx_session(model_path, provider_type, device_index, *m_env);
 
     // get all input and output port infos
     m_input_ports = get_input_port_infos(*m_session);
@@ -299,6 +301,7 @@ int OnnxModelInference::close()
 std::shared_ptr<Ort::Session> OnnxModelInference::create_onnx_session(
     const std::string &model_path,
     const std::string &provider_type,
+    int device_index,
     Ort::Env &env)
 {
     //! Create an ONNX session and load the model based on the provider type
@@ -314,13 +317,14 @@ std::shared_ptr<Ort::Session> OnnxModelInference::create_onnx_session(
     RDX_INFO_DEV(nullptr, __func__, false, "Configuring execution providier {}", provider_type);
     if (provider_type == onnx_ep_names::CUDA) {
         OrtCUDAProviderOptions cuda_options;
+        cuda_options.device_id = device_index;
         session_options.AppendExecutionProvider_CUDA(cuda_options);
     } else if (provider_type == onnx_ep_names::CPU) {
         // No additional configuration needed for CPU
     } else if (provider_type == onnx_ep_names::TensorRT) {
         RDX_INFO_DEV(nullptr, __func__, false, "Configuring execution provider {}", provider_type);
         OrtTensorRTProviderOptions trt_options;
-        trt_options.device_id = 0;
+        trt_options.device_id = device_index;
         trt_options.trt_max_partition_iterations = 10;
         session_options.AppendExecutionProvider_TensorRT(trt_options);
     } else {

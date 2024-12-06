@@ -81,7 +81,9 @@ colcon build --packages-up-to $PackagesToBuild \
     -DCMAKE_CXX_STANDARD=20 \
     -DCMAKE_CXX_STANDARD_REQUIRED=ON \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-    -DJSON_STRUCT_OPT_INSTALL=ON
+    -DJSON_STRUCT_OPT_INSTALL=ON \
+    -DCMAKE_CXX_FLAGS="-Wno-stringop-overflow"
+    
 source install/setup.bash
 
 # Set CUDA_VISIBLE_DEVICES in WSL2 environment
