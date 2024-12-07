@@ -84,8 +84,11 @@ class DeliverySourceData
     }
 
     //! Get the image encoding
-    virtual const std::string &get_image_encoding() const
+    virtual std::string get_image_encoding() const
     {
+        if (frame_metadata.encoding.empty()) {
+            return image_utils::get_default_image_encoding(frame_image);
+        }
         return frame_metadata.encoding;
     }
 

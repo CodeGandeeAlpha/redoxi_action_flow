@@ -77,6 +77,9 @@ class DeliverySourceData
         header.stamp = rclcpp::Clock().now();
         cv_bridge::CvImage cv_bridge_img(header, encoding, output_image);
         msg = *cv_bridge_img.toImageMsg();
+
+        RDX_INFO_DEV(nullptr, __func__, "Converted image to ros message, encoding: {}, data size: {}", msg.encoding, msg.data.size());
+
         return 0;
     }
 

@@ -70,35 +70,21 @@ class PullProcessReplyHandler
     // return 0 if success, -1 if failed
     virtual ProcessResult process_and_reply()
     {
-        // auto input_port_ptr = m_input_port;
-        // RDX_INFO_DEV(nullptr, __func__, "Processing and replying, m_input_port = {}, self={}",
-        //              (int64_t)m_input_port, (int64_t)this);
-        // RDX_INFO_DEV(nullptr, __func__, "After logging, m_input_port = {}, input_port_ptr={}, self={}",
-        //              (int64_t)m_input_port, (int64_t)input_port_ptr, (int64_t)this);
-        // if (m_input_port == 0) {
-        //     RDX_INFO_DEV(nullptr, __func__, "No input port, m_input_port = {}, input_port_ptr={}, self={}",
-        //                  (int64_t)m_input_port, (int64_t)input_port_ptr, (int64_t)this);
-
-        //     return ProcessResult::NoData;
-        // }
-
         if (!m_input_port) {
             // no port, treat it as no data
+            RDX_INFO_DEV(nullptr, __func__, true, "{}", "No input port, treat it as no data");
             return ProcessResult::NoData;
         }
 
-        // RDX_INFO_DEV(nullptr, __func__, true, "{}", "Trying to get input data");
         // get data from input port
         std::shared_ptr<InputSourceData_t> input_data;
         if (m_config->block_input_reading) {
-            RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Blocking input reading", UUIDTrait::to_string(InputActionDataTrait_t::get_uuid(*input_data->get_goal())));
+            RDX_INFO_DEV(nullptr, __func__, true, "{}", "Blocking input reading");
             input_data = m_input_port->pop_source_data();
         } else {
-            RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Trying to get input data", UUIDTrait::to_string(InputActionDataTrait_t::get_uuid(*input_data->get_goal())));
             input_data = m_input_port->try_pop_source_data();
         }
         if (!input_data) {
-            RDX_INFO_DEV(nullptr, __func__, true, "{}", "No input data");
             return ProcessResult::NoData;
         }
         RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Got input data", UUIDTrait::to_string(InputActionDataTrait_t::get_uuid(*input_data->get_goal())));

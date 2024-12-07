@@ -84,8 +84,11 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     }
 
     //! Get the image encoding
-    virtual const std::string &get_image_encoding() const
+    virtual std::string get_image_encoding() const
     {
+        if (m_goal.frame.metadata.encoding.empty()) {
+            return image_utils::get_default_image_encoding(image);
+        }
         return m_goal.frame.metadata.encoding;
     }
 

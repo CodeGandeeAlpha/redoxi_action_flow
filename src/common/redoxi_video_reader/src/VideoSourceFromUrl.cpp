@@ -130,6 +130,15 @@ void VideoSourceFromUrl::set_video_url(const std::string &video_url)
     config->video_url = video_url;
 }
 
+int VideoSourceFromUrl::_on_before_request_enqueue(DeliveryRequest_t &request, DeliveryPolicy_t &enqueue_policy)
+{
+    (void)enqueue_policy;
+    RDX_INFO_DEV(this, __func__, false, "sending request with image encoding={}, in metadata={}",
+                 request.get_source_data().get_image_encoding(),
+                 request.get_source_data().get_frame_metadata().encoding);
+    return 0;
+}
+
 VideoSourceFromUrl::ReadFrameResult VideoSourceFromUrl::_read_frame(SourceData_t &source_data, std::atomic<int64_t> &frame_number)
 {
     // check if video capture is opened
@@ -171,6 +180,7 @@ VideoSourceFromUrl::ReadFrameResult VideoSourceFromUrl::_read_frame(SourceData_t
     metadata.source_frame_index = fno;
     metadata.width = frame.cols;
     metadata.height = frame.rows;
+    metadata.encoding = output_image_encoding;
     auto timestamp_ms = m_video_capture->get(cv::CAP_PROP_POS_MSEC);
     metadata.source_timestamp = ros2_time_msg_from_ms(timestamp_ms);
 

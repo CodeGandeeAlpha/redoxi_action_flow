@@ -42,10 +42,12 @@ int StampedImagePub::publish(const sensor_msgs::msg::Image &image_msg,
         RDX_RAISE_ERROR("Publisher is not initialized in {}", __func__);
         return -1;
     }
+    //! Log the image encoding and data size
+    RDX_INFO_DEV(nullptr, __func__, "Image encoding: {}, data size: {}", image_msg.encoding, image_msg.data.size());
 
     //! If image is empty, treat it as error, ignore it
     if (image_msg.data.empty()) {
-        // m_pub->publish(image_msg);
+        RDX_INFO_DEV(nullptr, __func__, "{}", "Image data is empty, treating as error and ignoring.");
         return -1;
     }
 
@@ -53,12 +55,15 @@ int StampedImagePub::publish(const sensor_msgs::msg::Image &image_msg,
     cv_bridge::CvImageConstPtr cv_ptr;
     try {
         cv_ptr = cv_bridge::toCvCopy(image_msg, DefaultColorImageEncoding.data());
+        // cv_ptr = cv_bridge::toCvCopy(image_msg);
+        RDX_INFO_DEV(nullptr, __func__, "{}", "Successfully converted sensor_msgs::msg::Image to cv::Mat.");
     } catch (cv_bridge::Exception &e) {
         RDX_RAISE_ERROR("cv_bridge exception in {}: {}", __func__, e.what());
         return -1;
     }
 
     //! Call the publish function that takes cv::Mat
+    RDX_INFO_DEV(nullptr, __func__, "{}", "Publishing image using cv::Mat");
     return publish(cv_ptr->image, text, text_color, scale, background_color);
 }
 

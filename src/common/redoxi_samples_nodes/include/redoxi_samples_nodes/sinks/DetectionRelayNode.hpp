@@ -57,10 +57,12 @@ class DetectionRelayNode : public common_nodes::StartStopNode
 
   protected:
     int _parse_detection(cv::Mat *output, const SourceData_t &source_data);
+    int _create_port_handler(std::shared_ptr<RuntimeConfig_t> runtime_config);
 
   protected:
+    using PortHandler_t = port_handlers::PullProcessReplyHandler<InputPort_t::MasterSpec_t>;
     std::shared_ptr<InputPort_t> m_input_port;
     StampedImagePub m_pub_visualization;
-    port_handlers::PullProcessReplyHandler<InputPort_t::MasterSpec_t> m_port_handler;
+    std::shared_ptr<PortHandler_t> m_port_handler;
 };
 } // namespace redoxi_works

@@ -15,6 +15,7 @@ int DetectionDriver::_on_process_callee_result(OutputTypes::OutputRequest_t *out
     OutputTypes::OutputSourceData_t output_source_data;
     output_source_data.detections = callee_result->detections;
     output_source_data.image = callee_request.get_source_data().get_image();
+    output_source_data.image_encoding = callee_request.get_source_data().get_image_encoding();
     output_source_data.uid = callee_request.get_source_data().get_uuid();
     output_request->set_source_data(output_source_data);
     return 0;
@@ -36,9 +37,11 @@ int DetectionDriver::_on_process_input_request(InputRequestHandler_t::OutputRequ
     const auto frame_number = source_data->get_goal()->frame.metadata.frame_num;
     const auto source_frame_index = source_data->get_goal()->frame.metadata.source_frame_index;
     const auto source_frame_timestamp = source_data->get_goal()->frame.metadata.source_timestamp;
-    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Driver got frame number={}, source_frame_index={}, source_frame_timestamp={}",
+    const auto source_image_encoding = source_data->get_goal()->frame.metadata.encoding;
+    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Driver got frame number={}, source_frame_index={}, source_frame_timestamp={}, source_image_encoding={}",
                  msg_uuid_str, frame_number, source_frame_index,
-                 fmt::format("{}.{:06d} sec", source_frame_timestamp.sec, source_frame_timestamp.nanosec));
+                 fmt::format("{}.{:06d} sec", source_frame_timestamp.sec, source_frame_timestamp.nanosec),
+                 source_image_encoding);
 
     // create request
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Creating request from source data", msg_uuid_str);
@@ -46,14 +49,13 @@ int DetectionDriver::_on_process_input_request(InputRequestHandler_t::OutputRequ
     const auto &raw_image = source_data->get_goal()->frame.raw_image;
     if (!raw_image.data.empty()) {
         cv::Mat image;
-        image = cv_bridge::toCvCopy(raw_image)->image;
+        image = cv_bridge::toCvCopy(raw_image, raw_image.encoding)->image;
 
         RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Extracted image from source data, width={}, height={}",
                      msg_uuid_str, image.cols, image.rows);
-        output_source_data.set_image(image);
+        output_source_data.set_image(image, raw_image.encoding);
     }
 
-    // FIXME: handle image encoding properly
     output_source_data.set_frame_metadata(source_data->get_goal()->frame.metadata);
     output_request->set_source_data(output_source_data);
 

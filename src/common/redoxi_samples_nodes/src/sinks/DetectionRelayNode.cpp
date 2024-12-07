@@ -33,33 +33,6 @@ int DetectionRelayNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> co
         m_pub_visualization.init(this, init_config->publish_visualization_topic, StampedImagePub::DefaultQoS);
     }
 
-    // create port handler
-    RDX_INFO_DEV(this, __func__, false, "{}", "Initializing port handler");
-    auto port_handler_config = std::make_shared<decltype(m_port_handler)::InitConfig_t>();
-    m_port_handler.init(m_input_port.get(), nullptr, port_handler_config, this);
-    m_port_handler.on_process_input_data = [this](InputPort_t::ActionResult_t *output_action_result,
-                                                  std::shared_ptr<SourceData_t> source_data,
-                                                  auto &resource_token) {
-        RDX_INFO_DEV(this, __func__, false, "{}", "processing input data");
-        (void)resource_token;
-        (void)output_action_result;
-
-        // publish visualization
-        auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(get_runtime_config());
-        if (runtime_config->enable_visualization && m_pub_visualization.valid()) {
-            auto msg_uuid = ActionDataTrait_t::get_uuid(*source_data->get_goal());
-            RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Publishing visualization",
-                         boost::uuids::to_string(msg_uuid));
-            cv::Mat vis_image;
-            _parse_detection(&vis_image, *source_data);
-
-            RDX_INFO_DEV(this, __func__, false, "Visualization image size: {}x{}", vis_image.cols, vis_image.rows);
-            m_pub_visualization.publish(vis_image);
-        }
-
-        return 0;
-    };
-
     RDX_INFO_DEV(this, __func__, false, "{}", "Init config update completed successfully");
     return 0;
 }
@@ -72,7 +45,11 @@ int DetectionRelayNode::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig
         RDX_RAISE_ERROR("[{}] Failed to cast runtime config to DetectionRelayNodeRuntimeConfig", __func__);
     }
 
-    // nothing to do here
+    // create port handler
+    auto ret = _create_port_handler(runtime_config);
+    if (ret != 0) {
+        RDX_RAISE_ERROR("[{}] Failed to create port handler, ret = {}", __func__, ret);
+    }
 
     return 0;
 }
@@ -100,10 +77,51 @@ int DetectionRelayNode::_stop()
 
 void DetectionRelayNode::_step()
 {
-    // auto msg_uuid = UUIDTrait::generate();
-    // RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Processing input data",
-    //              boost::uuids::to_string(msg_uuid));
-    m_port_handler.process_and_reply();
+    if (m_port_handler) {
+        m_port_handler->process_and_reply();
+    }
+}
+
+int DetectionRelayNode::_create_port_handler(
+    std::shared_ptr<RuntimeConfig_t> runtime_config)
+{
+    RDX_INFO_DEV(this, __func__, false, "{}", "Creating port handler");
+    m_port_handler = std::make_shared<PortHandler_t>();
+    auto port_handler_config = std::make_shared<PortHandler_t::InitConfig_t>();
+    port_handler_config->block_input_reading = runtime_config->enable_blocking_mode;
+    port_handler_config->block_resource_acquisition = runtime_config->enable_blocking_mode;
+    m_port_handler->init(m_input_port.get(), nullptr, port_handler_config, this);
+
+    m_port_handler->on_process_input_data =
+        [this, runtime_config](InputPort_t::ActionResult_t *output_action_result,
+                               std::shared_ptr<SourceData_t> source_data,
+                               auto &resource_token) {
+            RDX_INFO_DEV(this, __func__, false, "{}", "processing input data");
+            (void)resource_token;
+            (void)output_action_result;
+
+            // publish visualization
+            if (runtime_config->enable_visualization && m_pub_visualization.valid()) {
+                auto msg_uuid = ActionDataTrait_t::get_uuid(*source_data->get_goal());
+                RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Publishing visualization",
+                             boost::uuids::to_string(msg_uuid));
+                cv::Mat vis_image;
+                auto ret = _parse_detection(&vis_image, *source_data);
+                if (ret != 0) {
+                    RDX_INFO_DEV(this, __func__, false, "Failed to parse detection, ret = {}", ret);
+                    return ret;
+                } else if (vis_image.empty()) {
+                    RDX_INFO_DEV(this, __func__, false, "{}", "Visualization image is empty, skipping");
+                } else {
+                    RDX_INFO_DEV(this, __func__, false, "Visualization image size: {}x{}", vis_image.cols, vis_image.rows);
+                    m_pub_visualization.publish(vis_image);
+                }
+            }
+
+            return 0;
+        };
+    // nothing to do here
+    return 0;
 }
 
 int DetectionRelayNode::_parse_detection(cv::Mat *output,
@@ -123,7 +141,7 @@ int DetectionRelayNode::_parse_detection(cv::Mat *output,
         const auto &image_msg = source_data.get_goal()->frame.raw_image;
         *output = cv_bridge::toCvCopy(image_msg, image_msg.encoding)->image;
     } catch (cv_bridge::Exception &e) {
-        RDX_INFO_DEV(this, __func__, false, "{}", "cv_bridge exception: {}, ignoring the error", e.what());
+        RDX_INFO_DEV(this, __func__, false, "cv_bridge exception: {}, ignoring the error", e.what());
     }
 
     image_utils::DrawDetectionsOptions options;

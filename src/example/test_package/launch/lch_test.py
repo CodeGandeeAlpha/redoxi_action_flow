@@ -94,7 +94,7 @@ det_node_params = {
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
-        "step_interval": StepIntervals.Slow,
+        "step_interval": StepIntervals.VeryFast,
         "enable_blocking_mode": True,
         "model_output_config": {"conf_threshold": 0.35, "iou_threshold": 0.5},
         "enable_visualization": True,
@@ -129,7 +129,7 @@ video_source_params = {
                             "fallback_wait_time_retry_response": 10000,
                         },
                         "precondition": "dont_care",
-                        "drop_strategy": "drop_as_needed",
+                        "drop_strategy": "no_drop",
                     },
                     "create_debug_pub": True,
                 },
@@ -149,14 +149,14 @@ video_source_params = {
         "video_end_time": -1,
         "frame_interval": 0,
         "output_image_size": {"width": 1024, "height": -1},
-        "output_image_encoding": "rgb8",
+        "output_image_encoding": "bgr8",
         "publish_to_debug_topic": True,
         "frame_enqueue_policy": {
             "precondition": "dont_care",
             "drop_strategy": "no_drop",
         },
         "_time_unit": "us(1e-6)",
-        "step_interval": StepIntervals.VerySlow,
+        "step_interval": StepIntervals.Fast,
     },
 }
 
@@ -174,7 +174,7 @@ detection_relay_params = {
         "_time_unit": "us(1e-6)",
     },
     "runtime_config": {
-        "enable_blocking_mode": True,
+        "enable_blocking_mode": False,
         "enable_visualization": True,
         "_time_unit": "us(1e-6)",
         "step_interval": StepIntervals.Fast,

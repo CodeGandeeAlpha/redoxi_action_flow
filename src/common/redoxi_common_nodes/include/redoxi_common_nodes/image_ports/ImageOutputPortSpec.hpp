@@ -73,16 +73,19 @@ class DeliverySourceData
     {
         m_image = image;
         if (encoding.empty()) {
-            m_encoding = image_utils::get_default_image_encoding(image);
+            m_frame_metadata.encoding = image_utils::get_default_image_encoding(image);
         } else {
-            m_encoding = encoding;
+            m_frame_metadata.encoding = encoding;
         }
     }
 
     //! Get the image encoding
-    virtual const std::string &get_image_encoding() const
+    virtual std::string get_image_encoding() const
     {
-        return m_encoding;
+        if (m_frame_metadata.encoding.empty()) {
+            return image_utils::get_default_image_encoding(m_image);
+        }
+        return m_frame_metadata.encoding;
     }
 
     //! Get the frame number
@@ -112,6 +115,11 @@ class DeliverySourceData
     virtual void set_frame_metadata(const FrameMetadata_t &frame_metadata)
     {
         m_frame_metadata = frame_metadata;
+
+        // no encoding is set, infer from image if possible
+        if (m_frame_metadata.encoding.empty()) {
+            m_frame_metadata.encoding = get_image_encoding();
+        }
     }
 
     //! Convert the source data to a ROS message for publishing
@@ -124,7 +132,7 @@ class DeliverySourceData
 
         cv_bridge::CvImage cv_image;
         cv_image.image = m_image;
-        cv_image.encoding = m_encoding;
+        cv_image.encoding = get_image_encoding();
         cv_image.toImageMsg(msg);
         return 0;
     }
@@ -146,7 +154,6 @@ class DeliverySourceData
 
   protected:
     cv::Mat m_image;
-    std::string m_encoding; // empty means infer from image type
     UUIDType m_uuid;
 
     // source timestamp and frame index
@@ -220,6 +227,12 @@ class DeliveryRequest : public DeliveryRequestBase
         goal.frame.metadata = this->m_source_data.get_frame_metadata();
         goal.frame.metadata.width = image.cols;
         goal.frame.metadata.height = image.rows;
+
+        // FIXME: source data encoding is wrong, different from request
+
+        RDX_INFO_DEV(nullptr, __func__, false, "in target data goal, raw image encoding={}, in metadata={}",
+                     goal.frame.raw_image.encoding,
+                     goal.frame.metadata.encoding);
 
         // no longer needed, base class will handle standard information
         // using ActionTrait = DeliveryTargetData::ActionDataTrait_t;

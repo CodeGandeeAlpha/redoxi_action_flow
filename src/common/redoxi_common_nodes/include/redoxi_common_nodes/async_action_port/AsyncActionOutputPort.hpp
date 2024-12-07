@@ -542,6 +542,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 pub->publish(source_pub_msg, s);
             }
         }
+
         if (target_data != nullptr) {
             auto pub = ds.get_debug_pub_target_data_sending();
             if (pub != nullptr) {
