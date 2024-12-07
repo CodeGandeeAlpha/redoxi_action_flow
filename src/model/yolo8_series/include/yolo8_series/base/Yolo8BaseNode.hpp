@@ -364,6 +364,7 @@ int Yolo8BaseNode<TModel>::_create_image_request_handler(const RuntimeConfig_t &
 template <YoloModelConcept TModel>
 int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig_t &runtime_config)
 {
+    RDX_INFO_DEV(this, __func__, false, "{}", "Creating detection request handler");
     using ActionDataTrait_t = typename ByDetectionRequest::InputPort_t::ActionDataTrait_t;
 
     auto handler_config = std::make_shared<typename Impl::PullProcessReplyHandler_t::InitConfig_t>();
@@ -373,6 +374,10 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
     bool enable_performance_probe = runtime_config.enable_performance_probe;
     m_impl->work_then_reply_handler = std::make_shared<typename Impl::PullProcessReplyHandler_t>();
     auto process_handler = m_impl->work_then_reply_handler;
+
+    RDX_INFO_DEV(this, __func__, false, "Initializing detection request handler, action name: {}",
+                 m_detection_request_input_port->get_config()->get_action_name());
+
     process_handler->init(
         m_detection_request_input_port.get(),
         &m_impl->inference_resource_pool,
@@ -384,9 +389,12 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
                                                                typename Impl::PullProcessReplyHandler_t::ResourceToken_t &resource_token) {
             auto msg_uuid = ActionDataTrait_t::get_uuid(*source_data->get_goal());
             std::string msg_uuid_str = UUIDTrait::to_string(msg_uuid);
+            RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Got detection request", msg_uuid_str);
 
             // Extract image from input data
             cv::Mat input_image;
+
+            RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Extracting image from input data", msg_uuid_str);
             auto ret_extract_image = _extract_image(&input_image, source_data);
             if (ret_extract_image != 0) {
                 RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Failed to extract image from input data, error code: {}",
@@ -428,6 +436,8 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
             return 0;
         };
     process_handler->on_process_input_data = process_func;
+
+    RDX_INFO_DEV(this, __func__, false, "{}", "Detection request handler completed");
 
     return 0;
 }
@@ -646,6 +656,7 @@ int Yolo8BaseNode<TModel>::_process_image_request()
 template <YoloModelConcept TModel>
 void Yolo8BaseNode<TModel>::_step()
 {
+    // RDX_INFO_DEV(this, __func__, false, "{}", "Stepping");
     if (m_detection_request_input_port) {
         _process_detection_request();
     }

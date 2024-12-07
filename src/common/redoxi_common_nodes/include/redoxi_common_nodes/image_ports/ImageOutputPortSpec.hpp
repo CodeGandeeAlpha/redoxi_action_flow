@@ -104,6 +104,11 @@ class DeliverySourceData
         return m_frame_metadata;
     }
 
+    virtual FrameMetadata_t &get_frame_metadata()
+    {
+        return m_frame_metadata;
+    }
+
     virtual void set_frame_metadata(const FrameMetadata_t &frame_metadata)
     {
         m_frame_metadata = frame_metadata;

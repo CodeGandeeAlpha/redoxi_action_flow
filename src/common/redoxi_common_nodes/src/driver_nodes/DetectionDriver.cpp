@@ -52,6 +52,8 @@ int DetectionDriver::_on_process_input_request(InputRequestHandler_t::OutputRequ
                      msg_uuid_str, image.cols, image.rows);
         output_source_data.set_image(image);
     }
+
+    // FIXME: handle image encoding properly
     output_source_data.set_frame_metadata(source_data->get_goal()->frame.metadata);
     output_request->set_source_data(output_source_data);
 

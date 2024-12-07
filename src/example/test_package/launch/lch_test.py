@@ -94,7 +94,7 @@ det_node_params = {
     },
     "runtime_config": {
         "_time_unit": "us(1e-6)",
-        "step_interval": StepIntervals.VeryFast,
+        "step_interval": StepIntervals.Slow,
         "enable_blocking_mode": True,
         "model_output_config": {"conf_threshold": 0.35, "iou_threshold": 0.5},
         "enable_visualization": True,
@@ -131,7 +131,7 @@ video_source_params = {
                         "precondition": "dont_care",
                         "drop_strategy": "drop_as_needed",
                     },
-                    "create_debug_pub": False,
+                    "create_debug_pub": True,
                 },
             ],
             "num_buffer_requests": 1,
@@ -156,7 +156,7 @@ video_source_params = {
             "drop_strategy": "no_drop",
         },
         "_time_unit": "us(1e-6)",
-        "step_interval": StepIntervals.Fast,
+        "step_interval": StepIntervals.VerySlow,
     },
 }
 
@@ -217,7 +217,7 @@ detection_driver_params = {
                         "precondition": "dont_care",
                         "drop_strategy": "no_drop",
                     },
-                    "create_debug_pub": False,
+                    "create_debug_pub": True,
                 },
             ],
             "num_buffer_requests": 1,
