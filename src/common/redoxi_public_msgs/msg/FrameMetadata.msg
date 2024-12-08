@@ -24,5 +24,8 @@ string encoding
 int64 width 0
 int64 height 0
 
+# about the source of this frame
+FrameDeviceTag device_tag
+
 # any other data
 AnyData any_data
