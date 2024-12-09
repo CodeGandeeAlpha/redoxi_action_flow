@@ -13,7 +13,8 @@ log_level_arg = DeclareLaunchArgument(
 )
 
 fn_video = (
-    "/3d/chengxiao/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+    # "/3d/chengxiao/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+    "/3d/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.6.30-2023-06-18-15-00-02.mp4"
 )
 
 # 定义一些通用的配置
@@ -84,7 +85,7 @@ video_source_params = {
         **default_runtime_config,
         "video_start_time": 0,
         "video_end_time": -1,
-        "output_image_size": {"width": 1024, "height": -1},
+        "output_image_size": {"width": 1920, "height": 1080},
         "output_image_encoding": "rgb8",
         "publish_to_debug_topic": True,
         "frame_enqueue_policy": default_enqueue_policy,
@@ -249,7 +250,7 @@ psg_tracker_node_json_params = {
     "init_config": {
         **default_init_config,
         "create_debug_pub": False,
-        "tracker_type": 0,
+        "tracker_type": 1,
     },
     "runtime_config": {**default_runtime_config, "enable_debug_topics": False},
 }
@@ -269,7 +270,7 @@ psg_counter_node_json_params = {
                 }
             ],
         },
-        "passengerflow_config_path": "/3d/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.7.164.json",
+        "passengerflow_config_path": "/3d/chengxiao/data/passengerflow/fairmot_train_230907/psg_configs/20.22.6.30.json",
     },
     "runtime_config": {
         **default_runtime_config,

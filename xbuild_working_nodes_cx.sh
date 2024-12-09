@@ -15,11 +15,11 @@ display_help() {
     echo "  $0 --verbose --debug"
 }
 
-PackagesToBuild="redoxi_common_nodes \
+PackagesToBuild="redoxi_video_reader \
+                 redoxi_common_nodes \
                  redoxi_shared_memory \
                  redoxi_shm_v6d \
                  redoxi_inference \
-                 test_cx \
                  rosboard \
                  psg_common \
                  psg_master_node \
@@ -30,9 +30,9 @@ PackagesToBuild="redoxi_common_nodes \
                  psg_pose_detector \
                  psg_tracker \
                  video_reader_orbbec \
-                 redoxi_video_reader \
                  video_reader_from_url \
-                 psg_counter"
+                 psg_counter \
+                 test_cx"
 
 
 # PackagesToBuild="
