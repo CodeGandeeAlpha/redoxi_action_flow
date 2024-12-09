@@ -101,6 +101,9 @@ int DetectionRelayNode::_create_port_handler(
             (void)resource_token;
             (void)output_action_result;
 
+            image_utils::FrameMediator fm(&source_data->get_goal()->frame_bundle.primary_frame);
+            auto encoding = fm.get_encoding();
+
             // publish visualization
             if (runtime_config->enable_visualization && m_pub_visualization.valid()) {
                 auto msg_uuid = ActionDataTrait_t::get_uuid(*source_data->get_goal());
@@ -115,7 +118,7 @@ int DetectionRelayNode::_create_port_handler(
                     RDX_INFO_DEV(this, __func__, false, "{}", "Visualization image is empty, skipping");
                 } else {
                     RDX_INFO_DEV(this, __func__, false, "Visualization image size: {}x{}", vis_image.cols, vis_image.rows);
-                    m_pub_visualization.publish(vis_image);
+                    m_pub_visualization.publish(vis_image, encoding);
                 }
             }
 

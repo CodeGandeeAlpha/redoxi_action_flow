@@ -301,6 +301,10 @@ int RedoxiVideoReaderBase::_update_runtime_config(std::shared_ptr<BaseRuntimeCon
         SourceData_t::FrameData_t frame_data;
         frame_data.image = resized_image;
         frame_data.metadata = request.get_source_data().get_primary_frame().metadata;
+
+        // update size info
+        frame_data.metadata.width = resized_image.cols;
+        frame_data.metadata.height = resized_image.rows;
         request.get_source_data().set_primary_frame(frame_data);
     });
 

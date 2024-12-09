@@ -243,6 +243,9 @@ class DeliveryRequest : public DeliveryRequestBase
         }
 
         auto &goal = target_data.get_goal();
+        auto msg_uuid = DeliveryTargetData::ActionDataTrait_t::get_uuid(goal);
+        RDX_INFO_DEV(nullptr, __func__, false, "[msg_uuid={}] converting source to target data",
+                     UUIDTrait::to_string(msg_uuid));
 
         // fill primary frame
         {
@@ -264,6 +267,9 @@ class DeliveryRequest : public DeliveryRequestBase
                 frame.to_frame_msg(goal.frame_bundle.secondary_frames[i]);
             }
         }
+
+        RDX_INFO_DEV(nullptr, __func__, false, "[msg_uuid={}] Done, converted source to target data",
+                     UUIDTrait::to_string(msg_uuid));
 
         return 0;
     }
@@ -323,7 +329,7 @@ class DownstreamDebugPublisher
     //! Publish an image with the DownstreamDebugPublisher
     virtual int publish(const cv::Mat &image)
     {
-        return m_pub->publish(image);
+        return m_pub->publish(image, DefaultColorImageEncoding.data());
     }
 
     virtual int publish(const MessageType_t &msg)

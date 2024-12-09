@@ -1,5 +1,20 @@
 #include "redoxi_common_cpp/image_proc/FrameMediator.hpp"
 #include <redoxi_common_cpp/ros_utils/common.hpp>
+#include <unordered_set>
+#include <sensor_msgs/image_encodings.hpp>
+
+static const std::unordered_set<std::string> allowed_3ch_encodings = {
+    sensor_msgs::image_encodings::RGB8,
+    sensor_msgs::image_encodings::BGR8,
+    sensor_msgs::image_encodings::RGB16,
+    sensor_msgs::image_encodings::BGR16,
+    sensor_msgs::image_encodings::YUV422,
+};
+
+static const std::unordered_set<std::string> allowed_1ch_encodings = {
+    sensor_msgs::image_encodings::MONO8,
+    sensor_msgs::image_encodings::MONO16,
+};
 
 namespace redoxi_works::image_utils
 {
@@ -27,7 +42,7 @@ FrameMediator::FrameMediator(const cv::Mat &frame, const std::string &encoding)
         RDX_RAISE_ERROR("[f={}] encoding is empty", __func__);
     }
 
-    update_frame_metadata(m_frame_metadata, frame);
+    make_metadata_compatible(&m_frame_metadata, frame);
     m_frame_metadata.encoding = encoding;
 }
 
@@ -35,13 +50,17 @@ FrameMediator::FrameMediator(const cv::Mat &frame, const std::string &encoding)
 FrameMediator::FrameMediator(const cv::Mat &frame)
     : m_frame(frame)
 {
-    update_frame_metadata(m_frame_metadata, frame);
+    make_metadata_compatible(&m_frame_metadata, frame);
 }
 
 //! Construct from frame message
 FrameMediator::FrameMediator(const FrameMsg_t *frame_msg)
     : m_frame_msg(frame_msg)
 {
+    // metadata should be compatible with the frame message
+    if (!is_compatible(*m_frame_msg, m_frame_msg->metadata)) {
+        RDX_RAISE_ERROR("[f={}] frame is not compatible with metadata", __func__);
+    }
     m_frame_metadata = m_frame_msg->metadata;
 }
 
@@ -141,7 +160,7 @@ int FrameMediator::to_frame_msg(redoxi_public_msgs::msg::Frame &frame_msg,
 {
     //! Convert image to frame message with optional encoding conversion
     auto ret = to_image_msg(frame_msg.raw_image, encoding);
-    update_frame_metadata(frame_msg.metadata, frame_msg.raw_image);
+    make_metadata_compatible(&frame_msg.metadata, frame_msg.raw_image);
     return ret;
 }
 
@@ -197,39 +216,49 @@ const cv::Mat &FrameMediator::_get_frame() const
 }
 
 // Private helper methods
-void FrameMediator::update_frame_metadata(Metadata_t &frame_metadata, const cv_bridge::CvImage &cv_img)
+void FrameMediator::make_metadata_compatible(Metadata_t *frame_metadata, const cv_bridge::CvImage &cv_img)
 {
-    frame_metadata.width = cv_img.image.cols;
-    frame_metadata.height = cv_img.image.rows;
-    frame_metadata.encoding = cv_img.encoding;
+    frame_metadata->width = cv_img.image.cols;
+    frame_metadata->height = cv_img.image.rows;
+    frame_metadata->encoding = cv_img.encoding;
 }
 
-void FrameMediator::update_frame_metadata(Metadata_t &frame_metadata, const sensor_msgs::msg::Image &image_msg)
+void FrameMediator::make_metadata_compatible(Metadata_t *frame_metadata, const sensor_msgs::msg::Image &image_msg)
 {
-    frame_metadata.width = image_msg.width;
-    frame_metadata.height = image_msg.height;
-    frame_metadata.encoding = image_msg.encoding;
+    frame_metadata->width = image_msg.width;
+    frame_metadata->height = image_msg.height;
+    frame_metadata->encoding = image_msg.encoding;
 }
 
-void FrameMediator::update_frame_metadata(Metadata_t &frame_metadata, const cv::Mat &cv_img)
+void FrameMediator::make_metadata_compatible(Metadata_t *frame_metadata, const cv::Mat &cv_img)
 {
-    frame_metadata.width = cv_img.cols;
-    frame_metadata.height = cv_img.rows;
+    frame_metadata->width = cv_img.cols;
+    frame_metadata->height = cv_img.rows;
 
     if (cv_img.channels() == 1) {
+        // skip it if already has compatible encoding
+        if (allowed_1ch_encodings.count(frame_metadata->encoding) > 0) {
+            return;
+        }
+
         if (cv_img.depth() == CV_8U) {
-            frame_metadata.encoding = std::string(AssumedEncoding_1ch_u8);
+            frame_metadata->encoding = std::string(AssumedEncoding_1ch_u8);
         } else if (cv_img.depth() == CV_16U) {
-            frame_metadata.encoding = std::string(AssumedEncoding_1ch_u16);
+            frame_metadata->encoding = std::string(AssumedEncoding_1ch_u16);
         } else {
             RDX_INFO_DEV(nullptr, __func__, "unknown encoding, channels={}, depth={}",
                          cv_img.channels(), cv_img.depth());
         }
     } else if (cv_img.channels() == 3) {
+        // skip it if already has compatible encoding
+        if (allowed_3ch_encodings.count(frame_metadata->encoding) > 0) {
+            return;
+        }
+
         if (cv_img.depth() == CV_8U) {
-            frame_metadata.encoding = std::string(AssumedEncoding_3ch_u8);
+            frame_metadata->encoding = std::string(AssumedEncoding_3ch_u8);
         } else if (cv_img.depth() == CV_16U) {
-            frame_metadata.encoding = std::string(AssumedEncoding_3ch_u16);
+            frame_metadata->encoding = std::string(AssumedEncoding_3ch_u16);
         } else {
             RDX_INFO_DEV(nullptr, __func__, "unknown encoding, channels={}, depth={}",
                          cv_img.channels(), cv_img.depth());
@@ -242,7 +271,7 @@ void FrameMediator::update_frame_metadata(Metadata_t &frame_metadata, const cv::
 bool FrameMediator::is_compatible(const cv::Mat &mat, const Metadata_t &metadata)
 {
     if (mat.empty())
-        return true;
+        return metadata == Metadata_t();
 
     bool size_compatible = mat.cols == metadata.width && mat.rows == metadata.height;
     if (!size_compatible) {
@@ -253,11 +282,9 @@ bool FrameMediator::is_compatible(const cv::Mat &mat, const Metadata_t &metadata
 
     bool encoding_compatible = false;
     if (mat.channels() == 1) {
-        encoding_compatible = metadata.encoding == AssumedEncoding_1ch_u8 ||
-                              metadata.encoding == AssumedEncoding_1ch_u16;
+        encoding_compatible = allowed_1ch_encodings.count(metadata.encoding) > 0;
     } else if (mat.channels() == 3) {
-        encoding_compatible = metadata.encoding == AssumedEncoding_3ch_u8 ||
-                              metadata.encoding == AssumedEncoding_3ch_u16;
+        encoding_compatible = allowed_3ch_encodings.count(metadata.encoding) > 0;
     }
 
     if (!encoding_compatible) {
@@ -265,6 +292,31 @@ bool FrameMediator::is_compatible(const cv::Mat &mat, const Metadata_t &metadata
                      mat.channels(), metadata.encoding);
     }
     return size_compatible && encoding_compatible;
+}
+
+bool FrameMediator::is_compatible(const ImageMsg_t &image_msg, const Metadata_t &metadata)
+{
+    if (image_msg.data.empty())
+        return metadata == Metadata_t();
+
+    bool size_compatible = image_msg.width == metadata.width && image_msg.height == metadata.height;
+    if (!size_compatible) {
+        RDX_INFO_DEV(nullptr, __func__, "image size is not compatible with metadata, image size={}, metadata size={}",
+                     image_msg.width, image_msg.height, metadata.width, metadata.height);
+        return false;
+    }
+
+    bool encoding_compatible = image_msg.encoding == metadata.encoding;
+    if (!encoding_compatible) {
+        RDX_INFO_DEV(nullptr, __func__, "image encoding is not compatible with metadata, image encoding={}, metadata encoding={}",
+                     image_msg.encoding, metadata.encoding);
+    }
+    return size_compatible && encoding_compatible;
+}
+
+bool FrameMediator::is_compatible(const FrameMsg_t &frame_msg, const Metadata_t &metadata)
+{
+    return is_compatible(frame_msg.raw_image, metadata);
 }
 
 } // namespace redoxi_works::image_utils

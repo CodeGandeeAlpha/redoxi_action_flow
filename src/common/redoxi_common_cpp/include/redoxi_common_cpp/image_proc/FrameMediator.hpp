@@ -77,7 +77,7 @@ class FrameMediator
      * @note Assumes image_msg pointer remains valid during object lifetime
      * @note Assumes if image_msg contains image data, it has valid encoding
      */
-    explicit FrameMediator(const ImageMsg_t *image_msg);
+    // explicit FrameMediator(const ImageMsg_t *image_msg);
 
     /**
      * @brief Convert to cv::Mat with optional encoding conversion.
@@ -196,38 +196,6 @@ class FrameMediator
      */
     const cv::Mat &_get_frame() const;
 
-  private:
-    cv::Mat m_frame;
-    Metadata_t m_frame_metadata;
-    const FrameMsg_t *m_frame_msg = nullptr;
-
-    /**
-     * @brief Update frame metadata from CvImage.
-     * @param frame_metadata Output frame metadata.
-     * @param cv_img Input CvImage.
-     * @note Assumes cv_img contains valid image data
-     * @note Assumes cv_img encoding is valid
-     */
-    static void update_frame_metadata(Metadata_t &frame_metadata, const cv_bridge::CvImage &cv_img);
-
-    /**
-     * @brief Update frame metadata from cv::Mat.
-     * @param frame_metadata Output frame metadata.
-     * @param cv_img Input cv::Mat.
-     * @note Assumes cv_img is not empty
-     * @note Assumes cv_img type is a standard OpenCV format
-     */
-    static void update_frame_metadata(Metadata_t &frame_metadata, const cv::Mat &cv_img);
-
-    /**
-     * @brief Update frame metadata from ROS image message.
-     * @param frame_metadata Output frame metadata.
-     * @param image_msg Input ROS image message.
-     * @note Assumes image_msg is not empty
-     * @note Assumes image_msg contains valid encoding
-     */
-    static void update_frame_metadata(Metadata_t &frame_metadata, const ImageMsg_t &image_msg);
-
     /**
      * @brief Check if cv::Mat is compatible with metadata.
      * @param mat The cv::Mat to check.
@@ -237,6 +205,60 @@ class FrameMediator
      * @note Assumes mat is not empty
      */
     static bool is_compatible(const cv::Mat &mat, const Metadata_t &metadata);
+    /**
+     * @brief Check if ROS image message is compatible with metadata.
+     * @param image_msg The ROS image message to check.
+     * @param metadata The metadata to check against.
+     * @return True if compatible.
+     * @note Assumes metadata contains valid dimensions and encoding
+     * @note Assumes image_msg contains valid image data
+     */
+    static bool is_compatible(const ImageMsg_t &image_msg, const Metadata_t &metadata);
+
+    /**
+     * @brief Check if frame message is compatible with metadata.
+     * @param frame_msg The frame message to check.
+     * @param metadata The metadata to check against.
+     * @return True if compatible.
+     * @note Assumes metadata contains valid dimensions and encoding
+     * @note Assumes frame_msg contains valid image data and metadata
+     */
+    static bool is_compatible(const FrameMsg_t &frame_msg, const Metadata_t &metadata);
+
+    /**
+     * @brief Update frame metadata from CvImage, so that the metadata is compatible with the image,
+     *        it will not modify compatible fields, just override those that are not compatible
+     * @param frame_metadata Output frame metadata
+     * @param cv_img Input CvImage
+     * @note Assumes cv_img contains valid image data
+     * @note Assumes cv_img encoding is valid
+     */
+    static void make_metadata_compatible(Metadata_t *frame_metadata, const cv_bridge::CvImage &cv_img);
+
+    /**
+     * @brief Update frame metadata from cv::Mat, so that the metadata is compatible with the image,
+     *        it will not modify compatible fields, just override those that are not compatible
+     * @param frame_metadata Output frame metadata
+     * @param cv_img Input cv::Mat
+     * @note Assumes cv_img is not empty
+     * @note Assumes cv_img type is a standard OpenCV format
+     */
+    static void make_metadata_compatible(Metadata_t *frame_metadata, const cv::Mat &cv_img);
+
+    /**
+     * @brief Update frame metadata from ROS image message, so that the metadata is compatible with the image,
+     *        it will not modify compatible fields, just override those that are not compatible
+     * @param frame_metadata Output frame metadata
+     * @param image_msg Input ROS image message
+     * @note Assumes image_msg is not empty
+     * @note Assumes image_msg contains valid encoding
+     */
+    static void make_metadata_compatible(Metadata_t *frame_metadata, const ImageMsg_t &image_msg);
+
+  private:
+    cv::Mat m_frame;
+    Metadata_t m_frame_metadata;
+    const FrameMsg_t *m_frame_msg = nullptr;
 };
 
 } // namespace redoxi_works::image_utils

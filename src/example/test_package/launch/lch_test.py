@@ -95,7 +95,7 @@ det_node_params = {
     "runtime_config": {
         "_time_unit": "us(1e-6)",
         "step_interval": StepIntervals.VeryFast,
-        "enable_blocking_mode": True,
+        "enable_blocking_mode": False,
         "model_output_config": {"conf_threshold": 0.35, "iou_threshold": 0.5},
         "enable_visualization": True,
         "enable_performance_probe": True,

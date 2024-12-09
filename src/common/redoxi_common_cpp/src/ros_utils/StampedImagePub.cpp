@@ -1,5 +1,7 @@
 #include "redoxi_common_cpp/ros_utils/StampedImagePub.hpp"
 #include <redoxi_common_cpp/image_proc/ImageStamper.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
+#include <redoxi_public_msgs/msg/frame.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 
 namespace redoxi_works
@@ -51,24 +53,38 @@ int StampedImagePub::publish(const sensor_msgs::msg::Image &image_msg,
         return -1;
     }
 
-    //! Convert sensor_msgs::msg::Image to cv::Mat
-    cv_bridge::CvImageConstPtr cv_ptr;
-    try {
-        cv_ptr = cv_bridge::toCvCopy(image_msg, DefaultColorImageEncoding.data());
-        // cv_ptr = cv_bridge::toCvCopy(image_msg);
-        RDX_INFO_DEV(nullptr, __func__, "{}", "Successfully converted sensor_msgs::msg::Image to cv::Mat.");
-    } catch (cv_bridge::Exception &e) {
-        RDX_RAISE_ERROR("cv_bridge exception in {}: {}", __func__, e.what());
-        return -1;
-    }
+    // convert to cvmat
+    redoxi_public_msgs::msg::Frame frame;
+    frame.raw_image = image_msg;
+    image_utils::FrameMediator::make_metadata_compatible(&frame.metadata, image_msg);
+    image_utils::FrameMediator fm(&frame);
+    cv::Mat cv_image;
+    fm.to_cv_image_copy(cv_image);
+    // fm.to_cv_image_copy(cv_image, DefaultColorImageEncoding.data());
+
+    // cv::imshow("cv_image", cv_image);
+    // cv::waitKey(0);
+
+    // //! Convert sensor_msgs::msg::Image to cv::Mat
+    // cv_bridge::CvImageConstPtr cv_ptr;
+    // try {
+    //     // cv_ptr = cv_bridge::toCvCopy(image_msg, DefaultColorImageEncoding.data());
+    //     cv_ptr = cv_bridge::toCvCopy(image_msg, "bgr8");
+    //     // cv_ptr = cv_bridge::toCvCopy(image_msg);
+    //     RDX_INFO_DEV(nullptr, __func__, "{}", "Successfully converted sensor_msgs::msg::Image to cv::Mat.");
+    // } catch (cv_bridge::Exception &e) {
+    //     RDX_RAISE_ERROR("cv_bridge exception in {}: {}", __func__, e.what());
+    //     return -1;
+    // }
 
     //! Call the publish function that takes cv::Mat
     RDX_INFO_DEV(nullptr, __func__, "{}", "Publishing image using cv::Mat");
-    return publish(cv_ptr->image, text, text_color, scale, background_color);
+    return publish(cv_image, fm.get_encoding(), text, text_color, scale, background_color);
 }
 
 
 int StampedImagePub::publish(const cv::Mat &image,
+                             std::string encoding,
                              std::optional<std::string> text,
                              std::optional<cv::Scalar> text_color,
                              double scale,
@@ -92,13 +108,25 @@ int StampedImagePub::publish(const cv::Mat &image,
         stamped_image = stamper.stamp(false);
     }
 
-    sensor_msgs::msg::Image::SharedPtr msg =
-        cv_bridge::CvImage(std_msgs::msg::Header(),
-                           DefaultColorImageEncoding.data(),
-                           stamped_image)
-            .toImageMsg();
-    msg->header.stamp = m_node->now();
-    m_pub->publish(*msg);
+    image_utils::FrameMediator fm(stamped_image, encoding);
+    sensor_msgs::msg::Image msg;
+    fm.to_image_msg(msg);
+
+    RDX_INFO_DEV(nullptr, __func__, "StampedImagePub::publish: Publishing image with encoding: {}", msg.encoding);
+    // {
+    //     // convert to bgr8 and imshow it
+    //     // cv::Mat bgr_image;
+    //     // cv::cvtColor(stamped_image, bgr_image, cv::COLOR_RGB2BGR);
+    //     cv::imshow("stamped_image", stamped_image);
+    //     cv::waitKey(0);
+    // }
+    // sensor_msgs::msg::Image::SharedPtr msg =
+    //     cv_bridge::CvImage(std_msgs::msg::Header(),
+    //                        DefaultColorImageEncoding.data(),
+    //                        stamped_image)
+    //         .toImageMsg();
+    // msg->header.stamp = m_node->now();
+    m_pub->publish(msg);
 
     return 0;
 }

@@ -157,13 +157,14 @@ void FrameRelayNode::_step()
 
     cv::Mat frame;
     _parse_frame(&frame, *frame_data);
-    m_pub_relayed_frame.publish(frame);
+    auto encoding = frame_data->get_goal()->frame_bundle.primary_frame.metadata.encoding;
+    m_pub_relayed_frame.publish(frame, encoding);
 
     // publish debug topic?
     if (get_debug_topics_enabled()) {
         auto control_signal_code = ActionDataTrait_t::get_control_signal_code(*frame_data->get_goal());
         auto label_text = fmt::format("accepted, signal = {}", control_signal_code_to_string(control_signal_code));
-        m_pub_frame_accepted.publish(frame, label_text);
+        m_pub_frame_accepted.publish(frame, encoding, label_text);
     }
 
     // at the end, terminate the goal

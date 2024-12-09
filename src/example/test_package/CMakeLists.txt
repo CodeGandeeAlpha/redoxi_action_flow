@@ -66,15 +66,15 @@ option(BUILD_ONNX_INFERENCE_API "Build onnx_inference_api target" OFF)
 option(BUILD_ONNX_YOLO8POSE "Build onnx_yolo8pose target" OFF)
 option(BUILD_ONNX_YOLO8DET "Build onnx_yolo8det target" OFF)
 
-option(BUILD_VIDEO_FROM_URL_NODE "Build video_from_url_node target" OFF)
+option(BUILD_VIDEO_FROM_URL_NODE "Build video_from_url_node target" ON)
 option(BUILD_YOLO_BODY_POSE_DETECTION_NODE
-       "Build yolo_body_pose_detection_node target" OFF)
+       "Build yolo_body_pose_detection_node target" ON)
 option(BUILD_YOLO_OBJECT_DETECTION_NODE
-       "Build yolo_object_detection_node target" OFF)
-option(BUILD_DETECTION_RELAY_NODE "Build detection_relay_node target" OFF)
-option(BUILD_DETECTION_DRIVER_NODE "Build detection_driver_node target" OFF)
+       "Build yolo_object_detection_node target" ON)
+option(BUILD_DETECTION_RELAY_NODE "Build detection_relay_node target" ON)
+option(BUILD_DETECTION_DRIVER_NODE "Build detection_driver_node target" ON)
 option(BUILD_TEST_DRIVER_NODE "Build test_driver_node target" OFF)
-option(BUILD_TEST_FRAME_PROXY "Build test_frame_proxy target" ON)
+option(BUILD_TEST_FRAME_PROXY "Build test_frame_proxy target" OFF)
 
 # Function to configure a target
 function(configure_target target_name)

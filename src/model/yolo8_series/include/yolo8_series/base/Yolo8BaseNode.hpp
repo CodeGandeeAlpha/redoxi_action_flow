@@ -351,7 +351,13 @@ int Yolo8BaseNode<TModel>::_create_image_request_handler(const RuntimeConfig_t &
             if (m_impl->pub_visualization && enable_visualization && ret_extract_image == 0) {
                 cv::Mat vis_canvas = input_image.clone();
                 _draw_visualization(vis_canvas, det_result);
-                m_impl->pub_visualization->publish(vis_canvas);
+                RDX_INFO_DEV(this, __func__, false, "Publishing visualization with encoding: {}", fm.get_encoding());
+                // {
+                //     // directly show it
+                //     cv::imshow("vis_canvas", vis_canvas);
+                //     cv::waitKey(0);
+                // }
+                m_impl->pub_visualization->publish(vis_canvas, fm.get_encoding());
             }
 
             //! Print probe message
@@ -403,7 +409,8 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
             cv::Mat input_image;
 
             RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Extracting image from input data", msg_uuid_str);
-            auto ret_extract_image = _extract_image(&input_image, source_data);
+            image_utils::FrameMediator fm(&source_data->get_goal()->frame_bundle.primary_frame);
+            auto ret_extract_image = fm.to_cv_image_copy(input_image);
             if (ret_extract_image != 0) {
                 RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Failed to extract image from input data, error code: {}",
                              msg_uuid_str, ret_extract_image);
@@ -430,7 +437,13 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
             if (m_impl->pub_visualization && enable_visualization) {
                 cv::Mat vis_canvas = input_image.clone();
                 _draw_visualization(vis_canvas, det_result);
-                m_impl->pub_visualization->publish(vis_canvas);
+                RDX_INFO_DEV(this, __func__, false, "Publishing visualization with encoding: {}", fm.get_encoding());
+                // {
+                //     // directly show it
+                //     cv::imshow("vis_canvas", vis_canvas);
+                //     cv::waitKey(0);
+                // }
+                m_impl->pub_visualization->publish(vis_canvas, fm.get_encoding());
             }
 
             //! Print probe message
