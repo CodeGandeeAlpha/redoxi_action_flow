@@ -7,6 +7,8 @@
 #include <sensor_msgs/image_encodings.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 
+#include <redoxi_common_cpp/image_proc/utils.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
@@ -20,6 +22,54 @@ namespace redoxi_works::image_ports::types
 using TimeUnit = DefaultTimeUnit_t;
 using DeliveryActionType = redoxi_public_msgs::action::ProcessFrame;
 static_assert(RedoxiActionConcept<DeliveryActionType>, "DeliveryActionType must satisfy RedoxiActionConcept");
+
+struct FrameWithMetadata {
+    using Metadata_t = redoxi_public_msgs::msg::FrameMetadata;
+    using Frame_t = redoxi_public_msgs::msg::Frame;
+
+    cv::Mat image;
+    Metadata_t metadata;
+
+    bool is_empty() const
+    {
+        return image.empty();
+    }
+
+    const std::string &get_encoding() const
+    {
+        return metadata.encoding;
+    }
+
+    int to_frame_msg(Frame_t &frame) const
+    {
+        if (is_empty()) {
+            frame = Frame_t();
+        } else {
+            image_utils::FrameMediator fm(image, metadata);
+            fm.to_frame_msg(frame);
+        }
+        return 0;
+    }
+
+    //! create from frame message, with data copied from the frame message
+    int from_frame_msg_copy(const Frame_t &frame)
+    {
+        image_utils::FrameMediator fm(&frame);
+        fm.to_cv_image_copy(image);
+        metadata = fm.get_metadata();
+        return 0;
+    }
+
+    //! create from frame message, with data shared with the frame message
+    //! you must ensure the frame message is not destroyed before the frame data
+    int from_frame_msg_shared(const redoxi_public_msgs::msg::Frame &frame)
+    {
+        image_utils::FrameMediator fm(&frame);
+        image = fm.to_cv_image_shared();
+        metadata = fm.get_metadata();
+        return 0;
+    }
+};
 
 namespace Defaults
 {
@@ -45,9 +95,9 @@ class RetryPolicy : public output_port_types::DefaultRetryPolicy<TimeUnit>
 class DeliverySourceData
 {
   public:
-    using FrameMetadata_t = redoxi_public_msgs::msg::FrameMetadata;
+    using FrameData_t = FrameWithMetadata;
     using PublishMessageType_t = sensor_msgs::msg::Image;
-    inline static constexpr const char *DefaultEncoding = sensor_msgs::image_encodings::BGR8;
+    using FrameBundle_t = redoxi_public_msgs::msg::MultiDeviceFrame;
 
     DeliverySourceData()
     {
@@ -56,72 +106,54 @@ class DeliverySourceData
     }
     virtual ~DeliverySourceData() = default;
 
-    //! Get the encoding of the image
-    virtual const std::string &get_encoding() const
-    {
-        return m_encoding;
-    }
-
-    //! Set the encoding of the image
-    virtual void set_encoding(const std::string &encoding)
-    {
-        m_encoding = encoding;
-    }
-
     //! Get the image
-    virtual const cv::Mat &get_image() const
+    virtual const FrameData_t &get_primary_frame() const
     {
-        return m_image;
+        return m_primary_frame;
     }
 
     //! Get the image, mutable version
-    virtual cv::Mat &get_image()
+    virtual FrameData_t &get_primary_frame()
     {
-        return m_image;
+        return m_primary_frame;
     }
 
     //! Set the image
-    virtual void set_image(const cv::Mat &image)
+    virtual void set_primary_frame(const FrameData_t &frame)
     {
-        m_image = image;
+        m_primary_frame = frame;
     }
 
-    //! Get the frame number
-    //! @deprecated Use get_frame_metadata().frame_num instead
-    [[deprecated("Use get_frame_metadata().frame_num instead")]] virtual int64_t get_frame_number() const
+    //! Get the secondary frames
+    virtual const std::vector<FrameData_t> &get_secondary_frames() const
     {
-        return m_frame_metadata.frame_num;
+        return m_secondary_frames;
     }
 
-    //! Set the frame number
-    //! @deprecated Use set_frame_metadata() instead
-    [[deprecated("Use set_frame_metadata() instead")]] virtual void set_frame_number(int64_t frame_number)
+    //! Get the secondary frames, mutable version
+    virtual std::vector<FrameData_t> &get_secondary_frames()
     {
-        m_frame_metadata.frame_num = frame_number;
+        return m_secondary_frames;
     }
 
-    virtual const FrameMetadata_t &get_frame_metadata() const
+    //! Set the secondary frames
+    virtual void set_secondary_frames(const std::vector<FrameData_t> &frames)
     {
-        return m_frame_metadata;
-    }
-
-    virtual void set_frame_metadata(const FrameMetadata_t &frame_metadata)
-    {
-        m_frame_metadata = frame_metadata;
+        m_secondary_frames = frames;
     }
 
     //! Convert the source data to a ROS message for publishing
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        // empty image, skip
-        if (m_image.empty()) {
+        // empty primary frame, skip
+        if (m_primary_frame.is_empty()) {
             return -1;
         }
 
-        cv_bridge::CvImage cv_image;
-        cv_image.image = m_image;
-        cv_image.encoding = m_encoding;
-        cv_image.toImageMsg(msg);
+        // convert primary frame to ROS message
+        image_utils::FrameMediator fm(m_primary_frame.image, m_primary_frame.get_encoding());
+        fm.to_image_msg(msg);
+
         return 0;
     }
 
@@ -137,16 +169,29 @@ class DeliverySourceData
         m_uuid = uuid;
     }
 
+    virtual void from_frame_bundle(const FrameBundle_t &frame_bundle)
+    {
+        image_utils::FrameMediator fm(&frame_bundle.primary_frame);
+        fm.to_cv_image_copy(m_primary_frame.image);
+        m_primary_frame.metadata = fm.get_metadata();
+
+        // for secondary frames
+        m_secondary_frames.resize(frame_bundle.secondary_frames.size());
+        for (size_t i = 0; i < frame_bundle.secondary_frames.size(); ++i) {
+            image_utils::FrameMediator fm(&frame_bundle.secondary_frames[i]);
+            fm.to_cv_image_copy(m_secondary_frames[i].image);
+            m_secondary_frames[i].metadata = fm.get_metadata();
+        }
+    }
+
     // auxiliary data for easy extension without inheritance
     std::any auxiliary_data;
 
   protected:
-    cv::Mat m_image;
-    std::string m_encoding = DefaultEncoding;
-    boost::uuids::uuid m_uuid;
+    UUIDType m_uuid;
 
-    // source timestamp and frame index
-    FrameMetadata_t m_frame_metadata;
+    FrameWithMetadata m_primary_frame;
+    std::vector<FrameWithMetadata> m_secondary_frames;
 };
 
 
@@ -167,13 +212,9 @@ class DeliveryTargetData : public DeliveryTargetDataBase
 
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        auto &raw_image = this->m_goal.frame.raw_image;
-        if (!raw_image.data.empty()) {
-            msg = raw_image;
-            return 0;
-        } else {
-            return -1;
-        }
+        image_utils::FrameMediator fm(&this->m_goal.frame_bundle.primary_frame);
+        auto ret = fm.to_image_msg(msg);
+        return ret;
     }
 
     // auxiliary data for easy extension without inheritance
@@ -202,25 +243,33 @@ class DeliveryRequest : public DeliveryRequestBase
         }
 
         auto &goal = target_data.get_goal();
+        auto msg_uuid = DeliveryTargetData::ActionDataTrait_t::get_uuid(goal);
+        RDX_INFO_DEV(nullptr, __func__, false, "[msg_uuid={}] converting source to target data",
+                     UUIDTrait::to_string(msg_uuid));
 
-        // fill payload
-        auto image = this->m_source_data.get_image();
+        // fill primary frame
+        {
+            const auto &primary_frame = m_source_data.get_primary_frame();
+            primary_frame.to_frame_msg(goal.frame_bundle.primary_frame);
 
-        // convert image to ROS message
-        if (!image.empty()) {
-            cv_bridge::CvImage cv_bridge_image;
-            cv_bridge_image.image = image;
-            cv_bridge_image.encoding = sensor_msgs::image_encodings::BGR8;
-            cv_bridge_image.toImageMsg(goal.frame.raw_image);
+            // FIXME: source data encoding is wrong, different from request
+            RDX_INFO_DEV(nullptr, __func__, false, "in target data goal, raw image encoding={}, in metadata={}",
+                         goal.frame_bundle.primary_frame.raw_image.encoding,
+                         goal.frame_bundle.primary_frame.metadata.encoding);
         }
-        goal.frame.metadata = this->m_source_data.get_frame_metadata();
-        goal.frame.metadata.width = image.cols;
-        goal.frame.metadata.height = image.rows;
 
-        // no longer needed, base class will handle standard information
-        // using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
-        // ActionTrait::set_uuid(goal, this->m_source_data.get_uuid());
-        // ActionTrait::mark_with_control_signal(goal, this->get_control_signal_code());
+        // fill secondary frames
+        {
+            const auto &secondary_frames = m_source_data.get_secondary_frames();
+            goal.frame_bundle.secondary_frames.resize(secondary_frames.size());
+            for (size_t i = 0; i < secondary_frames.size(); ++i) {
+                const auto &frame = secondary_frames[i];
+                frame.to_frame_msg(goal.frame_bundle.secondary_frames[i]);
+            }
+        }
+
+        RDX_INFO_DEV(nullptr, __func__, false, "[msg_uuid={}] Done, converted source to target data",
+                     UUIDTrait::to_string(msg_uuid));
 
         return 0;
     }
@@ -280,7 +329,7 @@ class DownstreamDebugPublisher
     //! Publish an image with the DownstreamDebugPublisher
     virtual int publish(const cv::Mat &image)
     {
-        return m_pub->publish(image);
+        return m_pub->publish(image, DefaultColorImageEncoding.data());
     }
 
     virtual int publish(const MessageType_t &msg)

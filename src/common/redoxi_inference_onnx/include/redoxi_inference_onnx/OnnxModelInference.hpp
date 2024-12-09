@@ -86,6 +86,7 @@ class OnnxModelInference : public RedoxiModelInference
     static std::shared_ptr<Ort::Session> create_onnx_session(
         const std::string &model_path,
         const std::string &provider_type,
+        int device_index,
         Ort::Env &env);
 
     /**

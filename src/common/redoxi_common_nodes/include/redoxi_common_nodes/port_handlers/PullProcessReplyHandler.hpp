@@ -49,10 +49,21 @@ class PullProcessReplyHandler
         std::shared_ptr<PullProcessSendHandlerConfig> config,
         rclcpp::Node *node = nullptr)
     {
+        RDX_INFO_DEV(nullptr, __func__, true,
+                     "Initializing pull process reply handler, input port = {}, self={}",
+                     (int64_t)input_port, (int64_t)this);
+
+        if (!input_port) {
+            RDX_RAISE_ERROR("[f={}] Input port should not be nullptr", __func__);
+        }
         m_resource_token_queue = resource_token_queue;
         m_input_port = input_port;
         m_config = config;
         m_node = node;
+
+        RDX_INFO_DEV(nullptr, __func__, true,
+                     "Pull process reply handler initialized, m_input_port = {}, self={}",
+                     (int64_t)m_input_port, (int64_t)this);
     }
 
     // get data from input port, process it, and reply to the goal
@@ -60,21 +71,23 @@ class PullProcessReplyHandler
     virtual ProcessResult process_and_reply()
     {
         if (!m_input_port) {
+            // no port, treat it as no data
+            RDX_INFO_DEV(nullptr, __func__, true, "{}", "No input port, treat it as no data");
             return ProcessResult::NoData;
         }
 
-        // RDX_INFO_DEV(nullptr, __func__, true, "{}", "Trying to get input data");
         // get data from input port
         std::shared_ptr<InputSourceData_t> input_data;
         if (m_config->block_input_reading) {
+            RDX_INFO_DEV(nullptr, __func__, true, "{}", "Blocking input reading");
             input_data = m_input_port->pop_source_data();
         } else {
             input_data = m_input_port->try_pop_source_data();
         }
         if (!input_data) {
-            // RDX_INFO_DEV(nullptr, __func__, true, "{}", "No input data");
             return ProcessResult::NoData;
         }
+        RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Got input data", UUIDTrait::to_string(InputActionDataTrait_t::get_uuid(*input_data->get_goal())));
 
         // get goal handle
         auto goal_handle = input_data->get_goal_handle_future().get();

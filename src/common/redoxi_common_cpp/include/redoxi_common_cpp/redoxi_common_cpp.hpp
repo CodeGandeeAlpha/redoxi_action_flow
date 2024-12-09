@@ -55,6 +55,10 @@ const int DefaultMaxNumberOfRetries = 10;
 // how many ms to wait before next _step()
 const double DefaultNodeStepIntervalMs = 1;
 
+// default image encodings, in ros2 sensor_msgs::image_encodings format
+constexpr const std::string_view DefaultColorImageEncoding = "rgb8";
+constexpr const std::string_view DefaultMonoImageEncoding = "mono8";
+
 // default time unit for processing and waiting
 using DefaultTimeUnit_t = std::chrono::microseconds;
 

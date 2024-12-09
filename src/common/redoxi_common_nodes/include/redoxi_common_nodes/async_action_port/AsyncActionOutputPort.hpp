@@ -425,6 +425,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 RDX_RAISE_ERROR("[{}] failed to initialize downstream", __func__);
             }
             m_downstreams.push_back(ds);
+            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Connected to downstream: {}", it.get_action_name());
         }
 
         if (m_downstreams.empty()) {
@@ -541,6 +542,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 pub->publish(source_pub_msg, s);
             }
         }
+
         if (target_data != nullptr) {
             auto pub = ds.get_debug_pub_target_data_sending();
             if (pub != nullptr) {

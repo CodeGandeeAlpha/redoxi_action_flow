@@ -157,13 +157,14 @@ void FrameRelayNode::_step()
 
     cv::Mat frame;
     _parse_frame(&frame, *frame_data);
-    m_pub_relayed_frame.publish(frame);
+    auto encoding = frame_data->get_goal()->frame_bundle.primary_frame.metadata.encoding;
+    m_pub_relayed_frame.publish(frame, encoding);
 
     // publish debug topic?
     if (get_debug_topics_enabled()) {
         auto control_signal_code = ActionDataTrait_t::get_control_signal_code(*frame_data->get_goal());
         auto label_text = fmt::format("accepted, signal = {}", control_signal_code_to_string(control_signal_code));
-        m_pub_frame_accepted.publish(frame, label_text);
+        m_pub_frame_accepted.publish(frame, encoding, label_text);
     }
 
     // at the end, terminate the goal
@@ -181,7 +182,7 @@ int FrameRelayNode::_parse_frame(cv::Mat *output,
     auto msg_uuid = ActionDataTrait_t::get_uuid(*source_data.get_goal());
 
     // parse from shm
-    auto &shm_token = source_data.get_goal()->frame.shm_token;
+    auto &shm_token = source_data.get_goal()->frame_bundle.primary_frame.shm_token;
     if (shm_token.object_size >= 0 && m_shm_client && m_shm_client->is_connected()) {
         shared_memory::ObjectIdentifier oid;
         if (shm_token.object_id != 0) {
@@ -220,7 +221,7 @@ int FrameRelayNode::_parse_frame(cv::Mat *output,
         RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Reading raw image directly from the goal",
                      boost::uuids::to_string(msg_uuid));
 
-        auto &raw_image = source_data.get_goal()->frame.raw_image;
+        auto &raw_image = source_data.get_goal()->frame_bundle.primary_frame.raw_image;
         if (!raw_image.data.empty()) {
             auto img_bridge = cv_bridge::toCvCopy(raw_image, raw_image.encoding);
             *output = img_bridge->image;

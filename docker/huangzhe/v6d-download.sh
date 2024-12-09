@@ -12,7 +12,7 @@ pushd $(pwd)
 
 cd ./tmp/v6d
 git checkout tags/v0.24.2  # solid version, main branch will make error
-git submodule update --init
+git submodule update --init --recursive
 # Go back to the original directory
 popd
 

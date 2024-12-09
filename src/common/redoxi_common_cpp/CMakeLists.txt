@@ -26,7 +26,7 @@ find_package(json_struct REQUIRED)
 set(source_files
     src/redoxi_common_cpp.cpp src/redoxi_ros_util.cpp
     src/image_proc/ImageStamper.cpp src/ros_utils/StampedImagePub.cpp
-    src/image_proc/utils.cpp)
+    src/image_proc/utils.cpp src/image_proc/FrameMediator.cpp)
 
 set(required_dependencies ${OpenCV_LIBS} fmt::fmt nlohmann_json::nlohmann_json
                           TBB::tbb json_struct::json_struct)

@@ -14,7 +14,7 @@ int DetectionDriver::_on_process_callee_result(OutputTypes::OutputRequest_t *out
 
     OutputTypes::OutputSourceData_t output_source_data;
     output_source_data.detections = callee_result->detections;
-    output_source_data.image = callee_request.get_source_data().get_image();
+    output_source_data.frame_data = callee_request.get_source_data().get_primary_frame();
     output_source_data.uid = callee_request.get_source_data().get_uuid();
     output_request->set_source_data(output_source_data);
     return 0;
@@ -32,27 +32,21 @@ int DetectionDriver::_on_process_input_request(InputRequestHandler_t::OutputRequ
 
     auto msg_uuid = InputTypes::ActionDataTrait_t::get_uuid(*source_data->get_goal());
     auto msg_uuid_str = boost::uuids::to_string(msg_uuid);
+    image_utils::FrameMediator fm(&source_data->get_goal()->frame_bundle.primary_frame);
 
-    const auto frame_number = source_data->get_goal()->frame.metadata.frame_num;
-    const auto source_frame_index = source_data->get_goal()->frame.metadata.source_frame_index;
-    const auto source_frame_timestamp = source_data->get_goal()->frame.metadata.source_timestamp;
-    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Driver got frame number={}, source_frame_index={}, source_frame_timestamp={}",
+    const auto frame_number = fm.get_frame_number();
+    const auto source_frame_index = fm.get_source_frame_index();
+    const auto source_frame_timestamp = fm.get_source_timestamp_flat();
+    const auto source_image_encoding = fm.get_encoding();
+    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Driver got frame number={}, source_frame_index={}, source_frame_timestamp={}, source_image_encoding={}",
                  msg_uuid_str, frame_number, source_frame_index,
-                 fmt::format("{}.{:06d} sec", source_frame_timestamp.sec, source_frame_timestamp.nanosec));
+                 fmt::format("{:.6f} sec", source_frame_timestamp.count() / 1e6),
+                 source_image_encoding);
 
-    // create request
+    // fill source data
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Creating request from source data", msg_uuid_str);
     CalleeTypes::RequestOutputSourceData_t output_source_data;
-    const auto &raw_image = source_data->get_goal()->frame.raw_image;
-    if (!raw_image.data.empty()) {
-        cv::Mat image;
-        image = cv_bridge::toCvCopy(raw_image)->image;
-
-        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Extracted image from source data, width={}, height={}",
-                     msg_uuid_str, image.cols, image.rows);
-        output_source_data.set_image(image);
-    }
-    output_source_data.set_frame_metadata(source_data->get_goal()->frame.metadata);
+    output_source_data.from_frame_bundle(source_data->get_goal()->frame_bundle);
     output_request->set_source_data(output_source_data);
 
     // get signal code and show it

@@ -573,7 +573,7 @@ int FrameRelayPublisher::_debug_publish_accepted_goal(const FrameReceiveAction_t
         return -1;
     }
 
-    const auto &raw_image = goal.frame.raw_image;
+    const auto &raw_image = goal.frame_bundle.primary_frame.raw_image;
     auto msg_uuid = to_boost_uuid(goal.x_uid);
     if (raw_image.data.empty()) {
         RDX_INFO_DEV(this, __func__, "[msg_uuid={}] Accepted goal has no raw image data",
@@ -585,7 +585,10 @@ int FrameRelayPublisher::_debug_publish_accepted_goal(const FrameReceiveAction_t
         return -1;
     }
 
-    m_debug_pub_accepted_goal->publish(raw_image, fmt::format("accepted frame {}", goal.frame.metadata.frame_num), cv::Scalar(0, 255, 0));
+    m_debug_pub_accepted_goal->publish(
+        raw_image,
+        fmt::format("accepted frame {}", goal.frame_bundle.primary_frame.metadata.frame_num),
+        cv::Scalar(0, 255, 0));
     return 0;
 }
 
@@ -595,7 +598,7 @@ int FrameRelayPublisher::_debug_publish_rejected_goal(const FrameReceiveAction_t
         return -1;
     }
 
-    const auto &raw_image = goal.frame.raw_image;
+    const auto &raw_image = goal.frame_bundle.primary_frame.raw_image;
     auto msg_uuid = to_boost_uuid(goal.x_uid);
     if (raw_image.data.empty()) {
         RDX_INFO_DEV(this, __func__, "[msg_uuid={}] Rejected goal has no raw image data",
@@ -607,7 +610,10 @@ int FrameRelayPublisher::_debug_publish_rejected_goal(const FrameReceiveAction_t
         return -1;
     }
 
-    m_debug_pub_rejected_goal->publish(raw_image, fmt::format("rejected frame {}", goal.frame.metadata.frame_num), cv::Scalar(0, 0, 255));
+    m_debug_pub_rejected_goal->publish(
+        raw_image,
+        fmt::format("rejected frame {}", goal.frame_bundle.primary_frame.metadata.frame_num),
+        cv::Scalar(0, 0, 255));
     return 0;
 }
 
@@ -624,7 +630,7 @@ int FrameRelayPublisher::_publish_relayed_frame(const FrameReceiveAction_t::Goal
         return -1;
     }
 
-    const auto &raw_image = goal.frame.raw_image;
+    const auto &raw_image = goal.frame_bundle.primary_frame.raw_image;
     if (raw_image.data.empty()) {
         RDX_INFO_DEV(this, __func__, "[msg_uuid={}] Relay frame has no raw image data",
                      boost::uuids::to_string(msg_uuid));

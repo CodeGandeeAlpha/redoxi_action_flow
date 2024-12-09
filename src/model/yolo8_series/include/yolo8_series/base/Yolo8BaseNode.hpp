@@ -207,7 +207,7 @@ int Yolo8BaseNode<TModel>::_extract_image(cv::Mat *output,
         return 0;
     }
 
-    return _extract_image(output, source_data->get_goal()->frame);
+    return _extract_image(output, source_data->get_goal()->frame_bundle.primary_frame);
 }
 
 template <YoloModelConcept TModel>
@@ -219,7 +219,7 @@ int Yolo8BaseNode<TModel>::_extract_image(cv::Mat *output,
         return 0;
     }
 
-    return _extract_image(output, source_data->get_goal()->frame);
+    return _extract_image(output, source_data->get_goal()->frame_bundle.primary_frame);
 }
 
 template <YoloModelConcept TModel>
@@ -232,12 +232,8 @@ int Yolo8BaseNode<TModel>::_extract_image(cv::Mat *output,
     }
 
     //! TODO: currently only support raw image, implement shared memory image extraction later
-    const auto &raw_image = frame_msg.raw_image;
-    if (raw_image.data.empty()) {
-        RDX_INFO_DEV(this, __func__, false, "[f={}] Empty image data", __func__);
-        return -1;
-    }
-    *output = cv_bridge::toCvCopy(raw_image)->image;
+    image_utils::FrameMediator fm(&frame_msg);
+    fm.to_cv_image_copy(*output);
     return 0;
 }
 
@@ -247,17 +243,25 @@ int Yolo8BaseNode<TModel>::_process_detection_result(typename ByImageRequest::Ou
                                                      const typename ByImageRequest::InputSourceData_t &source_data,
                                                      const cv::Mat &input_image)
 {
+    (void)input_image;
+
     // convert detection result to ROS message
     inference::conversion::to_ros_msg(&output_source_data->detections, det_result);
 
     // add frame metadata to each detection
     for (auto &detection : output_source_data->detections) {
-        detection.frame_metadata = source_data.get_goal()->frame.metadata;
+        detection.frame_metadata = source_data.get_goal()->frame_bundle.primary_frame.metadata;
     }
 
-    // set the image
-    output_source_data->image = input_image;
+    ImageRequestOutputPort::SourceData_t::FrameData_t frame_data;
+    frame_data.from_frame_msg_copy(source_data.get_goal()->frame_bundle.primary_frame);
+    output_source_data->frame_data = frame_data;
 
+    // set the image
+    // output_source_data->image = input_image;
+    // image_ports::types::DeliverySourceData _output_source_data;
+    // image_ports::types::DeliverySourceData::FrameData_t frame_data;
+    // output_source_data->from_frame_bundle(source_data.get_goal()->frame_bundle);
     return 0;
 }
 
@@ -274,8 +278,9 @@ int Yolo8BaseNode<TModel>::_process_detection_result(typename ByDetectionRequest
     inference::conversion::to_ros_msg(&output_action_result->detections, det_result);
 
     // add frame metadata to each detection
+    image_utils::FrameMediator fm(&source_data.get_goal()->frame_bundle.primary_frame);
     for (auto &detection : output_action_result->detections) {
-        detection.frame_metadata = source_data.get_goal()->frame.metadata;
+        detection.frame_metadata = fm.get_metadata();
     }
 
     return 0;
@@ -310,7 +315,9 @@ int Yolo8BaseNode<TModel>::_create_image_request_handler(const RuntimeConfig_t &
             (void)output_enqueue_policy;
             // extract image
             cv::Mat input_image;
-            auto ret_extract_image = _extract_image(&input_image, source_data->get_goal()->frame);
+            image_utils::FrameMediator fm(&source_data->get_goal()->frame_bundle.primary_frame);
+            auto ret_extract_image = fm.to_cv_image_copy(input_image);
+            // auto ret_extract_image = _extract_image(&input_image, source_data->get_goal()->frame);
 
             // do inference
             DetectionResult_t det_result;
@@ -344,13 +351,20 @@ int Yolo8BaseNode<TModel>::_create_image_request_handler(const RuntimeConfig_t &
             if (m_impl->pub_visualization && enable_visualization && ret_extract_image == 0) {
                 cv::Mat vis_canvas = input_image.clone();
                 _draw_visualization(vis_canvas, det_result);
-                m_impl->pub_visualization->publish(vis_canvas);
+                RDX_INFO_DEV(this, __func__, false, "Publishing visualization with encoding: {}", fm.get_encoding());
+                // {
+                //     // directly show it
+                //     cv::imshow("vis_canvas", vis_canvas);
+                //     cv::waitKey(0);
+                // }
+                m_impl->pub_visualization->publish(vis_canvas, fm.get_encoding());
             }
 
             //! Print probe message
             if (enable_performance_probe && m_impl->pub_detection_done) {
                 std_msgs::msg::String msg;
-                msg.data = fmt::format("detection request done, frame_num={}", source_data->get_goal()->frame.metadata.frame_num);
+                msg.data = fmt::format("detection request done, frame_num={}",
+                                       source_data->get_goal()->frame_bundle.primary_frame.metadata.frame_num);
                 m_impl->pub_detection_done->publish(msg);
             }
 
@@ -364,6 +378,7 @@ int Yolo8BaseNode<TModel>::_create_image_request_handler(const RuntimeConfig_t &
 template <YoloModelConcept TModel>
 int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig_t &runtime_config)
 {
+    RDX_INFO_DEV(this, __func__, false, "{}", "Creating detection request handler");
     using ActionDataTrait_t = typename ByDetectionRequest::InputPort_t::ActionDataTrait_t;
 
     auto handler_config = std::make_shared<typename Impl::PullProcessReplyHandler_t::InitConfig_t>();
@@ -373,6 +388,10 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
     bool enable_performance_probe = runtime_config.enable_performance_probe;
     m_impl->work_then_reply_handler = std::make_shared<typename Impl::PullProcessReplyHandler_t>();
     auto process_handler = m_impl->work_then_reply_handler;
+
+    RDX_INFO_DEV(this, __func__, false, "Initializing detection request handler, action name: {}",
+                 m_detection_request_input_port->get_config()->get_action_name());
+
     process_handler->init(
         m_detection_request_input_port.get(),
         &m_impl->inference_resource_pool,
@@ -384,10 +403,14 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
                                                                typename Impl::PullProcessReplyHandler_t::ResourceToken_t &resource_token) {
             auto msg_uuid = ActionDataTrait_t::get_uuid(*source_data->get_goal());
             std::string msg_uuid_str = UUIDTrait::to_string(msg_uuid);
+            RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Got detection request", msg_uuid_str);
 
             // Extract image from input data
             cv::Mat input_image;
-            auto ret_extract_image = _extract_image(&input_image, source_data);
+
+            RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Extracting image from input data", msg_uuid_str);
+            image_utils::FrameMediator fm(&source_data->get_goal()->frame_bundle.primary_frame);
+            auto ret_extract_image = fm.to_cv_image_copy(input_image);
             if (ret_extract_image != 0) {
                 RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Failed to extract image from input data, error code: {}",
                              msg_uuid_str, ret_extract_image);
@@ -414,13 +437,20 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
             if (m_impl->pub_visualization && enable_visualization) {
                 cv::Mat vis_canvas = input_image.clone();
                 _draw_visualization(vis_canvas, det_result);
-                m_impl->pub_visualization->publish(vis_canvas);
+                RDX_INFO_DEV(this, __func__, false, "Publishing visualization with encoding: {}", fm.get_encoding());
+                // {
+                //     // directly show it
+                //     cv::imshow("vis_canvas", vis_canvas);
+                //     cv::waitKey(0);
+                // }
+                m_impl->pub_visualization->publish(vis_canvas, fm.get_encoding());
             }
 
             //! Print probe message
             if (enable_performance_probe && m_impl->pub_detection_done) {
                 std_msgs::msg::String msg;
-                msg.data = fmt::format("detection request done, frame_num={}", source_data->get_goal()->frame.metadata.frame_num);
+                msg.data = fmt::format("detection request done, frame_num={}",
+                                       source_data->get_goal()->frame_bundle.primary_frame.metadata.frame_num);
                 m_impl->pub_detection_done->publish(msg);
             }
 
@@ -428,6 +458,8 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
             return 0;
         };
     process_handler->on_process_input_data = process_func;
+
+    RDX_INFO_DEV(this, __func__, false, "{}", "Detection request handler completed");
 
     return 0;
 }
@@ -646,6 +678,7 @@ int Yolo8BaseNode<TModel>::_process_image_request()
 template <YoloModelConcept TModel>
 void Yolo8BaseNode<TModel>::_step()
 {
+    // RDX_INFO_DEV(this, __func__, false, "{}", "Stepping");
     if (m_detection_request_input_port) {
         _process_detection_request();
     }

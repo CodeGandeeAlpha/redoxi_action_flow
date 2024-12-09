@@ -27,6 +27,7 @@ using DeliveryTargetDataBase = output_port_types::DefaultTargetData<DetectionReq
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
   public:
+    using FrameData_t = image_ports::types::FrameWithMetadata;
     DeliveryTargetData()
     {
         static_assert(output_port_types::DeliveryTargetDataConcept<DeliveryTargetData>,
@@ -40,26 +41,55 @@ class DeliveryTargetData : public DeliveryTargetDataBase
 
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        auto canvas = image.clone();
-        image_utils::draw_detections(&canvas, detections);
-        if (canvas.empty()) {
-            // cannot convert, return error
+        auto vis_image = get_visualization_frame();
+        if (vis_image.is_empty()) {
             return -1;
         }
+
+        image_utils::FrameMediator fm(vis_image.image, vis_image.get_encoding());
+        auto canvas = vis_image.image.clone();
+        image_utils::draw_detections(&canvas, detections);
 
         //! Convert drawn image to ROS message using cv_bridge
         std_msgs::msg::Header header;
         header.stamp = rclcpp::Clock().now();
-        cv_bridge::CvImage cv_bridge_img(header, DeliverySourceData::DefaultEncoding, canvas);
-        msg = *cv_bridge_img.toImageMsg();
+        cv_bridge::CvImage cv_bridge_img(header, vis_image.get_encoding(), canvas);
+        cv_bridge_img.toImageMsg(msg);
         return 0;
+    }
+
+    //! Get the image to be visualized
+    virtual FrameData_t get_visualization_frame() const
+    {
+        if (!m_visualization_frame.is_empty()) {
+            return m_visualization_frame;
+        } else {
+            image_utils::FrameMediator fm(&m_goal.frame_bundle.primary_frame);
+            FrameData_t output;
+            fm.to_cv_image_copy(output.image);
+            output.metadata = m_goal.frame_bundle.primary_frame.metadata;
+            return output;
+        }
+    }
+
+    //! Get the image to be visualized, mutable
+    FrameData_t &get_visualization_frame()
+    {
+        return m_visualization_frame;
+    }
+
+    //! Set the image to be visualized
+    virtual void set_visualization_frame(const FrameData_t &frame)
+    {
+        m_visualization_frame = frame;
     }
 
     // auxiliary data for easy extension without inheritance
     std::any auxiliary_data;
 
+  protected:
     // the original image, used for visualization
-    cv::Mat image;
+    FrameData_t m_visualization_frame;
     std::vector<redoxi_public_msgs::msg::Detection> detections;
 };
 
@@ -90,27 +120,26 @@ class DeliveryRequest : public DeliveryRequestBase
 
         auto &goal = target_data.get_goal();
         const auto &source_data = this->m_source_data;
-        const auto &image_msg = source_data.get_image();
-        target_data.image = image_msg;
-        goal.frame.metadata = source_data.get_frame_metadata();
 
-        if (!image_msg.empty()) {
-            std_msgs::msg::Header header;
-            header.stamp = rclcpp::Clock().now();
-            source_data.to_publish_message(goal.frame.raw_image);
-            goal.frame.metadata.width = image_msg.cols;
-            goal.frame.metadata.height = image_msg.rows;
+        // set the visualization frame
+        target_data.set_visualization_frame(source_data.get_primary_frame());
+
+        // convert primary frame to goal
+        {
+            const auto &frame_data = source_data.get_primary_frame();
+            frame_data.to_frame_msg(goal.frame_bundle.primary_frame);
         }
 
-        // no longer needed, base class will handle standard information
-        // // set additional information into the goal
-        // using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
+        // convert secondary frame to goal
+        {
+            auto &secondary_frame = source_data.get_secondary_frames();
+            goal.frame_bundle.secondary_frames.clear();
+            for (auto &frame : secondary_frame) {
+                frame.to_frame_msg(goal.frame_bundle.secondary_frames.emplace_back());
+            }
+        }
 
-        // // set the source data UUID
-        // ActionTrait::set_uuid(goal, source_data.get_uuid());
-
-        // // set the control signal code
-        // ActionTrait::mark_with_control_signal(goal, get_control_signal_code());
+        // standard properties will be set by the base class
 
         return 0;
     }
@@ -132,34 +161,13 @@ using DeliveryTask = output_port_types::DefaultDeliveryTask<DeliveryRequest,
 static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
               "DeliveryTask must satisfy DeliveryTaskConcept");
 
-//! Downstream debug publisher type for detection request output port
-// using DownstreamDebugPublisher = redoxi_works::image_ports::types::DownstreamDebugPublisher;
-
-//! Downstream spec type with image publisher for detection request output port
-// using DownstreamSpec = redoxi_works::image_ports::types::DownstreamSpecWithImagePub<
-//     DetectionRequestActionType, DeliveryPolicy>;
-// static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
-//               "DownstreamSpec must satisfy DownstreamSpecConcept");
-
-
 using Downstream = image_ports::types::DownstreamBaseWithImagePub<
     DetectionRequestActionType, DeliveryPolicy>;
 // using DownstreamDebugPublisher = Downstream::SourcePublisherType_t;
 using DownstreamSpec = Downstream::DownstreamSpec_t;
 
-//! Downstream spec type for detection request output port
-// using DownstreamSpec = output_port_types::DefaultDownstreamSpec<DetectionRequestActionType,
-//                                                                 DeliveryPolicy,
-//                                                                 DownstreamDebugPublisher,
-//                                                                 DownstreamDebugPublisher>;
-// static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
-//               "DownstreamSpec must satisfy DownstreamSpecConcept");
-
 //! Init config type for detection request output port
 using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;
-
-//! Downstream type for detection request output port
-// using Downstream = output_port_types::DefaultDownstream<DownstreamSpec>;
 
 //! Detection request output port spec
 struct DetectionRequestOutputPortSpec {

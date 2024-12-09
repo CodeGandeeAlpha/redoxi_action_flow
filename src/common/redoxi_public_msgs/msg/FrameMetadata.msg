@@ -15,9 +15,17 @@ builtin_interfaces/Time source_timestamp
 # -1 for empty value
 int64 source_frame_index -1
 
+# encoding format of the frame data, e.g., 'rgb8', 'bgr8', etc.
+# see sensor_msgs/image_encodings for more details
+# if not specified, the application makes its own decision
+string encoding
+
 # image size
 int64 width 0
 int64 height 0
+
+# about the source of this frame
+FrameDeviceTag device_tag
 
 # any other data
 AnyData any_data

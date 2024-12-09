@@ -10,6 +10,7 @@
 #include <redoxi_common_nodes/detection_ports/DetectionResponseCommon.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
 #include <redoxi_common_nodes/image_ports/ImageOutputPortSpec.hpp>
+#include <redoxi_common_cpp/image_proc/utils.hpp>
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 
@@ -25,7 +26,7 @@ class DeliverySourceData
   public:
     using PublishMessageType_t = sensor_msgs::msg::Image;
     using ActionDataTrait_t = DetectionResponseActionDataTrait;
-    inline static constexpr const char *DefaultPublishEncoding = sensor_msgs::image_encodings::BGR8;
+    using FrameData_t = image_ports::types::FrameWithMetadata;
 
     DeliverySourceData()
     {
@@ -45,12 +46,14 @@ class DeliverySourceData
     //! Convert the source data to a ROS message for publishing
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        if (!image.has_value() || image->empty()) {
+        if (!frame_data.has_value() || frame_data->is_empty()) {
             // no image to publish
             return -1;
         }
 
-        cv::Mat output_image = image->clone();
+        const auto &frame_data = this->frame_data.value();
+        cv::Mat output_image = frame_data.image.clone();
+        auto encoding = frame_data.get_encoding();
 
         //! Draw detections on the image
         for (const auto &detection : detections) {
@@ -66,11 +69,15 @@ class DeliverySourceData
             }
         }
 
+
         //! Convert to ROS message using cv_bridge
         std_msgs::msg::Header header;
         header.stamp = rclcpp::Clock().now();
-        cv_bridge::CvImage cv_bridge_img(header, DefaultPublishEncoding, output_image);
-        msg = *cv_bridge_img.toImageMsg();
+        cv_bridge::CvImage cv_bridge_img(header, encoding, output_image);
+        cv_bridge_img.toImageMsg(msg);
+
+        // RDX_INFO_DEV(nullptr, __func__, "Converted image to ros message, encoding: {}, data size: {}", msg.encoding, msg.data.size());
+
         return 0;
     }
 
@@ -80,7 +87,7 @@ class DeliverySourceData
     std::vector<redoxi_public_msgs::msg::Detection> detections;
 
     // the image is for publish only
-    std::optional<cv::Mat> image;
+    std::optional<FrameData_t> frame_data;
 };
 
 //! Delivery target data type for detection output port
@@ -91,6 +98,7 @@ using DeliveryTargetDataBase = output_port_types::DefaultTargetData<DetectionRes
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
   public:
+    using FrameData_t = image_ports::types::FrameWithMetadata;
     DeliveryTargetData()
     {
         static_assert(output_port_types::DeliveryTargetDataConcept<DeliveryTargetData>,
@@ -106,7 +114,7 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     {
         DeliverySourceData tmp;
         tmp.detections = this->m_goal.detections;
-        tmp.image = this->image;
+        tmp.frame_data = this->frame_data;
         return tmp.to_publish_message(msg);
     }
 
@@ -114,7 +122,7 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     std::any auxiliary_data;
 
     // the original image, used for visualization
-    cv::Mat image;
+    std::optional<FrameData_t> frame_data;
 };
 
 //! Stamp data type for detection output port
@@ -145,28 +153,11 @@ class DeliveryRequest : public DeliveryRequestBase
         auto &goal = target_data.get_goal();
         const auto &source_data = this->m_source_data;
         goal.detections = source_data.detections;
-        if (source_data.image.has_value()) {
-            target_data.image = source_data.image.value();
-            std_msgs::msg::Header header;
-            header.stamp = rclcpp::Clock().now();
-            goal.frame.raw_image = *cv_bridge::CvImage(header,
-                                                       DeliverySourceData::DefaultPublishEncoding,
-                                                       target_data.image)
-                                        .toImageMsg();
-            goal.frame.metadata.width = target_data.image.cols;
-            goal.frame.metadata.height = target_data.image.rows;
+        target_data.frame_data = source_data.frame_data;
+        if (source_data.frame_data.has_value()) {
+            source_data.frame_data->to_frame_msg(goal.frame_bundle.primary_frame);
         }
-
-        // no longer needed, base class will handle standard information
-        // // set additional information into the goal
-        // using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
-
-        // // set the source data UUID
-        // ActionTrait::set_uuid(goal, source_data.get_uuid());
-
-        // // set the control signal code
-        // ActionTrait::mark_with_control_signal(goal, get_control_signal_code());
-
+        // standard information is handled by base class
         return 0;
     }
 

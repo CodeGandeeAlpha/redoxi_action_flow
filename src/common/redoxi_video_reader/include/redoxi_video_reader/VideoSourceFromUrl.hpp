@@ -73,6 +73,7 @@ class VideoSourceFromUrl : public RedoxiVideoReaderBase
     int _on_stopped() override;
     int _on_closed() override;
     ReadFrameResult _read_frame(SourceData_t &source_data, std::atomic<int64_t> &frame_number) override;
+    int _on_before_request_enqueue(DeliveryRequest_t &request, DeliveryPolicy_t &enqueue_policy) override;
 
   protected:
     std::shared_ptr<cv::VideoCapture> m_video_capture;

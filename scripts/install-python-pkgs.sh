@@ -38,5 +38,5 @@ done
 
 
 for pkg in "${required_packages[@]}"; do
-    pip3 install $pkg
+    pip3 install $pkg --break-system-packages
 done

@@ -184,6 +184,12 @@ class AsyncActionInputPort : public IStartStopProtocol
         return m_action_server;
     }
 
+    //! Get the current port configuration
+    std::shared_ptr<InitConfig_t> get_config() const
+    {
+        return m_init_config;
+    }
+
   protected:
     //! Reset the queue, clear all data and wake up all waiting threads
     void _reset_queue()

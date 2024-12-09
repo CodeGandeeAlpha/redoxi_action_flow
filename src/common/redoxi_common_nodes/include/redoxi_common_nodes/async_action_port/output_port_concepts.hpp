@@ -30,7 +30,7 @@ concept DeliverySourceDataConcept = requires(T t)
     //! Must have method to get UUID
     {
         std::declval<const T &>().get_uuid()
-        } -> std::same_as<boost::uuids::uuid>;
+        } -> std::same_as<UUIDType>;
 };
 
 //! data to be sent to the downstream action, in a format that the downstream action can use

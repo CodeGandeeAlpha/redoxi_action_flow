@@ -41,6 +41,8 @@ class StampedImagePub
     /**
      * @brief Publish the image
      * @param image The image to publish
+     * @param encoding The encoding of the image, following the format of sensor_msgs::msg::Image::encoding,
+     such as "bgr8", "rgb8", "mono8", "mono16", etc.
      * @param text The text to add to the image
      * @param text_color The color of the text
      * @param scale The scale of the text
@@ -48,6 +50,7 @@ class StampedImagePub
      * @return 0 on success, -1 on failure
      */
     int publish(const cv::Mat &image,
+                std::string encoding,
                 std::optional<std::string> text = std::nullopt,
                 std::optional<cv::Scalar> text_color = std::nullopt,
                 double scale = 1.0,

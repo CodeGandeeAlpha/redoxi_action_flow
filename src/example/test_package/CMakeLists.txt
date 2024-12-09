@@ -74,6 +74,7 @@ option(BUILD_YOLO_OBJECT_DETECTION_NODE
 option(BUILD_DETECTION_RELAY_NODE "Build detection_relay_node target" ON)
 option(BUILD_DETECTION_DRIVER_NODE "Build detection_driver_node target" ON)
 option(BUILD_TEST_DRIVER_NODE "Build test_driver_node target" OFF)
+option(BUILD_TEST_FRAME_PROXY "Build test_frame_proxy target" OFF)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -93,10 +94,19 @@ function(configure_target target_name)
            -DTEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../../data"
            -DTEST_OUTPUT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../../tmp/output")
 
+  # get DISPLAY env variable from os, and then set it to the target Get DISPLAY
+  # environment variable and set as compile definition if(DEFINED ENV{DISPLAY})
+  # target_compile_definitions(${target_name} PUBLIC
+  # -DDISPLAY_ENV_VAR="$ENV{DISPLAY}") endif()
+
   set(ALL_TEST_TARGETS
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_TEST_FRAME_PROXY)
+  configure_target(test_frame_proxy)
+endif()
 
 if(BUILD_TEST_DRIVER_NODE)
   configure_target(test_driver_node)

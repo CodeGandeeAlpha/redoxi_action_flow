@@ -149,7 +149,7 @@ int UniversalMotTrackerNode::_handle_input_data(InputPortHandler_t::InputActionR
     RDX_INFO_DEV(this, __func__, "{}", "Executing tracking");
     auto tracker = m_impl->m_tracker_impl->m_tracker;
     auto tracking_frame_number = tracker->get_current_frame_number();
-    auto current_frame_number = goal->frame.metadata.frame_num;
+    auto current_frame_number = goal->frame_bundle.primary_frame.metadata.frame_num;
     if (tracking_frame_number == rxt::INIT_TRACKING_FRAME) {
         // init tracking
         tracker->begin_track(image, track_detections, current_frame_number);
@@ -181,7 +181,7 @@ int UniversalMotTrackerNode::_handle_input_data(InputPortHandler_t::InputActionR
     RDX_INFO_DEV(this, __func__, "Got {} track targets, creating output messages", report_track_targets.size());
     using MsgTrackTarget = redoxi_public_msgs::msg::TrackTarget;
     std::vector<MsgTrackTarget> msg_track_targets;
-    const auto &frame_metadata = goal->frame.metadata;
+    const auto &frame_metadata = goal->frame_bundle.primary_frame.metadata;
     for (const auto &target : report_track_targets) {
         MsgTrackTarget msg;
         auto bbox = target->get_bbox();
