@@ -9,11 +9,18 @@ int TrackerDriverNode::_on_process_input_request(CalleeTypes::RequestOutputReque
                                                  std::shared_ptr<const InputTypes::SourceData_t> source_data,
                                                  InputRequestHandler_t::ResourceToken_t &resource_token)
 {
-    using CalleeDataTrait_t = CalleeTypes::RequestOutputActionDataTrait_t;
+    (void)out_upstream_result;
+    (void)resource_token;
+
+    // using CalleeDataTrait_t = CalleeTypes::RequestOutputActionDataTrait_t;
     using RequestDataTrait_t = InputTypes::ActionDataTrait_t;
 
     const auto &detector_source_data = *source_data;
     auto &tracker_source_data = out_callee_request->get_source_data();
+
+    auto msg_uuid = RequestDataTrait_t::get_uuid(*detector_source_data.get_goal());
+    RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Sending detections to tracker",
+                 UUIDTrait::to_string(msg_uuid));
 
     // fill control code and task uid
     auto signal_code = RequestDataTrait_t::get_control_signal_code(*detector_source_data.get_goal());
@@ -21,8 +28,15 @@ int TrackerDriverNode::_on_process_input_request(CalleeTypes::RequestOutputReque
 
     // get detections from source data, and put them into tracker source data
     const auto &det_msg = detector_source_data.get_goal()->detections;
-    // tracker_source_data
+    tracker_source_data.set_detections(det_msg);
+    auto &frame_data = tracker_source_data.get_primary_frame();
+    frame_data.from_frame_msg_copy(detector_source_data.get_goal()->frame_bundle.primary_frame);
 
+    // track the uuid
+    tracker_source_data.set_uuid(msg_uuid);
+
+    RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Tracker request data is ready",
+                 UUIDTrait::to_string(msg_uuid));
 
     return 0;
 }
@@ -33,6 +47,55 @@ int TrackerDriverNode::_on_process_callee_result(OutputTypes::OutputRequest_t *o
                                                  const CalleeTypes::RequestOutputRequest_t &callee_request,
                                                  const CalleeTypes::Downstream_t &downstream)
 {
+    (void)out_downstream_enqueue_policy;
+    (void)downstream;
+
+    // check control signal code first
+    auto signal_code = callee_request.get_control_signal_code();
+    if (signal_code != ControlSignalCode::Normal) {
+        // just set it and return
+        out_downstream_request->set_control_signal_code(signal_code);
+        return 0;
+    }
+
+    // track the uuid
+    auto &ds_source_data = out_downstream_request->get_source_data();
+    auto msg_uuid = callee_request.get_source_data().get_uuid();
+    ds_source_data.set_uuid(msg_uuid);
+
+    RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Got tracked result",
+                 UUIDTrait::to_string(msg_uuid));
+
+    // get the tracked result and draw it on the image
+    const auto &input_frame = callee_request.get_source_data().get_primary_frame();
+    image_utils::FrameMediator fm(input_frame.image, input_frame.metadata);
+    auto canvas = fm.to_cv_image_shared().clone();
+
+    // draw the tracked result
+    std::vector<redoxi_public_msgs::msg::Detection> dets;
+    for (const auto &track_target : callee_result->track_targets) {
+        auto det = track_target.predicted_detection;
+
+        // FIXME: using track_id as category is not good but works for now
+        det.category = track_target.track_id;
+        det.confidence = track_target.confidence;
+        dets.push_back(det);
+    }
+
+    RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Drawing tracked result, {} detections",
+                 UUIDTrait::to_string(msg_uuid), dets.size());
+    image_utils::DrawDetectionsOptions draw_opts;
+    draw_opts.colorization_mode = decltype(draw_opts.colorization_mode)::ClassId;
+    image_utils::draw_detections(&canvas, dets, draw_opts);
+
+    // set the image
+    auto output_frame = input_frame;
+    output_frame.image = canvas;
+    ds_source_data.set_primary_frame(output_frame);
+
+    // done
+    RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Converted tracked result to image",
+                 UUIDTrait::to_string(msg_uuid));
     return 0;
 }
 
