@@ -8,8 +8,10 @@ redoxi_public_msgs/TaskMetadata x_task_metadata
 redoxi_public_msgs/Detection[] detections
 
 # optional
-redoxi_public_msgs/Frame frame
+# redoxi_public_msgs/Frame frame
+redoxi_public_msgs/MultiDeviceFrame frame_bundle
 ---
 redoxi_public_msgs/ReturnResponse x_return
 ---
 redoxi_public_msgs/FeedbackResponse x_feedback
+

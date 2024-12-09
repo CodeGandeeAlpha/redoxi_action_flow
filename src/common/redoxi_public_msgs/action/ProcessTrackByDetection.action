@@ -6,7 +6,8 @@ redoxi_public_msgs/TaskMetadata x_task_metadata
 
 # input detections and frame, required
 redoxi_public_msgs/Detection[] detections
-redoxi_public_msgs/Frame frame
+# redoxi_public_msgs/Frame frame
+redoxi_public_msgs/MultiDeviceFrame frame_bundle
 
 ---
 # output tracked objects

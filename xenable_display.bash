@@ -25,6 +25,10 @@ fi
 if grep -qi microsoft /proc/version; then
     echo "Running in WSL, setting DISPLAY to host.docker.internal:$DISPLAY_NUMBER"
     export DISPLAY=host.docker.internal:$DISPLAY_NUMBER
+
+    # opengl use external display
+    # echo "setting LIBGL_ALWAYS_INDIRECT=1 to use external opengl gl"
+    # export LIBGL_ALWAYS_INDIRECT=1
 else
     echo "Running in non-WSL, setting DISPLAY to $CLIENT_IP:$DISPLAY_NUMBER"
     export DISPLAY=$CLIENT_IP:$DISPLAY_NUMBER

@@ -8,6 +8,7 @@
 #include <cv_bridge/cv_bridge.hpp>
 
 #include <redoxi_common_cpp/image_proc/utils.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
@@ -21,6 +22,13 @@ namespace redoxi_works::image_ports::types
 using TimeUnit = DefaultTimeUnit_t;
 using DeliveryActionType = redoxi_public_msgs::action::ProcessFrame;
 static_assert(RedoxiActionConcept<DeliveryActionType>, "DeliveryActionType must satisfy RedoxiActionConcept");
+
+struct FrameWithMetadata {
+    using Metadata_t = redoxi_public_msgs::msg::FrameMetadata;
+
+    cv::Mat image;
+    Metadata_t metadata;
+};
 
 namespace Defaults
 {
@@ -46,7 +54,7 @@ class RetryPolicy : public output_port_types::DefaultRetryPolicy<TimeUnit>
 class DeliverySourceData
 {
   public:
-    using FrameMetadata_t = redoxi_public_msgs::msg::FrameMetadata;
+    using FrameData_t = FrameWithMetadata;
     using PublishMessageType_t = sensor_msgs::msg::Image;
 
     DeliverySourceData()
@@ -57,35 +65,21 @@ class DeliverySourceData
     virtual ~DeliverySourceData() = default;
 
     //! Get the image
-    virtual const cv::Mat &get_image() const
+    virtual const FrameData_t &get_primary_frame() const
     {
-        return m_image;
+        return m_primary_frame;
     }
 
     //! Get the image, mutable version
-    virtual cv::Mat &get_image()
+    virtual FrameData_t &get_primary_frame()
     {
-        return m_image;
+        return m_primary_frame;
     }
 
     //! Set the image
-    virtual void set_image(const cv::Mat &image, std::string encoding = "")
+    virtual void set_primary_frame(const FrameData_t &frame)
     {
-        m_image = image;
-        if (encoding.empty()) {
-            m_frame_metadata.encoding = image_utils::get_default_image_encoding(image);
-        } else {
-            m_frame_metadata.encoding = encoding;
-        }
-    }
-
-    //! Get the image encoding
-    virtual std::string get_image_encoding() const
-    {
-        if (m_frame_metadata.encoding.empty()) {
-            return image_utils::get_default_image_encoding(m_image);
-        }
-        return m_frame_metadata.encoding;
+        m_primary_frame = frame;
     }
 
     //! Get the frame number
@@ -153,11 +147,10 @@ class DeliverySourceData
     std::any auxiliary_data;
 
   protected:
-    cv::Mat m_image;
     UUIDType m_uuid;
 
-    // source timestamp and frame index
-    FrameMetadata_t m_frame_metadata;
+    FrameWithMetadata m_primary_frame;
+    std::vector<FrameWithMetadata> m_secondary_frames;
 };
 
 
@@ -178,13 +171,9 @@ class DeliveryTargetData : public DeliveryTargetDataBase
 
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        auto &raw_image = this->m_goal.frame.raw_image;
-        if (!raw_image.data.empty()) {
-            msg = raw_image;
-            return 0;
-        } else {
-            return -1;
-        }
+        image_utils::FrameMediator fm(&this->m_goal.frame_bundle.primary_frame);
+        auto ret = fm.to_image_msg(msg);
+        return ret;
     }
 
     // auxiliary data for easy extension without inheritance
@@ -219,25 +208,15 @@ class DeliveryRequest : public DeliveryRequestBase
 
         // convert image to ROS message
         if (!image.empty()) {
-            cv_bridge::CvImage cv_bridge_image;
-            cv_bridge_image.image = image;
-            cv_bridge_image.encoding = m_source_data.get_image_encoding();
-            cv_bridge_image.toImageMsg(goal.frame.raw_image);
+            // convert to goal.frame.raw_image
+            image_utils::FrameMediator fm(image, m_source_data.get_image_encoding());
+            fm.to_frame_msg(goal.frame_bundle.primary_frame);
         }
-        goal.frame.metadata = this->m_source_data.get_frame_metadata();
-        goal.frame.metadata.width = image.cols;
-        goal.frame.metadata.height = image.rows;
 
         // FIXME: source data encoding is wrong, different from request
-
         RDX_INFO_DEV(nullptr, __func__, false, "in target data goal, raw image encoding={}, in metadata={}",
-                     goal.frame.raw_image.encoding,
-                     goal.frame.metadata.encoding);
-
-        // no longer needed, base class will handle standard information
-        // using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
-        // ActionTrait::set_uuid(goal, this->m_source_data.get_uuid());
-        // ActionTrait::mark_with_control_signal(goal, this->get_control_signal_code());
+                     goal.frame_bundle.primary_frame.raw_image.encoding,
+                     goal.frame_bundle.primary_frame.metadata.encoding);
 
         return 0;
     }

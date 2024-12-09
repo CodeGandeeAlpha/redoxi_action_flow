@@ -69,18 +69,19 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     }
 
     //! Set the image
-    virtual void set_image(const cv::Mat &img, const std::string &encoding = "")
+    virtual void set_image(const cv::Mat &img,
+                           std::optional<std::string> encoding = std::nullopt)
     {
         image = img;
         std::string image_encoding;
-        if (encoding.empty()) {
-            image_encoding = image_utils::get_default_image_encoding(image);
+        if (encoding.has_value()) {
+            image_encoding = encoding.value();
         } else {
-            image_encoding = encoding;
+            image_encoding = image_utils::get_default_image_encoding(image);
         }
-        m_goal.frame.metadata.encoding = image_encoding;
-        m_goal.frame.metadata.width = image.cols;
-        m_goal.frame.metadata.height = image.rows;
+
+        image_utils::FrameMediator fm(image, image_encoding);
+        fm.to_frame_msg(m_goal.frame_bundle.primary_frame);
     }
 
     //! Get the image encoding
