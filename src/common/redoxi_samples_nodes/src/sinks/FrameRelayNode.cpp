@@ -181,7 +181,7 @@ int FrameRelayNode::_parse_frame(cv::Mat *output,
     auto msg_uuid = ActionDataTrait_t::get_uuid(*source_data.get_goal());
 
     // parse from shm
-    auto &shm_token = source_data.get_goal()->frame.shm_token;
+    auto &shm_token = source_data.get_goal()->frame_bundle.primary_frame.shm_token;
     if (shm_token.object_size >= 0 && m_shm_client && m_shm_client->is_connected()) {
         shared_memory::ObjectIdentifier oid;
         if (shm_token.object_id != 0) {
@@ -220,7 +220,7 @@ int FrameRelayNode::_parse_frame(cv::Mat *output,
         RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Reading raw image directly from the goal",
                      boost::uuids::to_string(msg_uuid));
 
-        auto &raw_image = source_data.get_goal()->frame.raw_image;
+        auto &raw_image = source_data.get_goal()->frame_bundle.primary_frame.raw_image;
         if (!raw_image.data.empty()) {
             auto img_bridge = cv_bridge::toCvCopy(raw_image, raw_image.encoding);
             *output = img_bridge->image;

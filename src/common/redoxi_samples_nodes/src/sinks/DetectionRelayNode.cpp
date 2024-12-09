@@ -2,6 +2,7 @@
 #include <redoxi_dnn_models/message_conversion.hpp>
 #include <redoxi_dnn_models/visualizations.hpp>
 #include <cv_bridge/cv_bridge.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 namespace redoxi_works
 {
 
@@ -138,8 +139,8 @@ int DetectionRelayNode::_parse_detection(cv::Mat *output,
                  boost::uuids::to_string(msg_uuid));
 
     try {
-        const auto &image_msg = source_data.get_goal()->frame.raw_image;
-        *output = cv_bridge::toCvCopy(image_msg, image_msg.encoding)->image;
+        image_utils::FrameMediator fm(&source_data.get_goal()->frame_bundle.primary_frame);
+        fm.to_cv_image_copy(*output);
     } catch (cv_bridge::Exception &e) {
         RDX_INFO_DEV(this, __func__, false, "cv_bridge exception: {}, ignoring the error", e.what());
     }
@@ -149,16 +150,6 @@ int DetectionRelayNode::_parse_detection(cv::Mat *output,
     image_utils::draw_detections(output,
                                  source_data.get_goal()->detections,
                                  options);
-
-    // // parse detections
-    // auto output_detections = inference::conversion::from_ros_msg(source_data.get_goal()->detections);
-    // RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Got {} detections",
-    //              boost::uuids::to_string(msg_uuid), output_detections.objects.size());
-
-    // // draw detections
-    // dnn_models::visualizations::draw_detections(output, output_detections);
-
-    // RDX_INFO_DEV(this, __func__, false, "Output image size: {}x{}", output->cols, output->rows);
 
     return 0;
 }

@@ -18,11 +18,6 @@ SimpleActionGenerator::SimpleActionGenerator(const std::string &name, const rclc
 SimpleActionGenerator::ReadFrameResult
     SimpleActionGenerator::_read_frame(SourceData_t &source_data, std::atomic<int64_t> &frame_number)
 {
-    // //! Generate a random UUID and convert it to a string
-    // boost::uuids::random_generator gen;
-    // boost::uuids::uuid uuid = gen();
-    // std::string random_string = boost::uuids::to_string(uuid);
-
     // //! Use the random string to generate the frame content
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     auto frame_size = runtime_config->output_image_size;
@@ -36,15 +31,13 @@ SimpleActionGenerator::ReadFrameResult
     auto frame_text = fmt::format("{}\nFrame Number: {}", boost::uuids::to_string(uuid), frame_number.load());
     random_image_with_text(random_frame, frame_size, frame_text);
 
+    image_utils::FrameMediator fm(random_frame, runtime_config->output_image_encoding);
+    source_data.get_primary_frame().image = fm.to_cv_image_shared();
+    source_data.get_primary_frame().metadata = fm.get_metadata();
+
     // must do it this way to ensure thread safety
     int64_t current_frame_number = _increment_frame_number_by(frame_number, 1);
-
-    source_data.set_image(random_frame);
-    SourceData_t::FrameMetadata_t metadata;
-    metadata.frame_num = current_frame_number;
-    metadata.width = random_frame.cols;
-    metadata.height = random_frame.rows;
-    source_data.set_frame_metadata(metadata);
+    source_data.get_primary_frame().metadata.frame_num = current_frame_number;
 
     return ReadFrameResult::OK;
 }
@@ -77,7 +70,7 @@ void SimpleActionGenerator::_step_send_by_tbb_graph()
 
     //! Put the delivery request into the frame delivery node
     auto msg_uuid = delivery_request.get_source_data().get_uuid();
-    auto frame_num = delivery_request.get_source_data().get_frame_metadata().frame_num;
+    auto frame_num = delivery_request.get_source_data().get_primary_frame().metadata.frame_num;
     // {
     //     auto ok = m_primary_output_port->try_push_request(delivery_request);
     //     if (!ok) {

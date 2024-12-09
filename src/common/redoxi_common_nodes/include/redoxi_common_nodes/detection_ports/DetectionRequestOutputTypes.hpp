@@ -27,6 +27,7 @@ using DeliveryTargetDataBase = output_port_types::DefaultTargetData<DetectionReq
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
   public:
+    using FrameData_t = image_ports::types::FrameWithMetadata;
     DeliveryTargetData()
     {
         static_assert(output_port_types::DeliveryTargetDataConcept<DeliveryTargetData>,
@@ -40,57 +41,47 @@ class DeliveryTargetData : public DeliveryTargetDataBase
 
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        auto canvas = image.clone();
-        image_utils::draw_detections(&canvas, detections);
-        if (canvas.empty()) {
-            // cannot convert, return error
+        auto vis_image = get_visualization_frame();
+        if (vis_image.is_empty()) {
             return -1;
         }
+
+        image_utils::FrameMediator fm(vis_image.image, vis_image.get_encoding());
+        auto canvas = vis_image.image.clone();
+        image_utils::draw_detections(&canvas, detections);
 
         //! Convert drawn image to ROS message using cv_bridge
         std_msgs::msg::Header header;
         header.stamp = rclcpp::Clock().now();
-        cv_bridge::CvImage cv_bridge_img(header, get_image_encoding(), canvas);
-        msg = *cv_bridge_img.toImageMsg();
+        cv_bridge::CvImage cv_bridge_img(header, vis_image.get_encoding(), canvas);
+        cv_bridge_img.toImageMsg(msg);
         return 0;
     }
 
-
-    //! Get the image
-    virtual const cv::Mat &get_image() const
+    //! Get the image to be visualized
+    virtual FrameData_t get_visualization_frame() const
     {
-        return image;
-    }
-
-    //! Get the image, mutable version
-    virtual cv::Mat &get_image()
-    {
-        return image;
-    }
-
-    //! Set the image
-    virtual void set_image(const cv::Mat &img,
-                           std::optional<std::string> encoding = std::nullopt)
-    {
-        image = img;
-        std::string image_encoding;
-        if (encoding.has_value()) {
-            image_encoding = encoding.value();
+        if (!m_visualization_frame.is_empty()) {
+            return m_visualization_frame;
         } else {
-            image_encoding = image_utils::get_default_image_encoding(image);
+            image_utils::FrameMediator fm(&m_goal.frame_bundle.primary_frame);
+            FrameData_t output;
+            fm.to_cv_image_copy(output.image);
+            output.metadata = m_goal.frame_bundle.primary_frame.metadata;
+            return output;
         }
-
-        image_utils::FrameMediator fm(image, image_encoding);
-        fm.to_frame_msg(m_goal.frame_bundle.primary_frame);
     }
 
-    //! Get the image encoding
-    virtual std::string get_image_encoding() const
+    //! Get the image to be visualized, mutable
+    FrameData_t &get_visualization_frame()
     {
-        if (m_goal.frame.metadata.encoding.empty()) {
-            return image_utils::get_default_image_encoding(image);
-        }
-        return m_goal.frame.metadata.encoding;
+        return m_visualization_frame;
+    }
+
+    //! Set the image to be visualized
+    virtual void set_visualization_frame(const FrameData_t &frame)
+    {
+        m_visualization_frame = frame;
     }
 
     // auxiliary data for easy extension without inheritance
@@ -98,7 +89,7 @@ class DeliveryTargetData : public DeliveryTargetDataBase
 
   protected:
     // the original image, used for visualization
-    cv::Mat image;
+    FrameData_t m_visualization_frame;
     std::vector<redoxi_public_msgs::msg::Detection> detections;
 };
 
@@ -129,17 +120,23 @@ class DeliveryRequest : public DeliveryRequestBase
 
         auto &goal = target_data.get_goal();
         const auto &source_data = this->m_source_data;
-        const auto &image_data = source_data.get_image();
-        const auto &image_encoding = source_data.get_image_encoding();
-        target_data.set_image(image_data, image_encoding);
-        goal.frame.metadata = source_data.get_frame_metadata();
 
-        if (!image_data.empty()) {
-            std_msgs::msg::Header header;
-            header.stamp = rclcpp::Clock().now();
-            source_data.to_publish_message(goal.frame.raw_image);
-            goal.frame.metadata.width = image_data.cols;
-            goal.frame.metadata.height = image_data.rows;
+        // set the visualization frame
+        target_data.set_visualization_frame(source_data.get_primary_frame());
+
+        // convert primary frame to goal
+        {
+            const auto &frame_data = source_data.get_primary_frame();
+            frame_data.to_frame_msg(goal.frame_bundle.primary_frame);
+        }
+
+        // convert secondary frame to goal
+        {
+            auto &secondary_frame = source_data.get_secondary_frames();
+            goal.frame_bundle.secondary_frames.clear();
+            for (auto &frame : secondary_frame) {
+                frame.to_frame_msg(goal.frame_bundle.secondary_frames.emplace_back());
+            }
         }
 
         // standard properties will be set by the base class

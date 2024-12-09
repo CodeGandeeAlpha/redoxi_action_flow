@@ -23,6 +23,10 @@ FrameMediator::FrameMediator(const cv::Mat &frame, const Metadata_t &frame_metad
 FrameMediator::FrameMediator(const cv::Mat &frame, const std::string &encoding)
     : m_frame(frame)
 {
+    if (encoding.empty()) {
+        RDX_RAISE_ERROR("[f={}] encoding is empty", __func__);
+    }
+
     update_frame_metadata(m_frame_metadata, frame);
     m_frame_metadata.encoding = encoding;
 }
@@ -60,7 +64,7 @@ int FrameMediator::to_cv_image_copy(cv::Mat &cv_image, std::optional<std::string
         if (source_encoding == target_encoding) {
             RDX_INFO_DEV(nullptr, __func__, "source encoding={}, target encoding={}, no conversion",
                          source_encoding, target_encoding);
-            cv_image = m_frame;
+            cv_image = m_frame.clone();
         } else {
             RDX_INFO_DEV(nullptr, __func__, "source encoding={}, target encoding={}, convert encoding",
                          source_encoding, target_encoding);

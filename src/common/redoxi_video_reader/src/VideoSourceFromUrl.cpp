@@ -134,8 +134,8 @@ int VideoSourceFromUrl::_on_before_request_enqueue(DeliveryRequest_t &request, D
 {
     (void)enqueue_policy;
     RDX_INFO_DEV(this, __func__, false, "sending request with image encoding={}, in metadata={}",
-                 request.get_source_data().get_image_encoding(),
-                 request.get_source_data().get_frame_metadata().encoding);
+                 request.get_source_data().get_primary_frame().metadata.encoding,
+                 request.get_source_data().get_primary_frame().metadata.encoding);
     return 0;
 }
 
@@ -169,20 +169,30 @@ VideoSourceFromUrl::ReadFrameResult VideoSourceFromUrl::_read_frame(SourceData_t
     if (output_image_encoding == sensor_msgs::image_encodings::RGB8) {
         cv::cvtColor(frame, frame, cv::COLOR_BGR2RGB);
     }
-    source_data.set_image(frame, output_image_encoding);
+    image_utils::FrameMediator fm(frame, output_image_encoding);
+    auto &primary_frame = source_data.get_primary_frame();
+    primary_frame.image = fm.to_cv_image_shared();
+    primary_frame.metadata = fm.get_metadata();
 
-
-    // update metedata
-    // SourceData_t::FrameMetadata_t metadata;
-    auto &metadata = source_data.get_frame_metadata();
+    // update frame number
     auto fno = _increment_frame_number_by(frame_number, 1);
-    metadata.frame_num = fno;
-    metadata.source_frame_index = fno;
-    metadata.width = frame.cols;
-    metadata.height = frame.rows;
-    metadata.encoding = output_image_encoding;
+    primary_frame.metadata.frame_num = fno;
+    primary_frame.metadata.source_frame_index = fno;
     auto timestamp_ms = m_video_capture->get(cv::CAP_PROP_POS_MSEC);
-    metadata.source_timestamp = ros2_time_msg_from_ms(timestamp_ms);
+    primary_frame.metadata.source_timestamp = ros2_time_msg_from_ms(timestamp_ms);
+
+    // source_data.set_image(frame, output_image_encoding);
+    // // update metedata
+    // // SourceData_t::FrameMetadata_t metadata;
+    // auto &metadata = source_data.get_frame_metadata();
+    // auto fno = _increment_frame_number_by(frame_number, 1);
+    // metadata.frame_num = fno;
+    // metadata.source_frame_index = fno;
+    // metadata.width = frame.cols;
+    // metadata.height = frame.rows;
+    // metadata.encoding = output_image_encoding;
+    // auto timestamp_ms = m_video_capture->get(cv::CAP_PROP_POS_MSEC);
+    // metadata.source_timestamp = ros2_time_msg_from_ms(timestamp_ms);
 
     return ReadFrameResult::OK;
 }

@@ -47,12 +47,22 @@ RandomFrameVideoGenerator::ReadFrameResult
     auto frame_text = fmt::format("{}\nFrame Number: {}", boost::uuids::to_string(uuid), frame_number.load());
     random_image_with_text(random_frame, frame_size, frame_text);
 
-    data.set_image(random_frame);
-    SourceData_t::FrameMetadata_t metadata;
-    metadata.frame_num = _increment_frame_number_by(frame_number, 1);
-    metadata.width = random_frame.cols;
-    metadata.height = random_frame.rows;
-    data.set_frame_metadata(metadata);
+    //! Convert the frame to the desired encoding and set it in the source data
+    image_utils::FrameMediator fm(random_frame, runtime_config->output_image_encoding);
+    data.set_uuid(uuid);
+    data.get_primary_frame().image = fm.to_cv_image_shared();
+    data.get_primary_frame().metadata = fm.get_metadata();
+
+    // must do it this way to ensure thread safety
+    int64_t current_frame_number = _increment_frame_number_by(frame_number, 1);
+    data.get_primary_frame().metadata.frame_num = current_frame_number;
+
+    // data.set_image(random_frame);
+    // SourceData_t::FrameMetadata_t metadata;
+    // metadata.frame_num = _increment_frame_number_by(frame_number, 1);
+    // metadata.width = random_frame.cols;
+    // metadata.height = random_frame.rows;
+    // data.set_frame_metadata(metadata);
 
     return ReadFrameResult::OK;
 }

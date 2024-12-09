@@ -3,6 +3,7 @@
 #include <redoxi_video_reader/base/VideoReaderBase.hpp>
 #include <redoxi_shared_memory/SharedMemoryClient.hpp>
 #include <redoxi_shared_memory/SharedMemoryFactory.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 #include <json_struct/json_struct.h>
@@ -188,7 +189,7 @@ int RedoxiVideoReaderBase::_on_delivery_task_begin(TargetData_t &target_data,
     }
 
     // write data to shm
-    const auto &img = request.get_source_data().get_image();
+    const auto &img = request.get_source_data().get_primary_frame().image;
     if (img.empty()) {
         RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Image is empty, nothing to do", msg_uuid_str);
         return 0;
@@ -210,7 +211,7 @@ int RedoxiVideoReaderBase::_on_delivery_task_begin(TargetData_t &target_data,
     }
 
     // set target data
-    auto &shm_token = target_data.get_goal().frame.shm_token;
+    auto &shm_token = target_data.get_goal().frame_bundle.primary_frame.shm_token;
     if (oid.id.has_value()) {
         shm_token.object_id = oid.id.value();
     }
@@ -241,7 +242,7 @@ int RedoxiVideoReaderBase::_on_delivery_task_finish(TargetData_t &target_data,
 
     // failed, remove shm object, if any
     RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] Failed to send data to shm, removing object from shm", msg_uuid_str);
-    auto &shm_token = target_data.get_goal().frame.shm_token;
+    auto &shm_token = target_data.get_goal().frame_bundle.primary_frame.shm_token;
     if (shm_token.object_size >= 0) {
         shared_memory::ObjectIdentifier oid;
         if (shm_token.object_id != 0) {
@@ -272,12 +273,12 @@ int RedoxiVideoReaderBase::_update_runtime_config(std::shared_ptr<BaseRuntimeCon
     auto output_image_size = runtime_config->output_image_size;
     m_primary_output_port->set_callback_on_request_enqueued([output_image_size](DeliveryRequest_t &request) {
         // resize image if needed
-        auto original_size = request.get_source_data().get_image().size();
+        auto original_size = request.get_source_data().get_primary_frame().image.size();
         if ((output_image_size.width <= 0 && output_image_size.height <= 0) || output_image_size == original_size) {
             return;
         }
 
-        auto image = request.get_source_data().get_image();
+        auto image = request.get_source_data().get_primary_frame().image;
 
         // empty image? skip processing
         if (image.empty()) {
@@ -297,7 +298,10 @@ int RedoxiVideoReaderBase::_update_runtime_config(std::shared_ptr<BaseRuntimeCon
             cv::resize(image, resized_image, cv::Size(new_width, output_image_size.height));
         }
 
-        request.get_source_data().set_image(resized_image);
+        SourceData_t::FrameData_t frame_data;
+        frame_data.image = resized_image;
+        frame_data.metadata = request.get_source_data().get_primary_frame().metadata;
+        request.get_source_data().set_primary_frame(frame_data);
     });
 
     //! set publish to debug topic
@@ -421,13 +425,15 @@ void RedoxiVideoReaderBase::_step()
         // push request to output port
         bool success = false;
         if (!user_reject) {
-            auto frame_number = source_data.get_frame_metadata().frame_num;
-            auto source_frame_index = source_data.get_frame_metadata().source_frame_index;
-            auto source_frame_timestamp = source_data.get_frame_metadata().source_timestamp;
+            image_utils::FrameMediator fm(source_data.get_primary_frame().image,
+                                          source_data.get_primary_frame().metadata);
+            auto frame_number = fm.get_frame_number();
+            auto source_frame_index = fm.get_source_frame_index();
+            auto source_frame_timestamp = fm.get_source_timestamp_flat();
 
             RDX_INFO_DEV(this, __func__, "[msg_uuid={}] sending frame_number={}, source_frame_index={}, source_frame_timestamp={}",
                          boost::uuids::to_string(msg_uuid), frame_number, source_frame_index,
-                         fmt::format("{}.{:06d} sec", source_frame_timestamp.sec, source_frame_timestamp.nanosec));
+                         fmt::format("{:06f} sec", source_frame_timestamp.count() / 1e6));
             success = m_primary_output_port->push_request(delivery_request, qos);
         }
 
