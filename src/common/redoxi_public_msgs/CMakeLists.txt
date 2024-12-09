@@ -31,6 +31,8 @@ rosidl_generate_interfaces(
   "msg/TrackTarget.msg"
   "msg/TaskMetadata.msg"
   "msg/TrackObjectStatus.msg"
+  "msg/MultiDeviceFrame.msg"
+  "msg/FrameDeviceTag.msg"
   "action/ProcessBodyPoses.action"
   "action/ProcessDetections.action"
   "action/ProcessDetectionsByFrame.action"
