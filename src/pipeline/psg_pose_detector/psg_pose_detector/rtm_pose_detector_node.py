@@ -557,16 +557,18 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
     def _goal_callback(self, goal_request):
         x_control = goal_request.x_control
         if x_control.code == 1:
-            self.m_logger.info(f"frame {goal_request.frame.metadata.frame_num} ping")
+            self.m_logger.info(
+                f"frame {goal_request.frame_bundle.primary_frame.metadata.frame_num} ping"
+            )
         # 如果资源队列为空,则拒绝该帧
         if self.m_resource is None or self.m_resource.empty():
             self.m_logger.info(
-                f"frame {goal_request.frame.metadata.frame_num} was rejected because resource is None"
+                f"frame {goal_request.frame_bundle.primary_frame.metadata.frame_num} was rejected because resource is None"
             )
             return GoalResponse.REJECT
 
         self.m_logger.info(
-            f"frame {goal_request.frame.metadata.frame_num} ping accepted"
+            f"frame {goal_request.frame_bundle.primary_frame.metadata.frame_num} ping accepted"
         )
 
         return GoalResponse.ACCEPT

@@ -544,7 +544,9 @@ class DetectorNode(Node, IOpenCloseProtocol):
     def _goal_callback(self, goal_request):
         x_control = goal_request.x_control
         if x_control.code == 1:
-            self.m_logger.info(f"frame {goal_request.frame.metadata.frame_num} ping")
+            self.m_logger.info(
+                f"frame {goal_request.frame_bundle.primary_frame.metadata.frame_num} ping"
+            )
         # 如果任一类别的资源队列为空,则拒绝该帧
         for cat in self.m_category_to_resource:
             self.m_logger.info(
@@ -552,12 +554,12 @@ class DetectorNode(Node, IOpenCloseProtocol):
             )
             if self.m_category_to_resource[cat].empty():
                 self.m_logger.info(
-                    f"frame {goal_request.frame.metadata.frame_num} was rejected because resource queue for category {cat} is empty"
+                    f"frame {goal_request.frame_bundle.primary_frame.metadata.frame_num} was rejected because resource queue for category {cat} is empty"
                 )
                 return GoalResponse.REJECT
 
         self.m_logger.info(
-            f"frame {goal_request.frame.metadata.frame_num} ping accepted"
+            f"frame {goal_request.frame_bundle.primary_frame.metadata.frame_num} ping accepted"
         )
 
         return GoalResponse.ACCEPT
@@ -641,7 +643,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self.m_logger.info("Awaiting all tasks")
 
         detections_msg = self._merge_detections_by_category(
-            category_to_results, frame_bundle_msg.primary_frame
+            category_to_results, frame_bundle_msg
         )
 
         goal_handle.succeed()

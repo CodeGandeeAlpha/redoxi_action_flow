@@ -492,10 +492,11 @@ int PSGDetectorNode::_on_deliver_to_downstream_finish(TargetDataModel_t &target_
 sensor_msgs::msg::Image PSGDetectorNode::_create_debug_image(const psg_private_msgs::msg::PsgDocument &document)
 {
     //! 转换raw image到cv::Mat
-    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换raw image到cv::Mat", 0);
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换primary_frame到cv::Mat", 0);
     image_utils::FrameMediator fm(&document.frame_bundle.primary_frame);
     cv::Mat cv_image;
     fm.to_cv_image_copy(cv_image);
+    auto encoding = fm.get_encoding();
 
     //! 为不同类别设置不同颜色
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "设置类别颜色映射", 0);
@@ -539,7 +540,7 @@ sensor_msgs::msg::Image PSGDetectorNode::_create_debug_image(const psg_private_m
     //! 转回sensor_msgs/Image
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换回sensor_msgs/Image", 0);
     sensor_msgs::msg::Image debug_image;
-    image_utils::FrameMediator fm_cv_image(cv_image, "bgr8");
+    image_utils::FrameMediator fm_cv_image(cv_image, encoding);
     fm_cv_image.to_image_msg(debug_image);
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "完成debug图像创建, 大小: {}x{}", debug_image.width, debug_image.height);
     return debug_image;

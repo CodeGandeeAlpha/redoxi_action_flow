@@ -86,7 +86,7 @@ video_source_params = {
         "video_start_time": 0,
         "video_end_time": -1,
         "output_image_size": {"width": 1920, "height": 1080},
-        "output_image_encoding": "rgb8",
+        "output_image_encoding": "bgr8",
         "publish_to_debug_topic": True,
         "frame_enqueue_policy": default_enqueue_policy,
         "frame_request_policy": default_request_policy,
