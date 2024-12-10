@@ -356,6 +356,13 @@ std::shared_ptr<RedoxiVideoReaderBase::OutputPort_t>
     // RDX_ASSERT_CHECK_TRUE(!port_config.get_downstream_specs().empty(),
     //                       "[{}] port_config must have at least one downstream", __func__);
 
+    {
+        auto num_downstreams = port_config->get_downstream_specs().size();
+        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "number of downstreams={}", num_downstreams);
+        if (num_downstreams == 0) {
+            RDX_WARN_PRODUCTION(this, __func__, "{}", "no downstream, the frame will not be sent to anywhere");
+        }
+    }
     port->init(port_config);
 
     // register callbacks

@@ -31,7 +31,7 @@ struct InitConfig : public common_nodes::OpenCloseNode::InitConfig_t {
 
     //! create the debug publish topic for this video reader?
     bool create_debug_pub = true;
-    int debug_pub_queue_size = 10;
+    // int debug_pub_queue_size = 10;
     std::string debug_pub_task_enqueue_name = "debug_port/task_enqueue";
     std::string debug_pub_task_drop_name = "debug_port/task_drop";
 
@@ -47,7 +47,6 @@ struct InitConfig : public common_nodes::OpenCloseNode::InitConfig_t {
     JS_OBJECT_WITH_SUPER(JS_SUPER(common_nodes::OpenCloseNode::InitConfig_t),
                          JS_MEMBER(primary_output_spec),
                          JS_MEMBER(create_debug_pub),
-                         JS_MEMBER(debug_pub_queue_size),
                          JS_MEMBER(debug_pub_task_enqueue_name),
                          JS_MEMBER(debug_pub_task_drop_name));
 };

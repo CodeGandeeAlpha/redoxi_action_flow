@@ -362,6 +362,8 @@ int CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
         RDX_INFO_DEV(this, __func__, false, "Creating input port with action name: {}", config->input_port_config->get_action_name());
         m_input_port = std::make_shared<typename InputTypes::InputPort_t>(this);
         m_input_port->init(config->input_port_config);
+    } else {
+        RDX_INFO_DEV(this, __func__, false, "{}", "No input port config, skipping input port creation");
     }
 
     //! Create callee port
@@ -369,6 +371,8 @@ int CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
         RDX_INFO_DEV(this, __func__, false, "{}", "Creating callee request output port");
         m_callee_port = std::make_shared<typename CalleeTypes::RequestOutputPort_t>(this);
         m_callee_port->init(config->callee_request_port_config);
+    } else {
+        RDX_INFO_DEV(this, __func__, false, "{}", "No callee request port config, skipping callee request port creation");
     }
 
     //! Create output port
@@ -376,6 +380,8 @@ int CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
         RDX_INFO_DEV(this, __func__, false, "{}", "Creating output port");
         m_output_port = std::make_shared<typename OutputTypes::OutputPort_t>(this);
         m_output_port->init(config->output_port_config);
+    } else {
+        RDX_INFO_DEV(this, __func__, false, "{}", "No output port config, skipping output port creation");
     }
 
     RDX_INFO_DEV(this, __func__, false, "{}", "Completed update of initial configuration");

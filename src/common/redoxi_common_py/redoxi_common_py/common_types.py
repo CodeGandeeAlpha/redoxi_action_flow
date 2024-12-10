@@ -12,6 +12,7 @@ __all__ = [
     "DeliveryPrecondition",
     "DefaultSettings",
     "JsonConvertible",
+    "ImageSize",
 ]
 
 
@@ -65,6 +66,17 @@ class DeliveryPrecondition(str, Enum):
     AllDownstreamsReady = "all_downstreams_ready"
 
 
+@define(kw_only=True)
+class ImageSize(JsonConvertible):
+    """cvSize in OpenCV"""
+
+    width: int = field(default=-1)
+    height: int = field(default=-1)
+
+    def is_empty(self):
+        return self.width == -1 or self.height == -1
+
+
 class DefaultSettings:
     time_unit: RedoxiTimeUnit = RedoxiTimeUnit.Microseconds
     step_interval: int = 2500
@@ -73,3 +85,4 @@ class DefaultSettings:
     number_of_retry: int = 3
     delivery_precondition: DeliveryPrecondition = DeliveryPrecondition.DontCare
     drop_strategy: DropStrategy = DropStrategy.DropAsNeeded
+    image_encoding: str = "rgb8"

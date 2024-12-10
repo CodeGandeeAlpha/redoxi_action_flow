@@ -5,8 +5,12 @@ except ImportError:
     from attr import define, field, asdict
     import attr.validators as av
 
-import redoxi_common_py.configs.async_port_configs as portConfig
-import redoxi_common_py.configs.node_configs as nodeConfig
+from redoxi_common_py.configs.async_ports import *
+import redoxi_common_py.configs.async_ports as portCfg
+
+from redoxi_common_py.configs.base_node import *
+import redoxi_common_py.configs.base_node as baseNodeCfg
+
 from typing import Any, Literal
 
 ExampleConfig = {
@@ -30,22 +34,35 @@ ExampleConfig = {
     },
 }
 
+__all__ = (
+    [
+        "DetectionRelayInitConfig",
+        "DetectionRelayRuntimeConfig",
+        "DetectionRelayNodeConfig",
+    ]
+    + baseNodeCfg.__all__
+    + portCfg.__all__
+)
+
 
 @define(kw_only=True)
-class InitConfig(nodeConfig.BaseRosNodeInitConfig):
-    input_port_config: portConfig.InputPortConfig | None = field(default=None)
+class DetectionRelayInitConfig(baseNodeCfg.BaseRosNodeInitConfig):
+    # action type: redoxi_public_msgs/action/ProcessDetections_Goal
+    input_port_config: portCfg.InputPortConfig | None = field(default=None)
     publish_detection_topic: str | None = field(default=None)
     publish_visualization_topic: str | None = field(default=None)
 
 
 @define(kw_only=True)
-class RuntimeConfig(nodeConfig.BaseRosNodeRuntimeConfig):
+class DetectionRelayRuntimeConfig(baseNodeCfg.BaseRosNodeRuntimeConfig):
     enable_blocking_mode: bool = field(default=False)
     enable_visualization: bool = field(default=True)
 
 
 @define(kw_only=True)
-class DetectionRelayNodeConfig(nodeConfig.JsonConvertible):
+class DetectionRelayNodeConfig(baseNodeCfg.JsonConvertible):
     declare_params: dict[str, Any] | None = field(default=None)
-    init_config: InitConfig = field(factory=InitConfig)
-    runtime_config: RuntimeConfig = field(factory=RuntimeConfig)
+    init_config: DetectionRelayInitConfig = field(factory=DetectionRelayInitConfig)
+    runtime_config: DetectionRelayRuntimeConfig = field(
+        factory=DetectionRelayRuntimeConfig
+    )

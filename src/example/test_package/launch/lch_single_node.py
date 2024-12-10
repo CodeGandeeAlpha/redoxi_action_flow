@@ -6,7 +6,9 @@ from launch.actions import DeclareLaunchArgument
 import json
 
 import yolo8_series.configs as yolo
-import redoxi_common_py.configs.detection_relay_configs as detRelayCfg
+import redoxi_common_py.configs.detection_relay as detRelayCfg
+import redoxi_common_py.configs.video_source_from_url as videoSrcCfg
+import redoxi_common_py.configs.detection_driver as detDriverCfg
 
 try:
     from attrs import asdict
@@ -47,14 +49,39 @@ det_node_params = yolo.Yolo8ModelConfig(
 
 det_relay_node_name = "detection_relay"
 det_relay_node_params = detRelayCfg.DetectionRelayNodeConfig(
-    init_config=detRelayCfg.InitConfig(
+    init_config=detRelayCfg.DetectionRelayInitConfig(
         input_port_config=None,
         publish_detection_topic="out/relayed_detection",
         publish_visualization_topic="out/relayed_visualization",
     ),
-    runtime_config=detRelayCfg.RuntimeConfig(
+    runtime_config=detRelayCfg.DetectionRelayRuntimeConfig(
         enable_blocking_mode=False,
         enable_visualization=True,
+    ),
+)
+
+video_src_node_name = "video_source"
+video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
+    init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
+        video_url=r"/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4",
+        auto_replay=True,
+    ),
+    runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
+        step_interval=StepIntervals.VerySlow,
+    ),
+)
+
+det_driver_node_name = "detection_driver"
+det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
+    init_config=detDriverCfg.DetectionDriverInitConfig(
+        input_port_config=None,
+        output_port_config=None,
+        callee_request_port_config=None,
+    ),
+    runtime_config=detDriverCfg.DetectionDriverRuntimeConfig(
+        callee_request_enqueue_policy=None,
+        driver_output_enqueue_policy=None,
+        enable_blocking_mode=False,
     ),
 )
 
@@ -62,6 +89,38 @@ det_relay_node_params = detRelayCfg.DetectionRelayNodeConfig(
 common_prefix = None
 # common_ros_args = ["--disable-external-lib-logs"]
 common_ros_args = []
+
+det_driver_node = Node(
+    package="test_package",
+    executable="detection_driver_node",
+    name=det_driver_node_name,
+    namespace=det_driver_node_name,
+    prefix=common_prefix,
+    output="screen",
+    parameters=[
+        {
+            "param_as_json_string": det_driver_node_params.to_json(
+                ignore_none=True, compact=False
+            ),
+        },
+    ],
+)
+
+video_src_node = Node(
+    package="test_package",
+    executable="video_from_url_node",
+    name=video_src_node_name,
+    namespace=video_src_node_name,
+    prefix=common_prefix,
+    output="screen",
+    parameters=[
+        {
+            "param_as_json_string": video_src_node_params.to_json(
+                ignore_none=True, compact=False
+            ),
+        },
+    ],
+)
 
 detection_node = Node(
     package="test_package",
@@ -119,6 +178,8 @@ def generate_launch_description():
             *env_var_settings,
             log_level_arg,
             # detection_node,
-            detection_relay_node,
+            # detection_relay_node,
+            # video_src_node,
+            det_driver_node,
         ]
     )
