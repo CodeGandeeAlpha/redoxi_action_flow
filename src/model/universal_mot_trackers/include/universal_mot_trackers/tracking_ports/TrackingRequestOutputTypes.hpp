@@ -23,7 +23,7 @@ class DeliverySourceData
   public:
     using PublishMessageType_t = sensor_msgs::msg::Image;
     using Detection_t = redoxi_public_msgs::msg::Detection;
-    using FrameMetadata_t = redoxi_public_msgs::msg::FrameMetadata;
+    using FrameData_t = image_ports::types::FrameWithMetadata;
 
   public:
     virtual ~DeliverySourceData() = default;
@@ -42,72 +42,60 @@ class DeliverySourceData
     // to publish message
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        if (frame_image.empty()) {
+        if (frame_data.is_empty()) {
             return -1;
         }
 
-        cv::Mat output_image = frame_image.clone();
+        // get cv mat from frame data, draw detections on it, and convert to ros message
+        image_utils::FrameMediator fm_input(frame_data.image, frame_data.get_encoding());
+        cv::Mat output_image = fm_input.to_cv_image_shared().clone();
         image_utils::draw_detections(&output_image, detections);
 
-        //! Convert to ROS message using cv_bridge
-        std_msgs::msg::Header header;
-        header.stamp = rclcpp::Clock().now();
-        cv_bridge::CvImage cv_bridge_img(header, get_image_encoding(), output_image);
-        msg = *cv_bridge_img.toImageMsg();
+        image_utils::FrameMediator fm_output(output_image, frame_data.get_encoding());
+        fm_output.to_image_msg(msg);
         return 0;
     }
 
 
     //! Get the frame image
-    virtual const cv::Mat &get_image() const
+    virtual const FrameData_t &get_primary_frame() const
     {
-        return frame_image;
+        return frame_data;
     }
 
     //! Get the frame image, mutable version
-    virtual cv::Mat &get_image()
+    virtual FrameData_t &get_primary_frame()
     {
-        return frame_image;
+        return frame_data;
     }
 
     //! Set the frame image
-    virtual void set_image(const cv::Mat &image, const std::string &encoding = "")
+    virtual void set_primary_frame(const FrameData_t &frame_data)
     {
-        frame_image = image;
-        if (!encoding.empty()) {
-            frame_metadata.encoding = encoding;
-        } else {
-            frame_metadata.encoding = image_utils::get_default_image_encoding(image);
-        }
-        frame_metadata.width = image.cols;
-        frame_metadata.height = image.rows;
+        this->frame_data = frame_data;
     }
 
-    //! Get the image encoding
-    virtual std::string get_image_encoding() const
+    //! Get the detections
+    virtual const std::vector<Detection_t> &get_detections() const
     {
-        if (frame_metadata.encoding.empty()) {
-            return image_utils::get_default_image_encoding(frame_image);
-        }
-        return frame_metadata.encoding;
+        return detections;
     }
 
-    //! Get the frame metadata
-    virtual const FrameMetadata_t &get_frame_metadata() const
+    //! Get the detections, mutable version
+    virtual std::vector<Detection_t> &get_detections()
     {
-        return frame_metadata;
+        return detections;
     }
 
-    //! Get the frame metadata, mutable version
-    virtual FrameMetadata_t &get_frame_metadata()
+    //! Set the detections
+    virtual void set_detections(const std::vector<Detection_t> &detections)
     {
-        return frame_metadata;
+        this->detections = detections;
     }
 
   protected:
     UUIDType uid;
-    cv::Mat frame_image; // the frame data
-    FrameMetadata_t frame_metadata;
+    FrameData_t frame_data;              // the frame data
     std::vector<Detection_t> detections; // the detections
     std::any auxiliary_data;             // any auxiliary data
 };
@@ -118,10 +106,13 @@ static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>,
 using DeliveryTargetDataBase = output_port_types::DefaultTargetData<TrackingRequestActionType,
                                                                     TrackingRequestActionDataTrait,
                                                                     DeliverySourceData::PublishMessageType_t>;
-//! TODO: finish this
+
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
   public:
+    using FrameData_t = DeliverySourceData::FrameData_t;
+    using Detection_t = DeliverySourceData::Detection_t;
+
     DeliveryTargetData()
     {
         static_assert(output_port_types::DeliveryTargetDataConcept<DeliveryTargetData>,
@@ -135,23 +126,10 @@ class DeliveryTargetData : public DeliveryTargetDataBase
 
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        cv::Mat canvas;
-        if (!frame_image.empty()) {
-            canvas = frame_image.clone();
-        } else {
-            const auto &raw_image = m_goal.frame.raw_image;
-            if (raw_image.data.empty()) {
-                return -1;
-            }
-            canvas = cv_bridge::toCvCopy(raw_image)->image;
-        }
-        image_utils::draw_detections(&canvas, m_goal.detections);
-
-        //! Convert drawn image to ROS message using cv_bridge
-        std_msgs::msg::Header header;
-        header.stamp = rclcpp::Clock().now();
-        cv_bridge::CvImage cv_bridge_img(header, DeliverySourceData::DefaultEncoding, canvas);
-        msg = *cv_bridge_img.toImageMsg();
+        DeliverySourceData tmp;
+        tmp.set_primary_frame(frame_data);
+        tmp.set_detections(m_goal.detections);
+        tmp.to_publish_message(msg);
         return 0;
     }
 
@@ -159,7 +137,7 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     std::any auxiliary_data;
 
     // the frame image used for visualization, if not set, will use the raw image in the goal
-    cv::Mat frame_image;
+    FrameData_t frame_data;
 };
 
 //! Stamp data type for detection request output port
@@ -189,18 +167,9 @@ class DeliveryRequest : public DeliveryRequestBase
 
         auto &goal = target_data.get_goal();
         const auto &source_data = this->m_source_data;
-        const auto &image_msg = source_data.get_image();
-        target_data.image = image_msg;
-        goal.frame.metadata = source_data.get_frame_metadata();
 
-        if (!image_msg.empty()) {
-            std_msgs::msg::Header header;
-            header.stamp = rclcpp::Clock().now();
-            source_data.to_publish_message(goal.frame.raw_image);
-            goal.frame.metadata.width = image_msg.cols;
-            goal.frame.metadata.height = image_msg.rows;
-        }
-
+        goal.detections = source_data.get_detections();
+        source_data.get_primary_frame().to_frame_msg(goal.frame_bundle.primary_frame);
         // standard properties will be set by the base class
 
         return 0;
@@ -224,27 +193,26 @@ static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
               "DeliveryTask must satisfy DeliveryTaskConcept");
 
 using Downstream = image_ports::types::DownstreamBaseWithImagePub<
-    DetectionRequestActionType, DeliveryPolicy>;
-// using DownstreamDebugPublisher = Downstream::SourcePublisherType_t;
+    TrackingRequestActionType, DeliveryPolicy>;
 using DownstreamSpec = Downstream::DownstreamSpec_t;
 
 //! Init config type for detection request output port
 using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;
 
 //! Detection request output port spec
-struct DetectionRequestOutputPortSpec {
-    DetectionRequestOutputPortSpec()
+struct TrackingRequestOutputPortSpec {
+    TrackingRequestOutputPortSpec()
     {
-        static_assert(output_port_types::AsyncActionOutputPortSpecConcept<DetectionRequestOutputPortSpec>,
-                      "DetectionRequestOutputPortSpec must satisfy AsyncActionOutputPortSpecConcept");
+        static_assert(output_port_types::AsyncActionOutputPortSpecConcept<TrackingRequestOutputPortSpec>,
+                      "TrackingRequestOutputPortSpec must satisfy AsyncActionOutputPortSpecConcept");
     }
 
     //! Action type and related types
-    using ActionType_t = DetectionRequestActionType;
+    using ActionType_t = TrackingRequestActionType;
     using ActionGoal_t = ActionType_t::Goal;
     using ActionResult_t = ActionType_t::Result;
     using ActionFeedback_t = ActionType_t::Feedback;
-    using ActionDataTrait_t = DetectionRequestActionDataTrait;
+    using ActionDataTrait_t = TrackingRequestActionDataTrait;
 
     //! Time unit type
     using TimeUnit_t = TimeUnit;

@@ -39,8 +39,8 @@ DetectionDriverNodeName = "driver"
 
 # fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
 fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx"
-# fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
+fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+# fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
 
 DetectionRelayNodeName = "detection_relay"
 DetectionRelayInputActionName = DetectionResponseInputActionName
@@ -54,11 +54,6 @@ det_node_params = {
                 "device_type": "cuda",
                 "device_index": 0,
             },
-            # {
-            #     "model_path": fn_model_nano,
-            #     "device_type": "cpu",
-            #     "device_index": 0,
-            # },
         ],
         "detection_request_config": {
             "input_port_config": {
@@ -100,7 +95,7 @@ det_node_params = {
     "runtime_config": {
         "_time_unit": "us(1e-6)",
         "step_interval": StepIntervals.VeryFast,
-        "enable_blocking_mode": True,
+        "enable_blocking_mode": False,
         "model_output_config": {"conf_threshold": 0.35, "iou_threshold": 0.5},
         "enable_visualization": True,
         "enable_performance_probe": True,
@@ -128,10 +123,15 @@ video_source_params = {
                     "name": DetectionDriverNodeName,
                     "action_name": f"/{DetectionDriverNodeName}/{FrameInputActionName}",
                     "delivery_policy": {
+                        "retry_policy": {
+                            "fallback_number_of_retry": 1,
+                            "fallback_wait_time_between_retry": 5000,
+                            "fallback_wait_time_retry_response": 10000,
+                        },
                         "precondition": "dont_care",
                         "drop_strategy": "no_drop",
                     },
-                    "create_debug_pub": False,
+                    "create_debug_pub": True,
                 },
             ],
             "num_buffer_requests": 1,
@@ -149,10 +149,10 @@ video_source_params = {
         "video_end_time": -1,
         "frame_interval": 0,
         "output_image_size": {"width": 1024, "height": -1},
-        "output_image_encoding": "rgb8",
-        "publish_to_debug_topic": False,
+        "output_image_encoding": "bgr8",
+        "publish_to_debug_topic": True,
         "frame_enqueue_policy": {
-            "precondition": "any_downstream_ready",
+            "precondition": "dont_care",
             "drop_strategy": "no_drop",
         },
         "_time_unit": "us(1e-6)",
@@ -174,7 +174,7 @@ detection_relay_params = {
         "_time_unit": "us(1e-6)",
     },
     "runtime_config": {
-        "enable_blocking_mode": True,
+        "enable_blocking_mode": False,
         "enable_visualization": True,
         "_time_unit": "us(1e-6)",
         "step_interval": StepIntervals.Fast,
@@ -190,24 +190,7 @@ detection_driver_params = {
             "action_name": FrameInputActionName,
             "goal_result_expire_time": 1000000,
         },
-        "detection_request_output_port_config": {
-            "_action_goal_type": "redoxi_public_msgs/action/ProcessDetectionsByFrame_Goal",
-            "downstream_specs": [
-                {
-                    "name": DetectionNodeName,
-                    "action_name": f"/{DetectionNodeName}/{DetectionNodeInputActionName}",
-                    "delivery_policy": {
-                        "precondition": "dont_care",
-                        "drop_strategy": "no_drop",
-                    },
-                    "create_debug_pub": False,
-                },
-            ],
-            "num_buffer_requests": 1,
-            "preserve_request_order": True,
-            "fallback_delivery_precondition": "dont_care",
-        },
-        "detection_response_output_port_config": {
+        "output_port_config": {
             "_action_goal_type": "redoxi_public_msgs/action/ProcessDetections_Goal",
             "downstream_specs": [
                 {
@@ -224,12 +207,27 @@ detection_driver_params = {
             "preserve_request_order": True,
             "fallback_delivery_precondition": "dont_care",
         },
-        "publish_input_topic": "/vis/input",
-        "publish_detection_result_topic": "/vis/detection_result",
+        "callee_request_port_config": {
+            "_action_goal_type": "redoxi_public_msgs/action/ProcessDetectionsByFrame_Goal",
+            "downstream_specs": [
+                {
+                    "name": DetectionNodeName,
+                    "action_name": f"/{DetectionNodeName}/{DetectionNodeInputActionName}",
+                    "delivery_policy": {
+                        "precondition": "dont_care",
+                        "drop_strategy": "no_drop",
+                    },
+                    "create_debug_pub": True,
+                },
+            ],
+            "num_buffer_requests": 1,
+            "preserve_request_order": True,
+            "fallback_delivery_precondition": "dont_care",
+        },
         "_time_unit": "us(1e-6)",
     },
     "runtime_config": {
-        "detection_request_enqueue_policy": {
+        "callee_request_enqueue_policy": {
             "retry_policy": {
                 "fallback_number_of_retry": 3,
                 "fallback_wait_time_between_retry": 5000,
@@ -238,7 +236,7 @@ detection_driver_params = {
             "precondition": "dont_care",
             "drop_strategy": "no_drop",
         },
-        "detection_response_enqueue_policy": {
+        "driver_output_enqueue_policy": {
             "retry_policy": {
                 "fallback_number_of_retry": 3,
                 "fallback_wait_time_between_retry": 5000,
@@ -247,8 +245,7 @@ detection_driver_params = {
             "precondition": "dont_care",
             "drop_strategy": "no_drop",
         },
-        "enable_visualization": True,
-        "enable_blocking_mode": True,
+        "enable_blocking_mode": False,
         "_time_unit": "us(1e-6)",
         "step_interval": StepIntervals.Fast,
     },

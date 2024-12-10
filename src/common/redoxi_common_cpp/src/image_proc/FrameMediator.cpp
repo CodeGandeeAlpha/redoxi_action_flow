@@ -160,6 +160,7 @@ int FrameMediator::to_frame_msg(redoxi_public_msgs::msg::Frame &frame_msg,
 {
     //! Convert image to frame message with optional encoding conversion
     auto ret = to_image_msg(frame_msg.raw_image, encoding);
+    frame_msg.metadata = m_frame_metadata;
     make_metadata_compatible(&frame_msg.metadata, frame_msg.raw_image);
     return ret;
 }

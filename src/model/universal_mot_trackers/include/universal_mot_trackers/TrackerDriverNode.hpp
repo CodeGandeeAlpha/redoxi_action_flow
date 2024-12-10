@@ -2,15 +2,18 @@
 
 #include <universal_mot_trackers/visibility_control.h>
 #include <redoxi_common_nodes/detection_ports/DetectionResponseInputPort.hpp>
-#include <redoxi_common_nodes/detection_ports/DetectionRequestOutputPort.hpp>
+// #include <redoxi_common_nodes/detection_ports/DetectionRequestOutputPort.hpp>
+#include <universal_mot_trackers/tracking_ports/TrackingRequestOutputPort.hpp>
 #include <redoxi_common_nodes/image_ports/AsyncImageOutputPort.hpp>
 #include <universal_mot_trackers/UniversalMotTrackerNode.hpp>
 #include <redoxi_common_nodes/driver_nodes/CallActionDriverBase.hpp>
 
 namespace redoxi_works::model_nodes::universal_mot_trackers
 {
+
+// computed detections -> tracking request -> (tracked result) -> image output
 using TrackerDriverRequestPort = detection_ports::response_only::DetectionResponseInputPort;
-using TrackerDriverCalleePort = detection_ports::request_response::DetectionRequestOutputPort;
+using TrackerDriverCalleePort = tracking_ports::request_response::TrackingRequestOutputPort;
 using TrackerDriverOutputPort = image_ports::AsyncImageOutputPort;
 
 class TrackerDriverNode : public common_nodes::drivers::CallActionDriverBase<
