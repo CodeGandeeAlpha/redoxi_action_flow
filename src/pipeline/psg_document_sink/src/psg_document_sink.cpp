@@ -1,5 +1,6 @@
 #include <psg_document_sink/psg_document_sink.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 
 
 namespace redoxi_works
@@ -131,7 +132,9 @@ void PSGDocumentSink::_step()
 
 
     // publish image
-    const auto &raw_image = raw_document.frame.raw_image;
+    image_utils::FrameMediator fm(&raw_document.frame_bundle.primary_frame);
+    sensor_msgs::msg::Image raw_image;
+    fm.to_image_msg(raw_image);
 
     // publish debug topic?
     if (runtime_config->enable_debug_topics) {

@@ -2,7 +2,7 @@
 
 #include <any>
 #include <boost/uuid/uuid_generators.hpp>
-#include <cv_bridge/cv_bridge.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <psg_private_msgs/msg/psg_document.hpp>
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
@@ -53,15 +53,15 @@ class DeliverySourceData
     virtual ~DeliverySourceData() = default;
 
     //! Get the frame
-    virtual const redoxi_public_msgs::msg::Frame &get_frame() const
+    virtual const redoxi_public_msgs::msg::MultiDeviceFrame &get_frame_bundle() const
     {
-        return m_frame;
+        return m_frame_bundle;
     }
 
     //! Set the frame
-    virtual void set_frame(const redoxi_public_msgs::msg::Frame &frame)
+    virtual void set_frame_bundle(const redoxi_public_msgs::msg::MultiDeviceFrame &frame_bundle)
     {
-        m_frame = frame;
+        m_frame_bundle = frame_bundle;
     }
 
     //! Get the persons
@@ -79,14 +79,15 @@ class DeliverySourceData
     //! Convert the source data to a ROS message for publishing
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        msg = m_frame.raw_image;
+        image_utils::FrameMediator fm(&m_frame_bundle.primary_frame);
+        fm.to_image_msg(msg);
         return 0;
     }
 
     //! Get the UUID associated with this source data
     virtual boost::uuids::uuid get_uuid() const
     {
-        return to_boost_uuid(m_frame.x_uid.uuid);
+        return to_boost_uuid(m_frame_bundle.x_uid.uuid);
     }
 
     // auxiliary data for easy extension without inheritance
@@ -94,7 +95,7 @@ class DeliverySourceData
 
   protected:
     std::vector<psg_private_msgs::msg::Person> m_persons;
-    redoxi_public_msgs::msg::Frame m_frame;
+    redoxi_public_msgs::msg::MultiDeviceFrame m_frame_bundle;
 };
 
 
@@ -118,7 +119,8 @@ class DeliveryTargetData : public DeliveryTargetDataBase
 
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        msg = get_goal().frame.raw_image;
+        image_utils::FrameMediator fm(&get_goal().frame_bundle.primary_frame);
+        fm.to_image_msg(msg);
         return 0;
     }
 
@@ -151,7 +153,7 @@ class DeliveryRequest : public DeliveryRequestBase
         auto &goal = target_data.get_goal();
 
         // fill payload
-        goal.frame = this->m_source_data.get_frame();
+        goal.frame_bundle = this->m_source_data.get_frame_bundle();
         goal.persons = this->m_source_data.get_persons();
 
         // // set additional information into the goal

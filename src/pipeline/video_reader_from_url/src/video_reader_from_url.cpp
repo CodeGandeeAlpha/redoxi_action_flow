@@ -18,7 +18,7 @@ int VideoReaderFromUrl::_on_before_request_enqueue(DeliveryRequest_t &request, D
     // request.set_control_signal_code(ControlSignalCode::Flush);
 
     auto source_data = request.get_source_data();
-    RDX_INFO_DEV(this, __func__, "frame num: {}", source_data.get_frame_metadata().frame_num);
+    RDX_INFO_DEV(this, __func__, "frame num: {}", source_data.get_primary_frame().metadata.frame_num);
     (void)enqueue_policy;
     return 0;
 }

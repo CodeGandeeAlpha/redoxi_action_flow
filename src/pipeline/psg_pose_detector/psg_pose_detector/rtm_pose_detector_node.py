@@ -583,18 +583,18 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
             result.x_return.code = ReturnResponse.SUCCESS
             return result
 
-        frame_msg = goal_handle.request.frame
+        frame_bundle_msg = goal_handle.request.frame_bundle
         self.m_logger.info(
-            f"---TIME LOG: framenum {frame_msg.metadata.frame_num} node rtm_pose_detector_node type IN time {self.get_clock().now().nanoseconds}"
+            f"---TIME LOG: framenum {frame_bundle_msg.primary_frame.metadata.frame_num} node rtm_pose_detector_node type IN time {self.get_clock().now().nanoseconds}"
         )
 
-        raw_img = frame_msg.raw_image
+        raw_img = frame_bundle_msg.primary_frame.raw_image
         detections_msg = goal_handle.request.detections
         bboxes, uuids = self._get_bboxes_and_uuids_from_detections(detections_msg)
 
         if len(bboxes) == 0:
             self.m_logger.info(
-                f"_execute_task(): framenum {frame_msg.metadata.frame_num} have no bboxes"
+                f"_execute_task(): framenum {frame_bundle_msg.primary_frame.metadata.frame_num} have no bboxes"
             )
             # body_keypoints_msg_list = []
             # body_keypoints_msg = Keypoints()
@@ -603,14 +603,14 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
 
             goal_handle.succeed()
             self.m_logger.info(
-                f"_execute_task(): framenum {frame_msg.metadata.frame_num} call succeed()"
+                f"_execute_task(): framenum {frame_bundle_msg.primary_frame.metadata.frame_num} call succeed()"
             )
             result = ProcessKeypointsByDets.Result()
             result.x_return.message = "Accepted frame"
             result.x_return.code = ReturnResponse.SUCCESS
             # result.keypoints = body_keypoints_msg_list
             self.m_logger.info(
-                f"_execute_task(): framenum {frame_msg.metadata.frame_num} return results"
+                f"_execute_task(): framenum {frame_bundle_msg.primary_frame.metadata.frame_num} return results"
             )
             return result
         else:
@@ -624,7 +624,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
             )
             if img is None:
                 self.m_logger.info(
-                    f"_execute_task(): framenum {frame_msg.metadata.frame_num} call abort()"
+                    f"_execute_task(): framenum {frame_bundle_msg.primary_frame.metadata.frame_num} call abort()"
                 )
                 goal_handle.abort()
                 result = ProcessKeypointsByDets.Result()
@@ -638,12 +638,12 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
                 # body_keypoints_msg_list.append(body_keypoints_msg)
                 # result.keypoints = body_keypoints_msg_list
                 self.m_logger.info(
-                    f"_execute_task(): framenum {frame_msg.metadata.frame_num} return results"
+                    f"_execute_task(): framenum {frame_bundle_msg.primary_frame.metadata.frame_num} return results"
                 )
                 return result
 
             self.m_logger.debug(
-                f"[_process_frame_create_model_tasks] Frame {frame_msg.metadata.frame_num} image shape: {img.shape}"
+                f"[_process_frame_create_model_tasks] Frame {frame_bundle_msg.primary_frame.metadata.frame_num} image shape: {img.shape}"
             )
 
             # convert img to torch tensor
@@ -651,20 +651,22 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
 
             task_res = await self._do_model_inference(img_tensor, bboxes)
 
-            body_keypoints_msg_list = self._to_bodyposes_msg(task_res, frame_msg, uuids)
+            body_keypoints_msg_list = self._to_bodyposes_msg(
+                task_res, frame_bundle_msg.primary_frame, uuids
+            )
 
             self.m_logger.info("Awaiting all tasks")
 
             goal_handle.succeed()
             self.m_logger.info(
-                f"_execute_task(): framenum {frame_msg.metadata.frame_num} call succeed()"
+                f"_execute_task(): framenum {frame_bundle_msg.primary_frame.metadata.frame_num} call succeed()"
             )
             result = ProcessKeypointsByDets.Result()
             result.x_return.message = "Accepted frame"
             result.x_return.code = ReturnResponse.SUCCESS
             result.keypoints = body_keypoints_msg_list
             self.m_logger.info(
-                f"_execute_task(): framenum {frame_msg.metadata.frame_num} return results"
+                f"_execute_task(): framenum {frame_bundle_msg.primary_frame.metadata.frame_num} return results"
             )
             return result
 

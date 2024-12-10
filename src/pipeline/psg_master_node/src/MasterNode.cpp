@@ -3,7 +3,7 @@
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <redoxi_common_nodes/port_handlers/PullProcessSendHandler.hpp>
 #include <redoxi_samples_lib/random_image.hpp>
-#include <cv_bridge/cv_bridge.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 #include <json_struct/json_struct.h>
 
 #define PRINT_THREAD_ID_IN_LOG (true)
@@ -236,14 +236,15 @@ int PSGMasterNode::_create_document_request_handler(const RuntimeConfig_t &runti
             // from input source data to output source data
             OutputSourceData_t output_source_data;
             OutputSourceData_t::DeliverySourceData::PublishMessageType_t msg;
-            msg.frame = source_data->m_goal->frame;
+            msg.frame_bundle = source_data->m_goal->frame_bundle;
 
             auto goal_handle = source_data->get_goal_handle_future().get();
             auto control_signal_code = InputDataTrait_t::get_control_signal_code(*source_data->get_goal());
             RDX_INFO_DEV(this, __func__, true,
                          "on_process_input_data()中frame num: {}, control signal code: {}",
-                         msg.frame.metadata.frame_num, int(control_signal_code));
-            msg.frame.x_control.code = static_cast<int32_t>(control_signal_code);
+                         msg.frame_bundle.primary_frame.metadata.frame_num, int(control_signal_code));
+            msg.frame_bundle.x_control.code = static_cast<int32_t>(control_signal_code);
+            msg.frame_bundle.primary_frame.x_control.code = static_cast<int32_t>(control_signal_code);
             msg.x_control.code = static_cast<int32_t>(control_signal_code);
             output_source_data.set_document(msg);
 
@@ -255,6 +256,11 @@ int PSGMasterNode::_create_document_request_handler(const RuntimeConfig_t &runti
             RDX_INFO_DEV(this, __func__, true,
                          "output_request signal code: {}",
                          control_signal_code_to_string(output_request->get_control_signal_code()));
+
+            image_utils::FrameMediator fm(&msg.frame_bundle.primary_frame);
+            sensor_msgs::msg::Image image_msg;
+            fm.to_image_msg(image_msg);
+            m_pub_task_enqueue.publish(image_msg);
 
             // fill the action result, nothing to do
             (void)action_result;
@@ -297,67 +303,67 @@ void PSGMasterNode::_step()
     }
 }
 
-void PSGMasterNode::_step2()
-{
-    auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
-    if (get_status() != NodeStatusCode::STARTED) {
-        return;
-    }
+// void PSGMasterNode::_step2()
+// {
+//     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+//     if (get_status() != NodeStatusCode::STARTED) {
+//         return;
+//     }
 
-    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "step once");
+//     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "step once");
 
-    //! 随机构造input source data
-    auto frame_data = std::make_shared<InputSourceData_t>();
-    auto goal = std::make_shared<InputSourceData_t::ActionType_t::Goal>();
-    goal->frame = redoxi_public_msgs::msg::Frame();
+//     //! 随机构造input source data
+//     auto frame_data = std::make_shared<InputSourceData_t>();
+//     auto goal = std::make_shared<InputSourceData_t::ActionType_t::Goal>();
+//     goal->frame = redoxi_public_msgs::msg::Frame();
 
-    //! 修改这部分代码以确保正确的图像格式
-    cv::Mat img;
-    random_image_with_shapes(img, cv::Size(640, 480));
+//     //! 修改这部分代码以确保正确的图像格式
+//     cv::Mat img;
+//     random_image_with_shapes(img, cv::Size(640, 480));
 
-    //! 确保图像转换为正确的格式
-    auto msg = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", img).toImageMsg();
-    goal->frame.raw_image = *msg;
+//     //! 确保图像转换为正确的格式
+//     auto msg = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", img).toImageMsg();
+//     goal->frame.raw_image = *msg;
 
-    //! 设置其他必要的图像信息
-    goal->frame.raw_image.header.stamp = this->now();
-    goal->frame.raw_image.header.frame_id = "camera";
+//     //! 设置其他必要的图像信息
+//     goal->frame.raw_image.header.stamp = this->now();
+//     goal->frame.raw_image.header.frame_id = "camera";
 
-    frame_data->set_goal(goal);
+//     frame_data->set_goal(goal);
 
-    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "after set goal");
-    // frame_data->m_goal = std::make_shared<InputSourceData_t::Goal>();
-    // frame_data->m_goal->frame = cv::Mat(480, 640, CV_8UC3, cv::Scalar(rand()%255, rand()%255, rand()%255));
+//     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "after set goal");
+//     // frame_data->m_goal = std::make_shared<InputSourceData_t::Goal>();
+//     // frame_data->m_goal->frame = cv::Mat(480, 640, CV_8UC3, cv::Scalar(rand()%255, rand()%255, rand()%255));
 
-    // from input source data to output source data
-    OutputSourceData_t output_source_data;
-    OutputSourceData_t::DeliverySourceData::PublishMessageType_t doc_msg;
-    doc_msg.frame = frame_data->m_goal->frame;
-    output_source_data.set_document(doc_msg);
+//     // from input source data to output source data
+//     OutputSourceData_t output_source_data;
+//     OutputSourceData_t::DeliverySourceData::PublishMessageType_t doc_msg;
+//     doc_msg.frame = frame_data->m_goal->frame;
+//     output_source_data.set_document(doc_msg);
 
-    // create delivery request
-    auto delivery_request = _create_delivery_request(output_source_data);
+//     // create delivery request
+//     auto delivery_request = _create_delivery_request(output_source_data);
 
-    // this is used for logging
-    auto msg_uuid = output_source_data.get_uuid();
+//     // this is used for logging
+//     auto msg_uuid = output_source_data.get_uuid();
 
-    // get qos, controls how to retry and drop frames
-    auto &qos = runtime_config->frame_enqueue_policy;
-    bool success = m_primary_output_port->push_request(delivery_request, qos);
+//     // get qos, controls how to retry and drop frames
+//     auto &qos = runtime_config->frame_enqueue_policy;
+//     bool success = m_primary_output_port->push_request(delivery_request, qos);
 
-    if (success) {
-        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                     "[msg_uuid={}] success to push request",
-                     boost::uuids::to_string(msg_uuid));
-    } else {
-        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                     "[msg_uuid={}] failed to push request",
-                     boost::uuids::to_string(msg_uuid));
-    }
+//     if (success) {
+//         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+//                      "[msg_uuid={}] success to push request",
+//                      boost::uuids::to_string(msg_uuid));
+//     } else {
+//         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+//                      "[msg_uuid={}] failed to push request",
+//                      boost::uuids::to_string(msg_uuid));
+//     }
 
-    // FIXME: debug only
-    // wait for all requests to be processed, not necessary
-    m_primary_output_port->wait_for_all_requests();
-}
+//     // FIXME: debug only
+//     // wait for all requests to be processed, not necessary
+//     m_primary_output_port->wait_for_all_requests();
+// }
 
 } // namespace redoxi_works

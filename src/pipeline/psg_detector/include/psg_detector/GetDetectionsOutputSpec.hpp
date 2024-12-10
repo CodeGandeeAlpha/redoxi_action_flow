@@ -9,6 +9,7 @@
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
 #include <psg_detector/StampedStrPub.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 #include <redoxi_public_msgs/action/process_detections_by_frame.hpp>
 
 
@@ -107,7 +108,8 @@ class DeliveryTargetData : public DeliveryTargetDataBase
 
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        msg = get_goal().frame.raw_image;
+        image_utils::FrameMediator fm(&get_goal().frame_bundle.primary_frame);
+        fm.to_image_msg(msg);
         return 0;
     }
 
@@ -141,7 +143,8 @@ class DeliveryRequest : public DeliveryRequestBase
 
         // fill payload
         auto document = this->m_source_data.get_document();
-        goal.frame = document.frame;
+
+        goal.frame_bundle = document.frame_bundle;
 
         // // set additional information into the goal
         // using ActionTrait = DeliveryTargetData::ActionDataTrait_t;

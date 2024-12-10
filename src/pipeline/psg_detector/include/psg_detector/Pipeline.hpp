@@ -129,9 +129,9 @@ class PSGDetectorNode : public common_nodes::StartStopNode
                                                  const DeliveryRequestModel_t &request,
                                                  const DownstreamModel_t &ds);
 
-  private:
-    virtual int _read_frame(OutputSourceDataModel_t &source_data,
-                            std::atomic<int64_t> &frame_number);
+    // private:
+    //   virtual int _read_frame(OutputSourceDataModel_t &source_data,
+    //                           std::atomic<int64_t> &frame_number);
 
   protected:
     // input port

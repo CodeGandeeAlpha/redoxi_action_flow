@@ -109,7 +109,10 @@ psg_master_node_json_params = {
                 }
             ],
         },
-        "create_debug_pub": False,
+        "create_debug_pub": True,
+        "debug_pub_queue_size": 10,
+        "debug_pub_task_enqueue_name": "debug_port/task_enqueue",
+        "debug_pub_task_drop_name": "debug_port/task_drop",
     },
     "runtime_config": {
         **default_runtime_config,

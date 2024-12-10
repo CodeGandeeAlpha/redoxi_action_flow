@@ -2,7 +2,7 @@
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <redoxi_common_nodes/port_handlers/PullProcessSendHandler.hpp>
 #include <redoxi_samples_lib/random_image.hpp>
-#include <cv_bridge/cv_bridge.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 #include <json_struct/json_struct.h>
 #include <tbb/concurrent_queue.h>
 
@@ -365,13 +365,13 @@ int PSGPoseDetectorNode::_create_detections_request_handler(const RuntimeConfig_
                std::shared_ptr<const InputSourceData_t> source_data,
                ProcessHandler_t::ResourceToken_t &resource) {
             // 将document数据放入document map中
-            m_impl->m_document_map.synchronize()->insert({source_data->get_goal()->document.frame.metadata.frame_num,
+            m_impl->m_document_map.synchronize()->insert({source_data->get_goal()->document.frame_bundle.primary_frame.metadata.frame_num,
                                                           std::make_shared<psg_private_msgs::msg::PsgDocument>(source_data->get_goal()->document)});
 
             //! 从输入数据创建输出数据
             RDX_INFO_DEV(this, __func__, true, "{}", "开始从输入数据创建输出数据");
             OutputSourceDataModel_t output_model_source_data;
-            output_model_source_data.set_frame(source_data->get_goal()->document.frame);
+            output_model_source_data.set_frame_bundle(source_data->get_goal()->document.frame_bundle);
             output_model_source_data.set_detections(source_data->get_goal()->document.detections);
 
             //! 根据种类挑选出body的detections，并记录其在document中的索引
@@ -391,7 +391,7 @@ int PSGPoseDetectorNode::_create_detections_request_handler(const RuntimeConfig_
             auto control_signal_code = InputDataTrait_t::get_control_signal_code(*source_data->get_goal());
             RDX_INFO_DEV(this, __func__, true,
                          "on_process_input_data()中frame num: {}, control signal code: {}",
-                         source_data->get_goal()->document.frame.metadata.frame_num, int(control_signal_code));
+                         source_data->get_goal()->document.frame_bundle.primary_frame.metadata.frame_num, int(control_signal_code));
             //! 创建传输请求
             RDX_INFO_DEV(this, __func__, true, "{}", "创建传输请求");
             auto delivery_request = _create_delivery_request(output_model_source_data, control_signal_code);
@@ -491,13 +491,8 @@ sensor_msgs::msg::Image PSGPoseDetectorNode::_create_debug_image(const psg_priva
     //! 转换raw image到cv::Mat
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换raw image到cv::Mat", 0);
     cv::Mat cv_image;
-    try {
-        cv_image = cv_bridge::toCvCopy(document.frame.raw_image, sensor_msgs::image_encodings::BGR8)->image;
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "成功转换raw image, 大小: {}x{}", cv_image.cols, cv_image.rows);
-    } catch (const cv_bridge::Exception &e) {
-        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID_IN_LOG, "cv_bridge转换失败: {}", e.what());
-        return sensor_msgs::msg::Image(); // 返回空图像
-    }
+    image_utils::FrameMediator fm(&document.frame_bundle.primary_frame);
+    fm.to_cv_image_copy(cv_image);
 
     //! 为关键点设置颜色
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "设置关键点颜色", 0);
@@ -568,14 +563,8 @@ sensor_msgs::msg::Image PSGPoseDetectorNode::_create_debug_image(const psg_priva
     //! 转回sensor_msgs/Image
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换回sensor_msgs/Image", 0);
     sensor_msgs::msg::Image debug_image;
-    debug_image.header = document.frame.raw_image.header;
-    debug_image.height = cv_image.rows;
-    debug_image.width = cv_image.cols;
-    debug_image.encoding = "bgr8";
-    debug_image.is_bigendian = false;
-    debug_image.step = cv_image.cols * 3;
-    debug_image.data.assign(cv_image.data, cv_image.data + cv_image.total() * cv_image.elemSize());
-
+    image_utils::FrameMediator fm_cv_image(cv_image, "bgr8");
+    fm_cv_image.to_image_msg(debug_image);
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "完成debug图像创建, 大小: {}x{}", debug_image.width, debug_image.height);
     return debug_image;
 }
@@ -603,10 +592,10 @@ void PSGPoseDetectorNode::_get_model_result()
         OutputSourceDataPipeline_t output_pipeline_source_data;
         // 根据frame_number获取document
         RDX_LOG_DEBUG(this, __func__, "{}", "开始从document map中获取document");
-        auto document = m_impl->m_document_map.synchronize()->at(output_model_result.source_data->get_frame().metadata.frame_num);
+        auto document = m_impl->m_document_map.synchronize()->at(output_model_result.source_data->get_frame_bundle().primary_frame.metadata.frame_num);
         // 删掉字典中的document
         RDX_LOG_DEBUG(this, __func__, "{}", "开始从document map中删除document");
-        m_impl->m_document_map.synchronize()->erase(output_model_result.source_data->get_frame().metadata.frame_num);
+        m_impl->m_document_map.synchronize()->erase(output_model_result.source_data->get_frame_bundle().primary_frame.metadata.frame_num);
 
         if (result->keypoints.size() > 0) {
             RDX_LOG_DEBUG(this, __func__, "{}", "开始处理keypoints结果");
@@ -641,7 +630,7 @@ void PSGPoseDetectorNode::_get_model_result()
                      "control signal code: {}", int(control_signal_code));
         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
                      "document frame num: {}, control signal code: {}",
-                     document->frame.metadata.frame_num, int(document->x_control.code));
+                     document->frame_bundle.primary_frame.metadata.frame_num, int(document->x_control.code));
 
         // get qos, controls how to retry and drop frames
         RDX_LOG_DEBUG(this, __func__, "{}", "开始获取QoS配置");

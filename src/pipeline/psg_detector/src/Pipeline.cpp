@@ -368,7 +368,7 @@ int PSGDetectorNode::_create_frame_request_handler(const RuntimeConfig_t &runtim
             auto control_signal_code = InputDataTrait_t::get_control_signal_code(*source_data->get_goal());
             RDX_INFO_DEV(this, __func__, true,
                          "on_process_input_data()中frame num: {}, control signal code: {}",
-                         source_data->get_goal()->document.frame.metadata.frame_num, int(control_signal_code));
+                         source_data->get_goal()->document.frame_bundle.primary_frame.metadata.frame_num, int(control_signal_code));
 
 
             // create delivery request
@@ -493,14 +493,9 @@ sensor_msgs::msg::Image PSGDetectorNode::_create_debug_image(const psg_private_m
 {
     //! 转换raw image到cv::Mat
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换raw image到cv::Mat", 0);
+    image_utils::FrameMediator fm(&document.frame_bundle.primary_frame);
     cv::Mat cv_image;
-    try {
-        cv_image = cv_bridge::toCvCopy(document.frame.raw_image, sensor_msgs::image_encodings::BGR8)->image;
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "成功转换raw image, 大小: {}x{}", cv_image.cols, cv_image.rows);
-    } catch (const cv_bridge::Exception &e) {
-        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID_IN_LOG, "cv_bridge转换失败: {}", e.what());
-        return sensor_msgs::msg::Image(); // 返回空图像
-    }
+    fm.to_cv_image_copy(cv_image);
 
     //! 为不同类别设置不同颜色
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "设置类别颜色映射", 0);
@@ -544,14 +539,8 @@ sensor_msgs::msg::Image PSGDetectorNode::_create_debug_image(const psg_private_m
     //! 转回sensor_msgs/Image
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换回sensor_msgs/Image", 0);
     sensor_msgs::msg::Image debug_image;
-    debug_image.header = document.frame.raw_image.header;
-    debug_image.height = cv_image.rows;
-    debug_image.width = cv_image.cols;
-    debug_image.encoding = "bgr8";
-    debug_image.is_bigendian = false;
-    debug_image.step = cv_image.cols * 3;
-    debug_image.data.assign(cv_image.data, cv_image.data + cv_image.total() * cv_image.elemSize());
-
+    image_utils::FrameMediator fm_cv_image(cv_image, "bgr8");
+    fm_cv_image.to_image_msg(debug_image);
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "完成debug图像创建, 大小: {}x{}", debug_image.width, debug_image.height);
     return debug_image;
 }
@@ -582,7 +571,7 @@ void PSGDetectorNode::_get_model_result()
                      "control signal code: {}", int(control_signal_code));
         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
                      "document frame num: {}, control signal code: {}",
-                     document.frame.metadata.frame_num, int(document.x_control.code));
+                     document.frame_bundle.primary_frame.metadata.frame_num, int(document.x_control.code));
 
 
         // push to output port pipeline
@@ -622,31 +611,31 @@ void PSGDetectorNode::_get_model_result()
     }
 }
 
-int PSGDetectorNode::_read_frame(OutputSourceDataModel_t &data, std::atomic<int64_t> &frame_number)
-{
-    auto frame_size = cv::Size(1920, 1080);
-    if (frame_size.empty()) {
-        RDX_RAISE_ERROR("[{}][_read_frame()] output_image_size is not set", this->get_name());
-    }
+// int PSGDetectorNode::_read_frame(OutputSourceDataModel_t &data, std::atomic<int64_t> &frame_number)
+// {
+//     auto frame_size = cv::Size(1920, 1080);
+//     if (frame_size.empty()) {
+//         RDX_RAISE_ERROR("[{}][_read_frame()] output_image_size is not set", this->get_name());
+//     }
 
-    //! Generate a random frame with the UUID text
-    cv::Mat random_frame = cv::imread("data/ori_img.jpg");
-    auto uuid = data.get_uuid();
-    auto frame_text = fmt::format("{}\nFrame Number: {}", boost::uuids::to_string(uuid), frame_number.load());
-    // random_image_with_text(random_frame, frame_size, frame_text);
+//     //! Generate a random frame with the UUID text
+//     cv::Mat random_frame = cv::imread("data/ori_img.jpg");
+//     auto uuid = data.get_uuid();
+//     auto frame_text = fmt::format("{}\nFrame Number: {}", boost::uuids::to_string(uuid), frame_number.load());
+//     // random_image_with_text(random_frame, frame_size, frame_text);
 
 
-    psg_private_msgs::msg::PsgDocument doc_msg;
-    // convert image to ROS message
-    cv_bridge::CvImage cv_bridge_image;
-    cv_bridge_image.image = random_frame;
-    cv_bridge_image.encoding = sensor_msgs::image_encodings::BGR8;
-    cv_bridge_image.toImageMsg(doc_msg.frame.raw_image);
-    doc_msg.frame.metadata.frame_num = frame_number;
-    data.set_document(doc_msg);
+//     psg_private_msgs::msg::PsgDocument doc_msg;
+//     // convert image to ROS message
+//     cv_bridge::CvImage cv_bridge_image;
+//     cv_bridge_image.image = random_frame;
+//     cv_bridge_image.encoding = sensor_msgs::image_encodings::BGR8;
+//     cv_bridge_image.toImageMsg(doc_msg.frame.raw_image);
+//     doc_msg.frame.metadata.frame_num = frame_number;
+//     data.set_document(doc_msg);
 
-    frame_number++;
-    return 0;
-}
+//     frame_number++;
+//     return 0;
+// }
 
 } // namespace redoxi_works

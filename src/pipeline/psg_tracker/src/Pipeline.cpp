@@ -2,7 +2,7 @@
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <redoxi_common_nodes/port_handlers/PullProcessSendHandler.hpp>
 #include <redoxi_samples_lib/random_image.hpp>
-#include <cv_bridge/cv_bridge.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 #include <json_struct/json_struct.h>
 #include <tbb/concurrent_queue.h>
 #include <RedoxiTrack/RedoxiTrack.h>
@@ -372,7 +372,7 @@ int PSGTrackerPipelineNode::_create_frame_request_handler(const RuntimeConfig_t 
                std::shared_ptr<const InputSourceData_t> source_data,
                ProcessHandler_t::ResourceToken_t &resource) {
             // 将document数据放入document map中
-            m_impl->m_document_map.synchronize()->insert({source_data->get_goal()->document.frame.metadata.frame_num,
+            m_impl->m_document_map.synchronize()->insert({source_data->get_goal()->document.frame_bundle.primary_frame.metadata.frame_num,
                                                           std::make_shared<psg_private_msgs::msg::PsgDocument>(source_data->get_goal()->document)});
 
             // 将person数据放入person map中
@@ -384,7 +384,7 @@ int PSGTrackerPipelineNode::_create_frame_request_handler(const RuntimeConfig_t 
             // 创建delivery request，并推送到output port model
             // from input source data to output source data
             OutputSourceDataModel_t output_source_data;
-            output_source_data.set_frame(source_data->get_goal()->document.frame);
+            output_source_data.set_frame_bundle(source_data->get_goal()->document.frame_bundle);
             output_source_data.set_persons(source_data->get_goal()->document.persons);
 
 
@@ -392,7 +392,7 @@ int PSGTrackerPipelineNode::_create_frame_request_handler(const RuntimeConfig_t 
             auto control_signal_code = InputDataTrait_t::get_control_signal_code(*source_data->get_goal());
             RDX_INFO_DEV(this, __func__, true,
                          "on_process_input_data()中frame num: {}, control signal code: {}",
-                         source_data->get_goal()->document.frame.metadata.frame_num, int(control_signal_code));
+                         source_data->get_goal()->document.frame_bundle.primary_frame.metadata.frame_num, int(control_signal_code));
 
 
             // create delivery request
@@ -517,11 +517,9 @@ void PSGTrackerPipelineNode::_generate_source_data(psg_private_msgs::msg::PsgDoc
 
 
     // convert image to ROS message
-    cv_bridge::CvImage cv_bridge_image;
-    cv_bridge_image.image = random_frame;
-    cv_bridge_image.encoding = sensor_msgs::image_encodings::BGR8;
-    cv_bridge_image.toImageMsg(document.frame.raw_image);
-    document.frame.metadata.frame_num = frame_number;
+    image_utils::FrameMediator fm(random_frame, "bgr8");
+    fm.to_frame_msg(document.frame_bundle.primary_frame);
+    document.frame_bundle.primary_frame.metadata.frame_num = frame_number;
 
     frame_number++;
 }
@@ -584,13 +582,8 @@ sensor_msgs::msg::Image PSGTrackerPipelineNode::_create_debug_image(const psg_pr
     //! 转换raw image到cv::Mat
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换raw image到cv::Mat", 0);
     cv::Mat cv_image;
-    try {
-        cv_image = cv_bridge::toCvCopy(document.frame.raw_image, sensor_msgs::image_encodings::BGR8)->image;
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "成功转换raw image, 大小: {}x{}", cv_image.cols, cv_image.rows);
-    } catch (const cv_bridge::Exception &e) {
-        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID_IN_LOG, "cv_bridge转换失败: {}", e.what());
-        return sensor_msgs::msg::Image(); // 返回空图像
-    }
+    image_utils::FrameMediator fm(&document.frame_bundle.primary_frame);
+    fm.to_cv_image_copy(cv_image);
 
     //! 在图像上画关键点和骨架连接
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始在图像上绘制关键点, 共{}个检测结果", document.detections.size());
@@ -696,14 +689,8 @@ sensor_msgs::msg::Image PSGTrackerPipelineNode::_create_debug_image(const psg_pr
     //! 转回sensor_msgs/Image
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换回sensor_msgs/Image", 0);
     sensor_msgs::msg::Image debug_image;
-    debug_image.header = document.frame.raw_image.header;
-    debug_image.height = cv_image.rows;
-    debug_image.width = cv_image.cols;
-    debug_image.encoding = "bgr8";
-    debug_image.is_bigendian = false;
-    debug_image.step = cv_image.cols * 3;
-    debug_image.data.assign(cv_image.data, cv_image.data + cv_image.total() * cv_image.elemSize());
-
+    image_utils::FrameMediator fm_cv_image(cv_image, "bgr8");
+    fm_cv_image.to_image_msg(debug_image);
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "完成debug图像创建, 大小: {}x{}", debug_image.width, debug_image.height);
     return debug_image;
 }
@@ -731,10 +718,10 @@ void PSGTrackerPipelineNode::_get_model_result()
         OutputSourceDataPipeline_t output_pipeline_source_data;
         // 根据frame_number获取document
         RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始从document map中获取document", 0);
-        auto document = m_impl->m_document_map.synchronize()->at(output_model_result.source_data->get_frame().metadata.frame_num);
+        auto document = m_impl->m_document_map.synchronize()->at(output_model_result.source_data->get_frame_bundle().primary_frame.metadata.frame_num);
         // 删掉字典中的document
         RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始从document map中删除document", 0);
-        m_impl->m_document_map.synchronize()->erase(output_model_result.source_data->get_frame().metadata.frame_num);
+        m_impl->m_document_map.synchronize()->erase(output_model_result.source_data->get_frame_bundle().primary_frame.metadata.frame_num);
 
         RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始处理track_targets结果", 0);
         for (const auto &track_target : result->track_targets) {

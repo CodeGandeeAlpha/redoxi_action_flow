@@ -100,7 +100,7 @@ class PSGMasterNode : public common_nodes::StartStopNode
     virtual int _process_document_request();
 
     //! do periodic step operation
-    virtual void _step2();
+    // virtual void _step2();
 
   protected:
     // input port

@@ -2,7 +2,7 @@
 #include <psg_common/msg_converter.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <redoxi_common_nodes/port_handlers/PullProcessSendHandler.hpp>
-#include <cv_bridge/cv_bridge.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 #include <json_struct/json_struct.h>
 #include <PassengerFlow/utils/util_functions.h>
 
@@ -271,8 +271,8 @@ int PSGPersonGenerator::_create_document_request_handler(const RuntimeConfig_t &
             // convert to msg
             for (auto &person : v_persons) {
                 psg_private_msgs::msg::Person msg_person;
-                msg_person.frame_metadata = document_msg.frame.metadata;
-                FlowRos2Pipeline::convert_person_to_msg(person, document_msg.frame, msg_person);
+                msg_person.frame_metadata = document_msg.frame_bundle.primary_frame.metadata;
+                FlowRos2Pipeline::convert_person_to_msg(person, document_msg.frame_bundle.primary_frame, msg_person);
                 msg_person.x_uid = to_ros_uuid_msg(boost::uuids::random_generator()()); // 不加这个会导致tracker无法匹配
                 document_msg.persons.push_back(msg_person);
             }
@@ -421,13 +421,10 @@ sensor_msgs::msg::Image PSGPersonGenerator::_create_debug_image(const psg_privat
     //! 转换raw image到cv::Mat
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换raw image到cv::Mat", 0);
     cv::Mat cv_image;
-    try {
-        cv_image = cv_bridge::toCvCopy(document.frame.raw_image, sensor_msgs::image_encodings::BGR8)->image;
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "成功转换raw image, 大小: {}x{}", cv_image.cols, cv_image.rows);
-    } catch (const cv_bridge::Exception &e) {
-        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID_IN_LOG, "cv_bridge转换失败: {}", e.what());
-        return sensor_msgs::msg::Image(); // 返回空图像
-    }
+    image_utils::FrameMediator fm(&document.frame_bundle.primary_frame);
+    fm.to_cv_image_copy(cv_image);
+    RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "成功转换raw image, 大小: {}x{}", cv_image.cols, cv_image.rows);
+
 
     //! 在图像上画person相关的框和keypoints
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始在图像上绘制person相关的框和keypoints, 共{}个person", document.persons.size());
@@ -533,14 +530,8 @@ sensor_msgs::msg::Image PSGPersonGenerator::_create_debug_image(const psg_privat
     //! 转回sensor_msgs/Image
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换回sensor_msgs/Image", 0);
     sensor_msgs::msg::Image debug_image;
-    debug_image.header = document.frame.raw_image.header;
-    debug_image.height = cv_image.rows;
-    debug_image.width = cv_image.cols;
-    debug_image.encoding = "bgr8";
-    debug_image.is_bigendian = false;
-    debug_image.step = cv_image.cols * 3;
-    debug_image.data.assign(cv_image.data, cv_image.data + cv_image.total() * cv_image.elemSize());
-
+    image_utils::FrameMediator fm_cv_image(cv_image, "bgr8");
+    fm_cv_image.to_image_msg(debug_image);
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "完成debug图像创建, 大小: {}x{}", debug_image.width, debug_image.height);
     return debug_image;
 }

@@ -174,12 +174,20 @@ VideoReaderOrbbec::ReadFrameResult VideoReaderOrbbec::_read_frame(SourceData_t &
         cv::rotate(frame, frame, cv::ROTATE_180);
     }
 
-    source_data.set_image(frame);
-    SourceData_t::FrameMetadata_t metadata;
-    metadata.frame_num = _increment_frame_number_by(frame_number, 1);
-    // TODO: set timestamp
-    // metadata.source_timestamp =
-    source_data.set_frame_metadata(metadata);
+    image_utils::FrameMediator fm(frame);
+    redoxi_public_msgs::msg::Frame frame_msg;
+    fm.to_frame_msg(frame_msg);
+
+    SourceData_t::FrameData_t frame_data;
+    frame_data.image = frame;
+    frame_data.metadata = frame_msg.metadata;
+
+    // update size info
+    frame_data.metadata.width = frame.cols;
+    frame_data.metadata.height = frame.rows;
+    frame_data.metadata.frame_num = _increment_frame_number_by(frame_number, 1);
+
+    source_data.set_primary_frame(frame_data);
     return ReadFrameResult::OK;
 }
 

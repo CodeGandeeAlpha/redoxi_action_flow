@@ -19,7 +19,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/PsgDocument.msg"
   "msg/TrajectoryEvent.msg"
   "action/ProcessPsgDocument.action"
-  "action/ProcessTrackTargets.action"
   "action/ProcessTrackTargetsByPersons.action"
 
   DEPENDENCIES geometry_msgs redoxi_public_msgs std_msgs unique_identifier_msgs
