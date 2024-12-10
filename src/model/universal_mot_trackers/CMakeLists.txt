@@ -55,8 +55,7 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_target_dependencies(universal_mot_trackers PUBLIC redoxi_common_nodes
-                          redoxi_public_msgs RedoxiTrack)
+ament_export_dependencies(redoxi_common_nodes redoxi_public_msgs RedoxiTrack)
 ament_export_include_directories(include)
 ament_export_libraries(universal_mot_trackers)
 ament_export_targets(export_${PROJECT_NAME})

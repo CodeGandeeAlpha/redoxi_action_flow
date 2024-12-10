@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string_view>
+#include <redoxi_common_cpp/redoxi_json_struct_conversion.hpp>
 #include <universal_mot_trackers/visibility_control.h>
 #include <universal_mot_trackers/tracking_ports/TrackingRequestInputPort.hpp>
 #include <redoxi_common_nodes/base_nodes/OpenCloseNode.hpp>
@@ -32,7 +33,7 @@ class InitConfig : public common_nodes::OpenCloseNode::InitConfig_t
   public:
     using InputPort_t = TrackingRequestInputPort;
 
-    std::shared_ptr<InputPort_t::InitConfig_t> input_port_config;
+    std::shared_ptr<InputPort_t::InitConfig_t> input_port_config = std::make_shared<InputPort_t::InitConfig_t>();
     std::string publish_visualization_topic = "debug/visualization";
     std::string publish_probe_topic = "debug/tracking_done";
 

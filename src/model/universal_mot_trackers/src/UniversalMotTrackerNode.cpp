@@ -1,5 +1,6 @@
 #include <universal_mot_trackers/UniversalMotTrackerNode.hpp>
 #include <universal_mot_trackers/UniversalMotTrackerImpl.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <map>
 
@@ -75,7 +76,9 @@ int UniversalMotTrackerNode::_handle_input_data(InputPortHandler_t::InputActionR
     cv::Mat image;
     {
         RDX_INFO_DEV(this, __func__, "{}", "Extracting image");
-        auto ret = _extract_image(&image, source_data.get());
+        // auto ret = _extract_image(&image, source_data.get());
+        image_utils::FrameMediator fm(&source_data->get_goal()->frame_bundle.primary_frame);
+        auto ret = fm.to_cv_image_copy(image);
 
         // no image? exit
         if (ret != 0) {

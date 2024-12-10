@@ -49,7 +49,7 @@ class UniversalMotTrackerNode : public common_nodes::OpenCloseNode
     int _create_input_port_handler(
         const InitConfig_t &init_config,
         const RuntimeConfig_t &runtime_config);
-    int _extract_image(cv::Mat *output_image, const InputSourceData_t *source_data);
+    // int _extract_image(cv::Mat *output_image, const InputSourceData_t *source_data);
     int _handle_input_data(InputPortHandler_t::InputActionResult_t *output_action_result,
                            std::shared_ptr<InputPortHandler_t::InputSourceData_t> source_data,
                            InputPortHandler_t::ResourceToken_t &resource_token);

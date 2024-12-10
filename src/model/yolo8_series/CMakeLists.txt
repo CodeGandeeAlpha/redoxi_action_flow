@@ -13,6 +13,7 @@ find_package(redoxi_inference REQUIRED)
 find_package(redoxi_dnn_models REQUIRED)
 find_package(redoxi_common_nodes REQUIRED)
 find_package(json_struct REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 
 # uncomment the following section in order to fill in further dependencies
 # manually. find_package(<dependency> REQUIRED)
@@ -40,6 +41,9 @@ install(
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
+
+# install python modules
+ament_python_install_package(${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

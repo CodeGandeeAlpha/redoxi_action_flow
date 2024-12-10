@@ -25,7 +25,8 @@ set(DEPENDENCIES
     redoxi_inference
     redoxi_dnn_models
     yolo8_series
-    pluginlib)
+    pluginlib
+    universal_mot_trackers)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb xtensor)
 
@@ -75,6 +76,7 @@ option(BUILD_DETECTION_RELAY_NODE "Build detection_relay_node target" ON)
 option(BUILD_DETECTION_DRIVER_NODE "Build detection_driver_node target" ON)
 option(BUILD_TEST_DRIVER_NODE "Build test_driver_node target" OFF)
 option(BUILD_TEST_FRAME_PROXY "Build test_frame_proxy target" OFF)
+option(BUILD_MOT_TRACKER_NODE "Build mot_tracker_node target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -103,6 +105,10 @@ function(configure_target target_name)
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_MOT_TRACKER_NODE)
+  configure_target(mot_tracker_node)
+endif()
 
 if(BUILD_TEST_FRAME_PROXY)
   configure_target(test_frame_proxy)

@@ -271,7 +271,8 @@ int RedoxiVideoReaderBase::_update_runtime_config(std::shared_ptr<BaseRuntimeCon
 
     //! set callback on request enqueued to resize image if needed
     auto output_image_size = runtime_config->output_image_size;
-    m_primary_output_port->set_callback_on_request_enqueued([output_image_size](DeliveryRequest_t &request) {
+    m_primary_output_port->set_callback_on_request_enqueued([this, output_image_size](DeliveryRequest_t &request) {
+        (void)this;
         // resize image if needed
         auto original_size = request.get_source_data().get_primary_frame().image.size();
         if ((output_image_size.width <= 0 && output_image_size.height <= 0) || output_image_size == original_size) {
@@ -303,8 +304,14 @@ int RedoxiVideoReaderBase::_update_runtime_config(std::shared_ptr<BaseRuntimeCon
         frame_data.metadata = request.get_source_data().get_primary_frame().metadata;
 
         // update size info
-        frame_data.metadata.width = resized_image.cols;
-        frame_data.metadata.height = resized_image.rows;
+        // frame_data.metadata.width = resized_image.cols;
+        // frame_data.metadata.height = resized_image.rows;
+        image_utils::FrameMediator::make_metadata_compatible(&frame_data.metadata, resized_image);
+
+        // RDX_INFO_DEV(this, __func__, "after resized, frame number={}, width={}, height={}",
+        //              frame_data.metadata.frame_num,
+        //              frame_data.metadata.width,
+        //              frame_data.metadata.height);
         request.get_source_data().set_primary_frame(frame_data);
     });
 

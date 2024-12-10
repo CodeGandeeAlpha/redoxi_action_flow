@@ -16,9 +16,11 @@
   <depend>redoxi_inference</depend>
   <depend>redoxi_dnn_models</depend>
   <depend>yolo8_series</depend>
-
+  <depend>universal_mot_trackers</depend>
   <depend>psg_private_msgs</depend>
   <depend>pluginlib</depend>
+
+  <depend>redoxi_common_py</depend>
 
 
   <test_depend>ament_lint_auto</test_depend>
