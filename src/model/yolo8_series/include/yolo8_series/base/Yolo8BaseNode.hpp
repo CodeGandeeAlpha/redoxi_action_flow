@@ -289,6 +289,13 @@ int Yolo8BaseNode<TModel>::_process_detection_result(typename ByDetectionRequest
 template <YoloModelConcept TModel>
 int Yolo8BaseNode<TModel>::_create_image_request_handler(const RuntimeConfig_t &runtime_config)
 {
+    // TODO: handle the case where output port is nullptr but input port is valid
+    // should still work
+    if (!m_image_request_input_port || !m_image_request_output_port) {
+        RDX_INFO_DEV(this, __func__, false, "[f={}] No image request input or output port, skip", __func__);
+        return 0;
+    }
+
     using ProcessHandler_t = typename Impl::PullProcessSendHandler_t;
     using InputDataTrait_t = typename ByImageRequest::InputPort_t::ActionDataTrait_t;
     auto config = std::make_shared<typename ProcessHandler_t::InitConfig_t>();
@@ -380,6 +387,11 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
 {
     RDX_INFO_DEV(this, __func__, false, "{}", "Creating detection request handler");
     using ActionDataTrait_t = typename ByDetectionRequest::InputPort_t::ActionDataTrait_t;
+
+    if (!m_detection_request_input_port) {
+        RDX_INFO_DEV(this, __func__, false, "[f={}] No detection request input port, skip", __func__);
+        return 0;
+    }
 
     auto handler_config = std::make_shared<typename Impl::PullProcessReplyHandler_t::InitConfig_t>();
     handler_config->block_input_reading = runtime_config.enable_blocking_mode;
@@ -631,6 +643,11 @@ void Yolo8BaseNode<TModel>::_draw_visualization(cv::Mat &canvas,
 template <YoloModelConcept TModel>
 int Yolo8BaseNode<TModel>::_process_detection_request()
 {
+    if (!m_impl->work_then_reply_handler) {
+        // no detection request handler, error, should not reach here
+        RDX_RAISE_ERROR("[f={}] No detection request handler, should not reach here", __func__);
+    }
+
     auto ret = m_impl->work_then_reply_handler->process_and_reply();
     if (ret == Impl::PullProcessReplyHandler_t::ProcessResult::Error) {
         RDX_INFO_DEV(this, __func__, false, "Failed to process detection request, error code: {}", int(ret));
@@ -653,6 +670,11 @@ int Yolo8BaseNode<TModel>::_process_detection_request()
 template <YoloModelConcept TModel>
 int Yolo8BaseNode<TModel>::_process_image_request()
 {
+    if (!m_impl->work_then_send_handler) {
+        // no image request handler, error, should not reach here
+        RDX_RAISE_ERROR("[f={}] No image request handler, should not reach here", __func__);
+    }
+
     auto ret = m_impl->work_then_send_handler->process_and_send();
     if (ret == Impl::PullProcessSendHandler_t::ProcessResult::Error) {
         RDX_INFO_DEV(this, __func__, false, "Failed to process image request, error code: {}", int(ret));
@@ -679,10 +701,10 @@ template <YoloModelConcept TModel>
 void Yolo8BaseNode<TModel>::_step()
 {
     // RDX_INFO_DEV(this, __func__, false, "{}", "Stepping");
-    if (m_detection_request_input_port) {
+    if (m_detection_request_input_port && m_impl->work_then_reply_handler) {
         _process_detection_request();
     }
-    if (m_image_request_input_port) {
+    if (m_image_request_input_port && m_impl->work_then_send_handler) {
         _process_image_request();
     }
 }

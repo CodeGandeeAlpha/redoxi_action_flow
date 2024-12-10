@@ -5,6 +5,8 @@ from launch.actions import SetEnvironmentVariable
 from launch.actions import DeclareLaunchArgument
 import json
 
+import yolo8_series.configs as yolo
+
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
     "log_level",
@@ -77,32 +79,45 @@ CommonOutputPortConfig = {
     "fallback_delivery_precondition": "dont_care",
 }
 
-det_node_params = {
-    "declare_params": {},
-    "init_config": {
-        **CommonTimeConfig,
-        "model_configs": [
+det_node_params = yolo.Yolo8ModelConfig(
+    declare_params={},
+    init_config=yolo.InitConfig(
+        model_configs=[
             {
                 "model_path": fn_model,
                 "device_type": "cuda",
                 "device_index": 0,
             },
         ],
-        "detection_request_config": {
-            "input_port_config": {
-                **CommonInputPortConfig,
-                "action_name": DetectionNodeInputActionName,
-            }
-        },
-        "visualization_topic": "debug/visualization",
-    },
-    "runtime_config": {
-        **CommonRuntimeConfig,
-        "model_output_config": {"conf_threshold": 0.35, "iou_threshold": 0.5},
-        "enable_visualization": True,
-        "enable_performance_probe": True,
-    },
-}
+    ),
+)
+
+# det_node_params = {
+#     "declare_params": {},
+#     "init_config": {
+#         **CommonTimeConfig,
+#         "model_configs": [
+#             {
+#                 "model_path": fn_model,
+#                 "device_type": "cuda",
+#                 "device_index": 0,
+#             },
+#         ],
+#         "detection_request_config": {
+#             "input_port_config": {
+#                 **CommonInputPortConfig,
+#                 "action_name": DetectionNodeInputActionName,
+#             }
+#         },
+#         "visualization_topic": "debug/visualization",
+#     },
+#     "runtime_config": {
+#         **CommonRuntimeConfig,
+#         "model_output_config": {"conf_threshold": 0.35, "iou_threshold": 0.5},
+#         "enable_visualization": True,
+#         "enable_performance_probe": True,
+#     },
+# }
 
 video_source_params = {
     "declare_params": {},
