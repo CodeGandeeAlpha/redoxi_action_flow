@@ -38,10 +38,11 @@ int DetectionDriver::_on_process_input_request(InputRequestHandler_t::OutputRequ
     const auto source_frame_index = fm.get_source_frame_index();
     const auto source_frame_timestamp = fm.get_source_timestamp_flat();
     const auto source_image_encoding = fm.get_encoding();
-    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Driver got frame number={}, source_frame_index={}, source_frame_timestamp={}, source_image_encoding={}",
+    const auto signal_code = InputTypes::ActionDataTrait_t::get_control_signal_code(*source_data->get_goal());
+    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Driver got frame number={}, source_frame_index={}, source_frame_timestamp={}, source_image_encoding={}, signal code={}",
                  msg_uuid_str, frame_number, source_frame_index,
                  fmt::format("{:.6f} sec", source_frame_timestamp.count() / 1e6),
-                 source_image_encoding);
+                 source_image_encoding, control_signal_code_to_string(signal_code));
 
     // fill source data
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Creating request from source data", msg_uuid_str);
@@ -50,7 +51,7 @@ int DetectionDriver::_on_process_input_request(InputRequestHandler_t::OutputRequ
     output_request->set_source_data(output_source_data);
 
     // get signal code and show it
-    auto signal_code = InputTypes::ActionDataTrait_t::get_control_signal_code(*source_data->get_goal());
+    // auto signal_code = InputTypes::ActionDataTrait_t::get_control_signal_code(*source_data->get_goal());
     output_request->set_control_signal_code(signal_code);
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Set control signal code to {}",
                  msg_uuid_str, control_signal_code_to_string(signal_code));

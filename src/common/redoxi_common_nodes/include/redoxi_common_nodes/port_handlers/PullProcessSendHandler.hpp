@@ -98,8 +98,10 @@ class PullProcessSendHandler
         auto source_signal_code = InputActionDataTrait_t::get_control_signal_code(*input_data->get_goal());
         auto msg_uuid = InputActionDataTrait_t::get_uuid(*input_data->get_goal());
         auto msg_uuid_str = UUIDTrait::to_string(msg_uuid);
-        RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Got goal handle, signal_code={}",
-                     msg_uuid_str, control_signal_code_to_string(source_signal_code));
+        auto task_metadata = InputActionDataTrait_t::get_source_task_metadata(*input_data->get_goal());
+        auto task_uuid = task_metadata.source_task_id;
+        RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}][task={}] Got goal handle, signal code={}",
+                     msg_uuid_str, UUIDTrait::to_string(task_uuid), control_signal_code_to_string(source_signal_code));
 
         // get resource token
         ResourceToken_t resource_token;
@@ -139,6 +141,9 @@ class PullProcessSendHandler
         OutputRequest_t output_request;
         auto enqueue_policy = m_output_enqueue_policy;
 
+        // pass along the source task metadata
+        output_request.set_source_task_metadata(task_metadata);
+
         // get the delivery policy from the output request
         // if not set, use the default one
         // this is used for reliably sending special control signal, in other cases we will leave the user-defined policy unchanged
@@ -156,13 +161,7 @@ class PullProcessSendHandler
 
             // make sure request policy is reliable
             // FIXME: downstream policy timing settings is ignored here, should we care?
-            OutputDeliveryPolicy_t request_policy;
-            if (output_request.get_delivery_policy()) {
-                request_policy = *output_request.get_delivery_policy();
-            }
-            request_policy.set_precondition(DeliveryPrecondition::NoPrecondition);
-            request_policy.set_drop_strategy(DropStrategy::NoDrop);
-            output_request.set_delivery_policy(request_policy);
+            output_request.make_reliable();
         }
 
         auto action_result = std::make_shared<InputActionResult_t>();

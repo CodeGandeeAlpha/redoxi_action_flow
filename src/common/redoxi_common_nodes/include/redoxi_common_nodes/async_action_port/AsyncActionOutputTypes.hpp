@@ -354,6 +354,11 @@ class DefaultDeliveryRequest
 {
   public:
     virtual ~DefaultDeliveryRequest() = default;
+    DefaultDeliveryRequest()
+    {
+        // TODO:generate a random task id
+        m_source_task_metadata.source_task_id = UUIDTrait::generate();
+    }
 
     using SourceDataType_t = SourceDataType;
     using TargetDataType_t = TargetDataType;
@@ -412,6 +417,17 @@ class DefaultDeliveryRequest
     virtual void set_delivery_policy(const DeliveryPolicy_t &delivery_policy)
     {
         m_delivery_policy = delivery_policy;
+    }
+
+    //! Make this delivery request reliable
+    //! IMPORTANT: Note that this only affects delivery stage, not enqueue stage, you need to handle enqueue reliability yourself
+    virtual void make_reliable()
+    {
+        if (!m_delivery_policy.has_value()) {
+            m_delivery_policy = DeliveryPolicy_t();
+        }
+        m_delivery_policy.value().set_precondition(DeliveryPrecondition::NoPrecondition);
+        m_delivery_policy.value().set_drop_strategy(DropStrategy::NoDrop);
     }
 
     //! Get the delivery policy, nullptr if not set

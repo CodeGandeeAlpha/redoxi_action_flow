@@ -86,7 +86,7 @@ inline constexpr const char *control_signal_code_to_string(ControlSignalCode cod
 //! this metadata info is used to track the source task
 struct RosActionTaskMetadata {
     //! UUID of the source task
-    UUIDType source_task_id;
+    UUIDType source_task_id{0};
 
     //! Info string about the source task
     std::string source_task_info;
@@ -589,3 +589,17 @@ struct TypeHandler<redoxi_works::DropStrategy> : public TypeHandlerWithMapper<Dr
 
 
 } // namespace JS
+
+namespace redoxi_works
+{
+inline const std::string &drop_strategy_to_string(DropStrategy drop_strategy)
+{
+    return JS::DropStrategyMapper::get_enum_to_str().at(drop_strategy);
+}
+
+inline const std::string &precondition_to_string(DeliveryPrecondition precondition)
+{
+    return JS::DeliveryPreconditionMapper::get_enum_to_str().at(precondition);
+}
+
+} // namespace redoxi_works

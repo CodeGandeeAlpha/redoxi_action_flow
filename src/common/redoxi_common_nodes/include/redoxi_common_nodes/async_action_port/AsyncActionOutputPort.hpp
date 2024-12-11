@@ -122,7 +122,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         RDX_INFO_DEV(m_parent_node, __func__, false,
                      "[msg_uuid={}] try to push request in {} attempts, retry interval={}ms",
-                     msg_uuid_str, max_attempts, std::chrono::duration<double, std::milli>(interval_between_attempts).count());
+                     msg_uuid_str, drop_frame_strategy == DropStrategy::NoDrop ? "inf" : std::to_string(max_attempts),
+                     std::chrono::duration<double, std::milli>(interval_between_attempts).count());
 
         bool success = false;
         if (drop_frame_strategy == DropStrategy::NoDrop) {

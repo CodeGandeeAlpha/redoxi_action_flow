@@ -12,16 +12,10 @@
         "--background-index",
         "--completion-style=detailed",
         "--header-insertion=never",
-        "--pch-storage=memory"
+        "--pch-storage=disk"
     ],
     "clangd.fallbackFlags": [
         "-std=c++17"
-    ],
-    "python.autoComplete.extraPaths": [
-        "/opt/ros/iron/lib/python3.10/site-packages"
-    ],
-    "python.analysis.extraPaths": [
-        "/opt/ros/iron/lib/python3.10/site-packages"
     ],
     "gitlens.codeLens.authors.enabled": false,
     "gitlens.codeLens.recentChange.enabled": false,

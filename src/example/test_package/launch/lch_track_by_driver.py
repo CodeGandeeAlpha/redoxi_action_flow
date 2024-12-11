@@ -102,6 +102,7 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
 # detection_driver <-> detector
 # fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx"
 fn_model = r"/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8m-pose-dynbatch.onnx"
+# fn_model = r"/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx"
 det_node_name = "detector"
 det_node_params = yolo.Yolo8ModelNodeConfig(
     init_config=yolo.Yolo8ModelInitConfig(
@@ -120,8 +121,8 @@ det_node_params = yolo.Yolo8ModelNodeConfig(
     ),
     runtime_config=yolo.Yolo8ModelRuntimeConfig(
         model_output_config=yolo.ModelPostprocessConfig(
-            conf_threshold=0.4,
-            iou_threshold=0.5,
+            conf_threshold=0.2,
+            iou_threshold=0.4,
         )
     ),
 )
@@ -161,7 +162,8 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
 # video_source -> detection_driver
 video_src_node_name = "video_source"
 # fn_video = r"/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-fn_video = r"/soft/workspace/code/psf_ros2_ws/data/dancetrack/dancetrack-0039.mp4"
+fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
+# fn_video = r"/soft/workspace/code/psf_ros2_ws/data/dancetrack/dancetrack-0039.mp4"
 video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
         video_url=fn_video,
@@ -171,12 +173,19 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
                 videoSrcCfg.DownstreamSpec(
                     name=det_driver_node_name,
                     action_name=f"/{det_driver_node_name}/{det_driver_node_params.init_config.input_port_config.action_name}",
+                    delivery_policy=videoSrcCfg.DeliveryPolicy(
+                        drop_strategy=videoSrcCfg.DropStrategy.DropAsNeeded,
+                    ),
                 ),
             ],
         ),
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
         step_interval=StepIntervals.Medium,
+        video_end_time=-1,
+        frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
+            drop_strategy=videoSrcCfg.DropStrategy.DropAsNeeded,
+        ),
     ),
 )
 
