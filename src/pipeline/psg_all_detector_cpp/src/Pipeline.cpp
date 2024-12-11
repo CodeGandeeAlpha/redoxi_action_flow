@@ -588,6 +588,13 @@ void PSGAllDetectorCppNode::_get_model_result()
 
         output_pipeline_source_data.set_document(document);
 
+        // test: 输出所有document.detections的bbox和类别
+        for (const auto &det : document.detections) {
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                         "bbox: [{}, {}, {}, {}], category: {}",
+                         det.bbox.x, det.bbox.y, det.bbox.width, det.bbox.height, det.category);
+        }
+
         // create pipeline delivery request
         auto control_signal_code = output_model_result.control_signal_code;
         auto delivery_request = _create_delivery_request(output_pipeline_source_data, control_signal_code);
