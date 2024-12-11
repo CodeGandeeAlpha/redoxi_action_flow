@@ -1,21 +1,28 @@
 #include <redoxi_common_nodes/async_action_port/AsyncActionInputPort.hpp>
 #include <redoxi_samples_nodes/sinks/FrameRelayNode.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
+#include <spdlog/spdlog.h>
 
 namespace rdx = redoxi_works;
+using RosNode_t = rdx::FrameRelayNode;
 
 void print_init_config_json()
 {
-    {
-        auto init_config = std::make_shared<rdx::FrameRelayNodeInitConfig>();
-        auto js_string = JS::serializeStruct(*init_config);
-        std::cout << js_string << std::endl;
-    }
-    {
-        auto runtime_config = std::make_shared<rdx::FrameRelayNodeRuntimeConfig>();
-        auto js_string = JS::serializeStruct(*runtime_config);
-        std::cout << js_string << std::endl;
-    }
+    using InitConfig_t = RosNode_t::InitConfig_t;
+    using RuntimeConfig_t = RosNode_t::RuntimeConfig_t;
+    rdx::NodeConfigTemplate<InitConfig_t, RuntimeConfig_t> node_config;
+
+    auto init_config = std::make_shared<rdx::FrameRelayNodeInitConfig>();
+    init_config->input_port_config->set_action_name("in/frame");
+    init_config->publish_topic = "out/relayed_frame";
+    init_config->debug_topic_frame_accepted = "debug/frame_accepted";
+    init_config->debug_topic_frame_rejected = "debug/frame_rejected";
+
+    auto runtime_config = std::make_shared<rdx::FrameRelayNodeRuntimeConfig>();
+    node_config.init_config = *init_config;
+    node_config.runtime_config = *runtime_config;
+    auto js_string = JS::serializeStruct(node_config);
+    std::cout << js_string << std::endl;
 }
 
 int main(int argc, char **argv)
@@ -32,39 +39,33 @@ int main(int argc, char **argv)
     auto frame_relay_node = std::make_shared<rdx::FrameRelayNode>("frame_relay_node", options);
 
     //! Initialize the node with default configuration
-    RDX_INFO_DEV(frame_relay_node.get(), __func__, false, "{}", "Creating init config");
+    spdlog::info("Creating init config");
     auto init_config = std::make_shared<rdx::FrameRelayNodeInitConfig>();
 
-    RDX_INFO_DEV(frame_relay_node.get(), __func__, false, "{}", "Creating runtime config");
+    spdlog::info("Creating runtime config");
     auto runtime_config = std::make_shared<rdx::FrameRelayNodeRuntimeConfig>();
 
-    RDX_INFO_DEV(frame_relay_node.get(), __func__, false, "{}", "Parsing init config from node parameters");
+    spdlog::info("Parsing init config from node parameters");
     init_config->parse_from_node_parameters(init_config.get(), frame_relay_node.get());
-    {
-        RDX_INFO_DEV(frame_relay_node.get(), __func__, false, "{}", "Converting init config to JSON");
-        auto init_config_json = JS::serializeStruct(*init_config);
-        RDX_INFO_DEV(frame_relay_node.get(), __func__, false, "InitConfig JSON: {}", init_config_json);
-    }
     runtime_config->parse_from_node_parameters(runtime_config.get(), frame_relay_node.get());
-    {
-        RDX_INFO_DEV(frame_relay_node.get(), __func__, false, "{}", "Converting runtime config to JSON");
-        auto runtime_config_json = JS::serializeStruct(*runtime_config);
-        RDX_INFO_DEV(frame_relay_node.get(), __func__, false, "RuntimeConfig JSON: {}", runtime_config_json);
-    }
 
-    RDX_INFO_DEV(frame_relay_node.get(), __func__, false, "{}", "Initializing node");
+    spdlog::info("Initializing node");
     frame_relay_node->init(init_config, runtime_config);
 
     //! Start the node
+    spdlog::info("Starting node");
     frame_relay_node->start();
 
     //! Keep the node running
+    spdlog::info("Spinning node");
     rclcpp::spin(frame_relay_node);
 
     //! Stop the node before shutdown
+    spdlog::info("Stopping node");
     frame_relay_node->stop();
 
     //! Shutdown ROS
+    spdlog::info("Shutting down ROS");
     rclcpp::shutdown();
     return 0;
 }

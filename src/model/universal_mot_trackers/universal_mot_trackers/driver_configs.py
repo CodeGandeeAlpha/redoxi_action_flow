@@ -1,33 +1,35 @@
+import redoxi_common_py.configs.driver_base as driverCfg
+from redoxi_common_py.configs.driver_base import *
+
+import redoxi_common_py.configs.async_ports as portCfg
+from redoxi_common_py.configs.async_ports import *
+
 try:
     from attrs import define, field, asdict
     import attrs.validators as av
 except ImportError:
     from attr import define, field, asdict
     import attr.validators as av
-
-from redoxi_common_py.configs.driver_base import *
-import redoxi_common_py.configs.driver_base as driverBaseCfg
-
-from typing import Any, Literal
+from typing import Dict, Any, ClassVar
 
 ExampleConfig = {
     "declare_params": {},
     "init_config": {
         "input_port_config": {
-            "_action_goal_type": "redoxi_public_msgs/action/ProcessFrame_Goal",
+            "_action_goal_type": "redoxi_public_msgs/action/ProcessDetections_Goal",
             "buffer_capacity": -1,
-            "action_name": "",
+            "action_name": "in/tracking_request",
             "goal_result_expire_time": 1000000,
         },
         "output_port_config": {
-            "_action_goal_type": "redoxi_public_msgs/action/ProcessDetections_Goal",
+            "_action_goal_type": "redoxi_public_msgs/action/ProcessFrame_Goal",
             "downstream_specs": [],
             "num_buffer_requests": 1,
             "preserve_request_order": True,
             "fallback_delivery_precondition": "dont_care",
         },
         "callee_request_port_config": {
-            "_action_goal_type": "redoxi_public_msgs/action/ProcessDetectionsByFrame_Goal",
+            "_action_goal_type": "redoxi_public_msgs/action/ProcessTrackByDetection_Goal",
             "downstream_specs": [],
             "num_buffer_requests": 1,
             "preserve_request_order": True,
@@ -49,7 +51,7 @@ ExampleConfig = {
             "retry_policy": {
                 "fallback_number_of_retry": 3,
                 "fallback_wait_time_between_retry": 5000,
-                "fallback_wait_time_retry_response": 100000,
+                "fallback_wait_time_retry_response": 1000000,
             },
             "precondition": "dont_care",
             "drop_strategy": "dont_care",
@@ -60,37 +62,42 @@ ExampleConfig = {
     },
 }
 
-__all__ = [
-    "DetectionDriverInitConfig",
-    "DetectionDriverRuntimeConfig",
-    "DetectionDriverNodeConfig",
-] + driverBaseCfg.__all__
+__all__ = (
+    [
+        "TrackerDriverInitConfig",
+        "TrackerDriverRuntimeConfig",
+        "TrackerDriverNodeConfig",
+    ]
+    + driverCfg.__all__
+    + portCfg.__all__
+)
 
 
 @define(kw_only=True)
-class DetectionDriverInitConfig(driverBaseCfg.DriverBaseInitConfig):
-    """
-    This is the init config for the DetectionDriver.
+class TrackerDriverInitConfig(driverCfg.DriverBaseInitConfig):
+    """Initialization configuration for TrackerDriverNode.
 
+    action goal types
+    --------------------
     input_port_config:
-        action goal: redoxi_public_msgs/action/ProcessFrame_Goal
+    - redoxi_public_msgs/action/ProcessDetections_Goal
+
     output_port_config:
-        action goal: redoxi_public_msgs/action/ProcessDetections_Goal
+    - redoxi_public_msgs/action/ProcessFrame_Goal
+
     callee_request_port_config:
-        action goal: redoxi_public_msgs/action/ProcessDetectionsByFrame_Goal
+    - redoxi_public_msgs/action/ProcessTrackByDetection_Goal
     """
 
     pass
 
 
 @define(kw_only=True)
-class DetectionDriverRuntimeConfig(driverBaseCfg.DriverBaseRuntimeConfig):
+class TrackerDriverRuntimeConfig(driverCfg.DriverBaseRuntimeConfig):
     pass
 
 
 @define(kw_only=True)
-class DetectionDriverNodeConfig(driverBaseCfg.BaseRosNodeConfig):
-    init_config: DetectionDriverInitConfig = field(factory=DetectionDriverInitConfig)
-    runtime_config: DetectionDriverRuntimeConfig = field(
-        factory=DetectionDriverRuntimeConfig
-    )
+class TrackerDriverNodeConfig(driverCfg.BaseRosNodeConfig):
+    init_config: TrackerDriverInitConfig = field(default=None)
+    runtime_config: TrackerDriverRuntimeConfig = field(default=None)

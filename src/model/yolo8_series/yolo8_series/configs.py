@@ -152,7 +152,6 @@ class Yolo8ModelRuntimeConfig(BaseRosNodeRuntimeConfig):
 
 
 @define(kw_only=True)
-class Yolo8ModelNodeConfig(JsonConvertible):
-    declare_params: dict[str, Any] | None = field(default=None)
+class Yolo8ModelNodeConfig(BaseRosNodeConfig):
     init_config: Yolo8ModelInitConfig = field(factory=Yolo8ModelInitConfig)
     runtime_config: Yolo8ModelRuntimeConfig = field(factory=Yolo8ModelRuntimeConfig)

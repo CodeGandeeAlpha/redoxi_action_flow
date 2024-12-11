@@ -60,8 +60,7 @@ class DetectionRelayRuntimeConfig(baseNodeCfg.BaseRosNodeRuntimeConfig):
 
 
 @define(kw_only=True)
-class DetectionRelayNodeConfig(baseNodeCfg.JsonConvertible):
-    declare_params: dict[str, Any] | None = field(default=None)
+class DetectionRelayNodeConfig(baseNodeCfg.BaseRosNodeConfig):
     init_config: DetectionRelayInitConfig = field(factory=DetectionRelayInitConfig)
     runtime_config: DetectionRelayRuntimeConfig = field(
         factory=DetectionRelayRuntimeConfig

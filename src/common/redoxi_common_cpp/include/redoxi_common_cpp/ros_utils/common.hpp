@@ -15,23 +15,23 @@
 //! importance is an integer value, the higher the value, the more important the log message is
 //! importance below the threshold will be ignored
 #ifndef REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_INFO
-#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_INFO 1
+#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_INFO 0
 #endif
 
 #ifndef REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_DEBUG
-#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_DEBUG 1
+#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_DEBUG 0
 #endif
 
 #ifndef REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_WARN
-#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_WARN 1
+#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_WARN 0
 #endif
 
 #ifndef REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_ERROR
-#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_ERROR 1
+#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_ERROR 0
 #endif
 
 #ifndef REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_FATAL
-#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_FATAL 1
+#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_FATAL 0
 #endif
 
 namespace redoxi_works
@@ -458,11 +458,17 @@ DEFINE_RDX_LOGGING_SEVERITY_WITH_IMPORTANCE(FATAL, 4)
 // for development warning
 #define RDX_WARN_DEV RDX_LOG_WARN_1
 
+// for development debug
+#define RDX_DEBUG_DEV RDX_LOG_DEBUG_1
+
 // for production warning
 #define RDX_WARN_PRODUCTION RDX_LOG_WARN_2
 
 // for production output
 #define RDX_INFO_PRODUCTION RDX_LOG_INFO_2
+
+// for production debug
+#define RDX_DEBUG_PRODUCTION RDX_LOG_DEBUG_2
 
 
 //! Macro to get JSON parameter from node, defined as macro to avoid include nlohmann/json.hpp in this file

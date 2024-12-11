@@ -4,13 +4,14 @@ try:
 except ImportError:
     from attr import define, field
     import attr.validators as av
-from typing import Literal
+from typing import Literal, Dict, Any
 import redoxi_common_py.common_types as commonTypes
 from redoxi_common_py.common_types import *
 
 __all__ = [
     "BaseRosNodeInitConfig",
     "BaseRosNodeRuntimeConfig",
+    "BaseRosNodeConfig",
     "ModelConfig",
 ] + commonTypes.__all__
 
@@ -24,6 +25,12 @@ class BaseRosNodeInitConfig(commonTypes.JsonConvertible):
 class BaseRosNodeRuntimeConfig(commonTypes.JsonConvertible):
     _time_unit: RedoxiTimeUnit = field(default=DefaultSettings.time_unit)
     step_interval: int = field(default=DefaultSettings.step_interval)
+
+
+@define(kw_only=True)
+class BaseRosNodeConfig(commonTypes.JsonConvertible):
+    # these will be defined as independent ROS node parameters
+    declare_params: Dict[str, Any] = field(factory=dict)
 
 
 @define(kw_only=True)

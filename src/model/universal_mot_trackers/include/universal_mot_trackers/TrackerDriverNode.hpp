@@ -25,19 +25,19 @@ class TrackerDriverNode : public common_nodes::drivers::CallActionDriverBase<
     using BaseNode_t = common_nodes::drivers::CallActionDriverBase<TrackerDriverRequestPort, TrackerDriverCalleePort, TrackerDriverOutputPort>;
     using BaseInitConfig_t = BaseNode_t::InitConfig_t;
     using BaseRuntimeConfig_t = BaseNode_t::RuntimeConfig_t;
-    using BaseNode_t::CallActionDriverBase;
+    using BaseNode_t::BaseNode_t;
 
   protected:
-    virtual int _on_process_input_request(CalleeTypes::RequestOutputRequest_t *out_callee_request,
-                                          std::optional<CalleeTypes::RequestOutputDeliveryPolicy_t> *out_callee_enqueue_policy,
-                                          InputTypes::ActionResult_t *out_upstream_result,
-                                          std::shared_ptr<const InputTypes::SourceData_t> source_data,
-                                          InputRequestHandler_t::ResourceToken_t &resource_token) override;
+    int _on_process_input_request(CalleeTypes::RequestOutputRequest_t *out_callee_request,
+                                  std::optional<CalleeTypes::RequestOutputDeliveryPolicy_t> *out_callee_enqueue_policy,
+                                  InputTypes::ActionResult_t *out_upstream_result,
+                                  std::shared_ptr<const InputTypes::SourceData_t> source_data,
+                                  InputRequestHandler_t::ResourceToken_t &resource_token) override;
 
-    virtual int _on_process_callee_result(OutputTypes::OutputRequest_t *out_downstream_request,
-                                          OutputTypes::OutputDeliveryPolicy_t *out_downstream_enqueue_policy,
-                                          std::shared_ptr<const CalleeTypes::RequestOutputActionResult_t> callee_result,
-                                          const CalleeTypes::RequestOutputRequest_t &callee_request,
-                                          const CalleeTypes::Downstream_t &downstream) override;
+    int _on_process_callee_result(OutputTypes::OutputRequest_t *out_downstream_request,
+                                  OutputTypes::OutputDeliveryPolicy_t *out_downstream_enqueue_policy,
+                                  std::shared_ptr<const CalleeTypes::RequestOutputActionResult_t> callee_result,
+                                  const CalleeTypes::RequestOutputRequest_t &callee_request,
+                                  const CalleeTypes::Downstream_t &downstream) override;
 };
 } // namespace redoxi_works::model_nodes::universal_mot_trackers

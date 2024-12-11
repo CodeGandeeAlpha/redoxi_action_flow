@@ -77,8 +77,6 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
         ),
     ),
     runtime_config=detDriverCfg.DetectionDriverRuntimeConfig(
-        callee_request_enqueue_policy=None,
-        driver_output_enqueue_policy=None,
         enable_blocking_mode=False,
     ),
 )

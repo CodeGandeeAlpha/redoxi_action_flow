@@ -19,13 +19,15 @@ int UniversalMotTrackerNode::_update_init_config(std::shared_ptr<BaseInitConfig_
     auto init_config = std::static_pointer_cast<InitConfig_t>(config);
 
     // create port
-    {
+    if (init_config->input_port_config && !init_config->input_port_config->get_action_name().empty()) {
         RDX_INFO_DEV(this, __func__, "{}", "Creating port");
         m_input_port = std::make_shared<InputPort_t>(this);
         auto ret = m_input_port->init(init_config->input_port_config);
         if (ret != 0) {
             RDX_RAISE_ERROR("{}", "Failed to create port");
         }
+    } else {
+        RDX_INFO_DEV(this, __func__, "{}", "No input port config, skipping port creation");
     }
 
     // create publisher for visualization
@@ -227,7 +229,12 @@ int UniversalMotTrackerNode::_create_input_port_handler(
     const InitConfig_t &init_config,
     const RuntimeConfig_t &runtime_config)
 {
+    if (!m_input_port) {
+        RDX_INFO_DEV(this, __func__, "{}", "No input port, skipping input port handler creation");
+        return 0;
+    }
     (void)init_config;
+
     auto handler_config = std::make_shared<InputPortHandler_t::InitConfig_t>();
     handler_config->block_input_reading = runtime_config.enable_blocking_mode;
     handler_config->block_resource_acquisition = runtime_config.enable_blocking_mode;

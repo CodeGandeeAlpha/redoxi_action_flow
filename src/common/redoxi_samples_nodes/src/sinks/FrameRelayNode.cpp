@@ -1,6 +1,7 @@
 #include <redoxi_samples_nodes/sinks/FrameRelayNode.hpp>
 #include <redoxi_shared_memory/SharedMemoryClient.hpp>
 #include <redoxi_shared_memory/SharedMemoryFactory.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 
@@ -221,11 +222,13 @@ int FrameRelayNode::_parse_frame(cv::Mat *output,
         RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Reading raw image directly from the goal",
                      boost::uuids::to_string(msg_uuid));
 
-        auto &raw_image = source_data.get_goal()->frame_bundle.primary_frame.raw_image;
-        if (!raw_image.data.empty()) {
-            auto img_bridge = cv_bridge::toCvCopy(raw_image, raw_image.encoding);
-            *output = img_bridge->image;
-        }
+        image_utils::FrameMediator fm(&source_data.get_goal()->frame_bundle.primary_frame);
+        fm.to_cv_image_copy(*output);
+        // auto &raw_image = source_data.get_goal()->frame_bundle.primary_frame.raw_image;
+        // if (!raw_image.data.empty()) {
+        //     auto img_bridge = cv_bridge::toCvCopy(raw_image, raw_image.encoding);
+        //     *output = img_bridge->image;
+        // }
     }
 
     return 0;
