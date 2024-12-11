@@ -23,8 +23,12 @@ int DetectionRelayNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> co
 
     // create input port
     RDX_INFO_DEV(this, __func__, false, "{}", "Creating input port");
-    m_input_port = std::make_shared<InputPort_t>(this);
-    m_input_port->init(init_config->input_port_config);
+    if (!init_config->input_port_config->get_action_name().empty()) {
+        m_input_port = std::make_shared<InputPort_t>(this);
+        m_input_port->init(init_config->input_port_config);
+    } else {
+        RDX_INFO_DEV(this, __func__, false, "{}", "input port config has empty action name, skipping");
+    }
 
     // create publishers
     RDX_INFO_DEV(this, __func__, false, "{}", "Initializing publishers");
@@ -78,7 +82,7 @@ int DetectionRelayNode::_stop()
 
 void DetectionRelayNode::_step()
 {
-    if (m_port_handler) {
+    if (m_input_port && m_port_handler) {
         m_port_handler->process_and_reply();
     }
 }
@@ -87,6 +91,12 @@ int DetectionRelayNode::_create_port_handler(
     std::shared_ptr<RuntimeConfig_t> runtime_config)
 {
     RDX_INFO_DEV(this, __func__, false, "{}", "Creating port handler");
+
+    if (!m_input_port) {
+        RDX_WARN_PRODUCTION(this, __func__, false, "{}", "input port is not initialized, skipping");
+        return 0;
+    }
+
     m_port_handler = std::make_shared<PortHandler_t>();
     auto port_handler_config = std::make_shared<PortHandler_t::InitConfig_t>();
     port_handler_config->block_input_reading = runtime_config->enable_blocking_mode;

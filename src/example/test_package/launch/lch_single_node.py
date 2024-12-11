@@ -26,97 +26,31 @@ log_level_arg = DeclareLaunchArgument(
 class StepIntervals:
     VerySlow = 3000000
     Slow = 200000
-    Medium = 1000000 / 25
+    Medium = 20000
     Fast = 5000
     VeryFast = 1000
 
 
-# video source is upstream of detection driver
-video_src_node_name = "video_source"
-fn_video = r"/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
-    init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
-        video_url=fn_video,
-        auto_replay=True,
-        primary_output_spec=videoSrcCfg.OutputPortConfig(
-            downstream_specs=[
-                videoSrcCfg.DownstreamSpec(
-                    name="detection_driver",
-                    action_name="/detection_driver/in/frame",
-                ),
-            ],
-        ),
-    ),
-    runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
-        step_interval=StepIntervals.Medium,
-    ),
-)
-
-# detection driver is downstream of video source, upstream of detector, output to detection relay
-det_driver_node_name = "detection_driver"
-det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
-    init_config=detDriverCfg.DetectionDriverInitConfig(
-        input_port_config=detDriverCfg.InputPortConfig(
-            action_name="in/frame",
-        ),
-        output_port_config=detDriverCfg.OutputPortConfig(
-            downstream_specs=[
-                detDriverCfg.DownstreamSpec(
-                    name="detection_relay",
-                    action_name="/detection_relay/in/detections",
-                ),
-            ],
-        ),
-        callee_request_port_config=detDriverCfg.OutputPortConfig(
-            downstream_specs=[
-                detDriverCfg.DownstreamSpec(
-                    name="detector",
-                    action_name="/detector/in/detection_request",
-                ),
-            ],
-        ),
-    ),
-    runtime_config=detDriverCfg.DetectionDriverRuntimeConfig(
-        callee_request_enqueue_policy=None,
-        driver_output_enqueue_policy=None,
-        enable_blocking_mode=False,
-    ),
-)
-
 # fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
 fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx"
+
 det_node_name = "detector"
-det_node_params = yolo.Yolo8ModelNodeConfig(
-    init_config=yolo.Yolo8ModelInitConfig(
+det_node_params = yolo.Yolo8ModelConfig(
+    init_config=yolo.InitConfig(
         model_configs=[
-            yolo.ModelConfig(
-                model_path=fn_model,
-                device_type="cuda",
-                device_index=0,
-            ),
+            {
+                "model_path": fn_model,
+                "device_type": "cuda",
+                "device_index": 0,
+            },
         ],
-        detection_request_config=yolo.DetectionRequestConfig(
-            input_port_config=yolo.InputPortConfig(
-                action_name="in/detection_request",
-            ),
-        ),
-    ),
-    runtime_config=yolo.Yolo8ModelRuntimeConfig(
-        model_output_config=yolo.ModelPostprocessConfig(
-            conf_threshold=0.25,
-            iou_threshold=0.5,
-        ),
-        enable_visualization=True,
-        step_interval=StepIntervals.Fast,
     ),
 )
 
 det_relay_node_name = "detection_relay"
 det_relay_node_params = detRelayCfg.DetectionRelayNodeConfig(
     init_config=detRelayCfg.DetectionRelayInitConfig(
-        input_port_config=detRelayCfg.InputPortConfig(
-            action_name="in/detections",
-        ),
+        input_port_config=None,
         publish_detection_topic="out/relayed_detection",
         publish_visualization_topic="out/relayed_visualization",
     ),
@@ -126,6 +60,30 @@ det_relay_node_params = detRelayCfg.DetectionRelayNodeConfig(
     ),
 )
 
+video_src_node_name = "video_source"
+video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
+    init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
+        video_url=r"/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4",
+        auto_replay=True,
+    ),
+    runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
+        step_interval=StepIntervals.VerySlow,
+    ),
+)
+
+det_driver_node_name = "detection_driver"
+det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
+    init_config=detDriverCfg.DetectionDriverInitConfig(
+        input_port_config=None,
+        output_port_config=None,
+        callee_request_port_config=None,
+    ),
+    runtime_config=detDriverCfg.DetectionDriverRuntimeConfig(
+        callee_request_enqueue_policy=None,
+        driver_output_enqueue_policy=None,
+        enable_blocking_mode=False,
+    ),
+)
 
 # common_prefix = ["valgrind --tool=callgrind --dump-instr=yes -v --instr-atstart=no"]
 common_prefix = None
@@ -219,9 +177,9 @@ def generate_launch_description():
         [
             *env_var_settings,
             log_level_arg,
-            detection_node,
-            detection_relay_node,
-            video_src_node,
+            # detection_node,
+            # detection_relay_node,
+            # video_src_node,
             det_driver_node,
         ]
     )

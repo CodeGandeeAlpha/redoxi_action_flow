@@ -1,57 +1,61 @@
 from attrs import define, field, asdict
 import attrs.validators as av
 from typing import Literal
+import redoxi_common_py.common_types as commonTypes
 from redoxi_common_py.common_types import *
 
 __all__ = [
-    "RedoxiTimeUnit",
-    "DropStrategy",
-    "DeliveryPrecondition",
-    "ModelConfig",
     "InputPortConfig",
     "RetryPolicy",
     "DeliveryPolicy",
     "DownstreamSpec",
     "OutputPortConfig",
-]
+] + commonTypes.__all__
 
 
 @define(kw_only=True)
-class ModelConfig:
-    model_path: str = field()
-    device_type: Literal["cpu", "cuda"] = field(validator=av.in_(["cpu", "cuda"]))
-    device_index: int = field(validator=av.ge(0))
-
-
-@define(kw_only=True)
-class InputPortConfig:
+class InputPortConfig(commonTypes.JsonConvertible):
     _action_goal_type: str | None = field(default=None)
-    _time_unit: RedoxiTimeUnit = field(default=RedoxiTimeUnit.Default)
-    buffer_capacity: int | None = field(default=None)
+    _time_unit: commonTypes.RedoxiTimeUnit = field(
+        default=commonTypes.DefaultSettings.time_unit
+    )
+    buffer_capacity: int | None = field(default=1)
     action_name: str = field()
     goal_result_expire_time: int | None = field(default=None)
 
 
 @define(kw_only=True)
-class RetryPolicy:
-    _time_unit: RedoxiTimeUnit = field(default=RedoxiTimeUnit.Default)
-    number_of_retry: int | None = field(default=3)
-    wait_time_between_retry: int | None = field(default=5000)
-    wait_time_retry_response: int | None = field(default=100000)
+class RetryPolicy(commonTypes.JsonConvertible):
+    _time_unit: commonTypes.RedoxiTimeUnit = field(
+        default=commonTypes.DefaultSettings.time_unit
+    )
+    number_of_retry: int | None = field(
+        default=commonTypes.DefaultSettings.number_of_retry
+    )
+    wait_time_between_retry: int | None = field(
+        default=commonTypes.DefaultSettings.wait_time_between_retry
+    )
+    wait_time_retry_response: int | None = field(
+        default=commonTypes.DefaultSettings.wait_time_retry_response
+    )
     fallback_number_of_retry: int | None = field(default=None)
     fallback_wait_time_between_retry: int | None = field(default=None)
     fallback_wait_time_retry_response: int | None = field(default=None)
 
 
 @define(kw_only=True)
-class DeliveryPolicy:
+class DeliveryPolicy(commonTypes.JsonConvertible):
     retry_policy: RetryPolicy = field(factory=RetryPolicy)
-    precondition: DeliveryPrecondition = field(default=DeliveryPrecondition.DontCare)
-    drop_strategy: DropStrategy = field(default=DropStrategy.DontCare)
+    precondition: commonTypes.DeliveryPrecondition = field(
+        default=commonTypes.DefaultSettings.delivery_precondition
+    )
+    drop_strategy: commonTypes.DropStrategy = field(
+        default=commonTypes.DefaultSettings.drop_strategy
+    )
 
 
 @define(kw_only=True)
-class DownstreamSpec:
+class DownstreamSpec(commonTypes.JsonConvertible):
     name: str = field()
     action_name: str = field()
     delivery_policy: DeliveryPolicy = field(factory=DeliveryPolicy)
@@ -65,11 +69,11 @@ class DownstreamSpec:
 
 
 @define(kw_only=True)
-class OutputPortConfig:
+class OutputPortConfig(commonTypes.JsonConvertible):
     _action_goal_type: str | None = field(default=None)
     downstream_specs: list[DownstreamSpec] = field(factory=list)
     num_buffer_requests: int = field(default=1)
     preserve_request_order: bool = field(default=True)
-    fallback_delivery_precondition: DeliveryPrecondition = field(
-        default=DeliveryPrecondition.DontCare
+    fallback_delivery_precondition: commonTypes.DeliveryPrecondition = field(
+        default=commonTypes.DefaultSettings.delivery_precondition
     )

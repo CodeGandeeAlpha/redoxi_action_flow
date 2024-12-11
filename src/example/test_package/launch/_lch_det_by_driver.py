@@ -5,8 +5,6 @@ from launch.actions import SetEnvironmentVariable
 from launch.actions import DeclareLaunchArgument
 import json
 
-import yolo8_series.configs as yolo
-
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
     "log_level",
@@ -47,117 +45,124 @@ fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-0
 DetectionRelayNodeName = "detection_relay"
 DetectionRelayInputActionName = DetectionResponseInputActionName
 
-# Common config settings
-CommonTimeConfig = {
-    "_time_unit": "us(1e-6)",
-}
-
-CommonRuntimeConfig = {
-    **CommonTimeConfig,
-    "enable_blocking_mode": False,
-    "step_interval": StepIntervals.Fast,
-}
-
-CommonInputPortConfig = {
-    "buffer_capacity": 1,
-    "goal_result_expire_time": 1000000,
-}
-
-CommonDeliveryPolicy = {
-    "retry_policy": {
-        "fallback_number_of_retry": 3,
-        "fallback_wait_time_between_retry": 5000,
-        "fallback_wait_time_retry_response": 100000,
-    },
-    "precondition": "dont_care",
-    "drop_strategy": "no_drop",
-}
-
-CommonOutputPortConfig = {
-    "num_buffer_requests": 1,
-    "preserve_request_order": True,
-    "fallback_delivery_precondition": "dont_care",
-}
-
-det_node_params = yolo.Yolo8ModelConfig(
-    declare_params={},
-    init_config=yolo.InitConfig(
-        model_configs=[
+det_node_params = {
+    "declare_params": {},
+    "init_config": {
+        "model_configs": [
             {
                 "model_path": fn_model,
                 "device_type": "cuda",
                 "device_index": 0,
             },
         ],
-    ),
-)
-
-# det_node_params = {
-#     "declare_params": {},
-#     "init_config": {
-#         **CommonTimeConfig,
-#         "model_configs": [
-#             {
-#                 "model_path": fn_model,
-#                 "device_type": "cuda",
-#                 "device_index": 0,
-#             },
-#         ],
-#         "detection_request_config": {
-#             "input_port_config": {
-#                 **CommonInputPortConfig,
-#                 "action_name": DetectionNodeInputActionName,
-#             }
-#         },
-#         "visualization_topic": "debug/visualization",
-#     },
-#     "runtime_config": {
-#         **CommonRuntimeConfig,
-#         "model_output_config": {"conf_threshold": 0.35, "iou_threshold": 0.5},
-#         "enable_visualization": True,
-#         "enable_performance_probe": True,
-#     },
-# }
+        "detection_request_config": {
+            "input_port_config": {
+                "buffer_capacity": 1,
+                "action_name": DetectionNodeInputActionName,
+                "goal_result_expire_time": 1000000,
+            }
+        },
+        # "image_request_config": {
+        #     "input_port_config": {
+        #         "buffer_capacity": InputPortQueueSize,
+        #         "action_name": FrameInputActionName,
+        #         "goal_result_expire_time": 1000000,
+        #     },
+        #     "output_port_config": {
+        #         "downstream_specs": [
+        #             {
+        #                 "name": "",
+        #                 "action_name": f"/{DetectionRelayNodeName}/{DetectionRelayInputActionName}",
+        #                 "delivery_policy": {
+        #                     "precondition": "dont_care",
+        #                     "drop_strategy": "dont_care",
+        #                 },
+        #                 "create_debug_pub": False,
+        #             }
+        #         ],
+        #         "num_buffer_requests": 1,
+        #         "preserve_request_order": True,
+        #         "fallback_delivery_precondition": "dont_care",
+        #     },
+        #     "output_enqueue_policy": {
+        #         "precondition": "dont_care",
+        #         "drop_strategy": "dont_care",
+        #     },
+        # },
+        "visualization_topic": "debug/visualization",
+        "_time_unit": "us(1e-6)",
+    },
+    "runtime_config": {
+        "_time_unit": "us(1e-6)",
+        "step_interval": StepIntervals.VeryFast,
+        "enable_blocking_mode": False,
+        "model_output_config": {"conf_threshold": 0.35, "iou_threshold": 0.5},
+        "enable_visualization": True,
+        "enable_performance_probe": True,
+    },
+}
 
 video_source_params = {
     "declare_params": {},
     "init_config": {
-        **CommonTimeConfig,
         "video_url": fn_video,
         "auto_replay": True,
         "primary_output_spec": {
             "_action_goal_type": "redoxi_public_msgs/action/ProcessFrame_Goal",
             "downstream_specs": [
+                # {
+                #     "name": DetectionNodeName,
+                #     "action_name": f"/{DetectionNodeName}/{FrameInputActionName}",
+                #     "delivery_policy": {
+                #         "precondition": "dont_care",
+                #         "drop_strategy": "dont_care",
+                #     },
+                #     "create_debug_pub": False,
+                # },
                 {
                     "name": DetectionDriverNodeName,
                     "action_name": f"/{DetectionDriverNodeName}/{FrameInputActionName}",
-                    "delivery_policy": CommonDeliveryPolicy,
+                    "delivery_policy": {
+                        "retry_policy": {
+                            "fallback_number_of_retry": 1,
+                            "fallback_wait_time_between_retry": 5000,
+                            "fallback_wait_time_retry_response": 10000,
+                        },
+                        "precondition": "dont_care",
+                        "drop_strategy": "no_drop",
+                    },
                     "create_debug_pub": True,
                 },
             ],
-            **CommonOutputPortConfig,
+            "num_buffer_requests": 1,
+            "preserve_request_order": True,
+            "fallback_delivery_precondition": "dont_care",
         },
         "create_debug_pub": False,
         "debug_pub_queue_size": 10,
         "debug_pub_task_enqueue_name": "debug_port/task_enqueue",
         "debug_pub_task_drop_name": "debug_port/task_drop",
+        "_time_unit": "us(1e-6)",
     },
     "runtime_config": {
-        **CommonRuntimeConfig,
         "video_start_time": 0,
         "video_end_time": -1,
         "frame_interval": 0,
         "output_image_size": {"width": 1024, "height": -1},
         "output_image_encoding": "bgr8",
         "publish_to_debug_topic": True,
-        "frame_enqueue_policy": CommonDeliveryPolicy,
+        "frame_enqueue_policy": {
+            "precondition": "dont_care",
+            "drop_strategy": "no_drop",
+        },
+        "_time_unit": "us(1e-6)",
+        "step_interval": StepIntervals.Fast,
     },
 }
 
 detection_relay_params = {
     "declare_params": {},
     "init_config": {
-        **CommonTimeConfig,
         "input_port_config": {
             "_action_goal_type": "redoxi_public_msgs/action/ProcessDetections_Goal",
             "buffer_capacity": InputPortQueueSize,
@@ -166,21 +171,24 @@ detection_relay_params = {
         },
         "publish_detection_topic": "out/relayed_detection",
         "publish_visualization_topic": "out/relayed_visualization",
+        "_time_unit": "us(1e-6)",
     },
     "runtime_config": {
-        **CommonRuntimeConfig,
+        "enable_blocking_mode": False,
         "enable_visualization": True,
+        "_time_unit": "us(1e-6)",
+        "step_interval": StepIntervals.Fast,
     },
 }
 
 detection_driver_params = {
     "declare_params": {},
     "init_config": {
-        **CommonTimeConfig,
         "input_port_config": {
-            **CommonInputPortConfig,
             "_action_goal_type": "redoxi_public_msgs/action/ProcessFrame_Goal",
+            "buffer_capacity": 1,
             "action_name": FrameInputActionName,
+            "goal_result_expire_time": 1000000,
         },
         "output_port_config": {
             "_action_goal_type": "redoxi_public_msgs/action/ProcessDetections_Goal",
@@ -188,11 +196,16 @@ detection_driver_params = {
                 {
                     "name": DetectionRelayNodeName,
                     "action_name": f"/{DetectionRelayNodeName}/{DetectionRelayInputActionName}",
-                    "delivery_policy": CommonDeliveryPolicy,
+                    "delivery_policy": {
+                        "precondition": "dont_care",
+                        "drop_strategy": "no_drop",
+                    },
                     "create_debug_pub": False,
                 },
             ],
-            **CommonOutputPortConfig,
+            "num_buffer_requests": 1,
+            "preserve_request_order": True,
+            "fallback_delivery_precondition": "dont_care",
         },
         "callee_request_port_config": {
             "_action_goal_type": "redoxi_public_msgs/action/ProcessDetectionsByFrame_Goal",
@@ -200,17 +213,41 @@ detection_driver_params = {
                 {
                     "name": DetectionNodeName,
                     "action_name": f"/{DetectionNodeName}/{DetectionNodeInputActionName}",
-                    "delivery_policy": CommonDeliveryPolicy,
+                    "delivery_policy": {
+                        "precondition": "dont_care",
+                        "drop_strategy": "no_drop",
+                    },
                     "create_debug_pub": True,
                 },
             ],
-            **CommonOutputPortConfig,
+            "num_buffer_requests": 1,
+            "preserve_request_order": True,
+            "fallback_delivery_precondition": "dont_care",
         },
+        "_time_unit": "us(1e-6)",
     },
     "runtime_config": {
-        **CommonRuntimeConfig,
-        "callee_request_enqueue_policy": CommonDeliveryPolicy,
-        "driver_output_enqueue_policy": CommonDeliveryPolicy,
+        "callee_request_enqueue_policy": {
+            "retry_policy": {
+                "fallback_number_of_retry": 3,
+                "fallback_wait_time_between_retry": 5000,
+                "fallback_wait_time_retry_response": 100000,
+            },
+            "precondition": "dont_care",
+            "drop_strategy": "no_drop",
+        },
+        "driver_output_enqueue_policy": {
+            "retry_policy": {
+                "fallback_number_of_retry": 3,
+                "fallback_wait_time_between_retry": 5000,
+                "fallback_wait_time_retry_response": 100000,
+            },
+            "precondition": "dont_care",
+            "drop_strategy": "no_drop",
+        },
+        "enable_blocking_mode": False,
+        "_time_unit": "us(1e-6)",
+        "step_interval": StepIntervals.Fast,
     },
 }
 

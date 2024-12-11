@@ -24,9 +24,6 @@ void print_json()
 
 int main(int argc, char **argv)
 {
-    // print_json();
-    // return 0;
-
     //! Initialize ROS
     rclcpp::init(argc, argv);
 

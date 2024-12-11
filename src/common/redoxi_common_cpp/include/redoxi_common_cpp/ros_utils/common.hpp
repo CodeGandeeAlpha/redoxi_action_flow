@@ -455,6 +455,12 @@ DEFINE_RDX_LOGGING_SEVERITY_WITH_IMPORTANCE(FATAL, 4)
 // for development output
 #define RDX_INFO_DEV RDX_LOG_INFO_1
 
+// for development warning
+#define RDX_WARN_DEV RDX_LOG_WARN_1
+
+// for production warning
+#define RDX_WARN_PRODUCTION RDX_LOG_WARN_2
+
 // for production output
 #define RDX_INFO_PRODUCTION RDX_LOG_INFO_2
 
