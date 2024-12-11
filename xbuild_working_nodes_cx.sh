@@ -25,6 +25,7 @@ PackagesToBuild="redoxi_video_reader \
                  psg_master_node \
                  psg_document_sink \
                  psg_detector \
+                 psg_all_detector_cpp \
                  psg_frame_det_source_sink \
                  psg_person_generator \
                  psg_pose_detector \
