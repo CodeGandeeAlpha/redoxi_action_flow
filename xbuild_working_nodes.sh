@@ -72,16 +72,30 @@ echo "Building with BUILD_TYPE=$BUILD_TYPE"
 #     -DCMAKE_CXX_STANDARD_REQUIRED=ON \
 #     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
+# required by json_struct to use std data types
+# note that json_struct does not name these flags consistently,
+# using STD and STL in different places
+json_struct_flags=" \
+    -DJS_STD_OPTIONAL \
+    -DJS_STD_UNORDERED_MAP \
+    -DJS_STL_UNORDERED_SET \
+    -DJS_STL_SET \
+    -DJS_STL_MAP \
+    -DJS_STL_ARRAY"
+
 colcon build --packages-up-to $PackagesToBuild \
     $VERBOSE \
     --parallel-workers $NUM_JOBS \
     --symlink-install \
     --cmake-args \
+    -DCMAKE_CXX_FLAGS="$json_struct_flags" \
     -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
     -DCMAKE_CXX_STANDARD=20 \
     -DCMAKE_CXX_STANDARD_REQUIRED=ON \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
     -DJSON_STRUCT_OPT_INSTALL=ON \
+    -DJSON_STRUCT_OPT_BUILD_EXAMPLES=OFF \
+    -DJSON_STRUCT_OPT_BUILD_TESTS=OFF \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++
     

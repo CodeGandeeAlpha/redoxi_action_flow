@@ -213,6 +213,8 @@ int UniversalMotTrackerNode::_handle_input_data(InputPortHandler_t::InputActionR
 
         // create a predicted detection, with richer information
         // TODO: save all information of the tracked target here
+        msg.predicted_detection = msg.true_detection; // inherit whatever is in true_detection first
+        msg.predicted_detection.category = msg.track_id;
         msg.predicted_detection.bbox = msg.track_bbox;
         msg.predicted_detection.confidence = msg.confidence;
 

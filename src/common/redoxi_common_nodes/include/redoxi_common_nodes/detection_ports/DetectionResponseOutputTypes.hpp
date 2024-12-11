@@ -179,13 +179,18 @@ static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
               "DeliveryTask must satisfy DeliveryTaskConcept");
 
 //! Downstream debug publisher type for detection output port
-using DownstreamDebugPublisher = redoxi_works::image_ports::types::DownstreamDebugPublisher;
+// using DownstreamDebugPublisher = redoxi_works::image_ports::types::DownstreamDebugPublisher;
 
 //! Downstream spec type for detection output port
-using DownstreamSpec = output_port_types::DefaultDownstreamSpec<DetectionResponseActionType,
-                                                                DeliveryPolicy,
-                                                                DownstreamDebugPublisher,
-                                                                DownstreamDebugPublisher>;
+// using DownstreamSpec = output_port_types::DefaultDownstreamSpec<DetectionResponseActionType,
+//                                                                 DeliveryPolicy,
+//                                                                 DownstreamDebugPublisher,
+//                                                                 DownstreamDebugPublisher>;
+
+
+using Downstream = image_ports::types::DownstreamBaseWithImagePub<
+    DetectionResponseActionType, DeliveryPolicy>;
+using DownstreamSpec = Downstream::DownstreamSpec_t;
 static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
               "DownstreamSpec must satisfy DownstreamSpecConcept");
 
@@ -193,7 +198,7 @@ static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
 using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;
 
 //! Downstream type for detection output port
-using Downstream = output_port_types::DefaultDownstream<DownstreamSpec>;
+// using Downstream = output_port_types::DefaultDownstream<DownstreamSpec>;
 
 //! Detection output port spec
 struct DetectionResponseOutputPortSpec {
@@ -223,7 +228,7 @@ struct DetectionResponseOutputPortSpec {
     using SourcePublishMessageType_t = DeliverySourceData::PublishMessageType_t;
 
     //! Source data publisher type
-    using SourcePublisherType_t = DownstreamDebugPublisher;
+    using SourcePublisherType_t = DownstreamSpec::SourcePublisherType_t;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
@@ -232,7 +237,7 @@ struct DetectionResponseOutputPortSpec {
     using TargetPublishMessageType_t = DeliveryTargetData::PublishMessageType_t;
 
     //! Target data publisher type
-    using TargetPublisherType_t = DownstreamDebugPublisher;
+    using TargetPublisherType_t = DownstreamSpec::TargetPublisherType_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;

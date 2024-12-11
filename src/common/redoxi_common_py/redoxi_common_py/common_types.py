@@ -84,5 +84,5 @@ class DefaultSettings:
     wait_time_retry_response: int = 100000
     number_of_retry: int = 3
     delivery_precondition: DeliveryPrecondition = DeliveryPrecondition.DontCare
-    drop_strategy: DropStrategy = DropStrategy.DropAsNeeded
+    drop_strategy: DropStrategy = DropStrategy.NoDrop
     image_encoding: str = "rgb8"

@@ -4,6 +4,8 @@
 #include <redoxi_inference/default_impl.hpp>
 #include <json_struct/json_struct.h>
 #include <optional>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace redoxi_works::inference::yolo8
 {
@@ -74,12 +76,23 @@ class PostprocessorConfig
 
     // output class selections, if not set, all classes are selected
     // the key is the class id, the value is the class name
-    std::optional<std::map<int64_t, std::string>> selected_classes;
+    // std::optional<std::unordered_map<int64_t, std::string>> selected_classes;
 
-    // TODO: add selected_classes with custom type handler
+    // output class selections, specified by id, if not set, all classes are selected
+    std::optional<std::unordered_set<int>> selected_class_ids;
+
+    // output class selections, specified by id (string representation) to name mapping,
+    // if not set, all classes are selected
+    // for example, if id_name_map is {"0": "person", "1": "dog", "2": "cat"},
+    // then the output class selections will be "person", "dog", "cat", whose class ids are 0, 1, 2
+    // this is not very efficient, but required by json_struct to use std data types
+    // for any id that has no name mapping, the id is used as the class name
+    std::optional<std::unordered_map<std::string, std::string>> id_name_map;
 
     JS_OBJECT(JS_MEMBER(conf_threshold),
-              JS_MEMBER(iou_threshold));
+              JS_MEMBER(iou_threshold),
+              JS_MEMBER(selected_class_ids),
+              JS_MEMBER(id_name_map));
 };
 
 } // namespace redoxi_works::inference::yolo8

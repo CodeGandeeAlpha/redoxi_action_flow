@@ -1,6 +1,13 @@
 #pragma once
 
-#define JS_STD_OPTIONAL
+// required by json_struct to use std::optional and std::unordered_map
+// #ifndef JS_STD_OPTIONAL
+// #    define JS_STD_OPTIONAL
+// #endif
+
+// #ifndef JS_STD_UNORDERED_MAP
+// #    define JS_STD_UNORDERED_MAP
+// #endif
 
 #include <optional>
 #include <json_struct/json_struct.h>
