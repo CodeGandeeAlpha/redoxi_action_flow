@@ -56,7 +56,7 @@ class RuntimeConfig : public common_nodes::OpenCloseNode::RuntimeConfig_t
 {
   public:
     // IMPORTANT: default output is rgb8, if you use bgr8, you need to specify it in the config
-    inline static const std::string DefaultOutputImageEncoding = sensor_msgs::image_encodings::RGB8;
+    // inline static const std::string DefaultOutputImageEncoding = DefaultColorImageEncoding;
     inline static const TimeUnit_t DefaultRequestRetryInterval{std::chrono::milliseconds(5)};
     inline static const TimeUnit_t DefaultRequestRetryResponseTime{std::chrono::milliseconds(5)};
     inline static const int DefaultRequestRetryNumber{5};
@@ -65,8 +65,8 @@ class RuntimeConfig : public common_nodes::OpenCloseNode::RuntimeConfig_t
     RuntimeConfig()
     {
         auto &p = frame_enqueue_policy;
-        p.set_drop_strategy(DropStrategy::DropAsNeeded);
-        p.set_precondition(DeliveryPrecondition::AnyDownstreamReady);
+
+        // respect default settings defined in policy
         p.get_retry_policy().set_number_of_retry(DefaultRequestRetryNumber);
         p.get_retry_policy().set_wait_time_between_retry(DefaultRequestRetryInterval);
         p.get_retry_policy().set_wait_time_retry_response(DefaultRequestRetryResponseTime);
@@ -81,7 +81,7 @@ class RuntimeConfig : public common_nodes::OpenCloseNode::RuntimeConfig_t
 
     //! The encoding of the output image, see sensor_msgs::image_encodings for more details
     //! accepts rgb8, bgr8, mono8, mono16
-    std::string output_image_encoding = DefaultOutputImageEncoding;
+    std::string output_image_encoding{DefaultColorImageEncoding.data()};
 
     //! publish in debug topic?
     bool publish_to_debug_topic = false;

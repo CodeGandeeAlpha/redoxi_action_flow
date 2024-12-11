@@ -46,12 +46,8 @@ class RetryPolicy(commonTypes.JsonConvertible):
 @define(kw_only=True)
 class DeliveryPolicy(commonTypes.JsonConvertible):
     retry_policy: RetryPolicy = field(factory=RetryPolicy)
-    precondition: commonTypes.DeliveryPrecondition = field(
-        default=commonTypes.DefaultSettings.delivery_precondition
-    )
-    drop_strategy: commonTypes.DropStrategy = field(
-        default=commonTypes.DefaultSettings.drop_strategy
-    )
+    precondition: commonTypes.DeliveryPrecondition | None = field(default=None)
+    drop_strategy: commonTypes.DropStrategy | None = field(default=None)
 
 
 @define(kw_only=True)

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_map>
+#include <string>
 #include <redoxi_dnn_models/redoxi_dnn_models.hpp>
 #include <redoxi_dnn_models/yolo8/Yolo8ModelBase.hpp>
 #include <redoxi_dnn_models/yolo8/Yolo8ModelTypes.hpp>

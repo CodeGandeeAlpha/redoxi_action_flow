@@ -3,6 +3,7 @@
 #include <redoxi_dnn_models/yolo8/Yolo8Postprocessor.hpp>
 #include <redoxi_dnn_models/yolo8/Yolo8Preprocessor.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
+#include <redoxi_dnn_models/yolo8/Yolo8ClassMappings.hpp>
 #include <pluginlib/class_loader.hpp>
 #include <numeric>
 
@@ -109,14 +110,19 @@ void DetectionModelPostprocessor::postprocess(
         det.score = score;
         det.class_id = class_idx;
 
-        if (m_config->selected_classes.has_value()) {
-            auto iter = m_config->selected_classes->find(class_idx);
-            if (iter == m_config->selected_classes->end()) {
+        if (m_config->selected_class_ids.has_value()) {
+            auto iter = m_config->selected_class_ids->find(class_idx);
+            if (iter == m_config->selected_class_ids->end()) {
                 // has specified selected classes, but this class is not in the list
                 continue;
             } else {
                 // has specified selected classes, and this class is in the list
-                det.class_name = iter->second;
+                auto id_string = std::to_string(class_idx);
+                if (m_config->id_name_map.has_value() && m_config->id_name_map->find(id_string) != m_config->id_name_map->end()) {
+                    det.class_name = m_config->id_name_map->at(id_string);
+                } else {
+                    det.class_name = id_string;
+                }
             }
         }
 
