@@ -592,11 +592,11 @@ sensor_msgs::msg::Image PSGTrackerPipelineNode::_create_debug_image(const psg_pr
         cv::Scalar color = get_color(person.track_id);
 
         //! 获取body bbox坐标
-        if (person.body.category == 0) {
-            int x = static_cast<int>(person.body.bbox.x);
-            int y = static_cast<int>(person.body.bbox.y);
-            int width = static_cast<int>(person.body.bbox.width);
-            int height = static_cast<int>(person.body.bbox.height);
+        if (person.true_body.category == 0) {
+            int x = static_cast<int>(person.true_body.bbox.x);
+            int y = static_cast<int>(person.true_body.bbox.y);
+            int width = static_cast<int>(person.true_body.bbox.width);
+            int height = static_cast<int>(person.true_body.bbox.height);
 
             //! 画body bbox
             cv::rectangle(cv_image,
@@ -606,7 +606,7 @@ sensor_msgs::msg::Image PSGTrackerPipelineNode::_create_debug_image(const psg_pr
         }
 
         //! 画body keypoints
-        const auto &keypoints = person.body.keypoints;
+        const auto &keypoints = person.true_body.keypoints;
 
         //! 在访问数组或指针前添加检查
         if (!keypoints.keypoints_2.empty() && !keypoints.confidence.empty()) {
@@ -658,11 +658,11 @@ sensor_msgs::msg::Image PSGTrackerPipelineNode::_create_debug_image(const psg_pr
         }
 
         //! 画head bbox
-        if (person.head.category == 1) {
-            int x = static_cast<int>(person.head.bbox.x);
-            int y = static_cast<int>(person.head.bbox.y);
-            int width = static_cast<int>(person.head.bbox.width);
-            int height = static_cast<int>(person.head.bbox.height);
+        if (person.true_head.category == 1) {
+            int x = static_cast<int>(person.true_head.bbox.x);
+            int y = static_cast<int>(person.true_head.bbox.y);
+            int width = static_cast<int>(person.true_head.bbox.width);
+            int height = static_cast<int>(person.true_head.bbox.height);
 
             //! 画head bbox
             cv::rectangle(cv_image,
@@ -672,11 +672,11 @@ sensor_msgs::msg::Image PSGTrackerPipelineNode::_create_debug_image(const psg_pr
         }
 
         //! 画face bbox
-        if (person.face.category == 2) {
-            int x = static_cast<int>(person.face.bbox.x);
-            int y = static_cast<int>(person.face.bbox.y);
-            int width = static_cast<int>(person.face.bbox.width);
-            int height = static_cast<int>(person.face.bbox.height);
+        if (person.true_face.category == 2) {
+            int x = static_cast<int>(person.true_face.bbox.x);
+            int y = static_cast<int>(person.true_face.bbox.y);
+            int width = static_cast<int>(person.true_face.bbox.width);
+            int height = static_cast<int>(person.true_face.bbox.height);
 
             //! 画face bbox
             cv::rectangle(cv_image,
@@ -741,6 +741,7 @@ void PSGTrackerPipelineNode::_get_model_result()
                                   "更新person track_id - uuid:{}, track_id:{}",
                                   boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)),
                                   track_target.track_id);
+                    person->body = track_target.predicted_detection;
                 }
             }
 
@@ -748,6 +749,7 @@ void PSGTrackerPipelineNode::_get_model_result()
             for (auto &person : document->persons) {
                 if (person.x_uid == track_target.x_group_uid) {
                     person.track_id = track_target.track_id;
+                    person.body = track_target.predicted_detection;
                     break;
                 }
             }

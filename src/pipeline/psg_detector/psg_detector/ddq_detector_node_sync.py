@@ -489,7 +489,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 detection_msg.bbox.y = pred.xyxy[1]
                 detection_msg.bbox.width = pred.xyxy[2] - pred.xyxy[0]
                 detection_msg.bbox.height = pred.xyxy[3] - pred.xyxy[1]
-                detection_msg.is_detected_by_camera = True
+                # detection_msg.is_detected_by_camera = True
 
                 detections.detections.append(detection_msg)
 

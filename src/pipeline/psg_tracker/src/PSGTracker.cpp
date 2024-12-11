@@ -293,7 +293,7 @@ std::vector<redoxi_public_msgs::msg::TrackTarget> PSGTracker::_track(const std::
     auto persons = goal->persons;
     std::vector<redoxi_public_msgs::msg::Detection> detections;
     for (const auto &person : persons) {
-        detections.push_back(person.body);
+        detections.push_back(person.true_body);
         detections.back().x_group_uid = person.x_uid; // 方便后面把track_targets和persons关联起来
     }
 

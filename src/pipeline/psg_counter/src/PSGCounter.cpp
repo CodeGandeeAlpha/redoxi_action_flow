@@ -325,6 +325,8 @@ int PSGCounter::_create_document_request_handler(const RuntimeConfig_t &runtime_
                     person->set_camera(m_impl->m_camera);
                     if (person->head()) {
                         dynamic_cast<PassengerFlow::Detection *>(person->head().get())->set_camera(m_impl->m_camera);
+                        // 不加这个会导致没法计算身高，如果convert_msg_to_traj转出来是有头的说明person_msg里是有true_head的
+                        dynamic_cast<PassengerFlow::Detection *>(person->head().get())->set_detected_by_camera(true);
                     }
                 }
                 v_trajs.push_back(traj);
@@ -352,6 +354,23 @@ int PSGCounter::_create_document_request_handler(const RuntimeConfig_t &runtime_
                                      person->get_person_id(),
                                      person->get_body_height().m_body_height,
                                      foot_position.x, foot_position.y, foot_position.z);
+                        // 输出keypoints
+                        for (auto &iter : person->get_keypoints()) {
+                            RDX_INFO_DEV(this, __func__, false,
+                                         "keypoint: [{}, {}], confidence: {}",
+                                         iter.second.m_point.x,
+                                         iter.second.m_point.y,
+                                         iter.second.m_confidence);
+                        }
+
+                        // 输出head bbox
+                        if (person->head()) {
+                            auto head_bbox = person->head()->get_bbox();
+                            RDX_INFO_DEV(this, __func__, false,
+                                         "head bbox: [{}, {}, {}, {}], score: {}",
+                                         head_bbox.x, head_bbox.y, head_bbox.width, head_bbox.height,
+                                         person->head()->get_confidence());
+                        }
                     }
 
                     // has_traj = true;

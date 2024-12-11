@@ -583,6 +583,7 @@ void PSGAllDetectorCppNode::_get_model_result()
             head_detection.bbox.height = head_bbox.height;
             head_detection.category = 1;
             head_detection.confidence = 1.0;
+            // head_detection.is_detected_by_camera = true;
             document.detections.push_back(head_detection);
         }
 
@@ -593,6 +594,15 @@ void PSGAllDetectorCppNode::_get_model_result()
             RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
                          "bbox: [{}, {}, {}, {}], category: {}",
                          det.bbox.x, det.bbox.y, det.bbox.width, det.bbox.height, det.category);
+            if (det.category == 0) { // 输出keypoints
+                for (size_t i = 0; i < det.keypoints.keypoints_2.size(); ++i) {
+                    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                                 "keypoint: [{}, {}]",
+                                 det.keypoints.keypoints_2[i].x, det.keypoints.keypoints_2[i].y);
+                    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                                 "score: {}", det.keypoints.confidence[i]);
+                }
+            }
         }
 
         // create pipeline delivery request

@@ -250,6 +250,11 @@ redoxi_public_msgs::msg::TrackTarget ROSTracker::_track_target_with_msg_det_to_m
     track_target_msg.track_bbox.height = track_bbox.height;
     track_target_msg.track_status.bitmask = track_target->get_path_state();
 
+    track_target_msg.predicted_detection.bbox = track_target_msg.track_bbox;
+    track_target_msg.predicted_detection.category = 0;
+    track_target_msg.predicted_detection.x_group_uid = track_target_msg.x_group_uid;
+    track_target_msg.predicted_detection.frame_metadata = track_target_msg.frame_metadata;
+    track_target_msg.predicted_detection.confidence = track_target_msg.confidence;
     return track_target_msg;
 }
 
@@ -265,6 +270,12 @@ redoxi_public_msgs::msg::TrackTarget ROSTracker::_track_target_to_msg(RedoxiTrac
     track_target_msg.track_bbox.height = track_bbox.height;
     track_target_msg.track_status.bitmask = track_target->get_path_state();
     track_target_msg.frame_metadata.frame_num = track_target->get_end_frame_number();
+
+    track_target_msg.predicted_detection.bbox = track_target_msg.track_bbox;
+    track_target_msg.predicted_detection.category = 0;
+    track_target_msg.predicted_detection.x_group_uid = track_target_msg.x_group_uid;
+    track_target_msg.predicted_detection.frame_metadata = track_target_msg.frame_metadata;
+    track_target_msg.predicted_detection.confidence = track_target_msg.confidence;
 
     return track_target_msg;
 }

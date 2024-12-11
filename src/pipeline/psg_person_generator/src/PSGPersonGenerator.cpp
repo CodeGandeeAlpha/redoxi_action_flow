@@ -433,11 +433,11 @@ sensor_msgs::msg::Image PSGPersonGenerator::_create_debug_image(const psg_privat
         cv::Scalar color = cv::Scalar(rand() % 256, rand() % 256, rand() % 256);
 
         //! 获取body bbox坐标
-        if (person.body.category == 0) {
-            int x = static_cast<int>(person.body.bbox.x);
-            int y = static_cast<int>(person.body.bbox.y);
-            int width = static_cast<int>(person.body.bbox.width);
-            int height = static_cast<int>(person.body.bbox.height);
+        if (person.true_body.category == 0) {
+            int x = static_cast<int>(person.true_body.bbox.x);
+            int y = static_cast<int>(person.true_body.bbox.y);
+            int width = static_cast<int>(person.true_body.bbox.width);
+            int height = static_cast<int>(person.true_body.bbox.height);
 
             //! 画body bbox
             cv::rectangle(cv_image,
@@ -447,7 +447,7 @@ sensor_msgs::msg::Image PSGPersonGenerator::_create_debug_image(const psg_privat
         }
 
         //! 画body keypoints
-        const auto &keypoints = person.body.keypoints;
+        const auto &keypoints = person.true_body.keypoints;
 
         //! 在访问数组或指针前添加检查
         if (!keypoints.keypoints_2.empty() && !keypoints.confidence.empty()) {
@@ -499,11 +499,11 @@ sensor_msgs::msg::Image PSGPersonGenerator::_create_debug_image(const psg_privat
         }
 
         //! 画head bbox
-        if (person.head.category == 1) {
-            int x = static_cast<int>(person.head.bbox.x);
-            int y = static_cast<int>(person.head.bbox.y);
-            int width = static_cast<int>(person.head.bbox.width);
-            int height = static_cast<int>(person.head.bbox.height);
+        if (person.true_head.category == 1) {
+            int x = static_cast<int>(person.true_head.bbox.x);
+            int y = static_cast<int>(person.true_head.bbox.y);
+            int width = static_cast<int>(person.true_head.bbox.width);
+            int height = static_cast<int>(person.true_head.bbox.height);
 
             //! 画head bbox
             cv::rectangle(cv_image,
@@ -513,11 +513,11 @@ sensor_msgs::msg::Image PSGPersonGenerator::_create_debug_image(const psg_privat
         }
 
         //! 画face bbox
-        if (person.face.category == 2) {
-            int x = static_cast<int>(person.face.bbox.x);
-            int y = static_cast<int>(person.face.bbox.y);
-            int width = static_cast<int>(person.face.bbox.width);
-            int height = static_cast<int>(person.face.bbox.height);
+        if (person.true_face.category == 2) {
+            int x = static_cast<int>(person.true_face.bbox.x);
+            int y = static_cast<int>(person.true_face.bbox.y);
+            int width = static_cast<int>(person.true_face.bbox.width);
+            int height = static_cast<int>(person.true_face.bbox.height);
 
             //! 画face bbox
             cv::rectangle(cv_image,

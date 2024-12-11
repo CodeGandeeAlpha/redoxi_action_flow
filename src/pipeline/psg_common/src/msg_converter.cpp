@@ -17,7 +17,7 @@ void convert_detection_to_msg(PassengerFlow::Detection &det, const redoxi_public
     msg.category_name = category_name_mapping[det.get_type()];
     msg.confidence = det.get_confidence();
     msg.frame_metadata = msg_frame.metadata;
-    msg.is_detected_by_camera = det.detected_by_camera();
+    // msg.is_detected_by_camera = det.detected_by_camera();
 
     if (det.get_type() == RedoxiTrack::DetectionTypes::PersonBody) {
         RedoxiTrack::fVECTOR feature;
@@ -50,7 +50,7 @@ void convert_msg_to_detection(const redoxi_public_msgs::msg::Detection &msg, Pas
     }
 
     det->set_frame_number(msg.frame_metadata.frame_num);
-    det->set_detected_by_camera(msg.is_detected_by_camera);
+    // det->set_detected_by_camera(msg.is_detected_by_camera);
 }
 
 
@@ -77,6 +77,10 @@ void convert_msg_to_detection(const redoxi_public_msgs::msg::Detection &msg, Pas
 
 void convert_person_to_msg(const PassengerFlow::PersonPtr &person, const redoxi_public_msgs::msg::Frame &msg_frame, psg_private_msgs::msg::Person &msg)
 {
+    msg.true_body.category = -1;
+    msg.true_face.category = -1;
+    msg.true_head.category = -1;
+
     msg.body.category = -1;
     msg.face.category = -1;
     msg.head.category = -1;
@@ -85,19 +89,19 @@ void convert_person_to_msg(const PassengerFlow::PersonPtr &person, const redoxi_
         redoxi_public_msgs::msg::Detection msg_body;
         auto *body_ptr = RedoxiTrack::dyncast_with_check<PassengerFlow::Detection>(person->body().get());
         convert_detection_to_msg(*body_ptr, msg_frame, msg_body);
-        msg.body = msg_body;
+        msg.true_body = msg_body;
     }
     if (person->head()) {
         redoxi_public_msgs::msg::Detection msg_head;
         auto *head_ptr = RedoxiTrack::dyncast_with_check<PassengerFlow::Detection>(person->head().get());
         convert_detection_to_msg(*head_ptr, msg_frame, msg_head);
-        msg.head = msg_head;
+        msg.true_head = msg_head;
     }
     if (person->face()) {
         redoxi_public_msgs::msg::Detection msg_face;
         auto *face_ptr = RedoxiTrack::dyncast_with_check<PassengerFlow::Detection>(person->face().get());
         convert_detection_to_msg(*face_ptr, msg_frame, msg_face);
-        msg.face = msg_face;
+        msg.true_face = msg_face;
     }
 
     auto person_pose = person->get_keypoints();
@@ -115,7 +119,7 @@ void convert_person_to_msg(const PassengerFlow::PersonPtr &person, const redoxi_
             pt.z = 0;
             msg_body_pose.keypoints_2.push_back(pt);
         }
-        msg.body.keypoints = msg_body_pose;
+        msg.true_body.keypoints = msg_body_pose;
     }
 
     msg.track_id = person->get_person_id();
@@ -145,31 +149,31 @@ void convert_person_to_msg(const PassengerFlow::PersonPtr &person, const redoxi_
 
 void convert_msg_to_person(const psg_private_msgs::msg::Person &msg, PassengerFlow::PersonPtr &person)
 {
-    if (msg.body.category != -1) {
+    if (msg.true_body.category != -1) {
         PassengerFlow::DetectionPtr one_det = std::make_shared<PassengerFlow::Detection>();
-        convert_msg_to_detection(msg.body, one_det);
+        convert_msg_to_detection(msg.true_body, one_det);
         person->set_body(one_det);
     }
 
-    if (msg.head.category != -1) {
+    if (msg.true_head.category != -1) {
         PassengerFlow::DetectionPtr one_det = std::make_shared<PassengerFlow::Detection>();
-        convert_msg_to_detection(msg.head, one_det);
+        convert_msg_to_detection(msg.true_head, one_det);
         person->set_head(one_det);
     }
 
-    if (msg.face.category != -1) {
+    if (msg.true_face.category != -1) {
         PassengerFlow::DetectionPtr one_det = std::make_shared<PassengerFlow::Detection>();
-        convert_msg_to_detection(msg.face, one_det);
+        convert_msg_to_detection(msg.true_face, one_det);
         person->set_face(one_det);
     }
 
-    if (msg.body.keypoints.keypoints_2.size() > 0) {
+    if (msg.true_body.keypoints.keypoints_2.size() > 0) {
         std::map<PassengerFlow::KeyPointSemanticType, PassengerFlow::Keypoint> pose;
-        for (size_t i = 0; i < msg.body.keypoints.confidence.size(); i++) {
-            PassengerFlow::KeyPointSemanticType pt_type = msg.body.keypoints.semantic_type[i];
+        for (size_t i = 0; i < msg.true_body.keypoints.confidence.size(); i++) {
+            PassengerFlow::KeyPointSemanticType pt_type = msg.true_body.keypoints.semantic_type[i];
             PassengerFlow::Keypoint kpt;
-            kpt.m_confidence = msg.body.keypoints.confidence[i];
-            auto &pt = msg.body.keypoints.keypoints_2[i];
+            kpt.m_confidence = msg.true_body.keypoints.confidence[i];
+            auto &pt = msg.true_body.keypoints.keypoints_2[i];
             kpt.m_point.x = pt.x;
             kpt.m_point.y = pt.y;
             kpt.m_semantic_id = pt_type;
