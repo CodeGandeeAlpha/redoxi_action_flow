@@ -8,6 +8,7 @@ Log/
 tmp/
 design.md
 output.log
+.env
 
 # Prerequisites
 *.d
