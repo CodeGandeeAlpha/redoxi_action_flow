@@ -458,11 +458,17 @@ DEFINE_RDX_LOGGING_SEVERITY_WITH_IMPORTANCE(FATAL, 4)
 // for development warning
 #define RDX_WARN_DEV RDX_LOG_WARN_1
 
+// for development debug
+#define RDX_DEBUG_DEV RDX_LOG_DEBUG_1
+
 // for production warning
 #define RDX_WARN_PRODUCTION RDX_LOG_WARN_2
 
 // for production output
 #define RDX_INFO_PRODUCTION RDX_LOG_INFO_2
+
+// for production debug
+#define RDX_DEBUG_PRODUCTION RDX_LOG_DEBUG_2
 
 
 //! Macro to get JSON parameter from node, defined as macro to avoid include nlohmann/json.hpp in this file

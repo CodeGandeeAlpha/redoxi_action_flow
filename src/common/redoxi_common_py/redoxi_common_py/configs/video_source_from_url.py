@@ -91,8 +91,7 @@ class VideoSourceFromUrlRuntimeConfig(videoReaderBaseCfg.VideoReaderBaseRuntimeC
 
 
 @define(kw_only=True)
-class VideoSourceFromUrlNodeConfig(videoReaderBaseCfg.JsonConvertible):
-    declare_params: dict[str, Any] = field(factory=dict)
+class VideoSourceFromUrlNodeConfig(videoReaderBaseCfg.BaseRosNodeConfig):
     init_config: VideoSourceFromUrlInitConfig = field(
         factory=VideoSourceFromUrlInitConfig
     )

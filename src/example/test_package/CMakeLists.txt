@@ -57,8 +57,7 @@ option(BUILD_TEST_SIMPLE_ACTION_GENERATOR
 option(BUILD_TEST_UUID_CONVERSION "Build test_uuid_conversion target" OFF)
 option(BUILD_TEST_V2_JSON_EXAMPLES "Build test_v2_json_examples target" OFF)
 option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2
-       "Build test_simple_action_generator_v2 target" ON)
-option(BUILD_TEST_V2_VIDEO_SINK "Build test_v2_video_sink target" ON)
+       "Build test_simple_action_generator_v2 target" OFF)
 option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target"
        ON)
 option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
@@ -77,6 +76,8 @@ option(BUILD_DETECTION_DRIVER_NODE "Build detection_driver_node target" ON)
 option(BUILD_TEST_DRIVER_NODE "Build test_driver_node target" OFF)
 option(BUILD_TEST_FRAME_PROXY "Build test_frame_proxy target" OFF)
 option(BUILD_MOT_TRACKER_NODE "Build mot_tracker_node target" ON)
+option(BUILD_MOT_TRACKER_DRIVER "Build mot_tracker_driver target" ON)
+option(BUILD_FRAME_RELAY_NODE "Build frame_relay_node target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -105,6 +106,10 @@ function(configure_target target_name)
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_MOT_TRACKER_DRIVER)
+  configure_target(mot_tracker_driver)
+endif()
 
 if(BUILD_MOT_TRACKER_NODE)
   configure_target(mot_tracker_node)
@@ -154,8 +159,8 @@ if(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE)
   configure_target(v2_random_video_source)
 endif()
 
-if(BUILD_TEST_V2_VIDEO_SINK)
-  configure_target(v2_video_sink)
+if(BUILD_FRAME_RELAY_NODE)
+  configure_target(frame_relay_node)
 endif()
 
 if(BUILD_TEST_UUID_CONVERSION)

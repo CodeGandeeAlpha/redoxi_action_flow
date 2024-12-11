@@ -8,12 +8,14 @@
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
   
   <depend>redoxi_common_nodes</depend>
   <depend>redoxi_public_msgs</depend>
+  <depend>redoxi_common_py</depend>
   <depend>RedoxiTrack</depend>
 
   <export>

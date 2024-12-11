@@ -11,10 +11,12 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(RedoxiTrack REQUIRED)
 find_package(redoxi_common_nodes REQUIRED)
 find_package(redoxi_public_msgs REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 # uncomment the following section in order to fill in further dependencies
 # manually. find_package(<dependency> REQUIRED)
 
-set(srcfiles src/universal_mot_trackers.cpp src/UniversalMotTrackerNode.cpp)
+set(srcfiles src/universal_mot_trackers.cpp src/UniversalMotTrackerNode.cpp
+             src/TrackerDriverNode.cpp)
 
 add_library(universal_mot_trackers ${srcfiles})
 add_library(universal_mot_trackers::universal_mot_trackers ALIAS
@@ -34,6 +36,8 @@ target_compile_definitions(universal_mot_trackers
 target_link_libraries(universal_mot_trackers PUBLIC RedoxiTrack::RedoxiTrack)
 ament_target_dependencies(universal_mot_trackers PUBLIC redoxi_common_nodes
                           redoxi_public_msgs)
+
+ament_python_install_package(${PROJECT_NAME})
 
 install(DIRECTORY include/ DESTINATION include)
 install(

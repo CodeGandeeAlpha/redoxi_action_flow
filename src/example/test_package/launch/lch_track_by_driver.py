@@ -29,28 +29,68 @@ log_level_arg = DeclareLaunchArgument(
 class StepIntervals:
     VerySlow = 3000000
     Slow = 200000
-    Medium = 20000
+    Medium = 1000000 / 25
     Fast = 5000
     VeryFast = 1000
 
 
+# the graph structure is:
+# video_source -> detection_driver -> tracker_driver -> frame_relay
+#                       |                   |
+#                    detector           tracker
+
+# tracker_driver -> frame_relay
 frame_relay_node_name = "frame_relay"
 frame_relay_node_params = frameRelayCfg.FrameRelayNodeConfig(
     init_config=frameRelayCfg.FrameRelayNodeInitConfig(
-        input_port_config=None,
-    ),
-    runtime_config=frameRelayCfg.FrameRelayNodeRuntimeConfig(
-        enable_blocking_mode=False,
-        enable_debug_topics=True,
+        input_port_config=frameRelayCfg.InputPortConfig(
+            action_name="in/frame",
+        ),
+        publish_topic="out/relayed_frame",
     ),
 )
 
+# tracker_driver <-> tracker
+tracker_node_name = "tracker"
+tracker_node_params = motTrackersCfg.UniversalMotTrackersNodeConfig(
+    init_config=motTrackersCfg.UniversalMotTrackersInitConfig(
+        input_port_config=motTrackersCfg.InputPortConfig(
+            action_name="in/track_request",
+        ),
+        publish_visualization_topic="vis/tracking",
+        # preferred_image_size={"width": 1920, "height": 1080},
+    ),
+    runtime_config=motTrackersCfg.UniversalMotTrackersRuntimeConfig(
+        enable_blocking_mode=False,
+        enable_visualization=True,
+    ),
+)
+
+# tracker_driver -> frame_relay
+#       |
+#    tracker
 tracker_driver_node_name = "tracker_driver"
 tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
     init_config=motTrackersDriverCfg.TrackerDriverInitConfig(
-        input_port_config=None,
-        output_port_config=None,
-        callee_request_port_config=None,
+        input_port_config=motTrackersDriverCfg.InputPortConfig(
+            action_name="in/detections",
+        ),
+        output_port_config=motTrackersDriverCfg.OutputPortConfig(
+            downstream_specs=[
+                motTrackersDriverCfg.DownstreamSpec(
+                    name=frame_relay_node_name,
+                    action_name=f"/{frame_relay_node_name}/{frame_relay_node_params.init_config.input_port_config.action_name}",
+                ),
+            ],
+        ),
+        callee_request_port_config=motTrackersDriverCfg.OutputPortConfig(
+            downstream_specs=[
+                motTrackersDriverCfg.DownstreamSpec(
+                    name=tracker_node_name,
+                    action_name=f"/{tracker_node_name}/{tracker_node_params.init_config.input_port_config.action_name}",
+                ),
+            ],
+        ),
     ),
     runtime_config=motTrackersDriverCfg.TrackerDriverRuntimeConfig(
         enable_blocking_mode=False,
@@ -58,22 +98,7 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
 )
 
 
-tracker_node_name = "tracker"
-tracker_node_params = motTrackersCfg.UniversalMotTrackersNodeConfig(
-    init_config=motTrackersCfg.UniversalMotTrackersInitConfig(
-        input_port_config=None,
-        publish_visualization_topic="out/visualization",
-        publish_probe_topic="out/probe",
-        preferred_image_size=None,
-    ),
-    runtime_config=motTrackersCfg.UniversalMotTrackersRuntimeConfig(
-        enable_blocking_mode=False,
-        enable_visualization=True,
-        enable_performance_probe=True,
-    ),
-)
-
-# fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
+# detection_driver <-> detector
 fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx"
 det_node_name = "detector"
 det_node_params = yolo.Yolo8ModelNodeConfig(
@@ -85,44 +110,63 @@ det_node_params = yolo.Yolo8ModelNodeConfig(
                 "device_index": 0,
             },
         ],
+        detection_request_config=yolo.DetectionRequestConfig(
+            input_port_config=yolo.InputPortConfig(
+                action_name="in/detection_request",
+            ),
+        ),
     ),
 )
 
-det_relay_node_name = "detection_relay"
-det_relay_node_params = detRelayCfg.DetectionRelayNodeConfig(
-    init_config=detRelayCfg.DetectionRelayInitConfig(
-        input_port_config=None,
-        publish_detection_topic="out/relayed_detection",
-        publish_visualization_topic="out/relayed_visualization",
-    ),
-    runtime_config=detRelayCfg.DetectionRelayRuntimeConfig(
-        enable_blocking_mode=False,
-        enable_visualization=True,
-    ),
-)
-
-video_src_node_name = "video_source"
-video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
-    init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
-        video_url=r"/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4",
-        auto_replay=True,
-    ),
-    runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
-        step_interval=StepIntervals.VerySlow,
-    ),
-)
-
+# detection_driver -> tracker_driver
+#       |
+#    detector
 det_driver_node_name = "detection_driver"
 det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
     init_config=detDriverCfg.DetectionDriverInitConfig(
-        input_port_config=None,
-        output_port_config=None,
-        callee_request_port_config=None,
+        input_port_config=detDriverCfg.InputPortConfig(
+            action_name="in/frame",
+        ),
+        output_port_config=detDriverCfg.OutputPortConfig(
+            downstream_specs=[
+                detDriverCfg.DownstreamSpec(
+                    name=tracker_driver_node_name,
+                    action_name=f"/{tracker_driver_node_name}/{tracker_driver_node_params.init_config.input_port_config.action_name}",
+                ),
+            ],
+        ),
+        callee_request_port_config=detDriverCfg.OutputPortConfig(
+            downstream_specs=[
+                detDriverCfg.DownstreamSpec(
+                    name=det_node_name,
+                    action_name=f"/{det_node_name}/{det_node_params.init_config.detection_request_config.input_port_config.action_name}",
+                ),
+            ],
+        ),
     ),
     runtime_config=detDriverCfg.DetectionDriverRuntimeConfig(
-        callee_request_enqueue_policy=None,
-        driver_output_enqueue_policy=None,
         enable_blocking_mode=False,
+    ),
+)
+
+# video_source -> detection_driver
+video_src_node_name = "video_source"
+fn_video = r"/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
+    init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
+        video_url=fn_video,
+        auto_replay=True,
+        primary_output_spec=videoSrcCfg.OutputPortConfig(
+            downstream_specs=[
+                videoSrcCfg.DownstreamSpec(
+                    name=det_driver_node_name,
+                    action_name=f"/{det_driver_node_name}/{det_driver_node_params.init_config.input_port_config.action_name}",
+                ),
+            ],
+        ),
+    ),
+    runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
+        step_interval=StepIntervals.Medium,
     ),
 )
 
@@ -141,38 +185,6 @@ frame_relay_node = Node(
     parameters=[
         {
             "param_as_json_string": frame_relay_node_params.to_json(
-                ignore_none=True, compact=False
-            ),
-        },
-    ],
-)
-
-tracker_driver_node = Node(
-    package="test_package",
-    executable="mot_tracker_driver",
-    name=tracker_driver_node_name,
-    namespace=tracker_driver_node_name,
-    prefix=common_prefix,
-    output="screen",
-    parameters=[
-        {
-            "param_as_json_string": tracker_driver_node_params.to_json(
-                ignore_none=True, compact=False
-            ),
-        },
-    ],
-)
-
-tracker_node = Node(
-    package="test_package",
-    executable="mot_tracker_node",
-    name=tracker_node_name,
-    namespace=tracker_node_name,
-    prefix=common_prefix,
-    output="screen",
-    parameters=[
-        {
-            "param_as_json_string": tracker_node_params.to_json(
                 ignore_none=True, compact=False
             ),
         },
@@ -230,23 +242,36 @@ detection_node = Node(
     # arguments=["--ros-args", "--disable-external-lib-logs"],
 )
 
-detection_relay_node = Node(
+tracking_node = Node(
     package="test_package",
-    executable="detection_relay_node",
-    name=det_relay_node_name,
-    namespace=det_relay_node_name,
+    executable="mot_tracker_node",
+    name=tracker_node_name,
+    namespace=tracker_node_name,
+    prefix=common_prefix,
     output="screen",
     parameters=[
         {
-            "param_as_json_string": det_relay_node_params.to_json(
+            "param_as_json_string": tracker_node_params.to_json(
                 ignore_none=True, compact=False
             ),
         },
     ],
+)
+
+tracking_driver_node = Node(
+    package="test_package",
+    executable="mot_tracker_driver",
+    name=tracker_driver_node_name,
+    namespace=tracker_driver_node_name,
     prefix=common_prefix,
-    arguments=["--ros-args", "--log-level", [f"{det_relay_node_name}:=", logger]]
-    + common_ros_args,
-    # arguments=["--ros-args", "--disable-external-lib-logs"],
+    output="screen",
+    parameters=[
+        {
+            "param_as_json_string": tracker_driver_node_params.to_json(
+                ignore_none=True, compact=False
+            ),
+        },
+    ],
 )
 
 
@@ -266,12 +291,11 @@ def generate_launch_description():
         [
             *env_var_settings,
             log_level_arg,
-            # detection_node,
-            # detection_relay_node,
-            # video_src_node,
-            # det_driver_node,
-            # tracker_node,
-            # tracker_driver_node,
+            detection_node,
+            video_src_node,
+            det_driver_node,
+            tracking_node,
+            tracking_driver_node,
             frame_relay_node,
         ]
     )
