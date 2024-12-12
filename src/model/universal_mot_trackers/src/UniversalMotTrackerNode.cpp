@@ -207,12 +207,21 @@ int UniversalMotTrackerNode::_handle_input_data(InputPortHandler_t::InputActionR
         report_track_targets.insert(target.second);
     }
 
+    // filter the track targets to remove lost (unmatched) tracks
+    // TODO: lost tracks are still useful in downstream, but it is defined differently in botsort and deepsort, so not usable now, add it back later
+    std::vector<rxt::TrackTargetPtr> filtered_track_targets;
+    for (const auto &target : report_track_targets) {
+        if (!(target->get_path_state() & rxt::TrackPathStateBitmask::Lost)) {
+            filtered_track_targets.push_back(target);
+        }
+    }
+
     //! Generate output messages
     RDX_INFO_DEV(this, __func__, "Got {} track targets, creating output messages", report_track_targets.size());
     using MsgTrackTarget = redoxi_public_msgs::msg::TrackTarget;
     std::vector<MsgTrackTarget> msg_track_targets;
     const auto &frame_metadata = goal->frame_bundle.primary_frame.metadata;
-    for (const auto &target : report_track_targets) {
+    for (const auto &target : filtered_track_targets) {
         MsgTrackTarget msg;
         auto bbox = target->get_bbox();
         msg.track_bbox.x = bbox.x;
