@@ -27,6 +27,7 @@ rosidl_generate_interfaces(
   "msg/FrameMetadata.msg"
   "msg/Keypoints.msg"
   "msg/ReturnResponse.msg"
+  "msg/SemanticIdentity.msg"
   "msg/SharedMemoryToken.msg"
   "msg/TrackTarget.msg"
   "msg/TaskMetadata.msg"
