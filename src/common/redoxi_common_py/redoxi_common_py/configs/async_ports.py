@@ -56,8 +56,6 @@ class DownstreamSpec(commonTypes.JsonConvertible):
     action_name: str = field()
     delivery_policy: DeliveryPolicy = field(factory=DeliveryPolicy)
     create_debug_pub: bool = field(default=False)
-    data_topic_source_data_succeeded: str | None = field(default=None)
-    data_topic_target_data_succeeded: str | None = field(default=None)
     debug_topic_source_data_sending: str | None = field(default=None)
     debug_topic_source_data_succeeded: str | None = field(default=None)
     debug_topic_source_data_failed: str | None = field(default=None)
@@ -75,3 +73,5 @@ class OutputPortConfig(commonTypes.JsonConvertible):
     fallback_delivery_precondition: commonTypes.DeliveryPrecondition = field(
         default=commonTypes.DefaultSettings.delivery_precondition
     )
+    data_topic_for_source_data: str | None = field(default=None)
+    data_topic_for_target_data: str | None = field(default=None)

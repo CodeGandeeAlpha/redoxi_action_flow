@@ -179,9 +179,10 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
                     delivery_policy=videoSrcCfg.DeliveryPolicy(
                         drop_strategy=videoSrcCfg.DropStrategy.DontCare,
                     ),
-                    # data_topic_target_data_succeeded="msg/target_data_succeeded",
                 ),
             ],
+            # data_topic_for_source_data="msg_out/source_data",
+            data_topic_for_target_data="msg_out/target_data",
         ),
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(

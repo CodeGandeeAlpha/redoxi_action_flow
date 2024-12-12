@@ -1,12 +1,12 @@
 # goal part of ProcessDetections.action
 
 unique_identifier_msgs/UUID x_uid
-redoxi_public_msgs/Control x_control
-redoxi_public_msgs/TaskMetadata x_task_metadata
+Control x_control
+TaskMetadata x_task_metadata
 
 # required
-redoxi_public_msgs/Detection[] detections
+Detection[] detections
 
 # optional
-redoxi_public_msgs/MultiDeviceFrame frame_bundle
+MultiDeviceFrame frame_bundle
 
