@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>video_reader_from_url</name>
+  <name>psg_all_detector_cpp</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
   <maintainer email="740151249@qq.com">chengxiao</maintainer>
@@ -10,7 +10,8 @@
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
 
   <depend>rclcpp</depend>
-  <depend>redoxi_video_reader</depend>
+  <depend>psg_document_sink</depend>
+  <depend>psg_common</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

@@ -8,4 +8,4 @@ redoxi_public_msgs/Detection[] detections
 
 PersonTrajectory[] trajectories
 TrajectoryEvent[] trajectory_events
-redoxi_public_msgs/Frame frame
+redoxi_public_msgs/MultiDeviceFrame frame_bundle

@@ -25,12 +25,15 @@ set(DEPENDENCIES
     redoxi_shared_memory
     psg_master_node
     psg_detector
+    psg_all_detector_cpp
     psg_document_sink
     psg_frame_det_source_sink
     psg_person_generator
     psg_pose_detector
     video_reader_orbbec
+    video_reader_from_url
     psg_tracker
+    psg_counter
     pluginlib)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb)
@@ -73,6 +76,9 @@ option(BUILD_TEST_V2_PSG_POSE_DETECTOR "Build test_v2_psg_pose_detector target" 
 option(BUILD_TEST_V2_ORBBEC_VIDEO_SOURCE "Build test_v2_orbbec_video_source target" ON)
 option(BUILD_TEST_V2_PSG_TRACKER_PIPELINE "Build test_v2_psg_tracker_pipeline target" ON)
 option(BUILD_TEST_V2_PSG_TRACKER "Build test_v2_psg_tracker target" ON)
+option(BUILD_TEST_V2_VIDEO_URL_FLUSH "Build test_v2_video_url_flush target" ON)
+option(BUILD_TEST_V2_PSG_COUNTER "Build test_v2_psg_counter target" ON)
+option(BUILD_TEST_V2_PSG_ALL_DETECTOR_CPP "Build test_v2_psg_all_detector_cpp target" ON)
 # Function to configure a target
 function(configure_target target_name)
   add_executable(${target_name} src/${target_name}.cpp)
@@ -191,6 +197,18 @@ endif()
 
 if(BUILD_TEST_V2_PSG_TRACKER)
   configure_target(v2_psg_tracker)
+endif()
+
+if(BUILD_TEST_V2_VIDEO_URL_FLUSH)
+  configure_target(v2_video_url_flush)
+endif()
+
+if(BUILD_TEST_V2_PSG_COUNTER)
+  configure_target(v2_psg_counter)
+endif()
+
+if(BUILD_TEST_V2_PSG_ALL_DETECTOR_CPP)
+  configure_target(v2_psg_all_detector_cpp)
 endif()
 
 # Install targets

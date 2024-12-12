@@ -1,7 +1,7 @@
 #include <psg_frame_det_source_sink/PSGFrameDetSourceSink.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <redoxi_samples_lib/random_image.hpp>
-#include <cv_bridge/cv_bridge.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 #include <json_struct/json_struct.h>
 #include <tbb/concurrent_queue.h>
 
@@ -372,12 +372,9 @@ int PSGFrameDetSourceSink::_read_frame(SourceData_t &data, std::atomic<int64_t> 
 
 
     psg_private_msgs::msg::PsgDocument doc_msg;
-    // convert image to ROS message
-    cv_bridge::CvImage cv_bridge_image;
-    cv_bridge_image.image = random_frame;
-    cv_bridge_image.encoding = sensor_msgs::image_encodings::BGR8;
-    cv_bridge_image.toImageMsg(doc_msg.frame.raw_image);
-    doc_msg.frame.metadata.frame_num = frame_number;
+    image_utils::FrameMediator fm(random_frame);
+    fm.to_image_msg(doc_msg.frame_bundle.primary_frame.raw_image);
+    doc_msg.frame_bundle.primary_frame.metadata.frame_num = frame_number;
     data.set_document(doc_msg);
 
     frame_number++;

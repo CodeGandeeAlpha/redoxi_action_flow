@@ -1,7 +1,8 @@
 #include <psg_tracker/Pipeline.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
+#include <redoxi_common_nodes/port_handlers/PullProcessSendHandler.hpp>
 #include <redoxi_samples_lib/random_image.hpp>
-#include <cv_bridge/cv_bridge.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 #include <json_struct/json_struct.h>
 #include <tbb/concurrent_queue.h>
 #include <RedoxiTrack/RedoxiTrack.h>
@@ -22,6 +23,7 @@ struct PSGTrackerPipelineImpl {
         std::shared_ptr<ModelResultPromise> promise;
         ModelResultFuture future;
         std::shared_ptr<PSGTrackerPipelineNode::OutputSourceDataModel_t> source_data;
+        ControlSignalCode control_signal_code;
     };
 
     using ArrayUUID = std::array<uint8_t, 16>;
@@ -45,6 +47,11 @@ struct PSGTrackerPipelineImpl {
 
     //! 记录trajectory的异步字典
     std::map<int, std::vector<ArrayUUID>> m_closed_trajectory_map; // indexed by track id
+
+    // pull input, work on it and then send output
+    using PullProcessSendHandler_t = redoxi_works::port_handlers::PullProcessSendHandler<PSGTrackerPipelineNode::InputPort_t::MasterSpec_t,
+                                                                                         PSGTrackerPipelineNode::OutputPortModel_t::MasterSpec_t>;
+    std::shared_ptr<PullProcessSendHandler_t> work_then_send_to_model_handler;
 };
 
 PSGTrackerPipelineNode::PSGTrackerPipelineNode(const std::string &name, const rclcpp::NodeOptions &options)
@@ -240,6 +247,9 @@ int PSGTrackerPipelineNode::_update_runtime_config(std::shared_ptr<BaseRuntimeCo
     //! set publish to debug topic
     set_publish_to_debug_topic(runtime_config->publish_to_debug_topic);
 
+    RDX_INFO_DEV(this, __func__, false, "{}", "Creating frame request handler");
+    _create_frame_request_handler(*runtime_config);
+
     return 0;
 }
 
@@ -252,7 +262,8 @@ std::shared_ptr<PSGTrackerPipelineImpl> PSGTrackerPipelineNode::_create_impl()
 }
 
 PSGTrackerPipelineNode::DeliveryRequestPipeline_t
-    PSGTrackerPipelineNode::_create_delivery_request(const OutputSourceDataPipeline_t &source_data)
+    PSGTrackerPipelineNode::_create_delivery_request(const OutputSourceDataPipeline_t &source_data,
+                                                     std::optional<ControlSignalCode> control_signal_code)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     //! Create delivery request
@@ -261,12 +272,15 @@ PSGTrackerPipelineNode::DeliveryRequestPipeline_t
     if (runtime_config->pipeline_request_policy.has_value()) {
         req.set_delivery_policy(*runtime_config->pipeline_request_policy);
     }
-
+    if (control_signal_code.has_value()) {
+        req.set_control_signal_code(*control_signal_code);
+    }
     return req;
 }
 
 PSGTrackerPipelineNode::DeliveryRequestModel_t
-    PSGTrackerPipelineNode::_create_delivery_request(const OutputSourceDataModel_t &source_data)
+    PSGTrackerPipelineNode::_create_delivery_request(const OutputSourceDataModel_t &source_data,
+                                                     std::optional<ControlSignalCode> control_signal_code)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     //! Create delivery request
@@ -274,6 +288,9 @@ PSGTrackerPipelineNode::DeliveryRequestModel_t
     req.set_source_data(source_data);
     if (runtime_config->model_request_policy.has_value()) {
         req.set_delivery_policy(*runtime_config->model_request_policy);
+    }
+    if (control_signal_code.has_value()) {
+        req.set_control_signal_code(*control_signal_code);
     }
     return req;
 }
@@ -333,71 +350,93 @@ std::shared_ptr<PSGTrackerPipelineNode::OutputPortModel_t>
     return port;
 }
 
+int PSGTrackerPipelineNode::_create_frame_request_handler(const RuntimeConfig_t &runtime_config)
+{
+    using ProcessHandler_t = PSGTrackerPipelineImpl::PullProcessSendHandler_t;
+    using InputDataTrait_t = PSGTrackerPipelineNode::InputPort_t::ActionDataTrait_t;
+    auto config = std::make_shared<ProcessHandler_t::InitConfig_t>();
+
+    config->block_input_reading = runtime_config.enable_blocking_mode;
+    config->block_resource_acquisition = runtime_config.enable_blocking_mode;
+
+    auto enqueue_policy = runtime_config.model_enqueue_policy;
+    m_impl->work_then_send_to_model_handler = std::make_shared<ProcessHandler_t>();
+    auto process_handler = m_impl->work_then_send_to_model_handler;
+    process_handler->init(m_input_port.get(), m_primary_output_port_model.get(),
+                          nullptr, config, enqueue_policy);
+
+    process_handler->on_process_input_data =
+        [this](ProcessHandler_t::OutputRequest_t *output_request,
+               std::optional<ProcessHandler_t::OutputDeliveryPolicy_t> *output_enqueue_policy,
+               ProcessHandler_t::InputActionResult_t *action_result,
+               std::shared_ptr<const InputSourceData_t> source_data,
+               ProcessHandler_t::ResourceToken_t &resource) {
+            // 将document数据放入document map中
+            m_impl->m_document_map.synchronize()->insert({source_data->get_goal()->document.frame_bundle.primary_frame.metadata.frame_num,
+                                                          std::make_shared<psg_private_msgs::msg::PsgDocument>(source_data->get_goal()->document)});
+
+            // 将person数据放入person map中
+            auto lock_ptr_person_map = m_impl->m_person_map.synchronize();
+            for (const auto &person : source_data->get_goal()->document.persons) {
+                lock_ptr_person_map->insert({person.x_uid.uuid, std::make_shared<psg_private_msgs::msg::Person>(person)});
+            }
+
+            // 创建delivery request，并推送到output port model
+            // from input source data to output source data
+            OutputSourceDataModel_t output_source_data;
+            output_source_data.set_frame_bundle(source_data->get_goal()->document.frame_bundle);
+            output_source_data.set_persons(source_data->get_goal()->document.persons);
+
+
+            auto goal_handle = source_data->get_goal_handle_future().get();
+            auto control_signal_code = InputDataTrait_t::get_control_signal_code(*source_data->get_goal());
+            RDX_INFO_DEV(this, __func__, true,
+                         "on_process_input_data()中frame num: {}, control signal code: {}",
+                         source_data->get_goal()->document.frame_bundle.primary_frame.metadata.frame_num, int(control_signal_code));
+
+
+            // create delivery request
+            auto delivery_request = _create_delivery_request(output_source_data, control_signal_code);
+            *output_request = delivery_request;
+
+            // fill the action result, nothing to do
+            (void)action_result;
+
+            (void)output_enqueue_policy;
+            (void)resource;
+            return 0;
+        };
+    return 0;
+}
+
+int PSGTrackerPipelineNode::_process_frame_request()
+{
+    auto ret = m_impl->work_then_send_to_model_handler->process_and_send();
+    if (ret == PSGTrackerPipelineImpl::PullProcessSendHandler_t::ProcessResult::Error) {
+        RDX_INFO_DEV(this, __func__, false, "Failed to process image request, error code: {}", int(ret));
+        return -1;
+    } else if (ret == PSGTrackerPipelineImpl::PullProcessSendHandler_t::ProcessResult::NoData) {
+        //! No data available, skipping
+        return 0;
+    } else if (ret == PSGTrackerPipelineImpl::PullProcessSendHandler_t::ProcessResult::Success) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Successfully processed image request");
+        return 0;
+    } else if (ret == PSGTrackerPipelineImpl::PullProcessSendHandler_t::ProcessResult::NoResourceToken) {
+        //! No resource token, skipping
+        return 0;
+    } else if (ret == PSGTrackerPipelineImpl::PullProcessSendHandler_t::ProcessResult::FailedToSend) {
+        RDX_INFO_DEV(this, __func__, false, "{}", "Failed to send image request to downstream, do you have a downstream?");
+        return 0;
+    } else {
+        RDX_RAISE_ERROR("[f={}] Unexpected process result: {}", __func__, int(ret));
+        return -1;
+    }
+}
+
 void PSGTrackerPipelineNode::_step()
 {
-    // 从input port pipeline获取数据，创建delivery request，并推送到output port model,
-    // 从input port model获取数据，放到detections buffer中去
-    if (get_status() != NodeStatusCode::STARTED) {
-        return;
-    }
-
-    if (m_impl->m_ros_time_token->try_pop_token()) {
-        auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
-
-        std::shared_ptr<InputSourceData_t> document_data;
-        if (runtime_config->enable_blocking_mode) {
-            // wait until there is data available
-            document_data = m_input_port->pop_source_data();
-        } else {
-            // try to get data without waiting
-            document_data = m_input_port->try_pop_source_data();
-        }
-
-        if (!document_data) {
-            return;
-        }
-
-        // 将document数据放入document map中
-        m_impl->m_document_map.synchronize()->insert({document_data->get_goal()->document.frame.metadata.frame_num,
-                                                      std::make_shared<psg_private_msgs::msg::PsgDocument>(document_data->get_goal()->document)});
-
-        // 将person数据放入person map中
-        auto lock_ptr_person_map = m_impl->m_person_map.synchronize();
-        for (const auto &person : document_data->get_goal()->document.persons) {
-            lock_ptr_person_map->insert({person.x_uid.uuid, std::make_shared<psg_private_msgs::msg::Person>(person)});
-        }
-
-        // 创建delivery request，并推送到output port model
-        // from input source data to output source data
-        OutputSourceDataModel_t output_model_source_data;
-        output_model_source_data.set_frame(document_data->get_goal()->document.frame);
-        output_model_source_data.set_persons(document_data->get_goal()->document.persons);
-
-        // create delivery request
-        auto delivery_request = _create_delivery_request(output_model_source_data);
-
-        // this is used for logging
-        auto msg_uuid = output_model_source_data.get_uuid();
-
-        // get qos, controls how to retry and drop frames
-        auto &qos = runtime_config->model_enqueue_policy;
-        auto success = m_primary_output_port_model->push_request(delivery_request, qos);
-
-        if (success) {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] success to push request to model, frame_num={}",
-                         boost::uuids::to_string(msg_uuid),
-                         document_data->get_goal()->document.frame.metadata.frame_num);
-        } else {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                         "[msg_uuid={}] failed to push request to model, frame_num={}",
-                         boost::uuids::to_string(msg_uuid),
-                         document_data->get_goal()->document.frame.metadata.frame_num);
-        }
-
-        // FIXME: debug only
-        // wait for all requests to be processed, not necessary
-        m_primary_output_port_model->wait_for_all_requests();
+    if (m_input_port) {
+        _process_frame_request();
     }
 }
 
@@ -478,11 +517,9 @@ void PSGTrackerPipelineNode::_generate_source_data(psg_private_msgs::msg::PsgDoc
 
 
     // convert image to ROS message
-    cv_bridge::CvImage cv_bridge_image;
-    cv_bridge_image.image = random_frame;
-    cv_bridge_image.encoding = sensor_msgs::image_encodings::BGR8;
-    cv_bridge_image.toImageMsg(document.frame.raw_image);
-    document.frame.metadata.frame_num = frame_number;
+    image_utils::FrameMediator fm(random_frame, "bgr8");
+    fm.to_frame_msg(document.frame_bundle.primary_frame);
+    document.frame_bundle.primary_frame.metadata.frame_num = frame_number;
 
     frame_number++;
 }
@@ -503,6 +540,7 @@ int PSGTrackerPipelineNode::_on_deliver_to_downstream_finish(TargetDataModel_t &
     output_model_result.promise = std::make_shared<ModelResultPromise>();
     output_model_result.future = output_model_result.promise->get_future().share();
     output_model_result.source_data = std::make_shared<OutputSourceDataModel_t>(request.get_source_data());
+    output_model_result.control_signal_code = request.get_control_signal_code();
 
     //! 3. 将output_model_result推送到buffer中
     RDX_INFO_DEV(this, __func__, false, "{}", "开始将output_model_result推送到buffer中");
@@ -544,13 +582,8 @@ sensor_msgs::msg::Image PSGTrackerPipelineNode::_create_debug_image(const psg_pr
     //! 转换raw image到cv::Mat
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换raw image到cv::Mat", 0);
     cv::Mat cv_image;
-    try {
-        cv_image = cv_bridge::toCvCopy(document.frame.raw_image, sensor_msgs::image_encodings::BGR8)->image;
-        RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "成功转换raw image, 大小: {}x{}", cv_image.cols, cv_image.rows);
-    } catch (const cv_bridge::Exception &e) {
-        RDX_LOG_ERROR(this, __func__, PRINT_THREAD_ID_IN_LOG, "cv_bridge转换失败: {}", e.what());
-        return sensor_msgs::msg::Image(); // 返回空图像
-    }
+    image_utils::FrameMediator fm(&document.frame_bundle.primary_frame);
+    fm.to_cv_image_copy(cv_image);
 
     //! 在图像上画关键点和骨架连接
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始在图像上绘制关键点, 共{}个检测结果", document.detections.size());
@@ -559,11 +592,11 @@ sensor_msgs::msg::Image PSGTrackerPipelineNode::_create_debug_image(const psg_pr
         cv::Scalar color = get_color(person.track_id);
 
         //! 获取body bbox坐标
-        if (person.body.category == 0) {
-            int x = static_cast<int>(person.body.bbox.x);
-            int y = static_cast<int>(person.body.bbox.y);
-            int width = static_cast<int>(person.body.bbox.width);
-            int height = static_cast<int>(person.body.bbox.height);
+        if (person.true_body.category == 0) {
+            int x = static_cast<int>(person.true_body.bbox.x);
+            int y = static_cast<int>(person.true_body.bbox.y);
+            int width = static_cast<int>(person.true_body.bbox.width);
+            int height = static_cast<int>(person.true_body.bbox.height);
 
             //! 画body bbox
             cv::rectangle(cv_image,
@@ -573,7 +606,7 @@ sensor_msgs::msg::Image PSGTrackerPipelineNode::_create_debug_image(const psg_pr
         }
 
         //! 画body keypoints
-        const auto &keypoints = person.body.keypoints;
+        const auto &keypoints = person.true_body.keypoints;
 
         //! 在访问数组或指针前添加检查
         if (!keypoints.keypoints_2.empty() && !keypoints.confidence.empty()) {
@@ -625,11 +658,11 @@ sensor_msgs::msg::Image PSGTrackerPipelineNode::_create_debug_image(const psg_pr
         }
 
         //! 画head bbox
-        if (person.head.category == 1) {
-            int x = static_cast<int>(person.head.bbox.x);
-            int y = static_cast<int>(person.head.bbox.y);
-            int width = static_cast<int>(person.head.bbox.width);
-            int height = static_cast<int>(person.head.bbox.height);
+        if (person.true_head.category == 1) {
+            int x = static_cast<int>(person.true_head.bbox.x);
+            int y = static_cast<int>(person.true_head.bbox.y);
+            int width = static_cast<int>(person.true_head.bbox.width);
+            int height = static_cast<int>(person.true_head.bbox.height);
 
             //! 画head bbox
             cv::rectangle(cv_image,
@@ -639,11 +672,11 @@ sensor_msgs::msg::Image PSGTrackerPipelineNode::_create_debug_image(const psg_pr
         }
 
         //! 画face bbox
-        if (person.face.category == 2) {
-            int x = static_cast<int>(person.face.bbox.x);
-            int y = static_cast<int>(person.face.bbox.y);
-            int width = static_cast<int>(person.face.bbox.width);
-            int height = static_cast<int>(person.face.bbox.height);
+        if (person.true_face.category == 2) {
+            int x = static_cast<int>(person.true_face.bbox.x);
+            int y = static_cast<int>(person.true_face.bbox.y);
+            int width = static_cast<int>(person.true_face.bbox.width);
+            int height = static_cast<int>(person.true_face.bbox.height);
 
             //! 画face bbox
             cv::rectangle(cv_image,
@@ -656,14 +689,8 @@ sensor_msgs::msg::Image PSGTrackerPipelineNode::_create_debug_image(const psg_pr
     //! 转回sensor_msgs/Image
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换回sensor_msgs/Image", 0);
     sensor_msgs::msg::Image debug_image;
-    debug_image.header = document.frame.raw_image.header;
-    debug_image.height = cv_image.rows;
-    debug_image.width = cv_image.cols;
-    debug_image.encoding = "bgr8";
-    debug_image.is_bigendian = false;
-    debug_image.step = cv_image.cols * 3;
-    debug_image.data.assign(cv_image.data, cv_image.data + cv_image.total() * cv_image.elemSize());
-
+    image_utils::FrameMediator fm_cv_image(cv_image, "bgr8");
+    fm_cv_image.to_image_msg(debug_image);
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "完成debug图像创建, 大小: {}x{}", debug_image.width, debug_image.height);
     return debug_image;
 }
@@ -691,10 +718,10 @@ void PSGTrackerPipelineNode::_get_model_result()
         OutputSourceDataPipeline_t output_pipeline_source_data;
         // 根据frame_number获取document
         RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始从document map中获取document", 0);
-        auto document = m_impl->m_document_map.synchronize()->at(output_model_result.source_data->get_frame().metadata.frame_num);
+        auto document = m_impl->m_document_map.synchronize()->at(output_model_result.source_data->get_frame_bundle().primary_frame.metadata.frame_num);
         // 删掉字典中的document
         RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始从document map中删除document", 0);
-        m_impl->m_document_map.synchronize()->erase(output_model_result.source_data->get_frame().metadata.frame_num);
+        m_impl->m_document_map.synchronize()->erase(output_model_result.source_data->get_frame_bundle().primary_frame.metadata.frame_num);
 
         RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始处理track_targets结果", 0);
         for (const auto &track_target : result->track_targets) {
@@ -714,6 +741,7 @@ void PSGTrackerPipelineNode::_get_model_result()
                                   "更新person track_id - uuid:{}, track_id:{}",
                                   boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)),
                                   track_target.track_id);
+                    person->body = track_target.predicted_detection;
                 }
             }
 
@@ -721,6 +749,7 @@ void PSGTrackerPipelineNode::_get_model_result()
             for (auto &person : document->persons) {
                 if (person.x_uid == track_target.x_group_uid) {
                     person.track_id = track_target.track_id;
+                    person.body = track_target.predicted_detection;
                     break;
                 }
             }
@@ -773,8 +802,9 @@ void PSGTrackerPipelineNode::_get_model_result()
         output_pipeline_source_data.set_document(*document);
 
         // create pipeline delivery request
+        auto control_signal_code = output_model_result.control_signal_code;
         RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始创建delivery request", 0);
-        auto delivery_request = _create_delivery_request(output_pipeline_source_data);
+        auto delivery_request = _create_delivery_request(output_pipeline_source_data, control_signal_code);
         // push to output port pipeline
         // this is used for logging
         auto msg_uuid = output_pipeline_source_data.get_uuid();

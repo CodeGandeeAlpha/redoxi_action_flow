@@ -25,7 +25,7 @@ from unique_identifier_msgs.msg import UUID as UUIDMsg
 from attr import field, define
 
 from redoxi_public_msgs.action import ProcessDetectionsByFrame
-from redoxi_public_msgs.msg import Detection, Frame, ReturnResponse
+from redoxi_public_msgs.msg import Detection, Frame, ReturnResponse, MultiDeviceFrame
 
 from psg_common.interfaces import IOpenCloseProtocol
 from psg_common.constants import (
@@ -535,7 +535,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
                 detection_msg.bbox.y = pred.xyxy[1]
                 detection_msg.bbox.width = pred.xyxy[2] - pred.xyxy[0]
                 detection_msg.bbox.height = pred.xyxy[3] - pred.xyxy[1]
-                detection_msg.is_detected_by_camera = True
+                # detection_msg.is_detected_by_camera = True
 
                 detections.append(detection_msg)
 
@@ -544,7 +544,9 @@ class DetectorNode(Node, IOpenCloseProtocol):
     def _goal_callback(self, goal_request):
         x_control = goal_request.x_control
         if x_control.code == 1:
-            self.m_logger.info(f"frame {goal_request.frame.metadata.frame_num} ping")
+            self.m_logger.info(
+                f"frame {goal_request.frame_bundle.primary_frame.metadata.frame_num} ping"
+            )
         # 如果任一类别的资源队列为空,则拒绝该帧
         for cat in self.m_category_to_resource:
             self.m_logger.info(
@@ -552,12 +554,12 @@ class DetectorNode(Node, IOpenCloseProtocol):
             )
             if self.m_category_to_resource[cat].empty():
                 self.m_logger.info(
-                    f"frame {goal_request.frame.metadata.frame_num} was rejected because resource queue for category {cat} is empty"
+                    f"frame {goal_request.frame_bundle.primary_frame.metadata.frame_num} was rejected because resource queue for category {cat} is empty"
                 )
                 return GoalResponse.REJECT
 
         self.m_logger.info(
-            f"frame {goal_request.frame.metadata.frame_num} ping accepted"
+            f"frame {goal_request.frame_bundle.primary_frame.metadata.frame_num} ping accepted"
         )
 
         return GoalResponse.ACCEPT
@@ -589,13 +591,13 @@ class DetectorNode(Node, IOpenCloseProtocol):
         #     result.detections = [detection]
         #     return result
 
-        frame_msg = goal_handle.request.frame
+        frame_bundle_msg = goal_handle.request.frame_bundle
         self.m_logger.info(
-            f"---TIME LOG: framenum {frame_msg.metadata.frame_num} node ddq_detector_node type IN time {self.get_clock().now().nanoseconds}"
+            f"---TIME LOG: framenum {frame_bundle_msg.primary_frame.metadata.frame_num} node ddq_detector_node type IN time {self.get_clock().now().nanoseconds}"
         )
         uuid = goal_handle.request.x_uid
 
-        raw_img = frame_msg.raw_image
+        raw_img = frame_bundle_msg.primary_frame.raw_image
         img: np.ndarray | None = (
             np.frombuffer(raw_img.data, dtype=np.uint8).reshape(
                 raw_img.height, raw_img.width, -1
@@ -611,7 +613,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
             return result
 
         self.m_logger.debug(
-            f"[_process_frame_create_model_tasks] Frame {frame_msg.metadata.frame_num} image shape: {img.shape}"
+            f"[_process_frame_create_model_tasks] Frame {frame_bundle_msg.primary_frame.metadata.frame_num} image shape: {img.shape}"
         )
 
         # convert img to torch tensor
@@ -641,7 +643,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
         self.m_logger.info("Awaiting all tasks")
 
         detections_msg = self._merge_detections_by_category(
-            category_to_results, frame_msg
+            category_to_results, frame_bundle_msg
         )
 
         goal_handle.succeed()
@@ -692,7 +694,7 @@ class DetectorNode(Node, IOpenCloseProtocol):
 
     def _visualize(self, goal: ProcessDetectionsByFrame.Goal):
         detections = goal.detections
-        frame = detections.frame
+        frame = detections.frame_bundle.primary_frame
         # img = self._get_frame_from_v6d(frame)
         img = np.copy(img)  # make a copy to avoid modifying the original image
         self.m_logger.debug(
@@ -729,11 +731,13 @@ class DetectorNode(Node, IOpenCloseProtocol):
     def _merge_detections_by_category(
         self,
         category_to_results: dict[str, list[list[DetectionResult]]],
-        frame_msg: Frame,
+        frame_bundle_msg: MultiDeviceFrame,
     ) -> list[Detection]:
         merged_detections = []
         for cat, results in category_to_results.items():
-            detections = self._to_detections_msg(results, frame_msg)
+            detections = self._to_detections_msg(
+                results, frame_bundle_msg.primary_frame
+            )
             # merged_detections[cat] = detections
             merged_detections.extend(detections)
 

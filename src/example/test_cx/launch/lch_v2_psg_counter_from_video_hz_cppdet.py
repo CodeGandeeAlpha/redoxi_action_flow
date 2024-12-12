@@ -13,7 +13,8 @@ log_level_arg = DeclareLaunchArgument(
 )
 
 fn_video = (
-    "/3d/chengxiao/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+    # "/3d/chengxiao/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+    "/3d/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.6.30-2023-06-18-15-00-02.mp4"
 )
 
 # 定义一些通用的配置
@@ -84,8 +85,8 @@ video_source_params = {
         **default_runtime_config,
         "video_start_time": 0,
         "video_end_time": -1,
-        "output_image_size": {"width": 1024, "height": -1},
-        "output_image_encoding": "rgb8",
+        "output_image_size": {"width": 1920, "height": 1080},
+        "output_image_encoding": "bgr8",
         "publish_to_debug_topic": True,
         "frame_enqueue_policy": default_enqueue_policy,
         "frame_request_policy": default_request_policy,
@@ -102,13 +103,16 @@ psg_master_node_json_params = {
             **default_output_port_config,
             "downstream_specs": [
                 {
-                    "name": "psg_detector",
-                    "action_name": "/detector_node/in/action",
+                    "name": "psg_all_detector_cpp",
+                    "action_name": "/psg_all_detector_cpp/in/action",
                     "delivery_policy": default_delivery_policy,
                 }
             ],
         },
-        "create_debug_pub": False,
+        "create_debug_pub": True,
+        "debug_pub_queue_size": 10,
+        "debug_pub_task_enqueue_name": "debug_port/task_enqueue",
+        "debug_pub_task_drop_name": "debug_port/task_drop",
     },
     "runtime_config": {
         **default_runtime_config,
@@ -117,43 +121,8 @@ psg_master_node_json_params = {
     },
 }
 
-# PSG检测器节点配置
-psg_detector_node_pipeline_json_params = {
-    "declare_params": {},
-    "init_config": {
-        **default_init_config,
-        "output_port_pipeline_config": {
-            **default_output_port_config,
-            "downstream_specs": [
-                {
-                    "name": "pose_detector_node",
-                    "action_name": "/pose_detector_node/in/action",
-                    "delivery_policy": default_delivery_policy,
-                }
-            ],
-        },
-        "output_port_model_config": {
-            "downstream_specs": [
-                {
-                    "name": "psg_detector",
-                    "action_name": "/psg_detector/model_process_frame_action",
-                    "delivery_policy": default_delivery_policy,
-                }
-            ],
-            "fallback_delivery_precondition": "no_precondition",
-        },
-    },
-    "runtime_config": {
-        **default_runtime_config,
-        "pipeline_enqueue_policy": default_enqueue_policy,
-        "pipeline_request_policy": default_request_policy,
-        "model_enqueue_policy": default_enqueue_policy,
-        "model_request_policy": default_request_policy,
-    },
-}
-
-# PSG姿态检测节点配置
-psg_pose_detector_node_pipeline_json_params = {
+# PSG cpp 姿态检测pipeline节点配置
+psg_all_detector_cpp_node_pipeline_json_params = {
     "declare_params": {},
     "init_config": {
         **default_init_config,
@@ -170,8 +139,8 @@ psg_pose_detector_node_pipeline_json_params = {
         "output_port_model_config": {
             "downstream_specs": [
                 {
-                    "name": "rtm_pose_detector_node",
-                    "action_name": "/rtm_pose_detector_node/model_process_detections_action",
+                    "name": "detector_with_pose",
+                    "action_name": "/detector_with_pose/in/detection_request",
                     "delivery_policy": default_delivery_policy,
                 }
             ]
@@ -181,6 +150,38 @@ psg_pose_detector_node_pipeline_json_params = {
         **default_runtime_config,
         "frame_enqueue_policy": default_enqueue_policy,
         "frame_request_policy": default_request_policy,
+    },
+}
+
+fn_model_nano = "/3d/chengxiao/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx"
+det_node_params = {
+    "declare_params": {},
+    "init_config": {
+        "model_configs": [
+            {
+                "model_path": fn_model_nano,
+                "device_type": "cuda",
+                "device_index": 0,
+            },
+        ],
+        "detection_request_config": {
+            "input_port_config": {
+                "buffer_capacity": 1,
+                "action_name": "in/detection_request",
+                "goal_result_expire_time": 1000000,
+            }
+        },
+        "publish_visualization_topic": "debug/visualization",
+        "publish_probe_detection_done_topic": "probe/detection_done",
+        "_time_unit": "us(1e-6)",
+    },
+    "runtime_config": {
+        "_time_unit": "us(1e-6)",
+        "step_interval": 1000,
+        "enable_blocking_mode": False,
+        "enable_performance_probe": True,
+        "model_output_config": {"conf_threshold": 0.1, "iou_threshold": 0.6},
+        "enable_visualization": True,
     },
 }
 
@@ -218,8 +219,8 @@ psg_tracker_node_pipeline_json_params = {
             **default_output_port_config,
             "downstream_specs": [
                 {
-                    "name": "document_sink",
-                    "action_name": "/document_sink/in/action",
+                    "name": "psg_counter",
+                    "action_name": "/psg_counter/in/action",
                     "delivery_policy": default_delivery_policy,
                 }
             ],
@@ -249,9 +250,35 @@ psg_tracker_node_json_params = {
     "init_config": {
         **default_init_config,
         "create_debug_pub": False,
-        "tracker_type": 0,
+        "tracker_type": 1,
     },
     "runtime_config": {**default_runtime_config, "enable_debug_topics": False},
+}
+
+# PSG计数器节点配置
+psg_counter_node_json_params = {
+    "declare_params": {},
+    "init_config": {
+        **default_init_config,
+        "output_port_config": {
+            **default_output_port_config,
+            "downstream_specs": [
+                {
+                    "name": "document_sink",
+                    "action_name": "/document_sink/in/action",
+                    "delivery_policy": default_delivery_policy,
+                }
+            ],
+        },
+        "passengerflow_config_path": "/3d/chengxiao/data/passengerflow/fairmot_train_230907/psg_configs/20.22.6.30.json",
+    },
+    "runtime_config": {
+        **default_runtime_config,
+        "pipeline_enqueue_policy": default_enqueue_policy,
+        "pipeline_request_policy": default_request_policy,
+        "model_enqueue_policy": default_enqueue_policy,
+        "model_request_policy": default_request_policy,
+    },
 }
 
 # 文档接收节点配置
@@ -311,56 +338,37 @@ psg_master_node = Node(
 
 psg_detector_node = Node(
     package="test_cx",
-    executable="v2_psg_detector",
-    name="detector_node",
-    namespace="detector_node",
+    executable="v2_psg_all_detector_cpp",
+    name="psg_all_detector_cpp",
+    namespace="psg_all_detector_cpp",
     prefix=common_prefix,
     parameters=[
         {
             "param_as_json_string": json.dumps(
-                psg_detector_node_pipeline_json_params, separators=(",", ":")
+                psg_all_detector_cpp_node_pipeline_json_params, separators=(",", ":")
             ),
         },
     ],
-    arguments=["--ros-args", "--log-level", ["detector_node:=", logger]]
+    arguments=["--ros-args", "--log-level", ["psg_all_detector_cpp:=", logger]]
     + common_ros_args,
 )
 
-psg_detector_node_model = Node(
-    package="psg_detector",
-    executable="ddq_detector_node.py",
-    name="psg_detector",
-    namespace="psg_detector",
+DetectionNodeName = "detector_with_pose"
+detection_node = Node(
+    package="test_package",
+    executable="yolo_body_pose_detection_node",
+    name=DetectionNodeName,
+    namespace=DetectionNodeName,
     prefix=common_prefix,
-    arguments=["--ros-args", "--log-level", ["psg_detector:=", logger]]
-    + common_ros_args,
-)
-
-psg_pose_detector_node = Node(
-    package="test_cx",
-    executable="v2_psg_pose_detector",
-    name="pose_detector_node",
-    namespace="pose_detector_node",
-    prefix=common_prefix,
+    output="screen",
     parameters=[
         {
-            "param_as_json_string": json.dumps(
-                psg_pose_detector_node_pipeline_json_params, separators=(",", ":")
-            ),
+            "param_as_json_string": json.dumps(det_node_params, separators=(",", ":")),
         },
     ],
-    arguments=["--ros-args", "--log-level", ["pose_detector_node:=", logger]]
+    arguments=["--ros-args", "--log-level", [f"{DetectionNodeName}:=", logger]]
     + common_ros_args,
-)
-
-psg_pose_detector_node_model = Node(
-    package="psg_pose_detector",
-    executable="rtm_pose_detector_node.py",
-    name="rtm_pose_detector_node",
-    namespace="rtm_pose_detector_node",
-    prefix=common_prefix,
-    arguments=["--ros-args", "--log-level", ["rtm_pose_detector_node:=", logger]]
-    + common_ros_args,
+    # arguments=["--ros-args", "--disable-external-lib-logs"],
 )
 
 psg_person_generator_node = Node(
@@ -416,6 +424,25 @@ psg_tracker_node = Node(
     + common_ros_args,
 )
 
+psg_counter_node = Node(
+    package="test_cx",
+    executable="v2_psg_counter",
+    output="screen",  # 将输出重定向到屏幕
+    emulate_tty=True,  # 保持颜色输出
+    name="psg_counter",
+    namespace="psg_counter",
+    prefix=common_prefix,
+    parameters=[
+        {
+            "param_as_json_string": json.dumps(
+                psg_counter_node_json_params, separators=(",", ":")
+            ),
+        },
+    ],
+    arguments=["--ros-args", "--log-level", ["psg_counter:=", logger]]
+    + common_ros_args,
+)
+
 document_sink_node = Node(
     package="test_cx",
     executable="v2_document_sink",
@@ -451,12 +478,11 @@ def generate_launch_description():
             video_source_node,
             psg_master_node,
             psg_detector_node,
-            psg_detector_node_model,
-            psg_pose_detector_node,
-            psg_pose_detector_node_model,
+            detection_node,
             psg_person_generator_node,
             psg_tracker_pipeline_node,
             psg_tracker_node,
+            psg_counter_node,
             document_sink_node,
         ]
     )

@@ -17,12 +17,14 @@
   <depend>psg_master_node</depend>
   <depend>psg_document_sink</depend>
   <depend>psg_detector</depend>
+  <depend>psg_all_detector_cpp</depend>
   <depend>psg_pose_detector</depend>
   <depend>psg_frame_det_source_sink</depend>
   <depend>video_reader_orbbec</depend>
   <depend>spdlog_vendor</depend>
   <depend>pluginlib</depend>
   <depend>psg_tracker</depend>
+  <depend>video_reader_from_url</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

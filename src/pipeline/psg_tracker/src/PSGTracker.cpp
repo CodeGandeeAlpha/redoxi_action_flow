@@ -3,7 +3,7 @@
 #include <redoxi_shared_memory/SharedMemoryClient.hpp>
 #include <redoxi_shared_memory/SharedMemoryFactory.hpp>
 #include <boost/uuid/uuid_io.hpp>
-#include <cv_bridge/cv_bridge.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 
 #define PRINT_THREAD_ID_IN_LOG (true)
 
@@ -217,7 +217,7 @@ void PSGTracker::_step()
 
     // flush signal?
     auto control_signal_code = ActionDataTrait_t::get_control_signal_code(*goal_handle->get_goal());
-    if (control_signal_code == ControlSignalCode::Flush) {
+    if (control_signal_code == ControlSignalCode::Flush || control_signal_code == ControlSignalCode::Terminate) {
         RDX_INFO_DEV(this, __func__, false, "[goal_uuid={}] {}",
                      boost::uuids::to_string(goal_uuid), "flush signal received");
     }
@@ -238,7 +238,10 @@ void PSGTracker::_step()
         RDX_INFO_DEV(this, __func__, false, "{}", "发布调试主题");
         auto control_signal_code = ActionDataTrait_t::get_control_signal_code(*goal_handle->get_goal());
         auto label_text = fmt::format("accepted, signal = {}", control_signal_code_to_string(control_signal_code));
-        m_pub_person_accepted.publish(goal_handle->get_goal()->frame.raw_image, label_text);
+        image_utils::FrameMediator fm(&goal_handle->get_goal()->frame_bundle.primary_frame);
+        sensor_msgs::msg::Image debug_image;
+        fm.to_image_msg(debug_image);
+        m_pub_person_accepted.publish(debug_image, label_text);
     }
 
     RDX_INFO_DEV(this, __func__, false, "{}", "完成目标处理");
@@ -264,51 +267,13 @@ int PSGTracker::_parse_frame(cv::Mat *output,
 
     auto msg_uuid = ActionDataTrait_t::get_uuid(*source_data.get_goal());
 
-    // parse from shm
-    auto &shm_token = source_data.get_goal()->frame.shm_token;
-    if (shm_token.object_size >= 0 && m_shm_client && m_shm_client->is_connected()) {
-        shared_memory::ObjectIdentifier oid;
-        if (shm_token.object_id != 0) {
-            oid.id = shm_token.object_id;
-        }
-        if (!shm_token.object_key.empty()) {
-            oid.key = shm_token.object_key;
-        }
-        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Getting data from shm with object id {}",
-                     boost::uuids::to_string(msg_uuid), oid.id.value_or(0));
-        auto datablock = m_shm_client->get_data(oid);
-        if (!datablock) {
-            RDX_INFO_DEV(this, __func__, false,
-                         "[msg_uuid={}] Failed to get data from shm", boost::uuids::to_string(msg_uuid));
-            return -1;
-        }
-
-        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Data from shm parsed to cv::Mat",
-                     boost::uuids::to_string(msg_uuid));
-        cv::Mat tmp;
-        datablock->get_as_cvmat(&tmp);
-
-        // IMPORTANT: copy the data to the output, because the datablock will be released after the function returns
-        tmp.copyTo(*output);
-
-        // after reading, delete the data from shm
-        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Deleting data from shm",
-                     boost::uuids::to_string(msg_uuid));
-        auto delete_ok = m_shm_client->delete_object(oid) == 0;
-        if (!delete_ok) {
-            RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to delete data from shm",
-                         boost::uuids::to_string(msg_uuid));
-        }
-    } else {
+    {
         // read raw image directly from the goal
         RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Reading raw image directly from the goal",
                      boost::uuids::to_string(msg_uuid));
 
-        auto &raw_image = source_data.get_goal()->frame.raw_image;
-        if (!raw_image.data.empty()) {
-            auto img_bridge = cv_bridge::toCvCopy(raw_image, raw_image.encoding);
-            *output = img_bridge->image;
-        }
+        image_utils::FrameMediator fm(&source_data.get_goal()->frame_bundle.primary_frame);
+        fm.to_cv_image_copy(*output);
     }
 
     return 0;
@@ -319,8 +284,7 @@ std::vector<redoxi_public_msgs::msg::TrackTarget> PSGTracker::_track(const std::
 {
     // get frame
     auto goal = source_data->get_goal();
-    auto frame = goal->frame;
-    auto frame_num = frame.metadata.frame_num;
+    auto frame_num = goal->frame_bundle.primary_frame.metadata.frame_num;
     cv::Mat frame_mat;
     _parse_frame(&frame_mat, *source_data);
 
@@ -329,9 +293,17 @@ std::vector<redoxi_public_msgs::msg::TrackTarget> PSGTracker::_track(const std::
     auto persons = goal->persons;
     std::vector<redoxi_public_msgs::msg::Detection> detections;
     for (const auto &person : persons) {
-        detections.push_back(person.body);
+        detections.push_back(person.true_body);
         detections.back().x_group_uid = person.x_uid; // 方便后面把track_targets和persons关联起来
     }
+
+    // // 保存frame和detections用以复现跟踪结果
+    // // frame保存成图片，detections保存成json
+    // std::string frame_img_path = fmt::format("/tmp/test_track/frame_{}.png", frame_num);
+    // cv::imwrite(frame_img_path, frame_mat);
+    // std::string detections_json_path = fmt::format("/tmp/test_track/detections_{}.json", frame_num);
+    // std::ofstream fout(detections_json_path);
+    // fout << detections;
 
     std::vector<redoxi_public_msgs::msg::TrackTarget> track_targets;
     if (control_signal_code == ControlSignalCode::Flush || control_signal_code == ControlSignalCode::Terminate || frame_num == INT_MAX) { // last frame

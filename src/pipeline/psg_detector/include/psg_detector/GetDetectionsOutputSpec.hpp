@@ -9,6 +9,7 @@
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
 #include <psg_detector/StampedStrPub.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 #include <redoxi_public_msgs/action/process_detections_by_frame.hpp>
 
 
@@ -107,7 +108,8 @@ class DeliveryTargetData : public DeliveryTargetDataBase
 
     virtual int to_publish_message(PublishMessageType_t &msg) const
     {
-        msg = get_goal().frame.raw_image;
+        image_utils::FrameMediator fm(&get_goal().frame_bundle.primary_frame);
+        fm.to_image_msg(msg);
         return 0;
     }
 
@@ -128,8 +130,8 @@ static_assert(output_port_types::DeliveryPolicyConcept<DeliveryPolicy>, "Deliver
 using DeliveryRequestBase = output_port_types::DefaultDeliveryRequest<DeliverySourceData, DeliveryTargetData, DeliveryPolicy, DeliveryStampData>;
 class DeliveryRequest : public DeliveryRequestBase
 {
-  public:
-    virtual int to_target_data(DeliveryTargetData &target_data) const
+  protected:
+    virtual int _to_target_data(DeliveryTargetData &target_data) const override
     {
         // apply custom function if set
         if (custom_to_target_data) {
@@ -141,18 +143,16 @@ class DeliveryRequest : public DeliveryRequestBase
 
         // fill payload
         auto document = this->m_source_data.get_document();
-        goal.frame = document.frame;
 
-        // set additional information into the goal
-        using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
+        goal.frame_bundle = document.frame_bundle;
 
-        // set the source data UUID
-        ActionTrait::set_uuid(goal, this->m_source_data.get_uuid());
+        // // set additional information into the goal
+        // using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
 
-        // set the control signal code
-        if (this->is_ping_request()) {
-            ActionTrait::mark_with_control_signal(goal, ControlSignalCode::Ping);
-        }
+        // // set the source data UUID
+        // ActionTrait::set_uuid(goal, this->m_source_data.get_uuid());
+
+        // ActionTrait::mark_with_control_signal(goal, get_control_signal_code());
 
         return 0;
     }

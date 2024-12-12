@@ -3,9 +3,15 @@ redoxi_public_msgs/Control x_control
 # same group id means the same object
 unique_identifier_msgs/UUID x_group_uid
 
+# true_xxx means the detection from image
+# xxx means the detection from tracker prediction
 redoxi_public_msgs/Detection head
+redoxi_public_msgs/Detection true_head
 redoxi_public_msgs/Detection body
+redoxi_public_msgs/Detection true_body
 redoxi_public_msgs/Detection face
+redoxi_public_msgs/Detection true_face
+
 redoxi_public_msgs/FrameMetadata frame_metadata
 int64 track_id
 float64 body_height

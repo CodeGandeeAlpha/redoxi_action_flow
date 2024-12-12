@@ -1,9 +1,9 @@
-#include <psg_detector/Pipeline.hpp>
+#include <psg_all_detector_cpp/Pipeline.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <redoxi_common_nodes/port_handlers/PullProcessSendHandler.hpp>
 #include <redoxi_common_nodes/port_handlers/PullProcessReplyHandler.hpp>
 #include <redoxi_samples_lib/random_image.hpp>
-#include <cv_bridge/cv_bridge.hpp>
+#include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
 #include <json_struct/json_struct.h>
 #include <tbb/concurrent_queue.h>
 
@@ -15,14 +15,14 @@ namespace redoxi_works
 {
 // shared_ptr is used to indicate whether the result is available
 // 如果我在request创建的时候就把promise和future绑定在一起，那么当request发送失败的时候我也可以把结果设置为nullptr来表示失败
-using ModelResultPromise = std::promise<std::shared_ptr<PSGDetectorNode::OutputModelResult_t>>;
-using ModelResultFuture = std::shared_future<std::shared_ptr<PSGDetectorNode::OutputModelResult_t>>;
+using ModelResultPromise = std::promise<std::shared_ptr<PSGAllDetectorCppNode::OutputModelResult_t>>;
+using ModelResultFuture = std::shared_future<std::shared_ptr<PSGAllDetectorCppNode::OutputModelResult_t>>;
 
-struct PSGDetectorImpl {
+struct PSGAllDetectorCppImpl {
     struct OutputModelResult {
         std::shared_ptr<ModelResultPromise> promise;
         ModelResultFuture future;
-        std::shared_ptr<PSGDetectorNode::OutputSourceDataModel_t> source_data;
+        std::shared_ptr<PSGAllDetectorCppNode::OutputSourceDataModel_t> source_data;
         ControlSignalCode control_signal_code;
     };
 
@@ -36,17 +36,17 @@ struct PSGDetectorImpl {
     tbb::task_group m_model_result_task_group;
 
     // pull input, work on it and then send output
-    using PullProcessSendHandler_t = redoxi_works::port_handlers::PullProcessSendHandler<PSGDetectorNode::InputPort_t::MasterSpec_t,
-                                                                                         PSGDetectorNode::OutputPortModel_t::MasterSpec_t>;
+    using PullProcessSendHandler_t = redoxi_works::port_handlers::PullProcessSendHandler<PSGAllDetectorCppNode::InputPort_t::MasterSpec_t,
+                                                                                         PSGAllDetectorCppNode::OutputPortModel_t::MasterSpec_t>;
     std::shared_ptr<PullProcessSendHandler_t> work_then_send_to_model_handler;
 };
 
-PSGDetectorNode::PSGDetectorNode(const std::string &name, const rclcpp::NodeOptions &options)
+PSGAllDetectorCppNode::PSGAllDetectorCppNode(const std::string &name, const rclcpp::NodeOptions &options)
     : common_nodes::StartStopNode(name, options)
 {
 }
 
-PSGDetectorNode::~PSGDetectorNode()
+PSGAllDetectorCppNode::~PSGAllDetectorCppNode()
 {
     // wait for all requests to be processed
     if (m_primary_output_port_pipeline) {
@@ -71,7 +71,7 @@ PSGDetectorNode::~PSGDetectorNode()
     m_impl->m_model_result_task_group.wait();
 }
 
-int PSGDetectorNode::_start()
+int PSGAllDetectorCppNode::_start()
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
 
@@ -113,7 +113,7 @@ int PSGDetectorNode::_start()
     return 0;
 }
 
-int PSGDetectorNode::_stop()
+int PSGAllDetectorCppNode::_stop()
 {
     //! Stop input port
     RDX_INFO_DEV(this, __func__, false, "{}", "Stopping psg detector node");
@@ -143,7 +143,7 @@ int PSGDetectorNode::_stop()
     return 0;
 }
 
-void PSGDetectorNode::set_publish_to_debug_topic(bool enable)
+void PSGAllDetectorCppNode::set_publish_to_debug_topic(bool enable)
 {
     m_publish_to_debug_topic = enable;
     if (m_publish_to_debug_topic) {
@@ -156,12 +156,12 @@ void PSGDetectorNode::set_publish_to_debug_topic(bool enable)
     }
 }
 
-bool PSGDetectorNode::get_publish_to_debug_topic() const
+bool PSGAllDetectorCppNode::get_publish_to_debug_topic() const
 {
     return m_publish_to_debug_topic;
 }
 
-int PSGDetectorNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
+int PSGAllDetectorCppNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
 {
     auto init_config = std::dynamic_pointer_cast<InitConfig_t>(config);
 
@@ -213,7 +213,7 @@ int PSGDetectorNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> confi
     return 0;
 }
 
-int PSGDetectorNode::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config)
+int PSGAllDetectorCppNode::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(config);
 
@@ -241,17 +241,17 @@ int PSGDetectorNode::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t>
     return 0;
 }
 
-std::shared_ptr<PSGDetectorImpl> PSGDetectorNode::_create_impl()
+std::shared_ptr<PSGAllDetectorCppImpl> PSGAllDetectorCppNode::_create_impl()
 {
     // do not use init config or runtime config here, because it may not be initialized yet
-    auto impl = std::make_shared<PSGDetectorImpl>();
+    auto impl = std::make_shared<PSGAllDetectorCppImpl>();
     impl->m_ros_time_token = std::make_shared<RosTimeToken>(this);
     return impl;
 }
 
-PSGDetectorNode::DeliveryRequestPipeline_t
-    PSGDetectorNode::_create_delivery_request(const OutputSourceDataPipeline_t &source_data,
-                                              std::optional<ControlSignalCode> control_signal_code)
+PSGAllDetectorCppNode::DeliveryRequestPipeline_t
+    PSGAllDetectorCppNode::_create_delivery_request(const OutputSourceDataPipeline_t &source_data,
+                                                    std::optional<ControlSignalCode> control_signal_code)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     //! Create delivery request
@@ -267,9 +267,9 @@ PSGDetectorNode::DeliveryRequestPipeline_t
     return req;
 }
 
-PSGDetectorNode::DeliveryRequestModel_t
-    PSGDetectorNode::_create_delivery_request(const OutputSourceDataModel_t &source_data,
-                                              std::optional<ControlSignalCode> control_signal_code)
+PSGAllDetectorCppNode::DeliveryRequestModel_t
+    PSGAllDetectorCppNode::_create_delivery_request(const OutputSourceDataModel_t &source_data,
+                                                    std::optional<ControlSignalCode> control_signal_code)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     //! Create delivery request
@@ -284,8 +284,8 @@ PSGDetectorNode::DeliveryRequestModel_t
     return req;
 }
 
-std::shared_ptr<PSGDetectorNode::OutputPortPipeline_t>
-    PSGDetectorNode::_create_primary_output_port_pipeline(const InitConfig_t &init_config)
+std::shared_ptr<PSGAllDetectorCppNode::OutputPortPipeline_t>
+    PSGAllDetectorCppNode::_create_primary_output_port_pipeline(const InitConfig_t &init_config)
 {
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "create primary output port pipeline");
     auto port = std::make_shared<OutputPortPipeline_t>(this);
@@ -311,8 +311,8 @@ std::shared_ptr<PSGDetectorNode::OutputPortPipeline_t>
     return port;
 }
 
-std::shared_ptr<PSGDetectorNode::OutputPortModel_t>
-    PSGDetectorNode::_create_primary_output_port_model(const InitConfig_t &init_config)
+std::shared_ptr<PSGAllDetectorCppNode::OutputPortModel_t>
+    PSGAllDetectorCppNode::_create_primary_output_port_model(const InitConfig_t &init_config)
 {
     RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "create primary output port model");
     auto port = std::make_shared<OutputPortModel_t>(this);
@@ -339,10 +339,10 @@ std::shared_ptr<PSGDetectorNode::OutputPortModel_t>
     return port;
 }
 
-int PSGDetectorNode::_create_frame_request_handler(const RuntimeConfig_t &runtime_config)
+int PSGAllDetectorCppNode::_create_frame_request_handler(const RuntimeConfig_t &runtime_config)
 {
-    using ProcessHandler_t = PSGDetectorImpl::PullProcessSendHandler_t;
-    using InputDataTrait_t = PSGDetectorNode::InputPort_t::ActionDataTrait_t;
+    using ProcessHandler_t = PSGAllDetectorCppImpl::PullProcessSendHandler_t;
+    using InputDataTrait_t = PSGAllDetectorCppNode::InputPort_t::ActionDataTrait_t;
     auto config = std::make_shared<ProcessHandler_t::InitConfig_t>();
 
     config->block_input_reading = runtime_config.enable_blocking_mode;
@@ -362,7 +362,11 @@ int PSGDetectorNode::_create_frame_request_handler(const RuntimeConfig_t &runtim
                ProcessHandler_t::ResourceToken_t &resource) {
             // from input source data to output source data
             OutputSourceDataModel_t output_source_data;
-            output_source_data.set_document(source_data->get_goal()->document);
+            OutputSourceDataModel_t::FrameData_t frame_data;
+            image_utils::FrameMediator fm(&source_data->get_goal()->document.frame_bundle.primary_frame);
+            fm.to_cv_image_copy(frame_data.image);
+            frame_data.metadata = source_data->get_goal()->document.frame_bundle.primary_frame.metadata;
+            output_source_data.set_primary_frame(frame_data);
 
             auto goal_handle = source_data->get_goal_handle_future().get();
             auto control_signal_code = InputDataTrait_t::get_control_signal_code(*source_data->get_goal());
@@ -385,22 +389,22 @@ int PSGDetectorNode::_create_frame_request_handler(const RuntimeConfig_t &runtim
     return 0;
 }
 
-int PSGDetectorNode::_process_frame_request()
+int PSGAllDetectorCppNode::_process_frame_request()
 {
     auto ret = m_impl->work_then_send_to_model_handler->process_and_send();
-    if (ret == PSGDetectorImpl::PullProcessSendHandler_t::ProcessResult::Error) {
+    if (ret == PSGAllDetectorCppImpl::PullProcessSendHandler_t::ProcessResult::Error) {
         RDX_INFO_DEV(this, __func__, false, "Failed to process image request, error code: {}", int(ret));
         return -1;
-    } else if (ret == PSGDetectorImpl::PullProcessSendHandler_t::ProcessResult::NoData) {
+    } else if (ret == PSGAllDetectorCppImpl::PullProcessSendHandler_t::ProcessResult::NoData) {
         //! No data available, skipping
         return 0;
-    } else if (ret == PSGDetectorImpl::PullProcessSendHandler_t::ProcessResult::Success) {
+    } else if (ret == PSGAllDetectorCppImpl::PullProcessSendHandler_t::ProcessResult::Success) {
         RDX_INFO_DEV(this, __func__, false, "{}", "Successfully processed image request");
         return 0;
-    } else if (ret == PSGDetectorImpl::PullProcessSendHandler_t::ProcessResult::NoResourceToken) {
+    } else if (ret == PSGAllDetectorCppImpl::PullProcessSendHandler_t::ProcessResult::NoResourceToken) {
         //! No resource token, skipping
         return 0;
-    } else if (ret == PSGDetectorImpl::PullProcessSendHandler_t::ProcessResult::FailedToSend) {
+    } else if (ret == PSGAllDetectorCppImpl::PullProcessSendHandler_t::ProcessResult::FailedToSend) {
         RDX_INFO_DEV(this, __func__, false, "{}", "Failed to send image request to downstream, do you have a downstream?");
         return 0;
     } else {
@@ -409,7 +413,7 @@ int PSGDetectorNode::_process_frame_request()
     }
 }
 
-void PSGDetectorNode::_step()
+void PSGAllDetectorCppNode::_step()
 {
     if (m_input_port) {
         _process_frame_request();
@@ -445,15 +449,15 @@ void PSGDetectorNode::_step()
     // m_primary_output_port_model->wait_for_all_requests();
 }
 
-int PSGDetectorNode::_on_deliver_to_downstream_finish(TargetDataModel_t &target_data,
-                                                      SendResultModel_t &result,
-                                                      const DeliveryRequestModel_t &request,
-                                                      const DownstreamModel_t &ds)
+int PSGAllDetectorCppNode::_on_deliver_to_downstream_finish(TargetDataModel_t &target_data,
+                                                            SendResultModel_t &result,
+                                                            const DeliveryRequestModel_t &request,
+                                                            const DownstreamModel_t &ds)
 {
     (void)target_data;
 
     // 1. 创建modelresult
-    PSGDetectorImpl::OutputModelResult output_model_result;
+    PSGAllDetectorCppImpl::OutputModelResult output_model_result;
 
     // 2. 绑定promise和future
     output_model_result.promise = std::make_shared<ModelResultPromise>();
@@ -476,7 +480,7 @@ int PSGDetectorNode::_on_deliver_to_downstream_finish(TargetDataModel_t &target_
         if (goal_handle) {
             auto action_result = ds.get_action_client()->async_get_result(goal_handle).get().result;
             // 将action result写入promise
-            auto output_model_result = std::make_shared<PSGDetectorNode::OutputModelResult_t>();
+            auto output_model_result = std::make_shared<PSGAllDetectorCppNode::OutputModelResult_t>();
             output_model_result->detections = action_result->detections;
             output_model_result->x_return = action_result->x_return;
             promise->set_value(output_model_result);
@@ -489,7 +493,7 @@ int PSGDetectorNode::_on_deliver_to_downstream_finish(TargetDataModel_t &target_
 }
 
 //! 将document中的raw image转换为带有检测框的debug image
-sensor_msgs::msg::Image PSGDetectorNode::_create_debug_image(const psg_private_msgs::msg::PsgDocument &document)
+sensor_msgs::msg::Image PSGAllDetectorCppNode::_create_debug_image(const psg_private_msgs::msg::PsgDocument &document)
 {
     //! 转换raw image到cv::Mat
     RDX_LOG_DEBUG(this, __func__, PRINT_THREAD_ID_IN_LOG, "开始转换primary_frame到cv::Mat", 0);
@@ -546,10 +550,10 @@ sensor_msgs::msg::Image PSGDetectorNode::_create_debug_image(const psg_private_m
     return debug_image;
 }
 
-void PSGDetectorNode::_get_model_result()
+void PSGAllDetectorCppNode::_get_model_result()
 {
     // 1. 从buffer中取出model result, 如果buffer为空，则等待
-    PSGDetectorImpl::OutputModelResult output_model_result;
+    PSGAllDetectorCppImpl::OutputModelResult output_model_result;
     m_impl->m_model_result_buffer.pop(output_model_result);
     // 2. 等待结果
     auto result = output_model_result.future.get();
@@ -559,9 +563,47 @@ void PSGDetectorNode::_get_model_result()
         auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
         // create output source data
         OutputSourceDataPipeline_t output_pipeline_source_data;
-        auto document = output_model_result.source_data->get_document();
+        psg_private_msgs::msg::PsgDocument document;
+        output_model_result.source_data->get_primary_frame().to_frame_msg(document.frame_bundle.primary_frame);
         document.detections = result->detections;
+
+        // 根据detections中的keypoints的头点，构建头的bbox
+        for (const auto &detection : result->detections) {
+            auto head_keypoint = detection.keypoints.keypoints_2[0];
+            auto body_width = detection.bbox.width;
+            auto body_height = detection.bbox.height;
+            auto head_bbox = cv::Rect(head_keypoint.x - body_width / 3 / 2,
+                                      head_keypoint.y - body_height / 6 / 2,
+                                      body_width / 3,
+                                      body_height / 6);
+            redoxi_public_msgs::msg::Detection head_detection;
+            head_detection.bbox.x = head_bbox.x;
+            head_detection.bbox.y = head_bbox.y;
+            head_detection.bbox.width = head_bbox.width;
+            head_detection.bbox.height = head_bbox.height;
+            head_detection.category = 1;
+            head_detection.confidence = 1.0;
+            // head_detection.is_detected_by_camera = true;
+            document.detections.push_back(head_detection);
+        }
+
         output_pipeline_source_data.set_document(document);
+
+        // test: 输出所有document.detections的bbox和类别
+        for (const auto &det : document.detections) {
+            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                         "bbox: [{}, {}, {}, {}], category: {}",
+                         det.bbox.x, det.bbox.y, det.bbox.width, det.bbox.height, det.category);
+            if (det.category == 0) { // 输出keypoints
+                for (size_t i = 0; i < det.keypoints.keypoints_2.size(); ++i) {
+                    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                                 "keypoint: [{}, {}]",
+                                 det.keypoints.keypoints_2[i].x, det.keypoints.keypoints_2[i].y);
+                    RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
+                                 "score: {}", det.keypoints.confidence[i]);
+                }
+            }
+        }
 
         // create pipeline delivery request
         auto control_signal_code = output_model_result.control_signal_code;
@@ -612,7 +654,7 @@ void PSGDetectorNode::_get_model_result()
     }
 }
 
-// int PSGDetectorNode::_read_frame(OutputSourceDataModel_t &data, std::atomic<int64_t> &frame_number)
+// int PSGAllDetectorCppNode::_read_frame(OutputSourceDataModel_t &data, std::atomic<int64_t> &frame_number)
 // {
 //     auto frame_size = cv::Size(1920, 1080);
 //     if (frame_size.empty()) {

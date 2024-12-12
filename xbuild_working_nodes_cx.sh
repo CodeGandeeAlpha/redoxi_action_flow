@@ -15,23 +15,25 @@ display_help() {
     echo "  $0 --verbose --debug"
 }
 
-PackagesToBuild="redoxi_common_nodes \
+PackagesToBuild="redoxi_video_reader \
+                 redoxi_common_nodes \
                  redoxi_shared_memory \
                  redoxi_shm_v6d \
                  redoxi_inference \
-                 test_cx \
-                 test_package \
                  rosboard \
                  psg_common \
                  psg_master_node \
                  psg_document_sink \
                  psg_detector \
+                 psg_all_detector_cpp \
                  psg_frame_det_source_sink \
                  psg_person_generator \
                  psg_pose_detector \
                  psg_tracker \
                  video_reader_orbbec \
-                 redoxi_video_reader"
+                 video_reader_from_url \
+                 psg_counter \
+                 test_cx"
 
 
 # PackagesToBuild="

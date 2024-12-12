@@ -5,46 +5,46 @@
 #include <psg_master_node/StampedDocumentPub.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputPort.hpp>
 #include <psg_document_sink/AsyncDocumentInputPort.hpp>
-#include <psg_tracker/PipelineTypes.hpp>
+#include <psg_all_detector_cpp/PipelineTypes.hpp>
 #include <thread>
 #include <nlohmann/json.hpp>
 
 namespace redoxi_works
 {
 
-struct PSGTrackerPipelineImpl;
+struct PSGAllDetectorCppImpl;
 
 /**
- * @brief The class for PSG tracker pipeline node.
+ * @brief The class for PSG detector node.
  * A frame is considered successfully sent if any downstream accepts it, in which case the frame is written into shared memory. Otherwise the frame is dropped.
  * @note: this is a stateful node, the status code is used to indicate the current state
  * state changes as following:
  * BEFORE_INIT -> [init()] -> CLOSED -> [open()] -> OPENED -> [start()] -> STARTED -> [stop()] -> STOPPED -> [close()] -> CLOSED
  * the action allowed at each state is shown in the comments of each function
  */
-class PSGTrackerPipelineNode : public common_nodes::StartStopNode
+class PSGAllDetectorCppNode : public common_nodes::StartStopNode
 {
-    friend struct PSGTrackerPipelineImpl;
-    friend struct psg_tracker_pipeline::InitConfig;
-    friend struct psg_tracker_pipeline::RuntimeConfig;
+    friend struct PSGAllDetectorCppImpl;
+    friend struct psg_all_detector_cpp::InitConfig;
+    friend struct psg_all_detector_cpp::RuntimeConfig;
 
   public:
     using InputPort_t = AsyncDocumentInputPort;
     using InputSourceData_t = InputPort_t::SourceData_t;
     using ActionDataTrait_t = InputPort_t::ActionDataTrait_t;
 
-    //! Import all names from PSGPoseDetectorInternalTypes
+    //! Import all names from PSGMasterNodeInternalTypes
     //! @note: this is to allow subclass to override the type definitions
     // using OutputPortSpec = video_reader_base::OutputPortSpec;
-    using OutputPortPipeline_t = psg_tracker_pipeline::OutputPortPipelineType;
-    using OutputPortModel_t = psg_tracker_pipeline::OutputPortModelType;
+    using OutputPortPipeline_t = psg_all_detector_cpp::OutputPortPipelineType;
+    using OutputPortModel_t = psg_all_detector_cpp::OutputPortModelType;
 
-    using OutputModelSpec_t = psg_tracker_pipeline::OutputPortModelSpec;
+    using OutputModelSpec_t = psg_all_detector_cpp::OutputPortModelSpec;
     using OutputModelAction_t = OutputModelSpec_t::ActionType_t;
     using OutputModelResult_t = OutputModelAction_t::Result;
 
-    using InitConfig_t = psg_tracker_pipeline::InitConfig;
-    using RuntimeConfig_t = psg_tracker_pipeline::RuntimeConfig;
+    using InitConfig_t = psg_all_detector_cpp::InitConfig;
+    using RuntimeConfig_t = psg_all_detector_cpp::RuntimeConfig;
 
     using DownstreamPipeline_t = OutputPortPipeline_t::Downstream_t;
     using DownstreamModel_t = OutputPortModel_t::Downstream_t;
@@ -74,10 +74,10 @@ class PSGTrackerPipelineNode : public common_nodes::StartStopNode
 
   public:
     //! Constructor with node options and name
-    explicit PSGTrackerPipelineNode(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+    explicit PSGAllDetectorCppNode(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
 
     //! Destructor
-    virtual ~PSGTrackerPipelineNode();
+    virtual ~PSGAllDetectorCppNode();
 
   public:
     //! enable or disable document publishing
@@ -108,77 +108,29 @@ class PSGTrackerPipelineNode : public common_nodes::StartStopNode
 
     //! create implementation details of this node
     //! @note this must be called before any other operations, so it cannot access any member variables
-    virtual std::shared_ptr<PSGTrackerPipelineImpl> _create_impl();
+    virtual std::shared_ptr<PSGAllDetectorCppImpl> _create_impl();
 
     //! get model result
     virtual void _get_model_result();
 
-    //! test step that itself generate some data delivering to downstream
-    virtual void _generate_source_data(psg_private_msgs::msg::PsgDocument &document, std::atomic<int64_t> &frame_number);
-    std::atomic<int64_t> m_frame_number{0};
+    //! create frame request handler
+    virtual int _create_frame_request_handler(const RuntimeConfig_t &runtime_config);
 
     //! process frame request
     virtual int _process_frame_request();
-
-    //! create frame request handler
-    virtual int _create_frame_request_handler(const RuntimeConfig_t &runtime_config);
 
     //! create debug image
     virtual sensor_msgs::msg::Image _create_debug_image(const psg_private_msgs::msg::PsgDocument &document);
 
   protected: // output port callback
-    //! callback when a delivery task is started, about to send to any downstream
-    virtual int _on_delivery_task_begin(TargetDataPipeline_t &target_data,
-                                        const DeliveryRequestPipeline_t &request)
-    {
-        (void)target_data;
-        (void)request;
-        return 0;
-    }
-    virtual int _on_delivery_task_begin(TargetDataModel_t &target_data,
-                                        const DeliveryRequestModel_t &request)
-    {
-        (void)target_data;
-        (void)request;
-        return 0;
-    }
-
-    //! callback when a delivery task is finished, after sending to all downstreams
-    virtual int _on_delivery_task_finish(TargetDataPipeline_t &target_data,
-                                         const DeliveryRequestPipeline_t &request,
-                                         const DeliveryResultPipeline_t &result)
-    {
-        (void)target_data;
-        (void)request;
-        (void)result;
-        return 0;
-    }
-    virtual int _on_delivery_task_finish(TargetDataModel_t &target_data,
-                                         const DeliveryRequestModel_t &request,
-                                         const DeliveryResultModel_t &result)
-    {
-        (void)target_data;
-        (void)request;
-        (void)result;
-        return 0;
-    }
-
-    //! callback when a frame is sent to a downstream, failure or success
-    virtual int _on_deliver_to_downstream_finish(TargetDataPipeline_t &target_data,
-                                                 SendResultPipeline_t &result,
-                                                 const DeliveryRequestPipeline_t &request,
-                                                 const DownstreamPipeline_t &ds)
-    {
-        (void)target_data;
-        (void)result;
-        (void)request;
-        (void)ds;
-        return 0;
-    }
     virtual int _on_deliver_to_downstream_finish(TargetDataModel_t &target_data,
                                                  SendResultModel_t &result,
                                                  const DeliveryRequestModel_t &request,
                                                  const DownstreamModel_t &ds);
+
+    // private:
+    //   virtual int _read_frame(OutputSourceDataModel_t &source_data,
+    //                           std::atomic<int64_t> &frame_number);
 
   protected:
     // input port
@@ -191,13 +143,16 @@ class PSGTrackerPipelineNode : public common_nodes::StartStopNode
     std::atomic<bool> m_publish_to_debug_topic{false};
 
     //! implementation details of this node
-    std::shared_ptr<PSGTrackerPipelineImpl> m_impl;
+    std::shared_ptr<PSGAllDetectorCppImpl> m_impl;
 
     //! debug publishers
     StampedImagePub m_pub_pipeline_enqueue;
     StampedImagePub m_pub_pipeline_drop;
     StampedImagePub m_pub_model_enqueue;
     StampedImagePub m_pub_model_drop;
+
+    //! frame number
+    std::atomic<int64_t> m_frame_number{0};
 
     //! thread for model result
     std::shared_ptr<std::thread> m_get_model_result_thread;

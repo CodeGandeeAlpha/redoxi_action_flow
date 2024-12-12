@@ -1,45 +1,39 @@
 #pragma once
 
-#include <rclcpp/rclcpp.hpp>
-#include <redoxi_common_nodes/image_ports/AsyncImageInputPort.hpp>
-#include <redoxi_common_cpp/redoxi_common_cpp.hpp>
-#include <psg_master_node/StampedDocumentPub.hpp>
-#include <redoxi_common_nodes/async_action_port/AsyncActionOutputPort.hpp>
-#include <psg_master_node/MasterNodeTypes.hpp>
-#include <thread>
-#include <nlohmann/json.hpp>
+#include <psg_counter/PSGCounterTypes.hpp>
+#include "psg_counter/visibility_control.h"
 
 namespace redoxi_works
 {
 
-struct PSGMasterNodeImpl;
+struct PSGCounterImpl;
 
 /**
- * @brief The class for PSG master node.
+ * @brief The class for PSG person generator.
  * A frame is considered successfully sent if any downstream accepts it, in which case the frame is written into shared memory. Otherwise the frame is dropped.
  * @note: this is a stateful node, the status code is used to indicate the current state
  * state changes as following:
  * BEFORE_INIT -> [init()] -> CLOSED -> [open()] -> OPENED -> [start()] -> STARTED -> [stop()] -> STOPPED -> [close()] -> CLOSED
  * the action allowed at each state is shown in the comments of each function
  */
-class PSGMasterNode : public common_nodes::StartStopNode
+class PSGCounter : public common_nodes::StartStopNode
 {
-    friend struct PSGMasterNodeImpl;
-    friend struct psg_master_node::InitConfig;
-    friend struct psg_master_node::RuntimeConfig;
+    friend struct PSGCounterImpl;
+    friend struct psg_counter::InitConfig;
+    friend struct psg_counter::RuntimeConfig;
 
   public:
-    using InputPort_t = image_ports::AsyncImageInputPort;
+    using InputPort_t = psg_counter::InputPortType;
     using InputSourceData_t = InputPort_t::SourceData_t;
     using ActionDataTrait_t = InputPort_t::ActionDataTrait_t;
 
-    //! Import all names from PSGMasterNodeInternalTypes
+    //! Import all names from PSGPersonGeneratorInternalTypes
     //! @note: this is to allow subclass to override the type definitions
     // using OutputPortSpec = video_reader_base::OutputPortSpec;
-    using OutputPort_t = psg_master_node::OutputPortType;
+    using OutputPort_t = psg_counter::OutputPortType;
 
-    using InitConfig_t = psg_master_node::InitConfig;
-    using RuntimeConfig_t = psg_master_node::RuntimeConfig;
+    using InitConfig_t = psg_counter::InitConfig;
+    using RuntimeConfig_t = psg_counter::RuntimeConfig;
 
     using Downstream_t = OutputPort_t::Downstream_t;
     using DownstreamSpec_t = Downstream_t::DownstreamSpec_t;
@@ -56,13 +50,10 @@ class PSGMasterNode : public common_nodes::StartStopNode
 
   public:
     //! Constructor with node options and name
-    explicit PSGMasterNode(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+    explicit PSGCounter(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
 
     //! Destructor
-    virtual ~PSGMasterNode();
-
-    using common_nodes::StartStopNode::get_init_config;
-    using common_nodes::StartStopNode::get_runtime_config;
+    virtual ~PSGCounter();
 
   public:
     //! enable or disable document publishing
@@ -82,25 +73,24 @@ class PSGMasterNode : public common_nodes::StartStopNode
      * @param source_data the source data to be filled with the read frame
      * @return the delivery request
      */
-    virtual DeliveryRequest_t _create_delivery_request(
-        const OutputSourceData_t &source_data,
-        std::optional<ControlSignalCode> control_signal_code = std::nullopt);
+    virtual DeliveryRequest_t _create_delivery_request(const OutputSourceData_t &source_data,
+                                                       std::optional<ControlSignalCode> control_signal_code);
 
     //! create primary output port
     virtual std::shared_ptr<OutputPort_t> _create_primary_output_port(const InitConfig_t &init_config);
 
     //! create implementation details of this node
     //! @note this must be called before any other operations, so it cannot access any member variables
-    virtual std::shared_ptr<PSGMasterNodeImpl> _create_impl();
+    virtual std::shared_ptr<PSGCounterImpl> _create_impl();
+
+    //! create debug image
+    virtual sensor_msgs::msg::Image _create_debug_image(const psg_private_msgs::msg::PsgDocument &document);
 
     //! create document request handler
     virtual int _create_document_request_handler(const RuntimeConfig_t &runtime_config);
 
     //! process document request
     virtual int _process_document_request();
-
-    //! do periodic step operation
-    // virtual void _step2();
 
   protected:
     // input port
@@ -112,7 +102,7 @@ class PSGMasterNode : public common_nodes::StartStopNode
     std::atomic<bool> m_publish_to_debug_topic{false};
 
     //! implementation details of this node
-    std::shared_ptr<PSGMasterNodeImpl> m_impl;
+    std::shared_ptr<PSGCounterImpl> m_impl;
 
     //! debug publishers
     StampedImagePub m_pub_task_enqueue;
