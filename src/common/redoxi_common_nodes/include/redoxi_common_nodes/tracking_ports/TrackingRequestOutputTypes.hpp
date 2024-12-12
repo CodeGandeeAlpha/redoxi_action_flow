@@ -4,13 +4,13 @@
 #include <variant>
 #include <redoxi_common_cpp/image_proc/utils.hpp>
 #include <redoxi_common_nodes/image_ports/ImageOutputPortSpec.hpp>
-#include <redoxi_common_nodes/detection_ports/DetectionResponseCommon.hpp>
-#include <universal_mot_trackers/tracking_ports/TrackingRequestCommon.hpp>
+// #include <redoxi_common_nodes/detection_ports/DetectionResponseCommon.hpp>
+// #include <redoxi_common_nodes/detection_ports/DetectionResponseOutputTypes.hpp>
+#include <redoxi_common_nodes/tracking_ports/TrackingRequestCommon.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
-#include <redoxi_common_nodes/detection_ports/DetectionResponseOutputTypes.hpp>
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
 
-namespace redoxi_works::model_nodes::tracking_ports::request_response::types
+namespace redoxi_works::tracking_ports::request_response::types
 {
 
 //! Retry policy type implementing the RetryPolicyConcept
@@ -260,4 +260,4 @@ struct TrackingRequestOutputPortSpec {
     using Downstream_t = Downstream;
 };
 
-} // namespace redoxi_works::model_nodes::tracking_ports::request_response::types
+} // namespace redoxi_works::tracking_ports::request_response::types

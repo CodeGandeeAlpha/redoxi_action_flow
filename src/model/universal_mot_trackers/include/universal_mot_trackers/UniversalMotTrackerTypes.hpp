@@ -3,7 +3,7 @@
 #include <string_view>
 #include <redoxi_common_cpp/redoxi_json_struct_conversion.hpp>
 #include <universal_mot_trackers/visibility_control.h>
-#include <universal_mot_trackers/tracking_ports/TrackingRequestInputPort.hpp>
+#include <redoxi_common_nodes/tracking_ports/TrackingRequestInputPort.hpp>
 #include <redoxi_common_nodes/base_nodes/OpenCloseNode.hpp>
 #include <opencv2/core.hpp>
 #include <json_struct/json_struct.h>
