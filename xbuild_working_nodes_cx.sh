@@ -33,6 +33,7 @@ PackagesToBuild="redoxi_video_reader \
                  video_reader_orbbec \
                  video_reader_from_url \
                  psg_counter \
+                 psg_common_py \
                  test_cx"
 
 

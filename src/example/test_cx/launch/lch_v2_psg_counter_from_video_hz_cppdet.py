@@ -4,10 +4,12 @@ from launch.substitutions import LaunchConfiguration
 from launch.actions import SetEnvironmentVariable
 from launch.actions import DeclareLaunchArgument
 
-import redoxi_common_py.configs.video_source_from_url as videoSrcCfg
-import pipeline.psg_common_py.configs.psg_document_sink as psgDocSinkCfg
-import pipeline.psg_common_py.configs.pipeline_base as psgPipelineBaseCfg
-import pipeline.psg_common_py.configs.inout_base as psgInoutBaseCfg
+import psg_common_py.configs.psg_document_sink as psgDocSinkCfg
+import psg_common_py.configs.pipeline_base as psgPipelineBaseCfg
+import psg_common_py.configs.inout_base as psgInoutBaseCfg
+import psg_common_py.configs.psg_counter as psgCounterCfg
+import psg_common_py.configs.psg_tracker as psgTrackerCfg
+import yolo8_series.configs as yolo
 import json
 
 logger = LaunchConfiguration("log_level")
@@ -91,7 +93,109 @@ document_sink_node_json_params = psgDocSinkCfg.PSGDocumentSinkNodeConfig(
 # PSG计数器节点配置
 # psg_tracker_pipeline_node -> psg_counter
 psg_counter_node_name = "psg_counter"
-psg_counter_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
+psg_counter_node_json_params = psgCounterCfg.PSGCounterNodeConfig(
+    init_config=psgCounterCfg.PSGCounterInitConfig(
+        create_debug_pub=True,
+        passengerflow_config_path="/3d/chengxiao/data/passengerflow/fairmot_train_230907/psg_configs/20.22.6.30.json",
+        input_port_config=psgCounterCfg.InputPortConfig(
+            action_name="in/action",
+        ),
+        output_port_config=psgCounterCfg.OutputPortConfig(
+            downstream_specs=[
+                psgCounterCfg.DownstreamSpec(
+                    name=document_sink_node_name,
+                    action_name=f"/{document_sink_node_name}/{document_sink_node_json_params.init_config.input_port_config.action_name}",
+                )
+            ],
+        ),
+    ),
+    runtime_config=psgCounterCfg.PSGCounterRuntimeConfig(
+        step_interval=StepIntervals.VeryFast,
+        document_interval=0,
+        enable_blocking_mode=False,
+        publish_to_debug_topic=False,
+        frame_request_policy=psgCounterCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
+        frame_enqueue_policy=psgCounterCfg.DeliveryPolicy(
+            drop_strategy="drop_as_needed",
+        ),
+    ),
+)
+
+
+class TrackerType:
+    DEEPSORT = 0
+    BOTSORT = 1
+
+
+# PSG跟踪器节点配置
+# psg_tracker_pipeline_node <-> psg_tracker_node
+psg_tracker_node_name = "psg_tracker_node"
+psg_tracker_node_json_params = psgTrackerCfg.PSGTrackerNodeConfig(
+    init_config=psgTrackerCfg.PSGTrackerInitConfig(
+        tracker_type=TrackerType.BOTSORT,
+        input_port_config=psgTrackerCfg.InputPortConfig(
+            action_name="in/action",
+        ),
+    ),
+    runtime_config=psgTrackerCfg.PSGTrackerRuntimeConfig(
+        enable_debug_topics=False,
+        enable_blocking_mode=False,
+    ),
+)
+
+# PSG跟踪器节点配置
+# psg_tracker_pipeline_node -> psg_tracker_node
+psg_tracker_node_pipeline_name = "psg_tracker_pipeline_node"
+psg_tracker_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConfig(
+    init_config=psgPipelineBaseCfg.PipelineBaseInitConfig(
+        create_debug_pub=True,
+        input_port_config=psgInoutBaseCfg.InputPortConfig(
+            action_name="in/action",
+        ),
+        output_port_pipeline_config=psgPipelineBaseCfg.OutputPortConfig(
+            downstream_specs=[
+                psgPipelineBaseCfg.DownstreamSpec(
+                    name=psg_counter_node_name,
+                    action_name=f"/{psg_counter_node_name}/{psg_counter_node_json_params.init_config.input_port_config.action_name}",
+                )
+            ],
+        ),
+        output_port_model_config=psgPipelineBaseCfg.OutputPortConfig(
+            downstream_specs=[
+                psgPipelineBaseCfg.DownstreamSpec(
+                    name=psg_tracker_node_name,
+                    action_name=f"/{psg_tracker_node_name}/{psg_tracker_node_json_params.init_config.input_port_config.action_name}",
+                )
+            ],
+        ),
+    ),
+    runtime_config=psgPipelineBaseCfg.PipelineBaseRuntimeConfig(
+        publish_to_debug_topic=False,
+        enable_blocking_mode=False,
+        pipeline_enqueue_policy=psgCounterCfg.DeliveryPolicy(
+            drop_strategy="drop_as_needed",
+        ),
+        pipeline_request_policy=psgCounterCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
+        model_enqueue_policy=psgCounterCfg.DeliveryPolicy(
+            drop_strategy="drop_as_needed",
+        ),
+        model_request_policy=psgCounterCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
+    ),
+)
+
+# PSG人员生成器节点配置
+# psg_all_detector_cpp -> psg_person_generator -> psg_tracker_pipeline_node
+psg_person_generator_node_name = "psg_person_generator"
+psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
     init_config=psgInoutBaseCfg.InoutBaseInitConfig(
         create_debug_pub=True,
         input_port_config=psgInoutBaseCfg.InputPortConfig(
@@ -100,38 +204,137 @@ psg_counter_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
         output_port_config=psgInoutBaseCfg.OutputPortConfig(
             downstream_specs=[
                 psgInoutBaseCfg.DownstreamSpec(
-                    name="document_sink",
-                    action_name="/document_sink/in/action",
-                    delivery_policy=default_delivery_policy,
+                    name=psg_tracker_node_pipeline_name,
+                    action_name=f"/{psg_tracker_node_pipeline_name}/{psg_tracker_node_pipeline_json_params.init_config.input_port_config.action_name}",
                 )
             ],
         ),
     ),
+    runtime_config=psgInoutBaseCfg.InoutBaseRuntimeConfig(
+        step_interval=StepIntervals.VeryFast,
+        document_interval=0,
+        enable_blocking_mode=False,
+        publish_to_debug_topic=False,
+        frame_request_policy=psgInoutBaseCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
+        frame_enqueue_policy=psgInoutBaseCfg.DeliveryPolicy(
+            drop_strategy="drop_as_needed",
+        ),
+    ),
 )
-psg_counter_node_json_params = {
-    "declare_params": {},
-    "init_config": {
-        **default_init_config,
-        "output_port_config": {
-            **default_output_port_config,
-            "downstream_specs": [
-                {
-                    "name": "document_sink",
-                    "action_name": "/document_sink/in/action",
-                    "delivery_policy": default_delivery_policy,
-                }
+
+# cpp 姿态检测节点配置
+# psg_all_detector_cpp <-> yolo_body_pose_detection_node
+fn_model_nano = "/3d/chengxiao/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx"
+det_node_name = "yolo_body_pose_detection_node"
+det_node_params = yolo.Yolo8ModelNodeConfig(
+    init_config=yolo.Yolo8ModelInitConfig(
+        model_configs=[
+            {
+                "model_path": fn_model_nano,
+                "device_type": "cuda",
+                "device_index": 0,
+            },
+        ],
+        detection_request_config=yolo.DetectionRequestConfig(
+            input_port_config=yolo.InputPortConfig(
+                action_name="in/detection_request",
+            ),
+        ),
+        publish_visualization_topic="debug/visualization",
+        publish_probe_detection_done_topic="probe/detection_done",
+    ),
+    runtime_config=yolo.Yolo8ModelRuntimeConfig(
+        model_output_config=yolo.ModelPostprocessConfig(
+            conf_threshold=0.2,
+            iou_threshold=0.4,
+        ),
+        enable_blocking_mode=False,
+        enable_performance_probe=True,
+        enable_visualization=True,
+    ),
+)
+
+# PSG cpp 姿态检测pipeline节点配置
+# psg_all_detector_cpp <-> yolo_body_pose_detection_node
+psg_all_detector_cpp_node_pipeline_name = "psg_all_detector_cpp"
+psg_all_detector_cpp_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConfig(
+    init_config=psgPipelineBaseCfg.PipelineBaseInitConfig(
+        create_debug_pub=True,
+        input_port_config=psgInoutBaseCfg.InputPortConfig(
+            action_name="in/action",
+        ),
+        output_port_pipeline_config=psgPipelineBaseCfg.OutputPortConfig(
+            downstream_specs=[
+                psgPipelineBaseCfg.DownstreamSpec(
+                    name=psg_person_generator_node_name,
+                    action_name=f"/{psg_person_generator_node_name}/{psg_person_generator_node_json_params.init_config.input_port_config.action_name}",
+                )
             ],
-        },
-        "passengerflow_config_path": "/3d/chengxiao/data/passengerflow/fairmot_train_230907/psg_configs/20.22.6.30.json",
-    },
-    "runtime_config": {
-        **default_runtime_config,
-        "pipeline_enqueue_policy": default_enqueue_policy,
-        "pipeline_request_policy": default_request_policy,
-        "model_enqueue_policy": default_enqueue_policy,
-        "model_request_policy": default_request_policy,
-    },
-}
+        ),
+        output_port_model_config=psgPipelineBaseCfg.OutputPortConfig(
+            downstream_specs=[
+                psgPipelineBaseCfg.DownstreamSpec(
+                    name=det_node_name,
+                    action_name=f"/{det_node_name}/{det_node_params.init_config.detection_request_config.input_port_config.action_name}",
+                )
+            ],
+        ),
+    ),
+    runtime_config=psgPipelineBaseCfg.PipelineBaseRuntimeConfig(
+        publish_to_debug_topic=False,
+        enable_blocking_mode=False,
+        pipeline_enqueue_policy=psgCounterCfg.DeliveryPolicy(
+            drop_strategy="drop_as_needed",
+        ),
+        pipeline_request_policy=psgCounterCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
+        model_enqueue_policy=psgCounterCfg.DeliveryPolicy(
+            drop_strategy="drop_as_needed",
+        ),
+        model_request_policy=psgCounterCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
+    ),
+)
+
+# PSG主节点配置
+# psg_master_node -> psg_all_detector_cpp_node_pipeline
+psg_master_node_name = "psg_master_node"
+psg_master_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
+    init_config=psgInoutBaseCfg.InoutBaseInitConfig(
+        create_debug_pub=True,
+        input_port_config=psgInoutBaseCfg.InputPortConfig(
+            action_name="in/action",
+        ),
+        output_port_config=psgInoutBaseCfg.OutputPortConfig(
+            downstream_specs=[
+                psgInoutBaseCfg.DownstreamSpec(
+                    name=psg_all_detector_cpp_node_pipeline_name,
+                    action_name=f"/{psg_all_detector_cpp_node_pipeline_name}/{psg_all_detector_cpp_node_pipeline_json_params.init_config.input_port_config.action_name}",
+                )
+            ],
+        ),
+    ),
+    runtime_config=psgInoutBaseCfg.InoutBaseRuntimeConfig(
+        step_interval=StepIntervals.VeryFast,
+        document_interval=0,
+        enable_blocking_mode=False,
+        publish_to_debug_topic=False,
+        frame_request_policy=psgInoutBaseCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
+        frame_enqueue_policy=psgInoutBaseCfg.DeliveryPolicy(
+            drop_strategy="drop_as_needed",
+        ),
+    ),
+)
 
 
 # 视频源配置
@@ -154,168 +357,6 @@ video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
         output_image_encoding="bgr8",
     ),
 )
-
-# PSG主节点配置
-psg_master_node_name = "psg_master_node"
-psg_master_node_json_params = {
-    "declare_params": {},
-    "init_config": {
-        **default_init_config,
-        "output_port_config": {
-            **default_output_port_config,
-            "downstream_specs": [
-                {
-                    "name": "psg_all_detector_cpp",
-                    "action_name": "/psg_all_detector_cpp/in/action",
-                    "delivery_policy": default_delivery_policy,
-                }
-            ],
-        },
-        "create_debug_pub": True,
-        "debug_pub_queue_size": 10,
-        "debug_pub_task_enqueue_name": "debug_port/task_enqueue",
-        "debug_pub_task_drop_name": "debug_port/task_drop",
-    },
-    "runtime_config": {
-        **default_runtime_config,
-        "frame_enqueue_policy": default_enqueue_policy,
-        "frame_request_policy": default_request_policy,
-    },
-}
-
-# PSG cpp 姿态检测pipeline节点配置
-psg_all_detector_cpp_node_pipeline_json_params = {
-    "declare_params": {},
-    "init_config": {
-        **default_init_config,
-        "output_port_pipeline_config": {
-            **default_output_port_config,
-            "downstream_specs": [
-                {
-                    "name": "psg_person_generator",
-                    "action_name": "/psg_person_generator/in/action",
-                    "delivery_policy": default_delivery_policy,
-                }
-            ],
-        },
-        "output_port_model_config": {
-            "downstream_specs": [
-                {
-                    "name": "detector_with_pose",
-                    "action_name": "/detector_with_pose/in/detection_request",
-                    "delivery_policy": default_delivery_policy,
-                }
-            ]
-        },
-    },
-    "runtime_config": {
-        **default_runtime_config,
-        "frame_enqueue_policy": default_enqueue_policy,
-        "frame_request_policy": default_request_policy,
-    },
-}
-
-fn_model_nano = "/3d/chengxiao/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx"
-det_node_params = {
-    "declare_params": {},
-    "init_config": {
-        "model_configs": [
-            {
-                "model_path": fn_model_nano,
-                "device_type": "cuda",
-                "device_index": 0,
-            },
-        ],
-        "detection_request_config": {
-            "input_port_config": {
-                "buffer_capacity": 1,
-                "action_name": "in/detection_request",
-                "goal_result_expire_time": 1000000,
-            }
-        },
-        "publish_visualization_topic": "debug/visualization",
-        "publish_probe_detection_done_topic": "probe/detection_done",
-        "_time_unit": "us(1e-6)",
-    },
-    "runtime_config": {
-        "_time_unit": "us(1e-6)",
-        "step_interval": 1000,
-        "enable_blocking_mode": False,
-        "enable_performance_probe": True,
-        "model_output_config": {"conf_threshold": 0.1, "iou_threshold": 0.6},
-        "enable_visualization": True,
-    },
-}
-
-# PSG人员生成器节点配置
-psg_person_generator_node_json_params = {
-    "declare_params": {},
-    "init_config": {
-        **default_init_config,
-        "output_port_config": {
-            **default_output_port_config,
-            "downstream_specs": [
-                {
-                    "name": "psg_tracker_pipeline_node",
-                    "action_name": "/psg_tracker_pipeline_node/in/action",
-                    "delivery_policy": default_delivery_policy,
-                }
-            ],
-        },
-    },
-    "runtime_config": {
-        **default_runtime_config,
-        "pipeline_enqueue_policy": default_enqueue_policy,
-        "pipeline_request_policy": default_request_policy,
-        "model_enqueue_policy": default_enqueue_policy,
-        "model_request_policy": default_request_policy,
-    },
-}
-
-# PSG跟踪器节点配置
-psg_tracker_node_pipeline_json_params = {
-    "declare_params": {},
-    "init_config": {
-        **default_init_config,
-        "output_port_pipeline_config": {
-            **default_output_port_config,
-            "downstream_specs": [
-                {
-                    "name": "psg_counter",
-                    "action_name": "/psg_counter/in/action",
-                    "delivery_policy": default_delivery_policy,
-                }
-            ],
-        },
-        "output_port_model_config": {
-            "downstream_specs": [
-                {
-                    "name": "psg_tracker_node",
-                    "action_name": "/psg_tracker_node/in/action",
-                    "delivery_policy": default_delivery_policy,
-                }
-            ]
-        },
-    },
-    "runtime_config": {
-        **default_runtime_config,
-        "pipeline_enqueue_policy": default_enqueue_policy,
-        "pipeline_request_policy": default_request_policy,
-        "model_enqueue_policy": default_enqueue_policy,
-        "model_request_policy": default_request_policy,
-    },
-}
-
-# PSG跟踪器节点配置
-psg_tracker_node_json_params = {
-    "declare_params": {},
-    "init_config": {
-        **default_init_config,
-        "create_debug_pub": False,
-        "tracker_type": 1,
-    },
-    "runtime_config": {**default_runtime_config, "enable_debug_topics": False},
-}
 
 
 # common_prefix = ["valgrind --tool=callgrind --dump-instr=yes -v --instr-atstart=no"]

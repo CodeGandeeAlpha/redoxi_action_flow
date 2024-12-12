@@ -82,17 +82,26 @@ class PipelineBaseInitConfig(baseNodeCfg.BaseRosNodeInitConfig):
     input_port_config: portCfg.InputPortConfig | None = field(default=None)
     output_port_pipeline_config: portCfg.OutputPortConfig | None = field(default=None)
     output_port_model_config: portCfg.OutputPortConfig | None = field(default=None)
+    create_debug_pub: bool = field(default=False)
+    debug_pub_queue_size: int = field(default=10)
+    debug_pub_pipeline_enqueue_name: str = field(default="debug_port/pipeline_enqueue")
+    debug_pub_pipeline_drop_name: str = field(default="debug_port/pipeline_drop")
+    debug_pub_model_enqueue_name: str = field(default="debug_port/model_enqueue")
+    debug_pub_model_drop_name: str = field(default="debug_port/model_drop")
 
 
 @define(kw_only=True)
 class PipelineBaseRuntimeConfig(baseNodeCfg.BaseRosNodeRuntimeConfig):
-    frame_request_policy: portCfg.DeliveryPolicy = field(default=None)
-    frame_enqueue_policy: portCfg.DeliveryPolicy = field(default=None)
+    pipeline_enqueue_policy: portCfg.DeliveryPolicy = field(default=None)
+    model_enqueue_policy: portCfg.DeliveryPolicy = field(default=None)
+    pipeline_request_policy: portCfg.DeliveryPolicy = field(default=None)
+    model_request_policy: portCfg.DeliveryPolicy = field(default=None)
     enable_blocking_mode: bool = field(default=False)
+    publish_to_debug_topic: bool = field(default=False)
+    document_interval: int = field(default=0)
 
 
 @define(kw_only=True)
-class PipelineBaseRuntimeConfig(baseNodeCfg.BaseRosNodeRuntimeConfig):
-    frame_request_policy: portCfg.DeliveryPolicy = field(default=None)
-    frame_enqueue_policy: portCfg.DeliveryPolicy = field(default=None)
-    enable_blocking_mode: bool = field(default=False)
+class PipelineBaseNodeConfig(baseNodeCfg.BaseRosNodeConfig):
+    init_config: PipelineBaseInitConfig = field(default=None)
+    runtime_config: PipelineBaseRuntimeConfig = field(default=None)

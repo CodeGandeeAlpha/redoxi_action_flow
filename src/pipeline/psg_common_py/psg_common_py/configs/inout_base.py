@@ -85,6 +85,8 @@ class InoutBaseRuntimeConfig(baseNodeCfg.BaseRosNodeRuntimeConfig):
     frame_request_policy: portCfg.DeliveryPolicy = field(default=None)
     frame_enqueue_policy: portCfg.DeliveryPolicy = field(default=None)
     enable_blocking_mode: bool = field(default=False)
+    publish_to_debug_topic: bool = field(default=False)
+    document_interval: int = field(default=0)
 
 
 @define(kw_only=True)

@@ -38,6 +38,6 @@ class PSGCounterRuntimeConfig(inoutBaseCfg.InoutBaseRuntimeConfig):
 
 
 @define(kw_only=True)
-class InoutBaseNodeConfig(inoutBaseCfg.InoutBaseNodeConfig):
+class PSGCounterNodeConfig(inoutBaseCfg.InoutBaseNodeConfig):
     init_config: PSGCounterInitConfig = field(default=None)
     runtime_config: PSGCounterRuntimeConfig = field(default=None)
