@@ -18,13 +18,22 @@ concept DeliverySourceDataConcept = requires(T t)
     requires std::copyable<T>;
     requires std::is_default_constructible_v<T>;
 
-    //! The source data can be converted to this type for publishing
+    //! The source data can be converted to this type for visualization
     typename T::PubVisualizationMsgType_t;
     requires RosMessageConcept<typename T::PubVisualizationMsgType_t>;
 
-    //! Must have method to get ROS message
+    //! The source data can be converted to this type for unreliable data transmission
+    typename T::PubDataMsgType_t;
+    requires RosMessageConcept<typename T::PubDataMsgType_t>;
+
+    //! Convert to visualization message
     {
         std::declval<const T &>().to_publish_visualization(std::declval<typename T::PubVisualizationMsgType_t &>())
+        } -> std::same_as<int>;
+
+    //! Convert to data message for unreliable data transmission
+    {
+        std::declval<const T &>().to_publish_data(std::declval<typename T::PubDataMsgType_t &>())
         } -> std::same_as<int>;
 
     //! Must have method to get UUID
@@ -48,6 +57,10 @@ concept DeliveryTargetDataConcept = requires(T t)
     //! Must have publish message type, can be used for debug publishing
     typename T::PubVisualizationMsgType_t;
     requires RosMessageConcept<typename T::PubVisualizationMsgType_t>;
+
+    //! Must have publish message type for lossy data transmission
+    typename T::PubDataMsgType_t;
+    requires RosMessageConcept<typename T::PubDataMsgType_t>;
 
     //! Must have action data trait
     typename T::ActionDataTrait_t;
@@ -90,6 +103,11 @@ concept DeliveryTargetDataConcept = requires(T t)
     //! Must have method to convert to publish message
     {
         std::declval<const T &>().to_publish_visualization(std::declval<typename T::PubVisualizationMsgType_t &>())
+        } -> std::same_as<int>;
+
+    //! Must have method to convert to unreliable data transmission message
+    {
+        std::declval<const T &>().to_publish_data(std::declval<typename T::PubDataMsgType_t &>())
         } -> std::same_as<int>;
 
     //! Get/set task metadata
@@ -273,20 +291,29 @@ concept DownstreamSpecConcept = requires(T t)
     //! Must have delivery policy type
     typename T::DeliveryPolicy_t;
 
-    //! Must have publisher type for source data
+    //! Must have publisher and message type for source data visualization
     typename T::SourceVisualizationPublisher_t;
-    //! Must have publisher type for target data
-    typename T::TargetVisualizationPublisher_t;
-    //! Must have publish message type for source data
     typename T::SourcePubVisualizationMsgType_t;
-    //! Must have publish message type for target data
-    typename T::TargetPubVisualizationMsgType_t;
-
-    //! Message types must match publisher message types
     requires RosPublisherConcept<typename T::SourceVisualizationPublisher_t>;
-    requires RosPublisherConcept<typename T::TargetVisualizationPublisher_t>;
     requires std::same_as<typename T::SourcePubVisualizationMsgType_t, typename T::SourceVisualizationPublisher_t::MessageType_t>;
+
+    //! Must have publisher and message type for source data lossy data transmission
+    typename T::SourceDataPublisher_t;
+    typename T::SourcePubDataMsgType_t;
+    requires RosPublisherConcept<typename T::SourceDataPublisher_t>;
+    requires std::same_as<typename T::SourcePubDataMsgType_t, typename T::SourceDataPublisher_t::MessageType_t>;
+
+    //! Must have publisher and message type for target data visualization
+    typename T::TargetVisualizationPublisher_t;
+    typename T::TargetPubVisualizationMsgType_t;
+    requires RosPublisherConcept<typename T::TargetVisualizationPublisher_t>;
     requires std::same_as<typename T::TargetPubVisualizationMsgType_t, typename T::TargetVisualizationPublisher_t::MessageType_t>;
+
+    //! Must have publisher and message type for target data lossy data transmission
+    typename T::TargetDataPublisher_t;
+    typename T::TargetPubDataMsgType_t;
+    requires RosPublisherConcept<typename T::TargetDataPublisher_t>;
+    requires std::same_as<typename T::TargetPubDataMsgType_t, typename T::TargetDataPublisher_t::MessageType_t>;
 
     //! Delivery policy type must satisfy DeliveryPolicyConcept
     requires DeliveryPolicyConcept<typename T::DeliveryPolicy_t>;
@@ -323,6 +350,14 @@ concept DownstreamSpecConcept = requires(T t)
     {
         std::declval<const T &>().get_use_debug_publish()
         } -> std::same_as<bool>;
+
+    //! Must have method to get unreliable data transmission topic
+    {
+        std::declval<T &>().get_data_topic_source_data_succeeded()
+        } -> std::same_as<std::optional<std::string>>;
+    {
+        std::declval<T &>().get_data_topic_target_data_succeeded()
+        } -> std::same_as<std::optional<std::string>>;
 
     //! Must have methods to get source data debug topics
     {
@@ -455,6 +490,14 @@ concept DownstreamConcept = requires(T t)
             std::declval<const typename T::DownstreamSpec_t &>(),
             std::declval<rclcpp::Node *>())
         } -> std::same_as<int>;
+
+    //! Must have method to get source data debug publishers
+    {
+        std::declval<const T &>().get_data_pub_source_data_succeeded()
+        } -> std::same_as<std::shared_ptr<typename T::SourceDataPublisher_t>>;
+    {
+        std::declval<T &>().get_data_pub_target_data_succeeded()
+        } -> std::same_as<std::shared_ptr<typename T::TargetDataPublisher_t>>;
 
     //! Get source data debug publishers
     {

@@ -162,9 +162,11 @@ static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
               "DeliveryTask must satisfy DeliveryTaskConcept");
 
 using Downstream = image_ports::types::DownstreamBaseWithImagePub<
-    DetectionRequestActionType, DeliveryPolicy>;
+    DetectionRequestActionType, DeliveryPolicy,
+    NoneRosPublisher<typename DeliverySourceData::PubDataMsgType_t>,
+    output_port_types::DefaultTargetDataPublisher<DetectionRequestActionType>>;
 // using DownstreamDebugPublisher = Downstream::SourceVisualizationPublisher_t;
-using DownstreamSpec = Downstream::DownstreamSpec_t;
+using DownstreamSpec = typename Downstream::DownstreamSpec_t;
 
 //! Init config type for detection request output port
 using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;

@@ -596,6 +596,42 @@ class AsyncActionOutputPort : public IStartStopProtocol
         return 0;
     }
 
+    /**
+     * @brief Publish data message when successfully sent to downstream
+     * @param source_data The source data to publish, if nullptr, no source data will be published
+     * @param target_data The target data to publish, if nullptr, no target data will be published
+     * @param ds The downstream node to publish to
+     * @param ith_attempt Current attempt number
+     * @param max_attempts Maximum number of attempts allowed
+     * @return 0 on success, otherwise return error code
+     */
+    virtual int _data_publish_sent_to_downstream(const SourceData_t *source_data,
+                                                 const TargetData_t *target_data,
+                                                 const Downstream_t &ds,
+                                                 int64_t ith_attempt,
+                                                 int64_t max_attempts)
+    {
+        if (source_data != nullptr) {
+            auto pub = ds.get_data_pub_source_data_succeeded();
+            if (pub != nullptr) {
+                typename SourceData_t::PubDataMsgType_t source_pub_msg;
+                source_data->to_publish_data(source_pub_msg);
+                auto s = fmt::format("[SENT] attempt {}/{}", ith_attempt, max_attempts);
+                pub->publish(source_pub_msg, s);
+            }
+        }
+        if (target_data != nullptr) {
+            auto pub = ds.get_data_pub_target_data_succeeded();
+            if (pub != nullptr) {
+                typename TargetData_t::PubDataMsgType_t target_pub_msg;
+                target_data->to_publish_data(target_pub_msg);
+                auto s = fmt::format("[SENT] attempt {}/{}", ith_attempt, max_attempts);
+                pub->publish(target_pub_msg, s);
+            }
+        }
+        return 0;
+    }
+
     virtual int _create_target_data(TargetData_t &target_data, const DeliveryRequest_t &request)
     {
         request.to_target_data(target_data);
@@ -849,6 +885,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
                             //! Publish the frame sent message
                             _debug_publish_sent_to_downstream(nullptr, &target_data, ds, attempts + 1, max_attempts);
+
+                            //! Publish the data sent message
+                            _data_publish_sent_to_downstream(nullptr, &target_data, ds, attempts + 1, max_attempts);
 
                             return 0; // Success
                         case ActionDownstreamResponse::REJECTED:

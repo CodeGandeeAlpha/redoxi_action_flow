@@ -21,9 +21,10 @@ using RetryPolicy = redoxi_works::output_port_types::DefaultRetryPolicy<TimeUnit
 class DeliverySourceData
 {
   public:
-    using PubVisualizationMsgType_t = sensor_msgs::msg::Image;
     using Detection_t = redoxi_public_msgs::msg::Detection;
     using FrameData_t = image_ports::types::FrameWithMetadata;
+    using PubVisualizationMsgType_t = sensor_msgs::msg::Image;
+    using PubDataMsgType_t = TrackingRequestActionType::Goal;
 
   public:
     virtual ~DeliverySourceData() = default;
@@ -37,6 +38,13 @@ class DeliverySourceData
     void set_uuid(const UUIDType &uid)
     {
         this->uid = uid;
+    }
+
+    virtual int to_publish_data(PubDataMsgType_t &msg) const
+    {
+        msg.detections = detections;
+        frame_data.to_frame_msg(msg.frame_bundle.primary_frame);
+        return 0;
     }
 
     // to publish message
@@ -193,7 +201,8 @@ static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
               "DeliveryTask must satisfy DeliveryTaskConcept");
 
 using Downstream = image_ports::types::DownstreamBaseWithImagePub<
-    TrackingRequestActionType, DeliveryPolicy>;
+    TrackingRequestActionType, DeliveryPolicy,
+    NoneRosPublisher<DeliverySourceData::PubDataMsgType_t>>;
 using DownstreamSpec = Downstream::DownstreamSpec_t;
 
 //! Init config type for detection request output port

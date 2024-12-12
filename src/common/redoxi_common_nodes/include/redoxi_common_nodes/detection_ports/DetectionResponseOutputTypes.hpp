@@ -24,9 +24,10 @@ using RetryPolicy = output_port_types::DefaultRetryPolicy<TimeUnit>;
 class DeliverySourceData
 {
   public:
-    using PubVisualizationMsgType_t = sensor_msgs::msg::Image;
     using ActionDataTrait_t = DetectionResponseActionDataTrait;
     using FrameData_t = image_ports::types::FrameWithMetadata;
+    using PubVisualizationMsgType_t = sensor_msgs::msg::Image;
+    using PubDataMsgType_t = DetectionResponseActionType::Goal;
 
     DeliverySourceData()
     {
@@ -41,6 +42,15 @@ class DeliverySourceData
     virtual boost::uuids::uuid get_uuid() const
     {
         return uid;
+    }
+
+    virtual int to_publish_data(PubDataMsgType_t &msg) const
+    {
+        msg.detections = detections;
+        if (frame_data.has_value()) {
+            frame_data->to_frame_msg(msg.frame_bundle.primary_frame);
+        }
+        return 0;
     }
 
     //! Convert the source data to a ROS message for publishing
@@ -189,8 +199,10 @@ static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
 
 
 using Downstream = image_ports::types::DownstreamBaseWithImagePub<
-    DetectionResponseActionType, DeliveryPolicy>;
-using DownstreamSpec = Downstream::DownstreamSpec_t;
+    DetectionResponseActionType, DeliveryPolicy,
+    NoneRosPublisher<typename DeliverySourceData::PubDataMsgType_t>,
+    output_port_types::DefaultTargetDataPublisher<DetectionResponseActionType>>;
+using DownstreamSpec = typename Downstream::DownstreamSpec_t;
 static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
               "DownstreamSpec must satisfy DownstreamSpecConcept");
 

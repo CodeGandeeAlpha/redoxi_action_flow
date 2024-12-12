@@ -190,6 +190,7 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
         frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
             drop_strategy=videoSrcCfg.DropStrategy.DontCare,
         ),
+        # output_image_size={"width": 1920, "height": 1080},
     ),
 )
 

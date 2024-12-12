@@ -2,6 +2,7 @@
 
 #include <opencv2/opencv.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
+#include <redoxi_common_cpp/common_concepts.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <string>
 #include <optional>
@@ -36,6 +37,9 @@ class StampedImagePub
              const std::string &topic_name,
              std::optional<rclcpp::QoS> qos = std::nullopt);
 
+    //! Initialize the publisher with inner publisher
+    void init(std::shared_ptr<Publisher_t> pub);
+
     //! Get the publisher
     Publisher_t::SharedPtr get_publisher() const;
 
@@ -68,4 +72,7 @@ class StampedImagePub
     Publisher_t::SharedPtr m_pub;
     rclcpp::Node *m_node = nullptr;
 };
+static_assert(RosPublisherConcept<StampedImagePub>,
+              "StampedImagePub must satisfy RosPublisherConcept");
+
 } // namespace redoxi_works
