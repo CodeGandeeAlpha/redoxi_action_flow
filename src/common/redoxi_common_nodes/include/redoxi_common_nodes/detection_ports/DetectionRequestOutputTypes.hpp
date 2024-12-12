@@ -22,7 +22,7 @@ using DeliverySourceData = image_ports::types::DeliverySourceData;
 //! Delivery target data type for detection request output port
 using DeliveryTargetDataBase = output_port_types::DefaultTargetData<DetectionRequestActionType,
                                                                     DetectionRequestActionDataTrait,
-                                                                    DeliverySourceData::PublishMessageType_t>;
+                                                                    DeliverySourceData::PubVisualizationMsgType_t>;
 
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
@@ -39,7 +39,7 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     {
     }
 
-    virtual int to_publish_message(PublishMessageType_t &msg) const
+    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
     {
         auto vis_image = get_visualization_frame();
         if (vis_image.is_empty()) {
@@ -163,7 +163,7 @@ static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
 
 using Downstream = image_ports::types::DownstreamBaseWithImagePub<
     DetectionRequestActionType, DeliveryPolicy>;
-// using DownstreamDebugPublisher = Downstream::SourcePublisherType_t;
+// using DownstreamDebugPublisher = Downstream::SourceVisualizationPublisher_t;
 using DownstreamSpec = Downstream::DownstreamSpec_t;
 
 //! Init config type for detection request output port
@@ -194,19 +194,19 @@ struct DetectionRequestOutputPortSpec {
     using DeliverySourceData_t = DeliverySourceData;
 
     //! Source data publish message type
-    using SourcePublishMessageType_t = DeliverySourceData::PublishMessageType_t;
+    using SourcePubVisualizationMsgType_t = DeliverySourceData::PubVisualizationMsgType_t;
 
     //! Source data publisher type
-    using SourcePublisherType_t = DownstreamSpec::SourcePublisherType_t;
+    using SourceVisualizationPublisher_t = DownstreamSpec::SourceVisualizationPublisher_t;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
 
     //! Target data publish message type
-    using TargetPublishMessageType_t = DeliveryTargetData::PublishMessageType_t;
+    using TargetPubVisualizationMsgType_t = DeliveryTargetData::PubVisualizationMsgType_t;
 
     //! Target data publisher type
-    using TargetPublisherType_t = DownstreamSpec::TargetPublisherType_t;
+    using TargetVisualizationPublisher_t = DownstreamSpec::TargetVisualizationPublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;

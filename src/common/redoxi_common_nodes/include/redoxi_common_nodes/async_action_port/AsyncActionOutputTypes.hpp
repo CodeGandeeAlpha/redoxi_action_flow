@@ -58,11 +58,11 @@ static_assert(RosPublisherConcept<_SampleTargetPublisher>,
 
 //! Sample source data type, used to test whether the concepts are working
 struct _SampleSourceData {
-    using PublishMessageType_t = _SampleImage;
+    using PubVisualizationMsgType_t = _SampleImage;
 
     _SampleSourceData() = default;
 
-    int to_publish_message(PublishMessageType_t &) const
+    int to_publish_visualization(PubVisualizationMsgType_t &) const
     {
         return 0;
     }
@@ -206,7 +206,7 @@ class DefaultTargetData
     //! The ROS message type that this target data wraps
     using ActionType_t = ActionType;
     using Goal_t = typename ActionType_t::Goal;
-    using PublishMessageType_t = PublishMessageType;
+    using PubVisualizationMsgType_t = PublishMessageType;
     using ActionDataTrait_t = ActionDataTrait;
 
     virtual ~DefaultTargetData() = default;
@@ -253,7 +253,7 @@ class DefaultTargetData
     }
 
     //! Convert to publish message
-    virtual int to_publish_message(PublishMessageType_t &) const
+    virtual int to_publish_visualization(PubVisualizationMsgType_t &) const
     {
         return 0;
     }
@@ -621,10 +621,10 @@ class DefaultDownstreamSpec
   public:
     using ActionType_t = ActionType;
     using DeliveryPolicy_t = DeliveryPolicyType;
-    using SourcePublisherType_t = SourceDataPublisherType;
-    using TargetPublisherType_t = TargetDataPublisherType;
-    using SourcePublishMessageType_t = typename SourcePublisherType_t::MessageType_t;
-    using TargetPublishMessageType_t = typename TargetPublisherType_t::MessageType_t;
+    using SourceVisualizationPublisher_t = SourceDataPublisherType;
+    using TargetVisualizationPublisher_t = TargetDataPublisherType;
+    using SourcePubVisualizationMsgType_t = typename SourceVisualizationPublisher_t::MessageType_t;
+    using TargetPubVisualizationMsgType_t = typename TargetVisualizationPublisher_t::MessageType_t;
 
     virtual ~DefaultDownstreamSpec() = default;
 
@@ -677,99 +677,99 @@ class DefaultDownstreamSpec
         return this->create_debug_pub;
     }
     //! Get the debug topic for source data sending
-    virtual std::optional<std::string> get_debug_topic_source_data_sending() const
+    virtual std::optional<std::string> get_vis_topic_source_data_sending() const
     {
         if (this->debug_topic_source_data_sending.has_value()) {
             return this->debug_topic_source_data_sending;
         }
-        return make_debug_topic_name(this->name, "source", "sending");
+        return make_vis_topic_name(this->name, "source", "sending");
     }
 
     //! Set the debug topic for source data sending
-    virtual void set_debug_topic_source_data_sending(const std::optional<std::string> &topic)
+    virtual void set_vis_topic_source_data_sending(const std::optional<std::string> &topic)
     {
         this->debug_topic_source_data_sending = topic;
     }
 
     //! Get the debug topic for source data succeeded
-    virtual std::optional<std::string> get_debug_topic_source_data_succeeded() const
+    virtual std::optional<std::string> get_vis_topic_source_data_succeeded() const
     {
         if (this->debug_topic_source_data_succeeded.has_value()) {
             return this->debug_topic_source_data_succeeded;
         }
-        return make_debug_topic_name(this->name, "source", "succeeded");
+        return make_vis_topic_name(this->name, "source", "succeeded");
     }
 
     //! Set the debug topic for source data succeeded
-    virtual void set_debug_topic_source_data_succeeded(const std::optional<std::string> &topic)
+    virtual void set_vis_topic_source_data_succeeded(const std::optional<std::string> &topic)
     {
         this->debug_topic_source_data_succeeded = topic;
     }
 
     //! Get the debug topic for source data failed
-    virtual std::optional<std::string> get_debug_topic_source_data_failed() const
+    virtual std::optional<std::string> get_vis_topic_source_data_failed() const
     {
         if (this->debug_topic_source_data_failed.has_value()) {
             return this->debug_topic_source_data_failed;
         }
-        return make_debug_topic_name(this->name, "source", "failed");
+        return make_vis_topic_name(this->name, "source", "failed");
     }
 
     //! Set the debug topic for source data failed
-    virtual void set_debug_topic_source_data_failed(const std::optional<std::string> &topic)
+    virtual void set_vis_topic_source_data_failed(const std::optional<std::string> &topic)
     {
         this->debug_topic_source_data_failed = topic;
     }
 
     //! Get the debug topic for target data sending
-    virtual std::optional<std::string> get_debug_topic_target_data_sending() const
+    virtual std::optional<std::string> get_vis_topic_target_data_sending() const
     {
         if (this->debug_topic_target_data_sending.has_value()) {
             return this->debug_topic_target_data_sending;
         }
-        return make_debug_topic_name(this->name, "target", "sending");
+        return make_vis_topic_name(this->name, "target", "sending");
     }
 
     //! Set the debug topic for target data sending
-    virtual void set_debug_topic_target_data_sending(const std::optional<std::string> &topic)
+    virtual void set_vis_topic_target_data_sending(const std::optional<std::string> &topic)
     {
         this->debug_topic_target_data_sending = topic;
     }
 
     //! Get the debug topic for target data succeeded
-    virtual std::optional<std::string> get_debug_topic_target_data_succeeded() const
+    virtual std::optional<std::string> get_vis_topic_target_data_succeeded() const
     {
         if (this->debug_topic_target_data_succeeded.has_value()) {
             return this->debug_topic_target_data_succeeded;
         }
-        return make_debug_topic_name(this->name, "target", "succeeded");
+        return make_vis_topic_name(this->name, "target", "succeeded");
     }
 
     //! Set the debug topic for target data succeeded
-    virtual void set_debug_topic_target_data_succeeded(const std::optional<std::string> &topic)
+    virtual void set_vis_topic_target_data_succeeded(const std::optional<std::string> &topic)
     {
         this->debug_topic_target_data_succeeded = topic;
     }
 
     //! Get the debug topic for target data failed
-    virtual std::optional<std::string> get_debug_topic_target_data_failed() const
+    virtual std::optional<std::string> get_vis_topic_target_data_failed() const
     {
         if (this->debug_topic_target_data_failed.has_value()) {
             return this->debug_topic_target_data_failed;
         }
-        return make_debug_topic_name(this->name, "target", "failed");
+        return make_vis_topic_name(this->name, "target", "failed");
     }
 
     //! Set the debug topic for target data failed
-    virtual void set_debug_topic_target_data_failed(const std::optional<std::string> &topic)
+    virtual void set_vis_topic_target_data_failed(const std::optional<std::string> &topic)
     {
         this->debug_topic_target_data_failed = topic;
     }
 
   protected: // no m_ prefix so that you can use json serialization easier
-    static std::string make_debug_topic_name(const std::string &name,
-                                             const std::string &data_type,
-                                             const std::string &event)
+    static std::string make_vis_topic_name(const std::string &name,
+                                           const std::string &data_type,
+                                           const std::string &event)
     {
         std::string output = fmt::format("downstream_debug/{}/{}/{}", name, data_type, event);
         // Remove consecutive forward slashes using std::unique
@@ -910,10 +910,10 @@ class DefaultDownstream
     using ActionClient_t = rclcpp_action::Client<ActionType_t>;
     using GoalHandle_t = typename ActionClient_t::GoalHandle;
     using SendGoalOptions_t = typename ActionClient_t::SendGoalOptions;
-    using SourcePublishMessageType_t = typename DownstreamSpec_t::SourcePublishMessageType_t;
-    using TargetPublishMessageType_t = typename DownstreamSpec_t::TargetPublishMessageType_t;
-    using SourcePublisherType_t = typename DownstreamSpec_t::SourcePublisherType_t;
-    using TargetPublisherType_t = typename DownstreamSpec_t::TargetPublisherType_t;
+    using SourcePubVisualizationMsgType_t = typename DownstreamSpec_t::SourcePubVisualizationMsgType_t;
+    using TargetPubVisualizationMsgType_t = typename DownstreamSpec_t::TargetPubVisualizationMsgType_t;
+    using SourceVisualizationPublisher_t = typename DownstreamSpec_t::SourceVisualizationPublisher_t;
+    using TargetVisualizationPublisher_t = typename DownstreamSpec_t::TargetVisualizationPublisher_t;
 
     //! Virtual destructor
     virtual ~DefaultDownstream() = default;
@@ -946,37 +946,37 @@ class DefaultDownstream
     }
 
     //! Get debug publisher for source data sending
-    virtual std::shared_ptr<SourcePublisherType_t> get_debug_pub_source_data_sending() const
+    virtual std::shared_ptr<SourceVisualizationPublisher_t> get_debug_pub_source_data_sending() const
     {
         return m_debug_pub_source_data_sending;
     }
 
     //! Get debug publisher for source data succeeded
-    virtual std::shared_ptr<SourcePublisherType_t> get_debug_pub_source_data_succeeded() const
+    virtual std::shared_ptr<SourceVisualizationPublisher_t> get_debug_pub_source_data_succeeded() const
     {
         return m_debug_pub_source_data_succeeded;
     }
 
     //! Get debug publisher for source data failed
-    virtual std::shared_ptr<SourcePublisherType_t> get_debug_pub_source_data_failed() const
+    virtual std::shared_ptr<SourceVisualizationPublisher_t> get_debug_pub_source_data_failed() const
     {
         return m_debug_pub_source_data_failed;
     }
 
     //! Get debug publisher for target data sending
-    virtual std::shared_ptr<TargetPublisherType_t> get_debug_pub_target_data_sending() const
+    virtual std::shared_ptr<TargetVisualizationPublisher_t> get_debug_pub_target_data_sending() const
     {
         return m_debug_pub_target_data_sending;
     }
 
     //! Get debug publisher for target data succeeded
-    virtual std::shared_ptr<TargetPublisherType_t> get_debug_pub_target_data_succeeded() const
+    virtual std::shared_ptr<TargetVisualizationPublisher_t> get_debug_pub_target_data_succeeded() const
     {
         return m_debug_pub_target_data_succeeded;
     }
 
     //! Get debug publisher for target data failed
-    virtual std::shared_ptr<TargetPublisherType_t> get_debug_pub_target_data_failed() const
+    virtual std::shared_ptr<TargetVisualizationPublisher_t> get_debug_pub_target_data_failed() const
     {
         return m_debug_pub_target_data_failed;
     }
@@ -1011,12 +1011,12 @@ class DefaultDownstream
   protected:
     DownstreamSpec_t m_downstream_spec;
     typename ActionClient_t::SharedPtr m_action_client;
-    std::shared_ptr<SourcePublisherType_t> m_debug_pub_source_data_sending;
-    std::shared_ptr<SourcePublisherType_t> m_debug_pub_source_data_succeeded;
-    std::shared_ptr<SourcePublisherType_t> m_debug_pub_source_data_failed;
-    std::shared_ptr<TargetPublisherType_t> m_debug_pub_target_data_sending;
-    std::shared_ptr<TargetPublisherType_t> m_debug_pub_target_data_succeeded;
-    std::shared_ptr<TargetPublisherType_t> m_debug_pub_target_data_failed;
+    std::shared_ptr<SourceVisualizationPublisher_t> m_debug_pub_source_data_sending;
+    std::shared_ptr<SourceVisualizationPublisher_t> m_debug_pub_source_data_succeeded;
+    std::shared_ptr<SourceVisualizationPublisher_t> m_debug_pub_source_data_failed;
+    std::shared_ptr<TargetVisualizationPublisher_t> m_debug_pub_target_data_sending;
+    std::shared_ptr<TargetVisualizationPublisher_t> m_debug_pub_target_data_succeeded;
+    std::shared_ptr<TargetVisualizationPublisher_t> m_debug_pub_target_data_failed;
     rclcpp::Node *m_node{nullptr};
 };
 using _SampleDownstream = DefaultDownstream<_SampleDownstreamSpec>;
@@ -1059,13 +1059,13 @@ concept AsyncActionOutputPortSpecConcept = requires(T t)
     requires DeliverySourceDataConcept<typename T::DeliverySourceData_t>;
 
     //! Source data publish message type
-    typename T::SourcePublishMessageType_t;
-    requires std::same_as<typename T::SourcePublishMessageType_t, typename T::DeliverySourceData_t::PublishMessageType_t>;
+    typename T::SourcePubVisualizationMsgType_t;
+    requires std::same_as<typename T::SourcePubVisualizationMsgType_t, typename T::DeliverySourceData_t::PubVisualizationMsgType_t>;
 
     //! Publisher types for downstream debug publishing
-    typename T::SourcePublisherType_t;
-    requires RosPublisherConcept<typename T::SourcePublisherType_t>;
-    requires std::same_as<typename T::SourcePublisherType_t::MessageType_t, typename T::SourcePublishMessageType_t>;
+    typename T::SourceVisualizationPublisher_t;
+    requires RosPublisherConcept<typename T::SourceVisualizationPublisher_t>;
+    requires std::same_as<typename T::SourceVisualizationPublisher_t::MessageType_t, typename T::SourcePubVisualizationMsgType_t>;
 
     //! Target data type
     typename T::DeliveryTargetData_t;
@@ -1074,12 +1074,12 @@ concept AsyncActionOutputPortSpecConcept = requires(T t)
     requires std::same_as<typename T::DeliveryTargetData_t::Goal_t, typename T::ActionGoal_t>;
 
     //! Target data publish message type
-    typename T::TargetPublishMessageType_t;
-    requires std::same_as<typename T::TargetPublishMessageType_t, typename T::DeliveryTargetData_t::PublishMessageType_t>;
+    typename T::TargetPubVisualizationMsgType_t;
+    requires std::same_as<typename T::TargetPubVisualizationMsgType_t, typename T::DeliveryTargetData_t::PubVisualizationMsgType_t>;
 
-    typename T::TargetPublisherType_t;
-    requires RosPublisherConcept<typename T::TargetPublisherType_t>;
-    requires std::same_as<typename T::TargetPublisherType_t::MessageType_t, typename T::TargetPublishMessageType_t>;
+    typename T::TargetVisualizationPublisher_t;
+    requires RosPublisherConcept<typename T::TargetVisualizationPublisher_t>;
+    requires std::same_as<typename T::TargetVisualizationPublisher_t::MessageType_t, typename T::TargetPubVisualizationMsgType_t>;
 
     //! Stamp type
     typename T::DeliveryStamp_t;
@@ -1108,8 +1108,8 @@ concept AsyncActionOutputPortSpecConcept = requires(T t)
     requires DownstreamSpecConcept<typename T::DownstreamSpec_t>;
     requires std::same_as<typename T::DownstreamSpec_t::ActionType_t, typename T::ActionType_t>;
     requires std::same_as<typename T::DownstreamSpec_t::DeliveryPolicy_t, typename T::DeliveryPolicy_t>;
-    requires std::same_as<typename T::DownstreamSpec_t::SourcePublisherType_t, typename T::SourcePublisherType_t>;
-    requires std::same_as<typename T::DownstreamSpec_t::TargetPublisherType_t, typename T::TargetPublisherType_t>;
+    requires std::same_as<typename T::DownstreamSpec_t::SourceVisualizationPublisher_t, typename T::SourceVisualizationPublisher_t>;
+    requires std::same_as<typename T::DownstreamSpec_t::TargetVisualizationPublisher_t, typename T::TargetVisualizationPublisher_t>;
 
     //! Config types
     typename T::InitConfig_t;
@@ -1144,14 +1144,14 @@ struct _SampleAsyncActionOutputPortSpec {
     using DeliveryTargetData_t = _SampleTargetData;
 
     //! Source publisher type
-    using SourcePublisherType_t = _SampleSourcePublisher;
+    using SourceVisualizationPublisher_t = _SampleSourcePublisher;
     //! Target publisher type
-    using TargetPublisherType_t = _SampleTargetPublisher;
+    using TargetVisualizationPublisher_t = _SampleTargetPublisher;
 
     //! Source publish message type
-    using SourcePublishMessageType_t = typename SourcePublisherType_t::MessageType_t;
+    using SourcePubVisualizationMsgType_t = typename SourceVisualizationPublisher_t::MessageType_t;
     //! Target publish message type
-    using TargetPublishMessageType_t = typename TargetPublisherType_t::MessageType_t;
+    using TargetPubVisualizationMsgType_t = typename TargetVisualizationPublisher_t::MessageType_t;
     //! Delivery policy type
     using DeliveryPolicy_t = _SampleDeliveryPolicy;
     //! Stamp type

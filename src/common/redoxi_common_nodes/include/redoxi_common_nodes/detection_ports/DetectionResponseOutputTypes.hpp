@@ -24,7 +24,7 @@ using RetryPolicy = output_port_types::DefaultRetryPolicy<TimeUnit>;
 class DeliverySourceData
 {
   public:
-    using PublishMessageType_t = sensor_msgs::msg::Image;
+    using PubVisualizationMsgType_t = sensor_msgs::msg::Image;
     using ActionDataTrait_t = DetectionResponseActionDataTrait;
     using FrameData_t = image_ports::types::FrameWithMetadata;
 
@@ -44,7 +44,7 @@ class DeliverySourceData
     }
 
     //! Convert the source data to a ROS message for publishing
-    virtual int to_publish_message(PublishMessageType_t &msg) const
+    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
     {
         if (!frame_data.has_value() || frame_data->is_empty()) {
             // no image to publish
@@ -93,7 +93,7 @@ class DeliverySourceData
 //! Delivery target data type for detection output port
 using DeliveryTargetDataBase = output_port_types::DefaultTargetData<DetectionResponseActionType,
                                                                     DetectionResponseActionDataTrait,
-                                                                    DeliverySourceData::PublishMessageType_t>;
+                                                                    DeliverySourceData::PubVisualizationMsgType_t>;
 
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
@@ -110,12 +110,12 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     {
     }
 
-    virtual int to_publish_message(PublishMessageType_t &msg) const
+    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
     {
         DeliverySourceData tmp;
         tmp.detections = this->m_goal.detections;
         tmp.frame_data = this->frame_data;
-        return tmp.to_publish_message(msg);
+        return tmp.to_publish_visualization(msg);
     }
 
     // auxiliary data for easy extension without inheritance
@@ -225,19 +225,19 @@ struct DetectionResponseOutputPortSpec {
     using DeliverySourceData_t = DeliverySourceData;
 
     //! Source data publish message type
-    using SourcePublishMessageType_t = DeliverySourceData::PublishMessageType_t;
+    using SourcePubVisualizationMsgType_t = DeliverySourceData::PubVisualizationMsgType_t;
 
     //! Source data publisher type
-    using SourcePublisherType_t = DownstreamSpec::SourcePublisherType_t;
+    using SourceVisualizationPublisher_t = DownstreamSpec::SourceVisualizationPublisher_t;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
 
     //! Target data publish message type
-    using TargetPublishMessageType_t = DeliveryTargetData::PublishMessageType_t;
+    using TargetPubVisualizationMsgType_t = DeliveryTargetData::PubVisualizationMsgType_t;
 
     //! Target data publisher type
-    using TargetPublisherType_t = DownstreamSpec::TargetPublisherType_t;
+    using TargetVisualizationPublisher_t = DownstreamSpec::TargetVisualizationPublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;
