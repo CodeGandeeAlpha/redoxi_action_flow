@@ -3,6 +3,11 @@ from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
 from launch.actions import SetEnvironmentVariable
 from launch.actions import DeclareLaunchArgument
+
+import redoxi_common_py.configs.video_source_from_url as videoSrcCfg
+import pipeline.psg_common_py.configs.psg_document_sink as psgDocSinkCfg
+import pipeline.psg_common_py.configs.pipeline_base as psgPipelineBaseCfg
+import pipeline.psg_common_py.configs.inout_base as psgInoutBaseCfg
 import json
 
 logger = LaunchConfiguration("log_level")
@@ -11,6 +16,15 @@ log_level_arg = DeclareLaunchArgument(
     default_value="info",
     description="Logging level",
 )
+
+
+class StepIntervals:
+    VerySlow = 3000000
+    Slow = 200000
+    Medium = 1000000 / 25
+    Fast = 5000
+    VeryFast = 1000
+
 
 fn_video = (
     # "/3d/chengxiao/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
@@ -58,43 +72,91 @@ default_runtime_config = {
     "publish_to_debug_topic": False,
 }
 
-# 视频源配置
-video_source_params = {
+# 文档接收节点配置
+# psg_counter -> document_sink
+document_sink_node_name = "document_sink"
+document_sink_node_json_params = psgDocSinkCfg.PSGDocumentSinkNodeConfig(
+    init_config=psgDocSinkCfg.PSGDocumentSinkNodeInitConfig(
+        input_port_config=psgDocSinkCfg.InputPortConfig(
+            action_name="in/action",
+        ),
+        publish_topic="out/relayed_document",
+    ),
+    runtime_config=psgDocSinkCfg.PSGDocumentSinkNodeRuntimeConfig(
+        enable_debug_topics=True,
+        enable_blocking_mode=False,
+    ),
+)
+
+# PSG计数器节点配置
+# psg_tracker_pipeline_node -> psg_counter
+psg_counter_node_name = "psg_counter"
+psg_counter_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
+    init_config=psgInoutBaseCfg.InoutBaseInitConfig(
+        create_debug_pub=True,
+        input_port_config=psgInoutBaseCfg.InputPortConfig(
+            action_name="in/action",
+        ),
+        output_port_config=psgInoutBaseCfg.OutputPortConfig(
+            downstream_specs=[
+                psgInoutBaseCfg.DownstreamSpec(
+                    name="document_sink",
+                    action_name="/document_sink/in/action",
+                    delivery_policy=default_delivery_policy,
+                )
+            ],
+        ),
+    ),
+)
+psg_counter_node_json_params = {
     "declare_params": {},
     "init_config": {
         **default_init_config,
-        "video_url": fn_video,
-        "auto_replay": True,
-        "primary_output_spec": {
+        "output_port_config": {
             **default_output_port_config,
             "downstream_specs": [
                 {
-                    "name": "psg_master_node",
-                    "action_name": "/psg_master_node/in/action",
+                    "name": "document_sink",
+                    "action_name": "/document_sink/in/action",
                     "delivery_policy": default_delivery_policy,
-                    "create_debug_pub": False,
                 }
             ],
         },
-        "create_debug_pub": False,
-        "debug_pub_queue_size": 10,
-        "debug_pub_task_enqueue_name": "debug_port/task_enqueue",
-        "debug_pub_task_drop_name": "debug_port/task_drop",
+        "passengerflow_config_path": "/3d/chengxiao/data/passengerflow/fairmot_train_230907/psg_configs/20.22.6.30.json",
     },
     "runtime_config": {
         **default_runtime_config,
-        "video_start_time": 0,
-        "video_end_time": -1,
-        "output_image_size": {"width": 1920, "height": 1080},
-        "output_image_encoding": "bgr8",
-        "publish_to_debug_topic": True,
-        "frame_enqueue_policy": default_enqueue_policy,
-        "frame_request_policy": default_request_policy,
-        "step_interval": 50000,
+        "pipeline_enqueue_policy": default_enqueue_policy,
+        "pipeline_request_policy": default_request_policy,
+        "model_enqueue_policy": default_enqueue_policy,
+        "model_request_policy": default_request_policy,
     },
 }
 
+
+# 视频源配置
+video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
+    init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
+        video_url=fn_video,
+        auto_replay=True,
+        primary_output_spec=videoSrcCfg.OutputPortConfig(
+            downstream_specs=[
+                videoSrcCfg.DownstreamSpec(
+                    name=psg_master_node_name,
+                    action_name=f"/{psg_master_node_name}/{psg_master_node_json_params.init_config.input_port_config.action_name}",
+                ),
+            ],
+        ),
+    ),
+    runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
+        step_interval=StepIntervals.Medium,
+        output_image_size={"width": 1920, "height": 1080},
+        output_image_encoding="bgr8",
+    ),
+)
+
 # PSG主节点配置
+psg_master_node_name = "psg_master_node"
 psg_master_node_json_params = {
     "declare_params": {},
     "init_config": {
@@ -255,42 +317,6 @@ psg_tracker_node_json_params = {
     "runtime_config": {**default_runtime_config, "enable_debug_topics": False},
 }
 
-# PSG计数器节点配置
-psg_counter_node_json_params = {
-    "declare_params": {},
-    "init_config": {
-        **default_init_config,
-        "output_port_config": {
-            **default_output_port_config,
-            "downstream_specs": [
-                {
-                    "name": "document_sink",
-                    "action_name": "/document_sink/in/action",
-                    "delivery_policy": default_delivery_policy,
-                }
-            ],
-        },
-        "passengerflow_config_path": "/3d/chengxiao/data/passengerflow/fairmot_train_230907/psg_configs/20.22.6.30.json",
-    },
-    "runtime_config": {
-        **default_runtime_config,
-        "pipeline_enqueue_policy": default_enqueue_policy,
-        "pipeline_request_policy": default_request_policy,
-        "model_enqueue_policy": default_enqueue_policy,
-        "model_request_policy": default_request_policy,
-    },
-}
-
-# 文档接收节点配置
-document_sink_node_json_params = {
-    "declare_params": {},
-    "init_config": {
-        **default_init_config,
-        "step_interval": 5,
-        "publish_topic": "out/relayed_document",
-    },
-    "runtime_config": {"enable_debug_topics": True, "enable_blocking_mode": False},
-}
 
 # common_prefix = ["valgrind --tool=callgrind --dump-instr=yes -v --instr-atstart=no"]
 common_prefix = None
