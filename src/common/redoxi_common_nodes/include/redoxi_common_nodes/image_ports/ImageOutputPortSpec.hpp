@@ -14,6 +14,7 @@
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
 #include <redoxi_public_msgs/msg/frame_metadata.hpp>
+#include <redoxi_public_msgs/msg/process_frame_goal.hpp>
 
 
 namespace redoxi_works::image_ports::types
@@ -22,6 +23,8 @@ namespace redoxi_works::image_ports::types
 using TimeUnit = DefaultTimeUnit_t;
 using DeliveryActionType = redoxi_public_msgs::action::ProcessFrame;
 static_assert(RedoxiActionConcept<DeliveryActionType>, "DeliveryActionType must satisfy RedoxiActionConcept");
+
+using DeliveryGoalMsgType = redoxi_public_msgs::msg::ProcessFrameGoal;
 
 struct FrameWithMetadata {
     using Metadata_t = redoxi_public_msgs::msg::FrameMetadata;
@@ -98,7 +101,7 @@ class DeliverySourceData
     using FrameData_t = FrameWithMetadata;
     using PubVisualizationMsgType_t = sensor_msgs::msg::Image;
     using FrameBundle_t = redoxi_public_msgs::msg::MultiDeviceFrame;
-    using PubDataMsgType_t = DeliveryActionType::Goal;
+    using PubDataMsgType_t = DeliveryGoalMsgType;
 
     DeliverySourceData()
     {
@@ -213,7 +216,10 @@ class DeliverySourceData
 
 //! Delivery target data type for image output port
 using DeliveryTargetDataBase =
-    output_port_types::DefaultTargetData<DeliveryActionType, RedoxiActionDataTrait<DeliveryActionType>, DeliverySourceData::PubVisualizationMsgType_t>;
+    output_port_types::DefaultTargetData<DeliveryActionType,
+                                         RedoxiActionDataTrait<DeliveryActionType>,
+                                         DeliverySourceData::PubVisualizationMsgType_t,
+                                         DeliveryGoalMsgType>;
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
   public:
@@ -226,11 +232,20 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     {
     }
 
-    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
+    int to_publish_visualization(PubVisualizationMsgType_t &msg) const override
     {
         image_utils::FrameMediator fm(&this->m_goal.frame_bundle.primary_frame);
         auto ret = fm.to_image_msg(msg);
         return ret;
+    }
+
+    int to_publish_data(PubDataMsgType_t &msg) const override
+    {
+        msg.x_task_metadata = this->m_goal.x_task_metadata;
+        msg.frame_bundle = this->m_goal.frame_bundle;
+        msg.x_control = this->m_goal.x_control;
+        msg.x_uid = this->m_goal.x_uid;
+        return 0;
     }
 
     // auxiliary data for easy extension without inheritance
@@ -302,49 +317,49 @@ static_assert(output_port_types::DeliveryRequestConcept<DeliveryRequest>, "Deliv
 using DeliveryTask = output_port_types::DefaultDeliveryTask<DeliveryRequest, DeliveryTargetData, RetryPolicy>;
 static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>, "DeliveryTask must satisfy DeliveryTaskConcept");
 
-class DownstreamDataPublisher
-{
-  public:
-    using MessageType_t = DeliveryActionType::Goal;
-    using Publisher_t = rclcpp::Publisher<MessageType_t>;
-    inline static const rclcpp::QoS DefaultQoS = DefaultParams::DataPublisherQoS;
-    virtual ~DownstreamDataPublisher() = default;
+using DownstreamDataPublisher = SimpleRosPublisher<DeliveryGoalMsgType>;
+// class DownstreamDataPublisher
+// {
+//   public:
+//     using MessageType_t = DeliveryGoalMsgType;
+//     using Publisher_t = rclcpp::Publisher<MessageType_t>;
+//     virtual ~DownstreamDataPublisher() = default;
 
-    virtual void init(std::shared_ptr<Publisher_t> pub)
-    {
-        m_pub = pub;
-    }
+//     virtual void init(std::shared_ptr<Publisher_t> pub)
+//     {
+//         m_pub = pub;
+//     }
 
-    virtual void set_publisher(std::shared_ptr<Publisher_t> pub)
-    {
-        m_pub = pub;
-    }
+//     virtual void set_publisher(std::shared_ptr<Publisher_t> pub)
+//     {
+//         m_pub = pub;
+//     }
 
-    virtual std::shared_ptr<Publisher_t> get_publisher() const
-    {
-        return m_pub;
-    }
+//     virtual std::shared_ptr<Publisher_t> get_publisher() const
+//     {
+//         return m_pub;
+//     }
 
 
-    virtual int publish(const MessageType_t &msg)
-    {
-        m_pub->publish(msg);
-        return 0;
-    }
+//     virtual int publish(const MessageType_t &msg)
+//     {
+//         m_pub->publish(msg);
+//         return 0;
+//     }
 
-    //! Publish a message with an annotation, required by concept, but not used here
-    //! @param annotation: not used, just ignored
-    virtual int publish(const MessageType_t &msg,
-                        const std::string &annotation)
-    {
-        (void)annotation;
-        m_pub->publish(msg);
-        return 0;
-    }
+//     //! Publish a message with an annotation, required by concept, but not used here
+//     //! @param annotation: not used, just ignored
+//     virtual int publish(const MessageType_t &msg,
+//                         const std::string &annotation)
+//     {
+//         (void)annotation;
+//         m_pub->publish(msg);
+//         return 0;
+//     }
 
-  protected:
-    std::shared_ptr<Publisher_t> m_pub;
-};
+//   protected:
+//     std::shared_ptr<Publisher_t> m_pub;
+// };
 
 //! Downstream debug publisher type for image output port
 class DownstreamDebugPublisher
@@ -408,7 +423,7 @@ class DownstreamDebugPublisher
 template <RosActionConcept ActionType,
           output_port_types::DeliveryPolicyConcept DeliveryPolicyType,
           RosPublisherConcept SourceDataPublisherType,
-          RosPublisherConcept TargetDataPublisherType = output_port_types::DefaultTargetDataPublisher<ActionType>>
+          RosPublisherConcept TargetDataPublisherType>
 class DownstreamSpecWithImagePub : public output_port_types::DefaultDownstreamSpec<
                                        ActionType,
                                        DeliveryPolicyType,
@@ -419,11 +434,13 @@ class DownstreamSpecWithImagePub : public output_port_types::DefaultDownstreamSp
 {
 };
 static_assert(output_port_types::DownstreamSpecConcept<
-                  DownstreamSpecWithImagePub<DeliveryActionType, DeliveryPolicy, DownstreamDataPublisher, DownstreamDataPublisher>>,
+                  DownstreamSpecWithImagePub<DeliveryActionType, DeliveryPolicy,
+                                             DownstreamDataPublisher, DownstreamDataPublisher>>,
               "DownstreamSpecWithImagePub must satisfy DownstreamSpecConcept");
 
 //! Downstream spec type with image publisher for image output port
-using DownstreamSpec = DownstreamSpecWithImagePub<DeliveryActionType, DeliveryPolicy, DownstreamDataPublisher, DownstreamDataPublisher>;
+using DownstreamSpec = DownstreamSpecWithImagePub<DeliveryActionType, DeliveryPolicy,
+                                                  DownstreamDataPublisher, DownstreamDataPublisher>;
 static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
               "DownstreamSpec must satisfy DefaultDownstreamSpecConcept");
 
@@ -431,7 +448,7 @@ static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
 template <RosActionConcept ActionType,
           output_port_types::DeliveryPolicyConcept DeliveryPolicyType,
           RosPublisherConcept SourceDataPublisherType,
-          RosPublisherConcept TargetDataPublisherType = output_port_types::DefaultTargetDataPublisher<ActionType>>
+          RosPublisherConcept TargetDataPublisherType = SimpleRosPublisher<typename ActionType::Goal>>
 class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
                                        DownstreamSpecWithImagePub<ActionType, DeliveryPolicyType,
                                                                   SourceDataPublisherType,

@@ -280,46 +280,9 @@ static_assert(DeliveryTargetDataConcept<_SampleTargetData>,
               "_SampleTargetData must satisfy DeliveryTargetDataConcept");
 
 //! Default implementation of target data publisher, using action goal as the message type
+//! Note that you will not be able to see this kind of message in rviz because it does not have a .msg file
 template <RosActionConcept TargetActionType>
-class DefaultTargetDataPublisher
-{
-  public:
-    using ActionType_t = TargetActionType;
-    using MessageType_t = typename TargetActionType::Goal;
-    using Publisher_t = rclcpp::Publisher<MessageType_t>;
-    virtual ~DefaultTargetDataPublisher() = default;
-
-    virtual int publish(const MessageType_t &msg) const
-    {
-        if (m_publisher) {
-            m_publisher->publish(msg);
-        }
-        return 0;
-    }
-
-    virtual int publish(const MessageType_t &msg, const std::string &annotation) const
-    {
-        (void)annotation;
-        // just ignore the annotation
-        if (m_publisher) {
-            m_publisher->publish(msg);
-        }
-        return 0;
-    }
-
-    virtual std::shared_ptr<Publisher_t> get_publisher() const
-    {
-        return m_publisher;
-    }
-
-    virtual void init(std::shared_ptr<Publisher_t> publisher)
-    {
-        m_publisher = publisher;
-    }
-
-  protected:
-    std::shared_ptr<Publisher_t> m_publisher;
-};
+using DefaultTargetDataPublisher = SimpleRosPublisher<typename TargetActionType::Goal>;
 using _SampleTargetDataPublisher = DefaultTargetDataPublisher<_SampleAction>;
 static_assert(RosPublisherConcept<_SampleTargetDataPublisher>,
               "_SampleTargetDataPublisher must satisfy RosPublisherConcept");

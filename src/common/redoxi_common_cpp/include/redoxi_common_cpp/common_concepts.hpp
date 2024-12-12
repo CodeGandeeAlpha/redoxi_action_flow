@@ -196,6 +196,47 @@ class NoneRosPublisher
 static_assert(RosPublisherConcept<NoneRosPublisher<int>>,
               "NoneRosPublisher must satisfy RosPublisherConcept");
 
+//! Simple ROS publisher, just a wrapper around the ros publisher
+template <RosMessageConcept MessageType>
+class SimpleRosPublisher
+{
+  public:
+    using MessageType_t = MessageType;
+    using Publisher_t = rclcpp::Publisher<MessageType>;
+    virtual ~SimpleRosPublisher() = default;
+
+    virtual void init(std::shared_ptr<Publisher_t> pub)
+    {
+        m_publisher = pub;
+    }
+
+    virtual int publish(const MessageType_t &msg) const
+    {
+        if (m_publisher) {
+            m_publisher->publish(msg);
+        }
+        return 0;
+    }
+
+    virtual int publish(const MessageType_t &msg, const std::string &) const
+    {
+        if (m_publisher) {
+            m_publisher->publish(msg);
+        }
+        return 0;
+    }
+
+    virtual std::shared_ptr<Publisher_t> get_publisher() const
+    {
+        return m_publisher;
+    }
+
+  protected:
+    std::shared_ptr<Publisher_t> m_publisher;
+};
+static_assert(RosPublisherConcept<SimpleRosPublisher<int>>,
+              "SimpleRosPublisher must satisfy RosPublisherConcept");
+
 //! Concept to check if a type is std::chrono::duration
 template <typename T>
 concept TimeDurationConcept = requires

@@ -22,7 +22,8 @@ using DeliverySourceData = image_ports::types::DeliverySourceData;
 //! Delivery target data type for detection request output port
 using DeliveryTargetDataBase = output_port_types::DefaultTargetData<DetectionRequestActionType,
                                                                     DetectionRequestActionDataTrait,
-                                                                    DeliverySourceData::PubVisualizationMsgType_t>;
+                                                                    DeliverySourceData::PubVisualizationMsgType_t,
+                                                                    DetectionRequestGoalMsgType>;
 
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
@@ -39,7 +40,7 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     {
     }
 
-    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
+    int to_publish_visualization(PubVisualizationMsgType_t &msg) const override
     {
         auto vis_image = get_visualization_frame();
         if (vis_image.is_empty()) {
@@ -55,6 +56,15 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         header.stamp = rclcpp::Clock().now();
         cv_bridge::CvImage cv_bridge_img(header, vis_image.get_encoding(), canvas);
         cv_bridge_img.toImageMsg(msg);
+        return 0;
+    }
+
+    int to_publish_data(DetectionRequestGoalMsgType &msg) const override
+    {
+        msg.x_task_metadata = m_goal.x_task_metadata;
+        msg.frame_bundle = m_goal.frame_bundle;
+        msg.x_control = m_goal.x_control;
+        msg.x_uid = m_goal.x_uid;
         return 0;
     }
 
@@ -163,8 +173,9 @@ static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
 
 using Downstream = image_ports::types::DownstreamBaseWithImagePub<
     DetectionRequestActionType, DeliveryPolicy,
-    NoneRosPublisher<typename DeliverySourceData::PubDataMsgType_t>,
-    output_port_types::DefaultTargetDataPublisher<DetectionRequestActionType>>;
+    SimpleRosPublisher<typename DeliverySourceData::PubDataMsgType_t>,
+    SimpleRosPublisher<typename DeliveryTargetData::PubDataMsgType_t>>;
+
 // using DownstreamDebugPublisher = Downstream::SourceVisualizationPublisher_t;
 using DownstreamSpec = typename Downstream::DownstreamSpec_t;
 

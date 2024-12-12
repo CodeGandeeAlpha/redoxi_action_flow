@@ -27,7 +27,7 @@ class DeliverySourceData
     using ActionDataTrait_t = DetectionResponseActionDataTrait;
     using FrameData_t = image_ports::types::FrameWithMetadata;
     using PubVisualizationMsgType_t = sensor_msgs::msg::Image;
-    using PubDataMsgType_t = DetectionResponseActionType::Goal;
+    using PubDataMsgType_t = DetectionResponseGoalMsgType;
 
     DeliverySourceData()
     {
@@ -103,7 +103,8 @@ class DeliverySourceData
 //! Delivery target data type for detection output port
 using DeliveryTargetDataBase = output_port_types::DefaultTargetData<DetectionResponseActionType,
                                                                     DetectionResponseActionDataTrait,
-                                                                    DeliverySourceData::PubVisualizationMsgType_t>;
+                                                                    DeliverySourceData::PubVisualizationMsgType_t,
+                                                                    DetectionResponseGoalMsgType>;
 
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
@@ -120,12 +121,22 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     {
     }
 
-    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
+    int to_publish_visualization(PubVisualizationMsgType_t &msg) const override
     {
         DeliverySourceData tmp;
         tmp.detections = this->m_goal.detections;
         tmp.frame_data = this->frame_data;
         return tmp.to_publish_visualization(msg);
+    }
+
+    int to_publish_data(PubDataMsgType_t &msg) const override
+    {
+        msg.x_task_metadata = this->m_goal.x_task_metadata;
+        msg.detections = this->m_goal.detections;
+        msg.frame_bundle = this->m_goal.frame_bundle;
+        msg.x_control = this->m_goal.x_control;
+        msg.x_uid = this->m_goal.x_uid;
+        return 0;
     }
 
     // auxiliary data for easy extension without inheritance
@@ -200,8 +211,8 @@ static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
 
 using Downstream = image_ports::types::DownstreamBaseWithImagePub<
     DetectionResponseActionType, DeliveryPolicy,
-    NoneRosPublisher<typename DeliverySourceData::PubDataMsgType_t>,
-    output_port_types::DefaultTargetDataPublisher<DetectionResponseActionType>>;
+    SimpleRosPublisher<typename DeliverySourceData::PubDataMsgType_t>,
+    SimpleRosPublisher<typename DeliveryTargetData::PubDataMsgType_t>>;
 using DownstreamSpec = typename Downstream::DownstreamSpec_t;
 static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
               "DownstreamSpec must satisfy DownstreamSpecConcept");
