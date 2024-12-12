@@ -55,6 +55,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
     using DeliveryPolicy_t = typename DeliveryRequest_t::DeliveryPolicy_t;
     using RetryPolicy_t = typename DeliveryPolicy_t::RetryPolicyType_t;
 
+    using SourceDataPublisher_t = typename TSpec::SourceDataPublisher_t;
+    using TargetDataPublisher_t = typename TSpec::TargetDataPublisher_t;
+
     // synchronous action sender
     using SyncActionSender_t = SyncActionSender<ActionType_t, TimeUnit_t>;
 
@@ -218,6 +221,14 @@ class AsyncActionOutputPort : public IStartStopProtocol
             auto ret = _connect_to_downstreams();
             if (ret != 0) {
                 RDX_RAISE_ERROR("[{}] failed to connect to downstreams", __func__);
+            }
+        }
+
+        // create data publishers
+        {
+            auto ret = _create_data_publishers(*init_config, m_parent_node);
+            if (ret != 0) {
+                RDX_RAISE_ERROR("[{}] failed to create data publishers", __func__);
             }
         }
 
@@ -437,6 +448,33 @@ class AsyncActionOutputPort : public IStartStopProtocol
         return 0;
     }
 
+    //! Create data publishers
+    //! @return 0 if success, otherwise return error code
+    virtual int _create_data_publishers(const InitConfig_t &init_config, rclcpp::Node *parent_node)
+    {
+        if (!parent_node) {
+            return -1;
+        }
+
+        auto qos_source_data = DefaultParams::DataPublisherQoS;
+        auto data_topic_for_source_data = init_config.get_data_topic_for_source_data();
+        if (data_topic_for_source_data.has_value()) {
+            m_data_pub_source_data = std::make_shared<SourceDataPublisher_t>();
+            auto inner_pub = parent_node->create_publisher<typename SourceDataPublisher_t::MessageType_t>(data_topic_for_source_data.value(), qos_source_data);
+            m_data_pub_source_data->init(inner_pub);
+        }
+
+        auto qos_target_data = DefaultParams::DataPublisherQoS;
+        auto data_topic_for_target_data = init_config.get_data_topic_for_target_data();
+        if (data_topic_for_target_data.has_value()) {
+            m_data_pub_target_data = std::make_shared<TargetDataPublisher_t>();
+            auto inner_pub = parent_node->create_publisher<typename TargetDataPublisher_t::MessageType_t>(data_topic_for_target_data.value(), qos_target_data);
+            m_data_pub_target_data->init(inner_pub);
+        }
+
+        return 0;
+    }
+
     //! Set the status code of the port
     void _set_status_code(int status_code)
     {
@@ -605,28 +643,23 @@ class AsyncActionOutputPort : public IStartStopProtocol
      * @param max_attempts Maximum number of attempts allowed
      * @return 0 on success, otherwise return error code
      */
-    virtual int _data_publish_sent_to_downstream(const SourceData_t *source_data,
-                                                 const TargetData_t *target_data,
-                                                 const Downstream_t &ds,
-                                                 int64_t ith_attempt,
-                                                 int64_t max_attempts)
+    virtual int _publish_data_message(const SourceData_t *source_data,
+                                      const TargetData_t *target_data)
     {
         if (source_data != nullptr) {
-            auto pub = ds.get_data_pub_source_data_succeeded();
+            auto pub = m_data_pub_source_data;
             if (pub != nullptr) {
                 typename SourceData_t::PubDataMsgType_t source_pub_msg;
                 source_data->to_publish_data(source_pub_msg);
-                auto s = fmt::format("[SENT] attempt {}/{}", ith_attempt, max_attempts);
-                pub->publish(source_pub_msg, s);
+                pub->publish(source_pub_msg);
             }
         }
         if (target_data != nullptr) {
-            auto pub = ds.get_data_pub_target_data_succeeded();
+            auto pub = m_data_pub_target_data;
             if (pub != nullptr) {
                 typename TargetData_t::PubDataMsgType_t target_pub_msg;
                 target_data->to_publish_data(target_pub_msg);
-                auto s = fmt::format("[SENT] attempt {}/{}", ith_attempt, max_attempts);
-                pub->publish(target_pub_msg, s);
+                pub->publish(target_pub_msg);
             }
         }
         return 0;
@@ -734,6 +767,14 @@ class AsyncActionOutputPort : public IStartStopProtocol
             auto ret = m_cb_on_deliver_task_begin(target_data, task);
             if (ret != 0) {
                 RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "on_deliver_before callback failed");
+            }
+        }
+
+        // publish data message
+        {
+            auto ret = _publish_data_message(&task.get_request().get_source_data(), &target_data);
+            if (ret != 0) {
+                RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Failed to publish data message");
             }
         }
 
@@ -886,9 +927,6 @@ class AsyncActionOutputPort : public IStartStopProtocol
                             //! Publish the frame sent message
                             _debug_publish_sent_to_downstream(nullptr, &target_data, ds, attempts + 1, max_attempts);
 
-                            //! Publish the data sent message
-                            _data_publish_sent_to_downstream(nullptr, &target_data, ds, attempts + 1, max_attempts);
-
                             return 0; // Success
                         case ActionDownstreamResponse::REJECTED:
                             RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame rejected by downstream {}",
@@ -1017,6 +1055,10 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
     // the parent node
     rclcpp::Node *m_parent_node = nullptr;
+
+    // data publishers
+    std::shared_ptr<SourceDataPublisher_t> m_data_pub_source_data;
+    std::shared_ptr<TargetDataPublisher_t> m_data_pub_target_data;
 
 
   protected:

@@ -171,16 +171,15 @@ using DeliveryTask = output_port_types::DefaultDeliveryTask<DeliveryRequest,
 static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
               "DeliveryTask must satisfy DeliveryTaskConcept");
 
-using Downstream = image_ports::types::DownstreamBaseWithImagePub<
-    DetectionRequestActionType, DeliveryPolicy,
-    SimpleRosPublisher<typename DeliverySourceData::PubDataMsgType_t>,
-    SimpleRosPublisher<typename DeliveryTargetData::PubDataMsgType_t>>;
+using Downstream = image_ports::types::DownstreamBaseWithImagePub<DetectionRequestActionType, DeliveryPolicy>;
 
 // using DownstreamDebugPublisher = Downstream::SourceVisualizationPublisher_t;
 using DownstreamSpec = typename Downstream::DownstreamSpec_t;
 
 //! Init config type for detection request output port
-using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;
+using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
+                                                        SimpleRosPublisher<typename DeliverySourceData::PubDataMsgType_t>,
+                                                        SimpleRosPublisher<typename DeliveryTargetData::PubDataMsgType_t>>;
 
 //! Detection request output port spec
 struct DetectionRequestOutputPortSpec {
@@ -216,7 +215,7 @@ struct DetectionRequestOutputPortSpec {
     using SourcePubDataMsgType_t = typename DeliverySourceData::PubDataMsgType_t;
 
     //! Source data publisher type
-    using SourceDataPublisher_t = typename DownstreamSpec::SourceDataPublisher_t;
+    using SourceDataPublisher_t = typename InitConfig::SourceDataPublisher_t;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
@@ -231,7 +230,7 @@ struct DetectionRequestOutputPortSpec {
     using TargetPubDataMsgType_t = typename DeliveryTargetData::PubDataMsgType_t;
 
     //! Target data publisher type
-    using TargetDataPublisher_t = typename DownstreamSpec::TargetDataPublisher_t;
+    using TargetDataPublisher_t = typename InitConfig::TargetDataPublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;

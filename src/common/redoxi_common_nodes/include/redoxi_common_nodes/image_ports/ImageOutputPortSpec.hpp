@@ -421,41 +421,31 @@ class DownstreamDebugPublisher
 
 //! Downstream spec type with image publisher for image output port
 template <RosActionConcept ActionType,
-          output_port_types::DeliveryPolicyConcept DeliveryPolicyType,
-          RosPublisherConcept SourceDataPublisherType,
-          RosPublisherConcept TargetDataPublisherType>
+          output_port_types::DeliveryPolicyConcept DeliveryPolicyType>
 class DownstreamSpecWithImagePub : public output_port_types::DefaultDownstreamSpec<
                                        ActionType,
                                        DeliveryPolicyType,
-                                       SourceDataPublisherType,
-                                       TargetDataPublisherType,
                                        DownstreamDebugPublisher,
                                        DownstreamDebugPublisher>
 {
 };
 static_assert(output_port_types::DownstreamSpecConcept<
-                  DownstreamSpecWithImagePub<DeliveryActionType, DeliveryPolicy,
-                                             DownstreamDataPublisher, DownstreamDataPublisher>>,
+                  DownstreamSpecWithImagePub<DeliveryActionType, DeliveryPolicy>>,
               "DownstreamSpecWithImagePub must satisfy DownstreamSpecConcept");
 
 //! Downstream spec type with image publisher for image output port
-using DownstreamSpec = DownstreamSpecWithImagePub<DeliveryActionType, DeliveryPolicy,
-                                                  DownstreamDataPublisher, DownstreamDataPublisher>;
+using DownstreamSpec = DownstreamSpecWithImagePub<DeliveryActionType, DeliveryPolicy>;
 static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
               "DownstreamSpec must satisfy DefaultDownstreamSpecConcept");
 
 //! Downstream base type with image publisher for image output port
 template <RosActionConcept ActionType,
-          output_port_types::DeliveryPolicyConcept DeliveryPolicyType,
-          RosPublisherConcept SourceDataPublisherType,
-          RosPublisherConcept TargetDataPublisherType = SimpleRosPublisher<typename ActionType::Goal>>
+          output_port_types::DeliveryPolicyConcept DeliveryPolicyType>
 class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
-                                       DownstreamSpecWithImagePub<ActionType, DeliveryPolicyType,
-                                                                  SourceDataPublisherType,
-                                                                  TargetDataPublisherType>>
+                                       DownstreamSpecWithImagePub<ActionType, DeliveryPolicyType>>
 {
   public:
-    using DownstreamBase_t = output_port_types::DefaultDownstream<DownstreamSpecWithImagePub<ActionType, DeliveryPolicyType, SourceDataPublisherType, TargetDataPublisherType>>;
+    using DownstreamBase_t = output_port_types::DefaultDownstream<DownstreamSpecWithImagePub<ActionType, DeliveryPolicyType>>;
     using typename DownstreamBase_t::DownstreamSpec_t;
 
     virtual int init_by_spec(const DownstreamSpec_t &spec, rclcpp::Node *node)
@@ -522,43 +512,17 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
                 this->m_debug_pub_target_data_failed->init(pub);
             }
         }
-
-        // create data publisher
-        using SourceDataMsgType = typename SourceDataPublisherType::MessageType_t;
-        using TargetDataMsgType = typename TargetDataPublisherType::MessageType_t;
-
-        // TODO: let user choose the qos for data publisher in config
-        auto qos_source_data = DefaultParams::DataPublisherQoS;
-        {
-            auto topic = spec.get_data_topic_source_data_succeeded();
-            if (topic.has_value() && !topic.value().empty()) {
-                this->m_data_pub_source_data_succeeded = std::make_shared<SourceDataPublisherType>();
-                auto pub = node->create_publisher<SourceDataMsgType>(topic.value(), qos_source_data);
-                this->m_data_pub_source_data_succeeded->init(pub);
-            }
-        }
-
-        // TODO: let user choose the qos for data publisher in config
-        auto qos_target_data = DefaultParams::DataPublisherQoS;
-        {
-            auto topic = spec.get_data_topic_target_data_succeeded();
-            if (topic.has_value() && !topic.value().empty()) {
-                this->m_data_pub_target_data_succeeded = std::make_shared<TargetDataPublisherType>();
-                auto pub = node->create_publisher<TargetDataMsgType>(topic.value(), qos_target_data);
-                this->m_data_pub_target_data_succeeded->init(pub);
-            }
-        }
-
         return 0;
     }
 };
-using Downstream = DownstreamBaseWithImagePub<DeliveryActionType, DeliveryPolicy,
-                                              DownstreamDataPublisher, DownstreamDataPublisher>;
+using Downstream = DownstreamBaseWithImagePub<DeliveryActionType, DeliveryPolicy>;
 static_assert(output_port_types::DownstreamConcept<Downstream>,
               "DownstreamSpec must satisfy DownstreamConcept");
 
 //! Init config type for image output port
-using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;
+using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
+                                                        DownstreamDataPublisher,
+                                                        DownstreamDataPublisher>;
 
 //! Image output port spec
 //! This type must satisfy the AsyncActionOutputPortSpecConcept
@@ -597,7 +561,7 @@ struct ImageActionOutputPortSpec {
     using SourcePubDataMsgType_t = typename DeliverySourceData_t::PubDataMsgType_t;
 
     //! Source data publisher type
-    using SourceDataPublisher_t = typename DownstreamSpec::SourceDataPublisher_t;
+    using SourceDataPublisher_t = DownstreamDataPublisher;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
@@ -612,7 +576,7 @@ struct ImageActionOutputPortSpec {
     using TargetPubDataMsgType_t = typename DeliveryTargetData_t::PubDataMsgType_t;
 
     //! Target data publisher type
-    using TargetDataPublisher_t = typename DownstreamSpec::TargetDataPublisher_t;
+    using TargetDataPublisher_t = DownstreamDataPublisher;
 
     //! Stamp type
     using DeliveryStamp_t = output_port_types::DefaultStampData;

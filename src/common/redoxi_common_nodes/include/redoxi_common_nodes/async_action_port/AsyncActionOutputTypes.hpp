@@ -625,8 +625,6 @@ static_assert(DeliveryTaskConcept<_SampleDeliveryTask>,
 //! Default implementation of downstream specification
 template <RosActionConcept ActionType,
           DeliveryPolicyConcept DeliveryPolicyType,
-          RosPublisherConcept SourceDataPublisherType,
-          RosPublisherConcept TargetDataPublisherType,
           RosPublisherConcept SourceVisualizationPublisherType,
           RosPublisherConcept TargetVisualizationPublisherType>
 class DefaultDownstreamSpec
@@ -635,18 +633,12 @@ class DefaultDownstreamSpec
     using ActionType_t = ActionType;
     using DeliveryPolicy_t = DeliveryPolicyType;
 
-    using SourceDataPublisher_t = SourceDataPublisherType;
-    using TargetDataPublisher_t = TargetDataPublisherType;
-    using SourcePubDataMsgType_t = typename SourceDataPublisher_t::MessageType_t;
-    using TargetPubDataMsgType_t = typename TargetDataPublisher_t::MessageType_t;
-
     using SourceVisualizationPublisher_t = SourceVisualizationPublisherType;
     using TargetVisualizationPublisher_t = TargetVisualizationPublisherType;
     using SourcePubVisualizationMsgType_t = typename SourceVisualizationPublisher_t::MessageType_t;
     using TargetPubVisualizationMsgType_t = typename TargetVisualizationPublisher_t::MessageType_t;
 
     virtual ~DefaultDownstreamSpec() = default;
-
 
     //! Get the name
     virtual const std::string &get_name() const
@@ -785,30 +777,6 @@ class DefaultDownstreamSpec
         this->debug_topic_target_data_failed = topic;
     }
 
-    //! Get the unreliable data topic for source data succeeded
-    virtual std::optional<std::string> get_data_topic_source_data_succeeded() const
-    {
-        return this->data_topic_source_data_succeeded;
-    }
-
-    //! Set the unreliable data topic for source data succeeded
-    virtual void set_data_topic_source_data_succeeded(const std::optional<std::string> &topic)
-    {
-        this->data_topic_source_data_succeeded = topic;
-    }
-
-    //! Get the unreliable data topic for target data succeeded
-    virtual std::optional<std::string> get_data_topic_target_data_succeeded() const
-    {
-        return this->data_topic_target_data_succeeded;
-    }
-
-    //! Set the unreliable data topic for target data succeeded
-    virtual void set_data_topic_target_data_succeeded(const std::optional<std::string> &topic)
-    {
-        this->data_topic_target_data_succeeded = topic;
-    }
-
   protected: // no m_ prefix so that you can use json serialization easier
     static std::string make_vis_topic_name(const std::string &name,
                                            const std::string &data_type,
@@ -822,19 +790,6 @@ class DefaultDownstreamSpec
         return output;
     }
 
-    // //! Make the data topic name
-    // static std::string make_data_topic_name(const std::string &name,
-    //                                         const std::string &data_type,
-    //                                         const std::string &event)
-    // {
-    //     std::string output = fmt::format("downstream_data/{}/{}/{}", name, data_type, event);
-    //     // Remove consecutive forward slashes using std::unique
-    //     output.erase(std::unique(output.begin(), output.end(),
-    //                              [](char a, char b) { return a == '/' && b == '/'; }),
-    //                  output.end());
-    //     return output;
-    // }
-
     //! The name of this output port
     std::string name;
 
@@ -846,10 +801,6 @@ class DefaultDownstreamSpec
 
     //! Whether to use debug publish
     bool create_debug_pub{false};
-
-    //! Unreliable data topics for source and target data succeeded
-    std::optional<std::string> data_topic_source_data_succeeded;
-    std::optional<std::string> data_topic_target_data_succeeded;
 
     //! Debug topics for publishing source data events
     std::optional<std::string> debug_topic_source_data_sending;
@@ -866,8 +817,6 @@ class DefaultDownstreamSpec
               JS_MEMBER(action_name),
               JS_MEMBER(delivery_policy),
               JS_MEMBER(create_debug_pub),
-              JS_MEMBER(data_topic_source_data_succeeded),
-              JS_MEMBER(data_topic_target_data_succeeded),
               JS_MEMBER(debug_topic_source_data_sending),
               JS_MEMBER(debug_topic_source_data_succeeded),
               JS_MEMBER(debug_topic_source_data_failed),
@@ -876,18 +825,24 @@ class DefaultDownstreamSpec
               JS_MEMBER(debug_topic_target_data_failed));
 };
 using _SampleDownstreamSpec = DefaultDownstreamSpec<_SampleAction, _SampleDeliveryPolicy,
-                                                    _SampleSourceDataPublisher, _SampleTargetDataPublisher,
                                                     _SampleSourceVisPublisher, _SampleTargetVisPublisher>;
 static_assert(DownstreamSpecConcept<_SampleDownstreamSpec>,
               "_SampleDownstreamSpec must satisfy DownstreamSpecConcept");
 
 //! Implementation of InitConfigConcept
-template <DownstreamSpecConcept TDownstreamSpec>
+template <DownstreamSpecConcept TDownstreamSpec,
+          RosPublisherConcept TSourceDataPublisher,
+          RosPublisherConcept TTargetDataPublisher>
 class DefaultInitConfig
 {
   public:
     //! Type aliases
     using DownstreamSpec_t = TDownstreamSpec;
+    using SourceDataPublisher_t = TSourceDataPublisher;
+    using TargetDataPublisher_t = TTargetDataPublisher;
+    using SourcePubDataMsgType_t = typename SourceDataPublisher_t::MessageType_t;
+    using TargetPubDataMsgType_t = typename TargetDataPublisher_t::MessageType_t;
+
     virtual ~DefaultInitConfig() = default;
 
     //! Get downstream specs (const)
@@ -944,8 +899,35 @@ class DefaultInitConfig
         this->fallback_delivery_precondition = precondition;
     }
 
+    //! Get data topic for source data
+    virtual std::optional<std::string> get_data_topic_for_source_data() const
+    {
+        return this->data_topic_for_source_data;
+    }
+
+    //! Set data topic for source data
+    virtual void set_data_topic_for_source_data(const std::optional<std::string> &topic)
+    {
+        this->data_topic_for_source_data = topic;
+    }
+
+    //! Get data topic for target data
+    virtual std::optional<std::string> get_data_topic_for_target_data() const
+    {
+        return this->data_topic_for_target_data;
+    }
+
+    //! Set data topic for target data
+    virtual void set_data_topic_for_target_data(const std::optional<std::string> &topic)
+    {
+        this->data_topic_for_target_data = topic;
+    }
+
   protected: // no m_ prefix so that you can use json serialization easier
     std::vector<DownstreamSpec_t> downstream_specs;
+    std::optional<std::string> data_topic_for_source_data;
+    std::optional<std::string> data_topic_for_target_data;
+
     int num_buffer_requests{1};
     bool preserve_request_order{true};
     DeliveryPrecondition fallback_delivery_precondition{DeliveryPrecondition::DontCare};
@@ -956,9 +938,12 @@ class DefaultInitConfig
               JS_MEMBER(downstream_specs),
               JS_MEMBER(num_buffer_requests),
               JS_MEMBER(preserve_request_order),
-              JS_MEMBER(fallback_delivery_precondition));
+              JS_MEMBER(fallback_delivery_precondition),
+              JS_MEMBER(data_topic_for_source_data),
+              JS_MEMBER(data_topic_for_target_data));
 };
-using _SampleInitConfig = DefaultInitConfig<_SampleDownstreamSpec>;
+using _SampleInitConfig = DefaultInitConfig<_SampleDownstreamSpec,
+                                            _SampleSourceDataPublisher, _SampleTargetDataPublisher>;
 static_assert(InitConfigConcept<_SampleInitConfig>,
               "_SampleInitConfig must satisfy InitConfigConcept");
 
@@ -973,11 +958,6 @@ class DefaultDownstream
     using ActionClient_t = rclcpp_action::Client<ActionType_t>;
     using GoalHandle_t = typename ActionClient_t::GoalHandle;
     using SendGoalOptions_t = typename ActionClient_t::SendGoalOptions;
-
-    using SourcePubDataMsgType_t = typename DownstreamSpec_t::SourcePubDataMsgType_t;
-    using TargetPubDataMsgType_t = typename DownstreamSpec_t::TargetPubDataMsgType_t;
-    using SourceDataPublisher_t = typename DownstreamSpec_t::SourceDataPublisher_t;
-    using TargetDataPublisher_t = typename DownstreamSpec_t::TargetDataPublisher_t;
 
     using SourcePubVisualizationMsgType_t = typename DownstreamSpec_t::SourcePubVisualizationMsgType_t;
     using TargetPubVisualizationMsgType_t = typename DownstreamSpec_t::TargetPubVisualizationMsgType_t;
@@ -1050,18 +1030,6 @@ class DefaultDownstream
         return m_debug_pub_target_data_failed;
     }
 
-    //! Get data publisher for source data succeeded
-    virtual std::shared_ptr<SourceDataPublisher_t> get_data_pub_source_data_succeeded() const
-    {
-        return m_data_pub_source_data_succeeded;
-    }
-
-    //! Get data publisher for target data succeeded
-    virtual std::shared_ptr<TargetDataPublisher_t> get_data_pub_target_data_succeeded() const
-    {
-        return m_data_pub_target_data_succeeded;
-    }
-
     //! Initialize downstream from spec
     virtual int init_by_spec(const DownstreamSpec_t &spec, rclcpp::Node *node)
     {
@@ -1092,8 +1060,7 @@ class DefaultDownstream
   protected:
     DownstreamSpec_t m_downstream_spec;
     typename ActionClient_t::SharedPtr m_action_client;
-    std::shared_ptr<SourceDataPublisher_t> m_data_pub_source_data_succeeded;
-    std::shared_ptr<TargetDataPublisher_t> m_data_pub_target_data_succeeded;
+
     std::shared_ptr<SourceVisualizationPublisher_t> m_debug_pub_source_data_sending;
     std::shared_ptr<SourceVisualizationPublisher_t> m_debug_pub_source_data_succeeded;
     std::shared_ptr<SourceVisualizationPublisher_t> m_debug_pub_source_data_failed;

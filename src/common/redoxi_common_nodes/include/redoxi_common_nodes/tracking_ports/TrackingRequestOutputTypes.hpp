@@ -200,13 +200,13 @@ using DeliveryTask = output_port_types::DefaultDeliveryTask<DeliveryRequest,
 static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
               "DeliveryTask must satisfy DeliveryTaskConcept");
 
-using Downstream = image_ports::types::DownstreamBaseWithImagePub<
-    TrackingRequestActionType, DeliveryPolicy,
-    NoneRosPublisher<DeliverySourceData::PubDataMsgType_t>>;
+using Downstream = image_ports::types::DownstreamBaseWithImagePub<TrackingRequestActionType, DeliveryPolicy>;
 using DownstreamSpec = Downstream::DownstreamSpec_t;
 
 //! Init config type for detection request output port
-using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;
+using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
+                                                        NoneRosPublisher<DeliverySourceData::PubDataMsgType_t>,
+                                                        SimpleRosPublisher<DeliveryTargetData::PubDataMsgType_t>>;
 
 //! Detection request output port spec
 struct TrackingRequestOutputPortSpec {
@@ -242,7 +242,7 @@ struct TrackingRequestOutputPortSpec {
     using SourcePubDataMsgType_t = typename DeliverySourceData::PubDataMsgType_t;
 
     //! Source data publisher type
-    using SourceDataPublisher_t = typename DownstreamSpec::SourceDataPublisher_t;
+    using SourceDataPublisher_t = InitConfig::SourceDataPublisher_t;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
@@ -257,7 +257,7 @@ struct TrackingRequestOutputPortSpec {
     using TargetPubDataMsgType_t = typename DeliveryTargetData::PubDataMsgType_t;
 
     //! Target data publisher type
-    using TargetDataPublisher_t = typename DownstreamSpec::TargetDataPublisher_t;
+    using TargetDataPublisher_t = InitConfig::TargetDataPublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;

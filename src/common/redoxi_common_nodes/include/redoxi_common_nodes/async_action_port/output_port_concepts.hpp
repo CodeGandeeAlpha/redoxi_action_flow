@@ -297,23 +297,11 @@ concept DownstreamSpecConcept = requires(T t)
     requires RosPublisherConcept<typename T::SourceVisualizationPublisher_t>;
     requires std::same_as<typename T::SourcePubVisualizationMsgType_t, typename T::SourceVisualizationPublisher_t::MessageType_t>;
 
-    //! Must have publisher and message type for source data lossy data transmission
-    typename T::SourceDataPublisher_t;
-    typename T::SourcePubDataMsgType_t;
-    requires RosPublisherConcept<typename T::SourceDataPublisher_t>;
-    requires std::same_as<typename T::SourcePubDataMsgType_t, typename T::SourceDataPublisher_t::MessageType_t>;
-
     //! Must have publisher and message type for target data visualization
     typename T::TargetVisualizationPublisher_t;
     typename T::TargetPubVisualizationMsgType_t;
     requires RosPublisherConcept<typename T::TargetVisualizationPublisher_t>;
     requires std::same_as<typename T::TargetPubVisualizationMsgType_t, typename T::TargetVisualizationPublisher_t::MessageType_t>;
-
-    //! Must have publisher and message type for target data lossy data transmission
-    typename T::TargetDataPublisher_t;
-    typename T::TargetPubDataMsgType_t;
-    requires RosPublisherConcept<typename T::TargetDataPublisher_t>;
-    requires std::same_as<typename T::TargetPubDataMsgType_t, typename T::TargetDataPublisher_t::MessageType_t>;
 
     //! Delivery policy type must satisfy DeliveryPolicyConcept
     requires DeliveryPolicyConcept<typename T::DeliveryPolicy_t>;
@@ -351,14 +339,6 @@ concept DownstreamSpecConcept = requires(T t)
         std::declval<const T &>().get_use_debug_publish()
         } -> std::same_as<bool>;
 
-    //! Must have method to get unreliable data transmission topic
-    {
-        std::declval<T &>().get_data_topic_source_data_succeeded()
-        } -> std::same_as<std::optional<std::string>>;
-    {
-        std::declval<T &>().get_data_topic_target_data_succeeded()
-        } -> std::same_as<std::optional<std::string>>;
-
     //! Must have methods to get source data debug topics
     {
         std::declval<const T &>().get_vis_topic_source_data_sending()
@@ -392,8 +372,21 @@ concept InitConfigConcept = requires(T t)
 {
     requires std::is_default_constructible_v<T>;
     requires std::copyable<T>;
+
     typename T::DownstreamSpec_t;
     requires DownstreamSpecConcept<typename T::DownstreamSpec_t>;
+
+    //! Must have source data publisher, for publishing data outside
+    typename T::SourceDataPublisher_t;
+    typename T::SourcePubDataMsgType_t;
+    requires RosPublisherConcept<typename T::SourceDataPublisher_t>;
+    requires std::same_as<typename T::SourcePubDataMsgType_t, typename T::SourceDataPublisher_t::MessageType_t>;
+
+    //! Must have target data publisher, for publishing data outside
+    typename T::TargetDataPublisher_t;
+    typename T::TargetPubDataMsgType_t;
+    requires RosPublisherConcept<typename T::TargetDataPublisher_t>;
+    requires std::same_as<typename T::TargetPubDataMsgType_t, typename T::TargetDataPublisher_t::MessageType_t>;
 
     //! Must have both const and non-const methods to get downstream specs
     {
@@ -418,6 +411,16 @@ concept InitConfigConcept = requires(T t)
     {
         std::declval<const T &>().get_fallback_delivery_precondition()
         } -> std::same_as<DeliveryPrecondition>;
+
+    //! Must have method to get source data publish topic
+    {
+        std::declval<const T &>().get_data_topic_for_source_data()
+        } -> std::same_as<std::optional<std::string>>;
+
+    //! Must have method to get target data publish topic
+    {
+        std::declval<const T &>().get_data_topic_for_target_data()
+        } -> std::same_as<std::optional<std::string>>;
 };
 
 //! Concept for downstream interface
@@ -490,14 +493,6 @@ concept DownstreamConcept = requires(T t)
             std::declval<const typename T::DownstreamSpec_t &>(),
             std::declval<rclcpp::Node *>())
         } -> std::same_as<int>;
-
-    //! Must have method to get source data debug publishers
-    {
-        std::declval<const T &>().get_data_pub_source_data_succeeded()
-        } -> std::same_as<std::shared_ptr<typename T::SourceDataPublisher_t>>;
-    {
-        std::declval<T &>().get_data_pub_target_data_succeeded()
-        } -> std::same_as<std::shared_ptr<typename T::TargetDataPublisher_t>>;
 
     //! Get source data debug publishers
     {
