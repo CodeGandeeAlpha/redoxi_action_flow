@@ -65,6 +65,10 @@ int UniversalMotTrackerNode::_handle_input_data(InputPortHandler_t::InputActionR
                                                 std::shared_ptr<InputPortHandler_t::InputSourceData_t> source_data,
                                                 InputPortHandler_t::ResourceToken_t &resource_token)
 {
+    // perform tracking based on detections
+    // note that, even if this is the end of tracking, we still need to check if there is any valid frame data
+    // because it may still contains valid frame data
+
     RDX_INFO_DEV(this, __func__, "{}", "Handling input data");
     (void)resource_token;
 
@@ -74,19 +78,9 @@ int UniversalMotTrackerNode::_handle_input_data(InputPortHandler_t::InputActionR
         RDX_RAISE_ERROR("{}", "Goal is not found, this is unexpected");
     }
 
-    //! Extract input image
-    cv::Mat image;
-    {
-        RDX_INFO_DEV(this, __func__, "{}", "Extracting image");
-        // auto ret = _extract_image(&image, source_data.get());
-        image_utils::FrameMediator fm(&source_data->get_goal()->frame_bundle.primary_frame);
-        auto ret = fm.to_cv_image_copy(image);
-
-        // no image? exit
-        if (ret != 0) {
-            return -1;
-        }
-    }
+    auto signal_code = InputActionDataTrait_t::get_control_signal_code(*goal);
+    image_utils::FrameMediator fm_source(&source_data->get_goal()->frame_bundle.primary_frame);
+    RDX_INFO_DEV(this, __func__, "Got frame number={}, signal code={}", fm_source.get_frame_number(), control_signal_code_to_string(signal_code));
 
     //! Convert detections to tracker format
     std::vector<rxt::DetectionPtr> track_detections;
@@ -150,25 +144,56 @@ int UniversalMotTrackerNode::_handle_input_data(InputPortHandler_t::InputActionR
             return 0;
         };
 
-    //! Execute tracking
-    RDX_INFO_DEV(this, __func__, "{}", "Executing tracking");
+    //! Check if we need to finish tracking
     auto tracker = m_impl->m_tracker_impl->m_tracker;
+    bool end_of_tracking = signal_code == ControlSignalCode::Flush || signal_code == ControlSignalCode::Terminate;
+
+    //! Extract input image
+    RDX_INFO_DEV(this, __func__, "{}", "Extracting image");
+    cv::Mat image;
+    auto got_source_frame = fm_source.to_cv_image_copy(image) == 0;
+    auto current_frame_number = fm_source.get_frame_number();
     auto tracking_frame_number = tracker->get_current_frame_number();
-    auto current_frame_number = goal->frame_bundle.primary_frame.metadata.frame_num;
-    if (tracking_frame_number == rxt::INIT_TRACKING_FRAME) {
-        // init tracking
-        tracker->begin_track(image, track_detections, current_frame_number);
+    RDX_INFO_DEV(this, __func__, "Report: current frame number={}, tracking frame number={}", current_frame_number, tracking_frame_number);
+
+    // check if we should track this frame, track only if
+    // 1. we got the source frame
+    // 2. the frame number is valid (>=0)
+    // 3. the frame number is greater than the current tracking frame number (ignore out-of-order frame)
+    // 4. the image is valid
+    bool is_trackable = got_source_frame && current_frame_number >= 0 && (current_frame_number > tracking_frame_number) && !image.empty();
+    if (is_trackable) {
+        RDX_INFO_DEV(this, __func__, "This frame (frame number={}) is trackable, do tracking", current_frame_number);
+        if (tracking_frame_number == rxt::INIT_TRACKING_FRAME) {
+            // init tracking
+            RDX_INFO_DEV(this, __func__, "{}", "This is the first frame, initializing tracking");
+            tracker->begin_track(image, track_detections, current_frame_number);
+        } else {
+            RDX_INFO_DEV(this, __func__, "{}", "This is subsequent frame, updating tracking");
+            // update tracking
+            tracker->track(image, track_detections, current_frame_number);
+        }
     } else {
-        // update tracking
-        tracker->track(image, track_detections, current_frame_number);
+        if (!got_source_frame) {
+            RDX_INFO_DEV(this, __func__, "{}", "Failed to get source frame, skip tracking");
+        } else if (current_frame_number < 0) {
+            RDX_INFO_DEV(this, __func__, "{}", "Invalid frame number, skip tracking");
+        } else if (current_frame_number <= tracking_frame_number) {
+            RDX_INFO_DEV(this, __func__, "Out-of-order frame (frame number={}, tracking frame number={}), skip tracking",
+                         current_frame_number, tracking_frame_number);
+        } else {
+            RDX_INFO_DEV(this, __func__, "{}", "Invalid image, skip tracking");
+        }
     }
 
-    //! Handle end of tracking if needed
-    auto signal_code = InputActionDataTrait_t::get_control_signal_code(*goal);
-    bool end_of_tracking = signal_code == ControlSignalCode::Flush || signal_code == ControlSignalCode::Terminate;
     if (end_of_tracking) {
-        RDX_INFO_DEV(this, __func__, "{}", "Finishing tracking");
+        RDX_INFO_DEV(this, __func__, "Received signal {}, finishing tracking", control_signal_code_to_string(signal_code));
         tracker->finish_track();
+    }
+
+    if (!is_trackable && !end_of_tracking) {
+        RDX_WARN_PRODUCTION(this, __func__, "{}", "Unexpected, not trackable or end of tracking, skip tracking");
+        return -1;
     }
 
     //! Collect tracking results
@@ -182,12 +207,21 @@ int UniversalMotTrackerNode::_handle_input_data(InputPortHandler_t::InputActionR
         report_track_targets.insert(target.second);
     }
 
+    // filter the track targets to remove lost (unmatched) tracks
+    // TODO: lost tracks are still useful in downstream, but it is defined differently in botsort and deepsort, so not usable now, add it back later
+    std::vector<rxt::TrackTargetPtr> filtered_track_targets;
+    for (const auto &target : report_track_targets) {
+        if (!(target->get_path_state() & rxt::TrackPathStateBitmask::Lost)) {
+            filtered_track_targets.push_back(target);
+        }
+    }
+
     //! Generate output messages
     RDX_INFO_DEV(this, __func__, "Got {} track targets, creating output messages", report_track_targets.size());
     using MsgTrackTarget = redoxi_public_msgs::msg::TrackTarget;
     std::vector<MsgTrackTarget> msg_track_targets;
     const auto &frame_metadata = goal->frame_bundle.primary_frame.metadata;
-    for (const auto &target : report_track_targets) {
+    for (const auto &target : filtered_track_targets) {
         MsgTrackTarget msg;
         auto bbox = target->get_bbox();
         msg.track_bbox.x = bbox.x;

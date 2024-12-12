@@ -20,9 +20,10 @@ cv::Size compute_resize_to_fit_and_keep_aspect_ratio(const cv::Size &original_si
  */
 struct DrawDetectionsOptions {
     enum class ColorizationMode {
-        None,    //!< if color is defined in the detection object, use it, otherwise use the default color
-        ClassId, //!< Colorize by class id
-        Random   //!< Random colorization
+        None,             //!< if color is defined in the detection object, use it, otherwise use the default color
+        ClassId,          //!< Colorize by class id
+        SemanticIdentity, //!< Colorize by semantic identity
+        Random            //!< Random colorization
     };
 
     ColorizationMode colorization_mode = ColorizationMode::None;

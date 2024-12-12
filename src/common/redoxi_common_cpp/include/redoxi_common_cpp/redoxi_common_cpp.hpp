@@ -14,6 +14,8 @@
 
 namespace redoxi_works
 {
+//! UUID type for redoxi works
+//! Note: UUID when created, is not guaranteed to be all 0, you need to UUIDType uid{0} to make it all 0
 using UUIDType = boost::uuids::uuid;
 
 //! Trait for UUID, handling conversion between string, array and UUID type

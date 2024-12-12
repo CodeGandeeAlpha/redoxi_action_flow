@@ -77,15 +77,18 @@ int TrackerDriverNode::_on_process_callee_result(OutputTypes::OutputRequest_t *o
         auto det = track_target.predicted_detection;
 
         // FIXME: using track_id as category is not good but works for now
-        det.category = track_target.track_id;
-        det.confidence = track_target.confidence;
+        // det.category = track_target.track_id;
+        // det.confidence = track_target.confidence;
+        det.semantic_identity.value = track_target.track_id;
+        det.semantic_identity.name = "track_" + std::to_string(track_target.track_id);
+        det.semantic_identity.confidence = track_target.confidence;
         dets.push_back(det);
     }
 
     RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Drawing tracked result, {} detections",
                  UUIDTrait::to_string(msg_uuid), dets.size());
     image_utils::DrawDetectionsOptions draw_opts;
-    draw_opts.colorization_mode = decltype(draw_opts.colorization_mode)::ClassId;
+    draw_opts.colorization_mode = decltype(draw_opts.colorization_mode)::SemanticIdentity;
     image_utils::draw_detections(&canvas, dets, draw_opts);
 
     // set the image

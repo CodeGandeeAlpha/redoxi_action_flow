@@ -96,9 +96,12 @@ class PullProcessReplyHandler
             // goal handle is not found, which means the goal is not accepted, should not happen
             return ProcessResult::Error;
         }
+        auto source_signal_code = InputActionDataTrait_t::get_control_signal_code(*input_data->get_goal());
         auto msg_uuid = InputActionDataTrait_t::get_uuid(*input_data->get_goal());
         auto msg_uuid_str = UUIDTrait::to_string(msg_uuid);
-        RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Got goal handle", msg_uuid_str);
+        auto task_uuid = InputActionDataTrait_t::get_source_task_metadata(*input_data->get_goal()).source_task_id;
+        RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}][task={}] Got goal handle, signal code={}",
+                     msg_uuid_str, UUIDTrait::to_string(task_uuid), control_signal_code_to_string(source_signal_code));
 
         // get resource token
         ResourceToken_t resource_token;

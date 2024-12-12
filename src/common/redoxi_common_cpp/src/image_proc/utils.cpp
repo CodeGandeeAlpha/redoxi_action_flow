@@ -112,6 +112,13 @@ void draw_detections(cv::Mat *output,
                     std::swap(box_color[0], box_color[2]);
                 }
                 break;
+            case DrawDetectionsOptions::ColorizationMode::SemanticIdentity:
+                if (detection.semantic_identity.value >= 0) {
+                    box_color = color_palette_rgb[detection.semantic_identity.value % color_palette_rgb.size()];
+                    //! Convert box_color from RGB to BGR
+                    std::swap(box_color[0], box_color[2]);
+                }
+                break;
             case DrawDetectionsOptions::ColorizationMode::Random:
                 box_color = cv::Scalar(rand() % 256, rand() % 256, rand() % 256); // Random color
                 break;

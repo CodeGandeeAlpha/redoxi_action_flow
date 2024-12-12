@@ -425,8 +425,10 @@ void RedoxiVideoReaderBase::_step()
         auto qos = runtime_config->frame_enqueue_policy;
         if (control_signal_code == ControlSignalCode::Flush || control_signal_code == ControlSignalCode::Terminate) {
             // end of video, flush or terminate signal must be sent reliably
+            RDX_INFO_DEV(this, __func__, "{}", "end of video, flush or terminate signal must be sent reliably");
             qos.set_precondition(DeliveryPrecondition::NoPrecondition);
             qos.set_drop_strategy(DropStrategy::NoDrop);
+            delivery_request.make_reliable();
         }
 
         // call callback before enqueue
@@ -448,10 +450,14 @@ void RedoxiVideoReaderBase::_step()
             auto frame_number = fm.get_frame_number();
             auto source_frame_index = fm.get_source_frame_index();
             auto source_frame_timestamp = fm.get_source_timestamp_flat();
-
-            RDX_INFO_DEV(this, __func__, "[msg_uuid={}] sending frame_number={}, source_frame_index={}, source_frame_timestamp={}",
-                         boost::uuids::to_string(msg_uuid), frame_number, source_frame_index,
-                         fmt::format("{:06f} sec", source_frame_timestamp.count() / 1e6));
+            auto task_metadata = delivery_request.get_source_task_metadata();
+            auto task_uuid = task_metadata.source_task_id;
+            RDX_INFO_DEV(this, __func__, "[msg_uuid={}][task={}] sending frame_number={}, source_frame_index={}, source_frame_timestamp={}, signal code={}, precondition={}, drop strategy={}",
+                         boost::uuids::to_string(msg_uuid), UUIDTrait::to_string(task_uuid), frame_number, source_frame_index,
+                         fmt::format("{:06f} sec", source_frame_timestamp.count() / 1e6),
+                         control_signal_code_to_string(delivery_request.get_control_signal_code()),
+                         precondition_to_string(qos.get_precondition()),
+                         drop_strategy_to_string(qos.get_drop_strategy()));
             success = m_primary_output_port->push_request(delivery_request, qos);
         }
 

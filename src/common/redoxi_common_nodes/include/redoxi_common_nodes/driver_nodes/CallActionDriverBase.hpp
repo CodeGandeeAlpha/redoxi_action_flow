@@ -159,6 +159,12 @@ class CallActionDriverBase : public OpenCloseNode
                                         std::shared_ptr<const typename InputTypes::SourceData_t> source_data,
                                         typename InputRequestHandler_t::ResourceToken_t &resource_token)
     {
+        // pass along task metadata and signal code
+        auto task_metadata = InputTypes::ActionDataTrait_t::get_source_task_metadata(*source_data->get_goal());
+        auto signal_code = InputTypes::ActionDataTrait_t::get_control_signal_code(*source_data->get_goal());
+        out_callee_request->set_source_task_metadata(task_metadata);
+        out_callee_request->set_control_signal_code(signal_code);
+
         // call class member function
         auto ret_member = _on_process_input_request(out_callee_request,
                                                     out_callee_enqueue_policy,
@@ -195,6 +201,12 @@ class CallActionDriverBase : public OpenCloseNode
                                         const typename CalleeTypes::RequestOutputRequest_t &callee_request,
                                         const typename CalleeTypes::Downstream_t &downstream)
     {
+        // pass along task metadata and signal code
+        auto task_metadata = callee_request.get_source_task_metadata();
+        auto signal_code = callee_request.get_control_signal_code();
+        out_downstream_request->set_source_task_metadata(task_metadata);
+        out_downstream_request->set_control_signal_code(signal_code);
+
         // call class member function
         auto ret_member = _on_process_callee_result(out_downstream_request,
                                                     out_downstream_enqueue_policy,
@@ -481,13 +493,14 @@ void CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>:
                 auto signal_code = delivery_request.get_control_signal_code();
 
                 // abnormal signal must be delivered reliably
+                typename OutputTypes::OutputRequest_t response_request;
                 if (signal_code != ControlSignalCode::Normal && signal_code != ControlSignalCode::Ping) {
                     policy.set_precondition(DeliveryPrecondition::NoPrecondition);
                     policy.set_drop_strategy(DropStrategy::NoDrop);
+                    response_request.make_reliable();
                 }
 
                 if (m_output_port) {
-                    typename OutputTypes::OutputRequest_t response_request;
                     auto ret = _internal_process_callee_result(&response_request, &policy, result.result, delivery_request, downstream);
                     if (ret == 0) {
                         auto sent = m_output_port->push_request(response_request, policy);
