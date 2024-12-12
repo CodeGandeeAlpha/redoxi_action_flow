@@ -18,8 +18,9 @@ from typing import Any, Literal
 
 __all__ = (
     [
-        "PipelineBaseInitConfig",
-        "PipelineBaseRuntimeConfig",
+        "PSGTrackerInitConfig",
+        "PSGTrackerRuntimeConfig",
+        "PSGTrackerNodeConfig",
     ]
     + commonTypes.__all__
     + portCfg.__all__

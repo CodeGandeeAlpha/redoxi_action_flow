@@ -61,8 +61,9 @@ ExampleConfig = {
 
 __all__ = (
     [
-        "PipelineBaseInitConfig",
-        "PipelineBaseRuntimeConfig",
+        "InoutBaseInitConfig",
+        "InoutBaseRuntimeConfig",
+        "InoutBaseNodeConfig",
     ]
     + commonTypes.__all__
     + portCfg.__all__

@@ -70,6 +70,7 @@ __all__ = (
     [
         "PipelineBaseInitConfig",
         "PipelineBaseRuntimeConfig",
+        "PipelineBaseNodeConfig",
     ]
     + commonTypes.__all__
     + portCfg.__all__

@@ -4,6 +4,7 @@ from launch.substitutions import LaunchConfiguration
 from launch.actions import SetEnvironmentVariable
 from launch.actions import DeclareLaunchArgument
 
+import redoxi_common_py.configs.video_source_from_url as videoSrcCfg
 import psg_common_py.configs.psg_document_sink as psgDocSinkCfg
 import psg_common_py.configs.pipeline_base as psgPipelineBaseCfg
 import psg_common_py.configs.inout_base as psgInoutBaseCfg
@@ -15,7 +16,7 @@ import json
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
     "log_level",
-    default_value="info",
+    default_value="debug",
     description="Logging level",
 )
 
@@ -32,47 +33,6 @@ fn_video = (
     # "/3d/chengxiao/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
     "/3d/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.6.30-2023-06-18-15-00-02.mp4"
 )
-
-# 定义一些通用的配置
-default_retry_policy = {
-    "fallback_number_of_retry": 3,
-    "fallback_wait_time_between_retry": 5000,
-    "fallback_wait_time_retry_response": 100000,
-}
-
-default_delivery_policy = {
-    "retry_policy": default_retry_policy,
-    "drop_strategy": "no_drop",
-}
-
-default_enqueue_policy = {
-    "retry_policy": {"number_of_retry": 5, **default_retry_policy},
-    # "precondition": "no_precondition",
-    # "drop_strategy": "no_drop",
-    "drop_strategy": "drop_as_needed",
-}
-
-default_request_policy = {"precondition": "no_precondition", "drop_strategy": "no_drop"}
-
-default_output_port_config = {
-    "num_buffer_requests": 1,
-    "preserve_request_order": True,
-    "fallback_delivery_precondition": "no_precondition",
-}
-
-default_init_config = {
-    "create_debug_pub": True,
-    "_time_unit": "us(1e-6)",
-    "input_port_config": {"buffer_capacity": 10, "action_name": "in/action"},
-}
-
-default_runtime_config = {
-    "_time_unit": "us(1e-6)",
-    "step_interval": 5,
-    "frame_interval": 0,
-    "enable_blocking_mode": False,
-    "publish_to_debug_topic": False,
-}
 
 # 文档接收节点配置
 # psg_counter -> document_sink
@@ -119,7 +79,8 @@ psg_counter_node_json_params = psgCounterCfg.PSGCounterNodeConfig(
             drop_strategy="no_drop",
         ),
         frame_enqueue_policy=psgCounterCfg.DeliveryPolicy(
-            drop_strategy="drop_as_needed",
+            precondition="no_precondition",
+            drop_strategy="no_drop",
         ),
     ),
 )
@@ -152,7 +113,7 @@ psg_tracker_node_pipeline_name = "psg_tracker_pipeline_node"
 psg_tracker_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConfig(
     init_config=psgPipelineBaseCfg.PipelineBaseInitConfig(
         create_debug_pub=True,
-        input_port_config=psgInoutBaseCfg.InputPortConfig(
+        input_port_config=psgPipelineBaseCfg.InputPortConfig(
             action_name="in/action",
         ),
         output_port_pipeline_config=psgPipelineBaseCfg.OutputPortConfig(
@@ -175,17 +136,19 @@ psg_tracker_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConfi
     runtime_config=psgPipelineBaseCfg.PipelineBaseRuntimeConfig(
         publish_to_debug_topic=False,
         enable_blocking_mode=False,
-        pipeline_enqueue_policy=psgCounterCfg.DeliveryPolicy(
-            drop_strategy="drop_as_needed",
-        ),
-        pipeline_request_policy=psgCounterCfg.DeliveryPolicy(
+        pipeline_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
             precondition="no_precondition",
             drop_strategy="no_drop",
         ),
-        model_enqueue_policy=psgCounterCfg.DeliveryPolicy(
-            drop_strategy="drop_as_needed",
+        pipeline_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
         ),
-        model_request_policy=psgCounterCfg.DeliveryPolicy(
+        model_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
+        model_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
             precondition="no_precondition",
             drop_strategy="no_drop",
         ),
@@ -220,7 +183,8 @@ psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
             drop_strategy="no_drop",
         ),
         frame_enqueue_policy=psgInoutBaseCfg.DeliveryPolicy(
-            drop_strategy="drop_as_needed",
+            precondition="no_precondition",
+            drop_strategy="no_drop",
         ),
     ),
 )
@@ -263,7 +227,7 @@ psg_all_detector_cpp_node_pipeline_name = "psg_all_detector_cpp"
 psg_all_detector_cpp_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConfig(
     init_config=psgPipelineBaseCfg.PipelineBaseInitConfig(
         create_debug_pub=True,
-        input_port_config=psgInoutBaseCfg.InputPortConfig(
+        input_port_config=psgPipelineBaseCfg.InputPortConfig(
             action_name="in/action",
         ),
         output_port_pipeline_config=psgPipelineBaseCfg.OutputPortConfig(
@@ -286,17 +250,19 @@ psg_all_detector_cpp_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBase
     runtime_config=psgPipelineBaseCfg.PipelineBaseRuntimeConfig(
         publish_to_debug_topic=False,
         enable_blocking_mode=False,
-        pipeline_enqueue_policy=psgCounterCfg.DeliveryPolicy(
-            drop_strategy="drop_as_needed",
-        ),
-        pipeline_request_policy=psgCounterCfg.DeliveryPolicy(
+        pipeline_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
             precondition="no_precondition",
             drop_strategy="no_drop",
         ),
-        model_enqueue_policy=psgCounterCfg.DeliveryPolicy(
-            drop_strategy="drop_as_needed",
+        pipeline_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
         ),
-        model_request_policy=psgCounterCfg.DeliveryPolicy(
+        model_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
+        model_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
             precondition="no_precondition",
             drop_strategy="no_drop",
         ),
@@ -331,13 +297,16 @@ psg_master_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
             drop_strategy="no_drop",
         ),
         frame_enqueue_policy=psgInoutBaseCfg.DeliveryPolicy(
-            drop_strategy="drop_as_needed",
+            precondition="no_precondition",
+            drop_strategy="no_drop",
         ),
     ),
 )
 
 
 # 视频源配置
+# video_source -> psg_master_node
+video_src_node_name = "video_source"
 video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
         video_url=fn_video,
@@ -353,7 +322,7 @@ video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
         step_interval=StepIntervals.Medium,
-        output_image_size={"width": 1920, "height": 1080},
+        output_image_size=videoSrcCfg.ImageSize(width=1920, height=1080),
         output_image_encoding="bgr8",
     ),
 )
@@ -367,18 +336,18 @@ common_ros_args = []
 video_source_node = Node(
     package="test_cx",
     executable="v2_video_url_flush",
-    name="video_source",
-    namespace="video_source",
+    name=video_src_node_name,
+    namespace=video_src_node_name,
     output="screen",
     parameters=[
         {
-            "param_as_json_string": json.dumps(
-                video_source_params, separators=(",", ":")
+            "param_as_json_string": video_source_params.to_json(
+                ignore_none=True, compact=False
             ),
         },
     ],
     prefix=common_prefix,
-    arguments=["--ros-args", "--log-level", [f"video_source:=", logger]]
+    arguments=["--ros-args", "--log-level", [f"{video_src_node_name}:=", logger]]
     + common_ros_args,
     # arguments=["--ros-args", "--disable-external-lib-logs"],
 )
@@ -389,51 +358,56 @@ psg_master_node = Node(
     executable="v2_psg_master_node",
     output="screen",  # 将输出重定向到屏幕
     emulate_tty=True,  # 保持颜色输出
-    name="psg_master_node",
-    namespace="psg_master_node",
+    name=psg_master_node_name,
+    namespace=psg_master_node_name,
     prefix=common_prefix,
     parameters=[
         {
-            "param_as_json_string": json.dumps(
-                psg_master_node_json_params, separators=(",", ":")
+            "param_as_json_string": psg_master_node_json_params.to_json(
+                ignore_none=True, compact=False
             ),
         },
     ],
-    arguments=["--ros-args", "--log-level", ["psg_master_node:=", logger]]
+    arguments=["--ros-args", "--log-level", [f"{psg_master_node_name}:=", logger]]
     + common_ros_args,
 )
 
 psg_detector_node = Node(
     package="test_cx",
     executable="v2_psg_all_detector_cpp",
-    name="psg_all_detector_cpp",
-    namespace="psg_all_detector_cpp",
+    name=psg_all_detector_cpp_node_pipeline_name,
+    namespace=psg_all_detector_cpp_node_pipeline_name,
     prefix=common_prefix,
     parameters=[
         {
-            "param_as_json_string": json.dumps(
-                psg_all_detector_cpp_node_pipeline_json_params, separators=(",", ":")
+            "param_as_json_string": psg_all_detector_cpp_node_pipeline_json_params.to_json(
+                ignore_none=True, compact=False
             ),
         },
     ],
-    arguments=["--ros-args", "--log-level", ["psg_all_detector_cpp:=", logger]]
+    arguments=[
+        "--ros-args",
+        "--log-level",
+        [f"{psg_all_detector_cpp_node_pipeline_name}:=", logger],
+    ]
     + common_ros_args,
 )
 
-DetectionNodeName = "detector_with_pose"
 detection_node = Node(
     package="test_package",
     executable="yolo_body_pose_detection_node",
-    name=DetectionNodeName,
-    namespace=DetectionNodeName,
+    name=det_node_name,
+    namespace=det_node_name,
     prefix=common_prefix,
     output="screen",
     parameters=[
         {
-            "param_as_json_string": json.dumps(det_node_params, separators=(",", ":")),
+            "param_as_json_string": det_node_params.to_json(
+                ignore_none=True, compact=False
+            ),
         },
     ],
-    arguments=["--ros-args", "--log-level", [f"{DetectionNodeName}:=", logger]]
+    arguments=["--ros-args", "--log-level", [f"{det_node_name}:=", logger]]
     + common_ros_args,
     # arguments=["--ros-args", "--disable-external-lib-logs"],
 )
@@ -443,51 +417,63 @@ psg_person_generator_node = Node(
     executable="v2_psg_person_generator",
     output="screen",  # 将输出重定向到屏幕
     emulate_tty=True,  # 保持颜色输出
-    name="psg_person_generator",
-    namespace="psg_person_generator",
+    name=psg_person_generator_node_name,
+    namespace=psg_person_generator_node_name,
     prefix=common_prefix,
     parameters=[
         {
-            "param_as_json_string": json.dumps(
-                psg_person_generator_node_json_params, separators=(",", ":")
+            "param_as_json_string": psg_person_generator_node_json_params.to_json(
+                ignore_none=True, compact=False
             ),
         },
     ],
-    arguments=["--ros-args", "--log-level", ["psg_person_generator:=", logger]]
+    arguments=[
+        "--ros-args",
+        "--log-level",
+        [f"{psg_person_generator_node_name}:=", logger],
+    ]
     + common_ros_args,
 )
 
 psg_tracker_pipeline_node = Node(
     package="test_cx",
     executable="v2_psg_tracker_pipeline",
-    name="psg_tracker_pipeline_node",
-    namespace="psg_tracker_pipeline_node",
+    name=psg_tracker_node_pipeline_name,
+    namespace=psg_tracker_node_pipeline_name,
     prefix=common_prefix,
     parameters=[
         {
-            "param_as_json_string": json.dumps(
-                psg_tracker_node_pipeline_json_params, separators=(",", ":")
+            "param_as_json_string": psg_tracker_node_pipeline_json_params.to_json(
+                ignore_none=True, compact=False
             ),
         },
     ],
-    arguments=["--ros-args", "--log-level", ["psg_tracker_pipeline_node:=", logger]]
+    arguments=[
+        "--ros-args",
+        "--log-level",
+        [f"{psg_tracker_node_pipeline_name}:=", logger],
+    ]
     + common_ros_args,
 )
 
 psg_tracker_node = Node(
     package="test_cx",
     executable="v2_psg_tracker",
-    name="psg_tracker_node",
-    namespace="psg_tracker_node",
+    name=psg_tracker_node_name,
+    namespace=psg_tracker_node_name,
     prefix=common_prefix,
     parameters=[
         {
-            "param_as_json_string": json.dumps(
-                psg_tracker_node_json_params, separators=(",", ":")
+            "param_as_json_string": psg_tracker_node_json_params.to_json(
+                ignore_none=True, compact=False
             ),
         },
     ],
-    arguments=["--ros-args", "--log-level", ["psg_tracker_node:=", logger]]
+    arguments=[
+        "--ros-args",
+        "--log-level",
+        [f"{psg_tracker_node_name}:=", logger],
+    ]
     + common_ros_args,
 )
 
@@ -496,34 +482,42 @@ psg_counter_node = Node(
     executable="v2_psg_counter",
     output="screen",  # 将输出重定向到屏幕
     emulate_tty=True,  # 保持颜色输出
-    name="psg_counter",
-    namespace="psg_counter",
+    name=psg_counter_node_name,
+    namespace=psg_counter_node_name,
     prefix=common_prefix,
     parameters=[
         {
-            "param_as_json_string": json.dumps(
-                psg_counter_node_json_params, separators=(",", ":")
+            "param_as_json_string": psg_counter_node_json_params.to_json(
+                ignore_none=True, compact=False
             ),
         },
     ],
-    arguments=["--ros-args", "--log-level", ["psg_counter:=", logger]]
+    arguments=[
+        "--ros-args",
+        "--log-level",
+        [f"{psg_counter_node_name}:=", logger],
+    ]
     + common_ros_args,
 )
 
 document_sink_node = Node(
     package="test_cx",
     executable="v2_document_sink",
-    name="document_sink",
-    namespace="document_sink",
+    name=document_sink_node_name,
+    namespace=document_sink_node_name,
     prefix=common_prefix,
     parameters=[
         {
-            "param_as_json_string": json.dumps(
-                document_sink_node_json_params, separators=(",", ":")
+            "param_as_json_string": document_sink_node_json_params.to_json(
+                ignore_none=True, compact=False
             ),
         },
     ],
-    arguments=["--ros-args", "--log-level", ["document_sink:=", logger]]
+    arguments=[
+        "--ros-args",
+        "--log-level",
+        [f"{document_sink_node_name}:=", logger],
+    ]
     + common_ros_args,
 )
 

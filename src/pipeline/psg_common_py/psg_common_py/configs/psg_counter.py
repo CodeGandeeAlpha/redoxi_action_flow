@@ -18,12 +18,13 @@ from typing import Any, Literal
 
 __all__ = (
     [
-        "PipelineBaseInitConfig",
-        "PipelineBaseRuntimeConfig",
+        "PSGCounterInitConfig",
+        "PSGCounterRuntimeConfig",
+        "PSGCounterNodeConfig",
     ]
     + commonTypes.__all__
     + portCfg.__all__
-    + baseNodeCfg.__all__
+    + inoutBaseCfg.__all__
 )
 
 

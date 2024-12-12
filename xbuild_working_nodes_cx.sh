@@ -86,11 +86,20 @@ echo "Building with BUILD_TYPE=$BUILD_TYPE"
 #     -DCMAKE_CXX_STANDARD_REQUIRED=ON \
 #     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
+json_struct_flags=" \
+    -DJS_STD_OPTIONAL \
+    -DJS_STD_UNORDERED_MAP \
+    -DJS_STL_UNORDERED_SET \
+    -DJS_STL_SET \
+    -DJS_STL_MAP \
+    -DJS_STL_ARRAY"
+
 colcon build --packages-up-to $PackagesToBuild \
     $VERBOSE \
     --parallel-workers $NUM_JOBS \
     --symlink-install \
     --cmake-args \
+    -DCMAKE_CXX_FLAGS="$json_struct_flags" \
     -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
     -DCMAKE_CXX_STANDARD=20 \
     -DCMAKE_CXX_STANDARD_REQUIRED=ON \
