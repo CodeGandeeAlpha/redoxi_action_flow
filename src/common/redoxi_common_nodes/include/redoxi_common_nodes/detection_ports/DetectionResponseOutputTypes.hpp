@@ -253,6 +253,12 @@ struct DetectionResponseOutputPortSpec {
     //! Source data publisher type
     using SourceVisualizationPublisher_t = DownstreamSpec::SourceVisualizationPublisher_t;
 
+    //! Source data publish message type
+    using SourcePubDataMsgType_t = DeliverySourceData::PubDataMsgType_t;
+
+    //! Source data publisher type
+    using SourceDataPublisher_t = DownstreamSpec::SourceDataPublisher_t;
+
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
 
@@ -261,6 +267,12 @@ struct DetectionResponseOutputPortSpec {
 
     //! Target data publisher type
     using TargetVisualizationPublisher_t = DownstreamSpec::TargetVisualizationPublisher_t;
+
+    //! Target data publish message type
+    using TargetPubDataMsgType_t = DeliveryTargetData::PubDataMsgType_t;
+
+    //! Target data publisher type
+    using TargetDataPublisher_t = DownstreamSpec::TargetDataPublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;

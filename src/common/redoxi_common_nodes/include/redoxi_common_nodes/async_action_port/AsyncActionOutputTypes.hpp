@@ -1150,6 +1150,15 @@ concept AsyncActionOutputPortSpecConcept = requires(T t)
     requires RosPublisherConcept<typename T::SourceVisualizationPublisher_t>;
     requires std::same_as<typename T::SourceVisualizationPublisher_t::MessageType_t, typename T::SourcePubVisualizationMsgType_t>;
 
+    //! Source data publish message type
+    typename T::SourcePubDataMsgType_t;
+    requires std::same_as<typename T::SourcePubDataMsgType_t, typename T::DeliverySourceData_t::PubDataMsgType_t>;
+
+    //! Publisher types for downstream data publishing
+    typename T::SourceDataPublisher_t;
+    requires RosPublisherConcept<typename T::SourceDataPublisher_t>;
+    requires std::same_as<typename T::SourceDataPublisher_t::MessageType_t, typename T::SourcePubDataMsgType_t>;
+
     //! Target data type
     typename T::DeliveryTargetData_t;
     requires DeliveryTargetDataConcept<typename T::DeliveryTargetData_t>;
@@ -1163,6 +1172,15 @@ concept AsyncActionOutputPortSpecConcept = requires(T t)
     typename T::TargetVisualizationPublisher_t;
     requires RosPublisherConcept<typename T::TargetVisualizationPublisher_t>;
     requires std::same_as<typename T::TargetVisualizationPublisher_t::MessageType_t, typename T::TargetPubVisualizationMsgType_t>;
+
+    //! Target data publish message type
+    typename T::TargetPubDataMsgType_t;
+    requires std::same_as<typename T::TargetPubDataMsgType_t, typename T::DeliveryTargetData_t::PubDataMsgType_t>;
+
+    //! Publisher types for downstream data publishing
+    typename T::TargetDataPublisher_t;
+    requires RosPublisherConcept<typename T::TargetDataPublisher_t>;
+    requires std::same_as<typename T::TargetDataPublisher_t::MessageType_t, typename T::TargetPubDataMsgType_t>;
 
     //! Stamp type
     typename T::DeliveryStamp_t;
@@ -1231,10 +1249,20 @@ struct _SampleAsyncActionOutputPortSpec {
     //! Target publisher type
     using TargetVisualizationPublisher_t = _SampleTargetVisPublisher;
 
+    //! Source data publisher type
+    using SourceDataPublisher_t = _SampleSourceDataPublisher;
+    //! Target data publisher type
+    using TargetDataPublisher_t = _SampleTargetDataPublisher;
+
     //! Source publish message type
     using SourcePubVisualizationMsgType_t = typename SourceVisualizationPublisher_t::MessageType_t;
     //! Target publish message type
     using TargetPubVisualizationMsgType_t = typename TargetVisualizationPublisher_t::MessageType_t;
+    //! Source publish data message type
+    using SourcePubDataMsgType_t = typename SourceDataPublisher_t::MessageType_t;
+    //! Target publish data message type
+    using TargetPubDataMsgType_t = typename TargetDataPublisher_t::MessageType_t;
+
     //! Delivery policy type
     using DeliveryPolicy_t = _SampleDeliveryPolicy;
     //! Stamp type

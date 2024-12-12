@@ -238,6 +238,12 @@ struct TrackingRequestOutputPortSpec {
     //! Source data publisher type
     using SourceVisualizationPublisher_t = DownstreamSpec::SourceVisualizationPublisher_t;
 
+    //! Source publish data message type
+    using SourcePubDataMsgType_t = typename DeliverySourceData::PubDataMsgType_t;
+
+    //! Source data publisher type
+    using SourceDataPublisher_t = typename DownstreamSpec::SourceDataPublisher_t;
+
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
 
@@ -246,6 +252,12 @@ struct TrackingRequestOutputPortSpec {
 
     //! Target data publisher type
     using TargetVisualizationPublisher_t = DownstreamSpec::TargetVisualizationPublisher_t;
+
+    //! Target publish data message type
+    using TargetPubDataMsgType_t = typename DeliveryTargetData::PubDataMsgType_t;
+
+    //! Target data publisher type
+    using TargetDataPublisher_t = typename DownstreamSpec::TargetDataPublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;

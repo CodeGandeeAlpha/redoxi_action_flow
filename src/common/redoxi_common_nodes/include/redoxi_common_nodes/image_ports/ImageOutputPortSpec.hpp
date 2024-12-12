@@ -526,6 +526,8 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
         // create data publisher
         using SourceDataMsgType = typename SourceDataPublisherType::MessageType_t;
         using TargetDataMsgType = typename TargetDataPublisherType::MessageType_t;
+
+        // TODO: let user choose the qos for data publisher in config
         auto qos_source_data = DefaultParams::DataPublisherQoS;
         {
             auto topic = spec.get_data_topic_source_data_succeeded();
@@ -536,6 +538,7 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
             }
         }
 
+        // TODO: let user choose the qos for data publisher in config
         auto qos_target_data = DefaultParams::DataPublisherQoS;
         {
             auto topic = spec.get_data_topic_target_data_succeeded();
@@ -588,7 +591,13 @@ struct ImageActionOutputPortSpec {
     using SourcePubVisualizationMsgType_t = typename DeliverySourceData_t::PubVisualizationMsgType_t;
 
     //! Source data publisher type
-    using SourceVisualizationPublisher_t = DownstreamDebugPublisher;
+    using SourceVisualizationPublisher_t = typename DownstreamSpec::SourceVisualizationPublisher_t;
+
+    //! Source data publish message type
+    using SourcePubDataMsgType_t = typename DeliverySourceData_t::PubDataMsgType_t;
+
+    //! Source data publisher type
+    using SourceDataPublisher_t = typename DownstreamSpec::SourceDataPublisher_t;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
@@ -597,7 +606,13 @@ struct ImageActionOutputPortSpec {
     using TargetPubVisualizationMsgType_t = typename DeliveryTargetData_t::PubVisualizationMsgType_t;
 
     //! Target data publisher type
-    using TargetVisualizationPublisher_t = DownstreamDebugPublisher;
+    using TargetVisualizationPublisher_t = typename DownstreamSpec::TargetVisualizationPublisher_t;
+
+    //! Target data publish message type
+    using TargetPubDataMsgType_t = typename DeliveryTargetData_t::PubDataMsgType_t;
+
+    //! Target data publisher type
+    using TargetDataPublisher_t = typename DownstreamSpec::TargetDataPublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = output_port_types::DefaultStampData;

@@ -207,19 +207,31 @@ struct DetectionRequestOutputPortSpec {
     using DeliverySourceData_t = DeliverySourceData;
 
     //! Source data publish message type
-    using SourcePubVisualizationMsgType_t = DeliverySourceData::PubVisualizationMsgType_t;
+    using SourcePubVisualizationMsgType_t = typename DeliverySourceData::PubVisualizationMsgType_t;
 
     //! Source data publisher type
-    using SourceVisualizationPublisher_t = DownstreamSpec::SourceVisualizationPublisher_t;
+    using SourceVisualizationPublisher_t = typename DownstreamSpec::SourceVisualizationPublisher_t;
+
+    //! Source publish data message type
+    using SourcePubDataMsgType_t = typename DeliverySourceData::PubDataMsgType_t;
+
+    //! Source data publisher type
+    using SourceDataPublisher_t = typename DownstreamSpec::SourceDataPublisher_t;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
 
     //! Target data publish message type
-    using TargetPubVisualizationMsgType_t = DeliveryTargetData::PubVisualizationMsgType_t;
+    using TargetPubVisualizationMsgType_t = typename DeliveryTargetData::PubVisualizationMsgType_t;
 
     //! Target data publisher type
-    using TargetVisualizationPublisher_t = DownstreamSpec::TargetVisualizationPublisher_t;
+    using TargetVisualizationPublisher_t = typename DownstreamSpec::TargetVisualizationPublisher_t;
+
+    //! Target publish data message type
+    using TargetPubDataMsgType_t = typename DeliveryTargetData::PubDataMsgType_t;
+
+    //! Target data publisher type
+    using TargetDataPublisher_t = typename DownstreamSpec::TargetDataPublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;
