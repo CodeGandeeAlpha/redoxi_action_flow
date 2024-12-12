@@ -491,8 +491,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
             if (pub != nullptr) {
                 RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Publishing to source publisher ...",
                               boost::uuids::to_string(source_data->get_uuid()));
-                typename SourceData_t::PublishMessageType_t source_pub_msg;
-                source_data->to_publish_message(source_pub_msg);
+                typename SourceData_t::PubVisualizationMsgType_t source_pub_msg;
+                source_data->to_publish_visualization(source_pub_msg);
                 auto s = fmt::format("[FAILED] attempt {}/{}", ith_attempt, max_attempts);
                 pub->publish(source_pub_msg, s);
             }
@@ -504,8 +504,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
             if (pub != nullptr) {
                 RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Publishing to target publisher ...",
                               boost::uuids::to_string(target_data->get_source_data_uuid()));
-                typename TargetData_t::PublishMessageType_t target_pub_msg;
-                target_data->to_publish_message(target_pub_msg);
+                typename TargetData_t::PubVisualizationMsgType_t target_pub_msg;
+                target_data->to_publish_visualization(target_pub_msg);
                 auto s = fmt::format("[FAILED] attempt {}/{}", ith_attempt, max_attempts);
                 pub->publish(target_pub_msg, s);
             }
@@ -537,8 +537,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
         if (source_data != nullptr) {
             auto pub = ds.get_debug_pub_source_data_sending();
             if (pub != nullptr) {
-                typename SourceData_t::PublishMessageType_t source_pub_msg;
-                source_data->to_publish_message(source_pub_msg);
+                typename SourceData_t::PubVisualizationMsgType_t source_pub_msg;
+                source_data->to_publish_visualization(source_pub_msg);
                 auto s = fmt::format("[SENDING] attempt {}/{}", ith_attempt, max_attempts);
                 pub->publish(source_pub_msg, s);
             }
@@ -547,8 +547,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
         if (target_data != nullptr) {
             auto pub = ds.get_debug_pub_target_data_sending();
             if (pub != nullptr) {
-                typename TargetData_t::PublishMessageType_t target_pub_msg;
-                target_data->to_publish_message(target_pub_msg);
+                typename TargetData_t::PubVisualizationMsgType_t target_pub_msg;
+                target_data->to_publish_visualization(target_pub_msg);
                 auto s = fmt::format("[SENDING] attempt {}/{}", ith_attempt, max_attempts);
                 pub->publish(target_pub_msg, s);
             }
@@ -578,8 +578,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
         if (source_data != nullptr) {
             auto pub = ds.get_debug_pub_source_data_succeeded();
             if (pub != nullptr) {
-                typename SourceData_t::PublishMessageType_t source_pub_msg;
-                source_data->to_publish_message(source_pub_msg);
+                typename SourceData_t::PubVisualizationMsgType_t source_pub_msg;
+                source_data->to_publish_visualization(source_pub_msg);
                 auto s = fmt::format("[SENT] attempt {}/{}", ith_attempt, max_attempts);
                 pub->publish(source_pub_msg, s);
             }
@@ -587,8 +587,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
         if (target_data != nullptr) {
             auto pub = ds.get_debug_pub_target_data_succeeded();
             if (pub != nullptr) {
-                typename TargetData_t::PublishMessageType_t target_pub_msg;
-                target_data->to_publish_message(target_pub_msg);
+                typename TargetData_t::PubVisualizationMsgType_t target_pub_msg;
+                target_data->to_publish_visualization(target_pub_msg);
                 auto s = fmt::format("[SENT] attempt {}/{}", ith_attempt, max_attempts);
                 pub->publish(target_pub_msg, s);
             }

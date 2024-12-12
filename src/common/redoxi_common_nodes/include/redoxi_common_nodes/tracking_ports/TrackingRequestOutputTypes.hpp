@@ -4,13 +4,13 @@
 #include <variant>
 #include <redoxi_common_cpp/image_proc/utils.hpp>
 #include <redoxi_common_nodes/image_ports/ImageOutputPortSpec.hpp>
-#include <redoxi_common_nodes/detection_ports/DetectionResponseCommon.hpp>
-#include <universal_mot_trackers/tracking_ports/TrackingRequestCommon.hpp>
+// #include <redoxi_common_nodes/detection_ports/DetectionResponseCommon.hpp>
+// #include <redoxi_common_nodes/detection_ports/DetectionResponseOutputTypes.hpp>
+#include <redoxi_common_nodes/tracking_ports/TrackingRequestCommon.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
-#include <redoxi_common_nodes/detection_ports/DetectionResponseOutputTypes.hpp>
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
 
-namespace redoxi_works::model_nodes::tracking_ports::request_response::types
+namespace redoxi_works::tracking_ports::request_response::types
 {
 
 //! Retry policy type implementing the RetryPolicyConcept
@@ -21,7 +21,7 @@ using RetryPolicy = redoxi_works::output_port_types::DefaultRetryPolicy<TimeUnit
 class DeliverySourceData
 {
   public:
-    using PublishMessageType_t = sensor_msgs::msg::Image;
+    using PubVisualizationMsgType_t = sensor_msgs::msg::Image;
     using Detection_t = redoxi_public_msgs::msg::Detection;
     using FrameData_t = image_ports::types::FrameWithMetadata;
 
@@ -40,7 +40,7 @@ class DeliverySourceData
     }
 
     // to publish message
-    virtual int to_publish_message(PublishMessageType_t &msg) const
+    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
     {
         if (frame_data.is_empty()) {
             return -1;
@@ -105,7 +105,7 @@ static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>,
 //! Delivery target data type for detection request output port
 using DeliveryTargetDataBase = output_port_types::DefaultTargetData<TrackingRequestActionType,
                                                                     TrackingRequestActionDataTrait,
-                                                                    DeliverySourceData::PublishMessageType_t>;
+                                                                    DeliverySourceData::PubVisualizationMsgType_t>;
 
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
@@ -124,12 +124,12 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     {
     }
 
-    virtual int to_publish_message(PublishMessageType_t &msg) const
+    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
     {
         DeliverySourceData tmp;
         tmp.set_primary_frame(frame_data);
         tmp.set_detections(m_goal.detections);
-        tmp.to_publish_message(msg);
+        tmp.to_publish_visualization(msg);
         return 0;
     }
 
@@ -224,19 +224,19 @@ struct TrackingRequestOutputPortSpec {
     using DeliverySourceData_t = DeliverySourceData;
 
     //! Source data publish message type
-    using SourcePublishMessageType_t = DeliverySourceData::PublishMessageType_t;
+    using SourcePubVisualizationMsgType_t = DeliverySourceData::PubVisualizationMsgType_t;
 
     //! Source data publisher type
-    using SourcePublisherType_t = DownstreamSpec::SourcePublisherType_t;
+    using SourceVisualizationPublisher_t = DownstreamSpec::SourceVisualizationPublisher_t;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
 
     //! Target data publish message type
-    using TargetPublishMessageType_t = DeliveryTargetData::PublishMessageType_t;
+    using TargetPubVisualizationMsgType_t = DeliveryTargetData::PubVisualizationMsgType_t;
 
     //! Target data publisher type
-    using TargetPublisherType_t = DownstreamSpec::TargetPublisherType_t;
+    using TargetVisualizationPublisher_t = DownstreamSpec::TargetVisualizationPublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;
@@ -260,4 +260,4 @@ struct TrackingRequestOutputPortSpec {
     using Downstream_t = Downstream;
 };
 
-} // namespace redoxi_works::model_nodes::tracking_ports::request_response::types
+} // namespace redoxi_works::tracking_ports::request_response::types

@@ -16,6 +16,7 @@ class StampedImagePub
     using MessageType_t = sensor_msgs::msg::Image;
     using Publisher_t = rclcpp::Publisher<MessageType_t>;
     inline static const rclcpp::QoS DefaultQoS = rclcpp::SensorDataQoS();
+    inline static const rclcpp::QoS DefaultReliableQoS = rclcpp::SystemDefaultsQoS().reliable();
     inline static const rclcpp::QoS DefaultUnreliableQoS = rclcpp::SensorDataQoS();
 
     //! Constructor

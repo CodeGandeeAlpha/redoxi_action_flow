@@ -235,7 +235,7 @@ int PSGMasterNode::_create_document_request_handler(const RuntimeConfig_t &runti
                ProcessHandler_t::ResourceToken_t &resource) {
             // from input source data to output source data
             OutputSourceData_t output_source_data;
-            OutputSourceData_t::DeliverySourceData::PublishMessageType_t msg;
+            OutputSourceData_t::DeliverySourceData::PubVisualizationMsgType_t msg;
             msg.frame_bundle = source_data->m_goal->frame_bundle;
 
             auto goal_handle = source_data->get_goal_handle_future().get();
@@ -337,7 +337,7 @@ void PSGMasterNode::_step()
 
 //     // from input source data to output source data
 //     OutputSourceData_t output_source_data;
-//     OutputSourceData_t::DeliverySourceData::PublishMessageType_t doc_msg;
+//     OutputSourceData_t::DeliverySourceData::PubVisualizationMsgType_t doc_msg;
 //     doc_msg.frame = frame_data->m_goal->frame;
 //     output_source_data.set_document(doc_msg);
 

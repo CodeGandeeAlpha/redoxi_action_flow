@@ -46,6 +46,7 @@ class FrameRelayNode : public common_nodes::StartStopNode
 {
   public:
     FrameRelayNode(const std::string &node_name, const rclcpp::NodeOptions &options);
+    inline static const rclcpp::QoS RelayedFrameQoS = rclcpp::QoS(50).reliable();
 
   public: // useful types
     using InputPort_t = image_ports::AsyncImageInputPort;

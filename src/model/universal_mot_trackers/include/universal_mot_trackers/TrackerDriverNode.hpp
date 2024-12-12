@@ -3,7 +3,7 @@
 #include <universal_mot_trackers/visibility_control.h>
 #include <redoxi_common_nodes/detection_ports/DetectionResponseInputPort.hpp>
 // #include <redoxi_common_nodes/detection_ports/DetectionRequestOutputPort.hpp>
-#include <universal_mot_trackers/tracking_ports/TrackingRequestOutputPort.hpp>
+#include <redoxi_common_nodes/tracking_ports/TrackingRequestOutputPort.hpp>
 #include <redoxi_common_nodes/image_ports/AsyncImageOutputPort.hpp>
 #include <universal_mot_trackers/UniversalMotTrackerNode.hpp>
 #include <redoxi_common_nodes/driver_nodes/CallActionDriverBase.hpp>

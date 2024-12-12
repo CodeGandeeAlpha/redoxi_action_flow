@@ -1,9 +1,9 @@
 #pragma once
 
-#include <universal_mot_trackers/visibility_control.h>
-#include <universal_mot_trackers/tracking_ports/TrackingRequestCommon.hpp>
+#include <redoxi_common_nodes/visibility_control.h>
+#include <redoxi_common_nodes/tracking_ports/TrackingRequestCommon.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionInputTypes.hpp>
-namespace redoxi_works::model_nodes::tracking_ports::request_response::types
+namespace redoxi_works::tracking_ports::request_response::types
 {
 
 //! Input port types for tracking requests
@@ -22,4 +22,4 @@ static_assert(input_port_types::AsyncActionInputPortSpecConcept<TrackingRequestI
               "TrackingRequestInputPortSpec must satisfy AsyncActionInputPortSpecConcept");
 
 
-} // namespace redoxi_works::model_nodes::tracking_ports::request_response::types
+} // namespace redoxi_works::tracking_ports::request_response::types

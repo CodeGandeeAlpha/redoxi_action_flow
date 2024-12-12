@@ -19,12 +19,12 @@ concept DeliverySourceDataConcept = requires(T t)
     requires std::is_default_constructible_v<T>;
 
     //! The source data can be converted to this type for publishing
-    typename T::PublishMessageType_t;
-    requires RosMessageConcept<typename T::PublishMessageType_t>;
+    typename T::PubVisualizationMsgType_t;
+    requires RosMessageConcept<typename T::PubVisualizationMsgType_t>;
 
     //! Must have method to get ROS message
     {
-        std::declval<const T &>().to_publish_message(std::declval<typename T::PublishMessageType_t &>())
+        std::declval<const T &>().to_publish_visualization(std::declval<typename T::PubVisualizationMsgType_t &>())
         } -> std::same_as<int>;
 
     //! Must have method to get UUID
@@ -46,8 +46,8 @@ concept DeliveryTargetDataConcept = requires(T t)
     requires std::same_as<typename T::Goal_t, typename T::ActionType_t::Goal>;
 
     //! Must have publish message type, can be used for debug publishing
-    typename T::PublishMessageType_t;
-    requires RosMessageConcept<typename T::PublishMessageType_t>;
+    typename T::PubVisualizationMsgType_t;
+    requires RosMessageConcept<typename T::PubVisualizationMsgType_t>;
 
     //! Must have action data trait
     typename T::ActionDataTrait_t;
@@ -89,7 +89,7 @@ concept DeliveryTargetDataConcept = requires(T t)
 
     //! Must have method to convert to publish message
     {
-        std::declval<const T &>().to_publish_message(std::declval<typename T::PublishMessageType_t &>())
+        std::declval<const T &>().to_publish_visualization(std::declval<typename T::PubVisualizationMsgType_t &>())
         } -> std::same_as<int>;
 
     //! Get/set task metadata
@@ -274,19 +274,19 @@ concept DownstreamSpecConcept = requires(T t)
     typename T::DeliveryPolicy_t;
 
     //! Must have publisher type for source data
-    typename T::SourcePublisherType_t;
+    typename T::SourceVisualizationPublisher_t;
     //! Must have publisher type for target data
-    typename T::TargetPublisherType_t;
+    typename T::TargetVisualizationPublisher_t;
     //! Must have publish message type for source data
-    typename T::SourcePublishMessageType_t;
+    typename T::SourcePubVisualizationMsgType_t;
     //! Must have publish message type for target data
-    typename T::TargetPublishMessageType_t;
+    typename T::TargetPubVisualizationMsgType_t;
 
     //! Message types must match publisher message types
-    requires RosPublisherConcept<typename T::SourcePublisherType_t>;
-    requires RosPublisherConcept<typename T::TargetPublisherType_t>;
-    requires std::same_as<typename T::SourcePublishMessageType_t, typename T::SourcePublisherType_t::MessageType_t>;
-    requires std::same_as<typename T::TargetPublishMessageType_t, typename T::TargetPublisherType_t::MessageType_t>;
+    requires RosPublisherConcept<typename T::SourceVisualizationPublisher_t>;
+    requires RosPublisherConcept<typename T::TargetVisualizationPublisher_t>;
+    requires std::same_as<typename T::SourcePubVisualizationMsgType_t, typename T::SourceVisualizationPublisher_t::MessageType_t>;
+    requires std::same_as<typename T::TargetPubVisualizationMsgType_t, typename T::TargetVisualizationPublisher_t::MessageType_t>;
 
     //! Delivery policy type must satisfy DeliveryPolicyConcept
     requires DeliveryPolicyConcept<typename T::DeliveryPolicy_t>;
@@ -326,28 +326,28 @@ concept DownstreamSpecConcept = requires(T t)
 
     //! Must have methods to get source data debug topics
     {
-        std::declval<const T &>().get_debug_topic_source_data_sending()
+        std::declval<const T &>().get_vis_topic_source_data_sending()
         } -> std::same_as<std::optional<std::string>>;
 
     {
-        std::declval<const T &>().get_debug_topic_source_data_succeeded()
+        std::declval<const T &>().get_vis_topic_source_data_succeeded()
         } -> std::same_as<std::optional<std::string>>;
 
     {
-        std::declval<const T &>().get_debug_topic_source_data_failed()
+        std::declval<const T &>().get_vis_topic_source_data_failed()
         } -> std::same_as<std::optional<std::string>>;
 
     //! Must have methods to get target data debug topics
     {
-        std::declval<const T &>().get_debug_topic_target_data_sending()
+        std::declval<const T &>().get_vis_topic_target_data_sending()
         } -> std::same_as<std::optional<std::string>>;
 
     {
-        std::declval<const T &>().get_debug_topic_target_data_succeeded()
+        std::declval<const T &>().get_vis_topic_target_data_succeeded()
         } -> std::same_as<std::optional<std::string>>;
 
     {
-        std::declval<const T &>().get_debug_topic_target_data_failed()
+        std::declval<const T &>().get_vis_topic_target_data_failed()
         } -> std::same_as<std::optional<std::string>>;
 };
 
@@ -408,28 +408,28 @@ concept DownstreamConcept = requires(T t)
     requires std::same_as<typename T::SendGoalOptions_t, typename T::ActionClient_t::SendGoalOptions>;
 
     //! Source data publisher type
-    typename T::SourcePublisherType_t;
-    requires RosPublisherConcept<typename T::SourcePublisherType_t>;
-    requires std::same_as<typename T::SourcePublisherType_t,
-                          typename T::DownstreamSpec_t::SourcePublisherType_t>;
+    typename T::SourceVisualizationPublisher_t;
+    requires RosPublisherConcept<typename T::SourceVisualizationPublisher_t>;
+    requires std::same_as<typename T::SourceVisualizationPublisher_t,
+                          typename T::DownstreamSpec_t::SourceVisualizationPublisher_t>;
 
     //! Source data publish message type
-    typename T::SourcePublishMessageType_t;
-    requires RosMessageConcept<typename T::SourcePublishMessageType_t>;
-    requires std::same_as<typename T::SourcePublishMessageType_t,
-                          typename T::DownstreamSpec_t::SourcePublishMessageType_t>;
+    typename T::SourcePubVisualizationMsgType_t;
+    requires RosMessageConcept<typename T::SourcePubVisualizationMsgType_t>;
+    requires std::same_as<typename T::SourcePubVisualizationMsgType_t,
+                          typename T::DownstreamSpec_t::SourcePubVisualizationMsgType_t>;
 
     //! Target data publisher type
-    typename T::TargetPublisherType_t;
-    requires RosPublisherConcept<typename T::TargetPublisherType_t>;
-    requires std::same_as<typename T::TargetPublisherType_t,
-                          typename T::DownstreamSpec_t::TargetPublisherType_t>;
+    typename T::TargetVisualizationPublisher_t;
+    requires RosPublisherConcept<typename T::TargetVisualizationPublisher_t>;
+    requires std::same_as<typename T::TargetVisualizationPublisher_t,
+                          typename T::DownstreamSpec_t::TargetVisualizationPublisher_t>;
 
     //! Target data publish message type
-    typename T::TargetPublishMessageType_t;
-    requires RosMessageConcept<typename T::TargetPublishMessageType_t>;
-    requires std::same_as<typename T::TargetPublishMessageType_t,
-                          typename T::DownstreamSpec_t::TargetPublishMessageType_t>;
+    typename T::TargetPubVisualizationMsgType_t;
+    requires RosMessageConcept<typename T::TargetPubVisualizationMsgType_t>;
+    requires std::same_as<typename T::TargetPubVisualizationMsgType_t,
+                          typename T::DownstreamSpec_t::TargetPubVisualizationMsgType_t>;
 
     //! Must have method to get downstream spec
     {
@@ -459,28 +459,28 @@ concept DownstreamConcept = requires(T t)
     //! Get source data debug publishers
     {
         std::declval<const T &>().get_debug_pub_source_data_sending()
-        } -> std::same_as<std::shared_ptr<typename T::SourcePublisherType_t>>;
+        } -> std::same_as<std::shared_ptr<typename T::SourceVisualizationPublisher_t>>;
 
     {
         std::declval<const T &>().get_debug_pub_source_data_succeeded()
-        } -> std::same_as<std::shared_ptr<typename T::SourcePublisherType_t>>;
+        } -> std::same_as<std::shared_ptr<typename T::SourceVisualizationPublisher_t>>;
 
     {
         std::declval<const T &>().get_debug_pub_source_data_failed()
-        } -> std::same_as<std::shared_ptr<typename T::SourcePublisherType_t>>;
+        } -> std::same_as<std::shared_ptr<typename T::SourceVisualizationPublisher_t>>;
 
     //! Get target data debug publishers
     {
         std::declval<const T &>().get_debug_pub_target_data_sending()
-        } -> std::same_as<std::shared_ptr<typename T::TargetPublisherType_t>>;
+        } -> std::same_as<std::shared_ptr<typename T::TargetVisualizationPublisher_t>>;
 
     {
         std::declval<const T &>().get_debug_pub_target_data_succeeded()
-        } -> std::same_as<std::shared_ptr<typename T::TargetPublisherType_t>>;
+        } -> std::same_as<std::shared_ptr<typename T::TargetVisualizationPublisher_t>>;
 
     {
         std::declval<const T &>().get_debug_pub_target_data_failed()
-        } -> std::same_as<std::shared_ptr<typename T::TargetPublisherType_t>>;
+        } -> std::same_as<std::shared_ptr<typename T::TargetVisualizationPublisher_t>>;
 };
 
 

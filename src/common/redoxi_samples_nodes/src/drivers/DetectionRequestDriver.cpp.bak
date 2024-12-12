@@ -128,7 +128,7 @@ void DetectionRequestDriver::_on_detection_request_sent(DetectionRequestOutputPo
                 bool do_publish_detection_result = runtime_config->enable_visualization && m_pub_detection_result && !target_data.image.empty();
                 if (do_publish_detection_result) {
                     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Publishing detection result", msg_uuid_str);
-                    DetectionRequestOutputPort_t::TargetData_t::PublishMessageType_t detection_result_msg;
+                    DetectionRequestOutputPort_t::TargetData_t::PubVisualizationMsgType_t detection_result_msg;
                     auto canvas = target_data.image.clone();
                     image_utils::draw_detections(&canvas, result.result->detections);
                     m_pub_detection_result->publish(canvas, fmt::format("{} detections", result.result->detections.size()));

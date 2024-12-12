@@ -45,7 +45,7 @@ class RetryPolicy : public output_port_types::DefaultRetryPolicy<TimeUnit>
 class DeliverySourceData
 {
   public:
-    using PublishMessageType_t = psg_private_msgs::msg::PsgDocument;
+    using PubVisualizationMsgType_t = psg_private_msgs::msg::PsgDocument;
 
     DeliverySourceData()
     {
@@ -56,19 +56,19 @@ class DeliverySourceData
 
 
     //! Get the image
-    virtual const PublishMessageType_t &get_document() const
+    virtual const PubVisualizationMsgType_t &get_document() const
     {
         return m_document;
     }
 
     //! Set the image
-    virtual void set_document(const PublishMessageType_t &document)
+    virtual void set_document(const PubVisualizationMsgType_t &document)
     {
         m_document = document;
     }
 
     //! Convert the source data to a ROS message for publishing
-    virtual int to_publish_message(PublishMessageType_t &msg) const
+    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
     {
         msg = m_document;
         std::copy(m_uuid.begin(), m_uuid.end(), msg.x_uid.uuid.begin());
@@ -98,7 +98,7 @@ class DeliverySourceData
 
 //! Delivery target data type for image output port
 using DeliveryTargetDataBase =
-    output_port_types::DefaultTargetData<DeliveryActionType, RedoxiActionDataTrait<DeliveryActionType>, DeliverySourceData::PublishMessageType_t>;
+    output_port_types::DefaultTargetData<DeliveryActionType, RedoxiActionDataTrait<DeliveryActionType>, DeliverySourceData::PubVisualizationMsgType_t>;
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
   public:
@@ -111,7 +111,7 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     {
     }
 
-    virtual int to_publish_message(PublishMessageType_t &msg) const
+    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
     {
         msg = this->m_goal.document;
         return 0;
@@ -255,13 +255,13 @@ class Downstream : public DownstreamBase
         if (ret != 0) {
             RDX_RAISE_ERROR("[{}] failed to initialize downstream", __func__);
         }
-        auto qos_source = DownstreamSpec::SourcePublisherType_t::DefaultQoS;
-        auto qos_target = DownstreamSpec::TargetPublisherType_t::DefaultQoS;
-        using SourceInnerPublisherType = DownstreamSpec::SourcePublisherType_t::Publisher_t;
-        using TargetInnerPublisherType = DownstreamSpec::TargetPublisherType_t::Publisher_t;
+        auto qos_source = DownstreamSpec::SourceVisualizationPublisher_t::DefaultQoS;
+        auto qos_target = DownstreamSpec::TargetVisualizationPublisher_t::DefaultQoS;
+        using SourceInnerPublisherType = DownstreamSpec::SourceVisualizationPublisher_t::Publisher_t;
+        using TargetInnerPublisherType = DownstreamSpec::TargetVisualizationPublisher_t::Publisher_t;
 
         {
-            auto topic = spec.get_debug_topic_source_data_failed();
+            auto topic = spec.get_vis_topic_source_data_failed();
             if (topic.has_value()) {
                 m_debug_pub_source_data_failed = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<SourceInnerPublisherType>(node, topic.value(), qos_source);
@@ -270,7 +270,7 @@ class Downstream : public DownstreamBase
         }
 
         {
-            auto topic = spec.get_debug_topic_source_data_sending();
+            auto topic = spec.get_vis_topic_source_data_sending();
             if (topic.has_value()) {
                 m_debug_pub_source_data_sending = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<SourceInnerPublisherType>(node, topic.value(), qos_source);
@@ -279,7 +279,7 @@ class Downstream : public DownstreamBase
         }
 
         {
-            auto topic = spec.get_debug_topic_source_data_succeeded();
+            auto topic = spec.get_vis_topic_source_data_succeeded();
             if (topic.has_value()) {
                 m_debug_pub_source_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<SourceInnerPublisherType>(node, topic.value(), qos_source);
@@ -288,7 +288,7 @@ class Downstream : public DownstreamBase
         }
 
         {
-            auto topic = spec.get_debug_topic_target_data_sending();
+            auto topic = spec.get_vis_topic_target_data_sending();
             if (topic.has_value()) {
                 m_debug_pub_target_data_sending = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<TargetInnerPublisherType>(node, topic.value(), qos_target);
@@ -297,7 +297,7 @@ class Downstream : public DownstreamBase
         }
 
         {
-            auto topic = spec.get_debug_topic_target_data_succeeded();
+            auto topic = spec.get_vis_topic_target_data_succeeded();
             if (topic.has_value()) {
                 m_debug_pub_target_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<TargetInnerPublisherType>(node, topic.value(), qos_target);
@@ -306,7 +306,7 @@ class Downstream : public DownstreamBase
         }
 
         {
-            auto topic = spec.get_debug_topic_target_data_failed();
+            auto topic = spec.get_vis_topic_target_data_failed();
             if (topic.has_value()) {
                 m_debug_pub_target_data_failed = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = std::make_shared<TargetInnerPublisherType>(node, topic.value(), qos_target);
@@ -346,19 +346,19 @@ struct PSGDocumentOutputPortSpec {
     using DeliverySourceData_t = DeliverySourceData;
 
     //! Source data publish message type
-    using SourcePublishMessageType_t = typename DeliverySourceData_t::PublishMessageType_t;
+    using SourcePubVisualizationMsgType_t = typename DeliverySourceData_t::PubVisualizationMsgType_t;
 
     //! Source data publisher type
-    using SourcePublisherType_t = DownstreamDebugPublisher;
+    using SourceVisualizationPublisher_t = DownstreamDebugPublisher;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
 
     //! Target data publish message type
-    using TargetPublishMessageType_t = typename DeliveryTargetData_t::PublishMessageType_t;
+    using TargetPubVisualizationMsgType_t = typename DeliveryTargetData_t::PubVisualizationMsgType_t;
 
     //! Target data publisher type
-    using TargetPublisherType_t = DownstreamDebugPublisher;
+    using TargetVisualizationPublisher_t = DownstreamDebugPublisher;
 
     //! Stamp type
     using DeliveryStamp_t = output_port_types::DefaultStampData;

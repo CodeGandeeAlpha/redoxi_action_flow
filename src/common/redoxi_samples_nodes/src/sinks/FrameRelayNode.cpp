@@ -44,7 +44,7 @@ int FrameRelayNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> config
 
     //! Step 4: Initialize publishers
     RDX_INFO_DEV(this, __func__, false, "{}", "Initializing publishers");
-    m_pub_relayed_frame.init(this, init_config->publish_topic, StampedImagePub::DefaultQoS);
+    m_pub_relayed_frame.init(this, init_config->publish_topic, RelayedFrameQoS);
     m_pub_frame_accepted.init(this, init_config->debug_topic_frame_accepted, StampedImagePub::DefaultUnreliableQoS);
     m_pub_frame_rejected.init(this, init_config->debug_topic_frame_rejected, StampedImagePub::DefaultUnreliableQoS);
 
@@ -121,6 +121,7 @@ void FrameRelayNode::_step()
     std::shared_ptr<SourceData_t> frame_data;
     if (runtime_config->enable_blocking_mode) {
         // wait until there is data available
+        RDX_INFO_DEV(this, __func__, false, "{}", "Reading in blocking mode, waiting for data from input port");
         frame_data = m_input_port->pop_source_data();
     } else {
         // try to get data without waiting
@@ -157,15 +158,27 @@ void FrameRelayNode::_step()
                  msg_uuid_str, "frame received and goal resolved");
 
     cv::Mat frame;
-    _parse_frame(&frame, *frame_data);
-    auto encoding = frame_data->get_goal()->frame_bundle.primary_frame.metadata.encoding;
-    m_pub_relayed_frame.publish(frame, encoding);
+    image_utils::FrameMediator fm(&frame_data->get_goal()->frame_bundle.primary_frame);
+    auto frame_number = fm.get_frame_number();
+    auto task_uuid = InputPort_t::ActionDataTrait_t::get_source_task_metadata(*frame_data->get_goal()).source_task_id;
+    auto got_frame = fm.to_cv_image_copy(frame) == 0;
+    if (got_frame) {
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}][task={}] got frame, frame number={}, signal code={}",
+                     msg_uuid_str, UUIDTrait::to_string(task_uuid), frame_number, control_signal_code_to_string(control_signal_code));
 
-    // publish debug topic?
-    if (get_debug_topics_enabled()) {
-        auto control_signal_code = ActionDataTrait_t::get_control_signal_code(*frame_data->get_goal());
-        auto label_text = fmt::format("accepted, signal = {}", control_signal_code_to_string(control_signal_code));
-        m_pub_frame_accepted.publish(frame, encoding, label_text);
+        // _parse_frame(&frame, *frame_data);
+        auto encoding = frame_data->get_goal()->frame_bundle.primary_frame.metadata.encoding;
+        m_pub_relayed_frame.publish(frame, encoding);
+
+        // publish debug topic?
+        if (get_debug_topics_enabled()) {
+            auto control_signal_code = ActionDataTrait_t::get_control_signal_code(*frame_data->get_goal());
+            auto label_text = fmt::format("accepted, signal = {}", control_signal_code_to_string(control_signal_code));
+            m_pub_frame_accepted.publish(frame, encoding, label_text);
+        }
+    } else {
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}][task={}] failed to get frame, frame number={}, signal code={}",
+                     msg_uuid_str, UUIDTrait::to_string(task_uuid), frame_number, control_signal_code_to_string(control_signal_code));
     }
 
     // at the end, terminate the goal
