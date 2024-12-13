@@ -4,7 +4,6 @@
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
 #include <redoxi_common_nodes/visibility_control.h>
 #include <redoxi_public_msgs/action/process_detections_by_frame.hpp>
-#include <redoxi_public_msgs/msg/process_detections_by_frame_goal.hpp>
 
 namespace redoxi_works::detection_ports::request_response::types
 {
@@ -13,6 +12,5 @@ using DetectionRequestActionType = redoxi_public_msgs::action::ProcessDetections
 using DetectionRequestActionDataTrait = RedoxiActionDataTrait<DetectionRequestActionType>;
 
 //! The goal message type for the detection request action, can be used as data publish type
-using DetectionRequestGoalMsgType = redoxi_public_msgs::msg::ProcessDetectionsByFrameGoal;
 static_assert(RedoxiActionConcept<DetectionRequestActionType>, "DetectionRequestActionType must satisfy RedoxiActionConcept");
 } // namespace redoxi_works::detection_ports::request_response::types

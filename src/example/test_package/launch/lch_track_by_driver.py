@@ -164,8 +164,8 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
 # video_source -> detection_driver
 video_src_node_name = "video_source"
 # fn_video = r"/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-# fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
-fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.mp4"
+fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
+# fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.mp4"
 # fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/new-york.mp4"
 # fn_video = r"/soft/workspace/code/psf_ros2_ws/data/dancetrack/dancetrack-0039.mp4"
 video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
@@ -180,9 +180,10 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
                     delivery_policy=videoSrcCfg.DeliveryPolicy(
                         drop_strategy=videoSrcCfg.DropStrategy.DontCare,
                     ),
+                    create_debug_pub=True,
                 ),
             ],
-            data_topic_for_source_data="data_out/source_data",
+            # data_topic_for_source_data="data_out/source_data",
             data_topic_for_target_data="data_out/target_data",
         ),
     ),
@@ -194,7 +195,7 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
             drop_strategy=videoSrcCfg.DropStrategy.DontCare,
         ),
         # output_image_size={"width": 1920, "height": 1080},
-        output_image_size={"width": 1024, "height": -1},
+        # output_image_size={"width": 1024, "height": -1},
     ),
 )
 

@@ -90,8 +90,7 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
 //! Delivery target data type for detection output port
 using DeliveryTargetDataBase = output_port_types::DefaultTargetData<DetectionResponseActionType,
                                                                     DetectionResponseActionDataTrait,
-                                                                    DeliverySourceData::PubVisualizationMsgType_t,
-                                                                    DetectionResponseGoalMsgType>;
+                                                                    DeliverySourceData::PubVisualizationMsgType_t>;
 
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
@@ -115,16 +114,6 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         tmp.detections = this->m_goal.detections;
         tmp.frame_data = this->frame_data;
         return tmp.to_publish_visualization(msg);
-    }
-
-    int to_publish_data(PubDataMsgType_t &msg) const override
-    {
-        msg.x_task_metadata = this->m_goal.x_task_metadata;
-        msg.detections = this->m_goal.detections;
-        msg.frame_bundle = this->m_goal.frame_bundle;
-        msg.x_control = this->m_goal.x_control;
-        msg.x_uid = this->m_goal.x_uid;
-        return 0;
     }
 
     // auxiliary data for easy extension without inheritance

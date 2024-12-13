@@ -14,8 +14,8 @@
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
 #include <redoxi_public_msgs/msg/frame_metadata.hpp>
-#include <redoxi_public_msgs/msg/process_frame_goal.hpp>
-
+// #include <redoxi_public_msgs/msg/process_frame_goal.hpp>
+// #include <redoxi_public_msgs/msg/process_frame_data_msg.hpp>
 
 namespace redoxi_works::image_ports::types
 {
@@ -23,8 +23,6 @@ namespace redoxi_works::image_ports::types
 using TimeUnit = DefaultTimeUnit_t;
 using DeliveryActionType = redoxi_public_msgs::action::ProcessFrame;
 static_assert(RedoxiActionConcept<DeliveryActionType>, "DeliveryActionType must satisfy RedoxiActionConcept");
-
-using DeliveryGoalMsgType = redoxi_public_msgs::msg::ProcessFrameGoal;
 
 struct FrameWithMetadata {
     using Metadata_t = redoxi_public_msgs::msg::FrameMetadata;
@@ -216,6 +214,11 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
         image_utils::FrameMediator fm(m_primary_frame.image, m_primary_frame.get_encoding());
         fm.to_image_msg(msg);
 
+        auto header = msg.header;
+        RDX_INFO_DEV(nullptr, __func__, false,
+                     "header frame_id={}, stamp.nanosec={}, stamp.sec={}, data size={}",
+                     header.frame_id, header.stamp.nanosec, header.stamp.sec, msg.data.size());
+
         return 0;
     }
 
@@ -253,15 +256,11 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
 using DeliveryTargetDataBase =
     output_port_types::DefaultTargetData<DeliveryActionType,
                                          RedoxiActionDataTrait<DeliveryActionType>,
-                                         DeliverySourceData::PubVisualizationMsgType_t,
-                                         DeliveryGoalMsgType>;
+                                         DeliverySourceData::PubVisualizationMsgType_t>;
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
   public:
-    using BaseType_t = output_port_types::DefaultTargetData<DeliveryActionType,
-                                                            RedoxiActionDataTrait<DeliveryActionType>,
-                                                            DeliverySourceData::PubVisualizationMsgType_t,
-                                                            DeliveryGoalMsgType>;
+    using BaseType_t = DeliveryTargetDataBase;
     using VisualizationPublisher_t = DownstreamDebugPublisher;
     using DataPublisher_t = SimpleRosPublisher<PubDataMsgType_t>;
 
@@ -279,24 +278,6 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         image_utils::FrameMediator fm(&this->m_goal.frame_bundle.primary_frame);
         auto ret = fm.to_image_msg(msg);
         return ret;
-    }
-
-    int to_publish_data(PubDataMsgType_t &msg) const override
-    {
-        // TODO: no effect?
-        //  msg.x_task_metadata = this->m_goal.x_task_metadata;
-        //  msg.frame_bundle = this->m_goal.frame_bundle;
-        //  msg.x_control = this->m_goal.x_control;
-        //  msg.x_uid = this->m_goal.x_uid;
-        //  to_publish_visualization(msg.primary_image);
-
-        // RDX_INFO_DEV(nullptr, __func__, false, "to_publish_data, primary_image encoding={}, data size={}",
-        //              msg.primary_image.encoding, msg.primary_image.data.size());
-        to_publish_visualization(msg.primary_image);
-
-        RDX_INFO_DEV(nullptr, __func__, false, "to_publish_data, primary_image encoding={}, data size={}",
-                     msg.primary_image.encoding, msg.primary_image.data.size());
-        return 0;
     }
 
     // auxiliary data for easy extension without inheritance

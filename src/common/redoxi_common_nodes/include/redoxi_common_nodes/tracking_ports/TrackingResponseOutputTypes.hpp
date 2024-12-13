@@ -107,8 +107,7 @@ static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>,
 //! Delivery target data type for detection request output port
 using DeliveryTargetDataBase = output_port_types::DefaultTargetData<TrackingResponseActionType,
                                                                     TrackingResponseActionDataTrait,
-                                                                    DeliverySourceData::PubVisualizationMsgType_t,
-                                                                    TrackingResponseGoalMsgType>;
+                                                                    DeliverySourceData::PubVisualizationMsgType_t>;
 
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
@@ -134,16 +133,6 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         tmp.set_primary_frame(frame_data);
         tmp.set_track_targets(m_goal.track_targets);
         tmp.to_publish_visualization(msg);
-        return 0;
-    }
-
-    int to_publish_data(PubDataMsgType_t &msg) const override
-    {
-        msg.x_task_metadata = m_goal.x_task_metadata;
-        msg.frame_bundle = m_goal.frame_bundle;
-        msg.track_targets = m_goal.track_targets;
-        msg.x_control = m_goal.x_control;
-        msg.x_uid = m_goal.x_uid;
         return 0;
     }
 

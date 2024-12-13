@@ -22,8 +22,7 @@ using DeliverySourceData = image_ports::types::DeliverySourceData;
 //! Delivery target data type for detection request output port
 using DeliveryTargetDataBase = output_port_types::DefaultTargetData<DetectionRequestActionType,
                                                                     DetectionRequestActionDataTrait,
-                                                                    DeliverySourceData::PubVisualizationMsgType_t,
-                                                                    DetectionRequestGoalMsgType>;
+                                                                    DeliverySourceData::PubVisualizationMsgType_t>;
 
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
@@ -56,15 +55,6 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         header.stamp = rclcpp::Clock().now();
         cv_bridge::CvImage cv_bridge_img(header, vis_image.get_encoding(), canvas);
         cv_bridge_img.toImageMsg(msg);
-        return 0;
-    }
-
-    int to_publish_data(DetectionRequestGoalMsgType &msg) const override
-    {
-        msg.x_task_metadata = m_goal.x_task_metadata;
-        msg.frame_bundle = m_goal.frame_bundle;
-        msg.x_control = m_goal.x_control;
-        msg.x_uid = m_goal.x_uid;
         return 0;
     }
 
