@@ -100,8 +100,8 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
 
 
 # detection_driver <-> detector
-fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx"
-# fn_model = r"/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8m-pose-dynbatch.onnx"
+# fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx"
+fn_model = r"/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8m-pose-dynbatch.onnx"
 # fn_model = r"/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx"
 # fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s-pose.onnx"
 det_node_name = "detector"
@@ -165,7 +165,8 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
 video_src_node_name = "video_source"
 # fn_video = r"/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
 # fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
-fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/new-york.mp4"
+fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.mp4"
+# fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/new-york.mp4"
 # fn_video = r"/soft/workspace/code/psf_ros2_ws/data/dancetrack/dancetrack-0039.mp4"
 video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
@@ -193,6 +194,7 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
             drop_strategy=videoSrcCfg.DropStrategy.DontCare,
         ),
         # output_image_size={"width": 1920, "height": 1080},
+        output_image_size={"width": 1024, "height": -1},
     ),
 )
 
@@ -251,8 +253,8 @@ video_src_node = Node(
 
 detection_node = Node(
     package="test_package",
-    executable="yolo_object_detection_node",
-    # executable="yolo_body_pose_detection_node",
+    # executable="yolo_object_detection_node",
+    executable="yolo_body_pose_detection_node",
     name=det_node_name,
     namespace=det_node_name,
     prefix=common_prefix,
