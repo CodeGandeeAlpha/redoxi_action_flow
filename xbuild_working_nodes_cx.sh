@@ -20,6 +20,7 @@ PackagesToBuild="redoxi_video_reader \
                  redoxi_shared_memory \
                  redoxi_shm_v6d \
                  redoxi_inference \
+                 redoxi_inference_onnx \
                  rosboard \
                  psg_common \
                  psg_master_node \
@@ -30,10 +31,10 @@ PackagesToBuild="redoxi_video_reader \
                  psg_person_generator \
                  psg_pose_detector \
                  psg_tracker \
-                 video_reader_orbbec \
                  video_reader_from_url \
                  psg_counter \
                  psg_common_py \
+                 test_package \
                  test_cx"
 
 
@@ -107,5 +108,7 @@ colcon build --packages-up-to $PackagesToBuild \
     -DJSON_STRUCT_OPT_INSTALL=ON \
     -DBUILD_SHARED_LIBS=ON \
     -DJSON_STRUCT_OPT_BUILD_EXAMPLES=OFF \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
     -DJSON_STRUCT_OPT_BUILD_TESTS=OFF
 source install/setup.bash

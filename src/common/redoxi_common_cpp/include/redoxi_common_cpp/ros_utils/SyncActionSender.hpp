@@ -85,6 +85,7 @@ class SyncActionSender
      *          If response_code is not set, the result is unknown, which occurs when you have never waited for the result.
      */
     struct _SendResult {
+        using ResponseCode_t = ActionDownstreamResponse;
         /**
          * @brief The response code from the downstream action server
          * @details ACCEPTED: The goal is accepted, goal_handle_future.get() can be used without waiting
@@ -92,7 +93,7 @@ class SyncActionSender
          *          TIMEOUT: The result is unknown, goal_handle_future.wait() should be used to wait for the result
          *          If not set, the result is unknown, this is the case when you have never waited for the result
          */
-        std::optional<ActionDownstreamResponse> response_code;
+        std::optional<ResponseCode_t> response_code;
 
         /**
          * @brief The goal handle future, obtained from the ROS action.

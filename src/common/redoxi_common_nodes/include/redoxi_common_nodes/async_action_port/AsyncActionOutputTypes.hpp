@@ -1092,7 +1092,7 @@ class DefaultDownstream
         m_node = node;
 
         // create action client
-        RDX_LOG_DEBUG(node, "[{}] Creating action client for action '{}'", __func__, spec.get_action_name());
+        RDX_LOG_DEBUG(node, __func__, "Creating action client for action '{}'", spec.get_action_name());
         m_action_client = rclcpp_action::create_client<ActionType_t>(node, spec.get_action_name());
         if (m_action_client == nullptr) {
             RDX_RAISE_ERROR("[{}()]: Failed to create action client for action '{}'", __func__, spec.get_action_name());
@@ -1103,7 +1103,7 @@ class DefaultDownstream
             RDX_RAISE_ERROR("[{}()]: Failed to wait for action server for action '{}'", __func__, spec.get_action_name());
         }
 
-        RDX_LOG_DEBUG(node, "[{}] Action client for action '{}' created", __func__, spec.get_action_name());
+        RDX_LOG_DEBUG(node, __func__, "Action client for action '{}' created", spec.get_action_name());
 
         return 0;
     }
