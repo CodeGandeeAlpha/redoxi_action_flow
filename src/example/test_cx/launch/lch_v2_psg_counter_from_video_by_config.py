@@ -67,6 +67,7 @@ psg_counter_node_json_params = psgCounterCfg.PSGCounterNodeConfig(
                     action_name=f"/{document_sink_node_name}/{document_sink_node_json_params.init_config.input_port_config.action_name}",
                 )
             ],
+            data_topic_for_target_data="data_out/target_data",
         ),
     ),
     runtime_config=psgCounterCfg.PSGCounterRuntimeConfig(
@@ -123,6 +124,7 @@ psg_tracker_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConfi
                     action_name=f"/{psg_counter_node_name}/{psg_counter_node_json_params.init_config.input_port_config.action_name}",
                 )
             ],
+            data_topic_for_target_data="data_out/target_data_pipeline",
         ),
         output_port_model_config=psgPipelineBaseCfg.OutputPortConfig(
             downstream_specs=[
@@ -131,6 +133,7 @@ psg_tracker_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConfi
                     action_name=f"/{psg_tracker_node_name}/{psg_tracker_node_json_params.init_config.input_port_config.action_name}",
                 )
             ],
+            data_topic_for_target_data="data_out/target_data_model",
         ),
     ),
     runtime_config=psgPipelineBaseCfg.PipelineBaseRuntimeConfig(
@@ -171,6 +174,7 @@ psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
                     action_name=f"/{psg_tracker_node_pipeline_name}/{psg_tracker_node_pipeline_json_params.init_config.input_port_config.action_name}",
                 )
             ],
+            data_topic_for_target_data="data_out/target_data",
         ),
     ),
     runtime_config=psgInoutBaseCfg.InoutBaseRuntimeConfig(
@@ -205,6 +209,7 @@ psg_pose_detector_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNod
                     action_name=f"/{psg_person_generator_node_name}/{psg_person_generator_node_json_params.init_config.input_port_config.action_name}",
                 )
             ],
+            data_topic_for_target_data="data_out/target_data_pipeline",
         ),
         output_port_model_config=psgPipelineBaseCfg.OutputPortConfig(
             downstream_specs=[
@@ -213,6 +218,7 @@ psg_pose_detector_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNod
                     action_name=f"/rtm_pose_detector_node/model_process_detections_action",
                 )
             ],
+            data_topic_for_target_data="data_out/target_data_model",
         ),
     ),
     runtime_config=psgPipelineBaseCfg.PipelineBaseRuntimeConfig(
@@ -251,6 +257,7 @@ psg_detector_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConf
                     action_name=f"/{psg_pose_detector_node_name}/{psg_pose_detector_node_pipeline_json_params.init_config.input_port_config.action_name}",
                 )
             ],
+            data_topic_for_target_data="data_out/target_data_pipeline",
         ),
         output_port_model_config=psgPipelineBaseCfg.OutputPortConfig(
             downstream_specs=[
@@ -259,6 +266,7 @@ psg_detector_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConf
                     action_name=f"/psg_detector/model_process_frame_action",
                 )
             ],
+            data_topic_for_target_data="data_out/target_data_model",
         ),
     ),
     runtime_config=psgPipelineBaseCfg.PipelineBaseRuntimeConfig(
@@ -297,6 +305,7 @@ psg_master_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
                     action_name=f"/{psg_detector_node_name}/{psg_detector_node_pipeline_json_params.init_config.input_port_config.action_name}",
                 )
             ],
+            data_topic_for_target_data="data_out/target_data",
         ),
     ),
     runtime_config=psgInoutBaseCfg.InoutBaseRuntimeConfig(
@@ -330,6 +339,7 @@ video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
                     action_name=f"/{psg_master_node_name}/{psg_master_node_json_params.init_config.input_port_config.action_name}",
                 ),
             ],
+            data_topic_for_target_data="data_out/target_data",
         ),
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
