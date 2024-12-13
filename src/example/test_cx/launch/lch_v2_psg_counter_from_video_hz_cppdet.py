@@ -16,7 +16,7 @@ import json
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
     "log_level",
-    default_value="debug",
+    default_value="info",
     description="Logging level",
 )
 
@@ -71,18 +71,18 @@ psg_counter_node_json_params = psgCounterCfg.PSGCounterNodeConfig(
         ),
     ),
     runtime_config=psgCounterCfg.PSGCounterRuntimeConfig(
-        step_interval=StepIntervals.VeryFast,
+        # step_interval=StepIntervals.VeryFast,
         document_interval=0,
         enable_blocking_mode=False,
         publish_to_debug_topic=False,
-        frame_request_policy=psgCounterCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-        frame_enqueue_policy=psgCounterCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
+        # frame_request_policy=psgCounterCfg.DeliveryPolicy(
+        #     precondition="no_precondition",
+        #     drop_strategy="no_drop",
+        # ),
+        # frame_enqueue_policy=psgCounterCfg.DeliveryPolicy(
+        #     precondition="no_precondition",
+        #     drop_strategy="no_drop",
+        # ),
     ),
 )
 
@@ -139,22 +139,22 @@ psg_tracker_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConfi
     runtime_config=psgPipelineBaseCfg.PipelineBaseRuntimeConfig(
         publish_to_debug_topic=False,
         enable_blocking_mode=False,
-        pipeline_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-        pipeline_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-        model_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-        model_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
+        # pipeline_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
+        #     precondition="no_precondition",
+        #     drop_strategy="no_drop",
+        # ),
+        # pipeline_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
+        #     precondition="no_precondition",
+        #     drop_strategy="no_drop",
+        # ),
+        # model_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
+        #     precondition="no_precondition",
+        #     drop_strategy="no_drop",
+        # ),
+        # model_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
+        #     precondition="no_precondition",
+        #     drop_strategy="no_drop",
+        # ),
     ),
 )
 
@@ -178,18 +178,18 @@ psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
         ),
     ),
     runtime_config=psgInoutBaseCfg.InoutBaseRuntimeConfig(
-        step_interval=StepIntervals.VeryFast,
+        # step_interval=StepIntervals.VeryFast,
         document_interval=0,
         enable_blocking_mode=False,
         publish_to_debug_topic=False,
-        frame_request_policy=psgInoutBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-        frame_enqueue_policy=psgInoutBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
+        # frame_request_policy=psgInoutBaseCfg.DeliveryPolicy(
+        #     precondition="no_precondition",
+        #     drop_strategy="no_drop",
+        # ),
+        # frame_enqueue_policy=psgInoutBaseCfg.DeliveryPolicy(
+        #     precondition="no_precondition",
+        #     drop_strategy="no_drop",
+        # ),
     ),
 )
 
@@ -256,22 +256,22 @@ psg_all_detector_cpp_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBase
     runtime_config=psgPipelineBaseCfg.PipelineBaseRuntimeConfig(
         publish_to_debug_topic=False,
         enable_blocking_mode=False,
-        pipeline_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-        pipeline_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-        model_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-        model_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
+        # pipeline_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
+        #     precondition="no_precondition",
+        #     drop_strategy="no_drop",
+        # ),
+        # pipeline_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
+        #     precondition="no_precondition",
+        #     drop_strategy="no_drop",
+        # ),
+        # model_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
+        #     precondition="no_precondition",
+        #     drop_strategy="no_drop",
+        # ),
+        # model_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
+        #     precondition="no_precondition",
+        #     drop_strategy="no_drop",
+        # ),
     ),
 )
 
@@ -295,18 +295,18 @@ psg_master_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
         ),
     ),
     runtime_config=psgInoutBaseCfg.InoutBaseRuntimeConfig(
-        step_interval=StepIntervals.VeryFast,
+        # step_interval=StepIntervals.VeryFast,
         document_interval=0,
         enable_blocking_mode=False,
         publish_to_debug_topic=False,
-        frame_request_policy=psgInoutBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-        frame_enqueue_policy=psgInoutBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
+        # frame_request_policy=psgInoutBaseCfg.DeliveryPolicy(
+        #     precondition="no_precondition",
+        #     drop_strategy="no_drop",
+        # ),
+        # frame_enqueue_policy=psgInoutBaseCfg.DeliveryPolicy(
+        #     precondition="no_precondition",
+        #     drop_strategy="no_drop",
+        # ),
     ),
 )
 
@@ -323,15 +323,22 @@ video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
                 videoSrcCfg.DownstreamSpec(
                     name=psg_master_node_name,
                     action_name=f"/{psg_master_node_name}/{psg_master_node_json_params.init_config.input_port_config.action_name}",
+                    create_debug_pub=True,
                 ),
             ],
             data_topic_for_target_data="data_out/target_data",
         ),
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
-        step_interval=StepIntervals.Medium,
-        output_image_size=videoSrcCfg.ImageSize(width=1920, height=1080),
+        step_interval=StepIntervals.Fast,
+        output_image_size=videoSrcCfg.ImageSize(width=1024, height=-1),
         output_image_encoding="bgr8",
+        frame_request_policy=videoSrcCfg.DeliveryPolicy(
+            drop_strategy="drop_as_needed",
+        ),
+        frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
+            drop_strategy="drop_as_needed",
+        ),
     ),
 )
 
