@@ -93,15 +93,73 @@ class RetryPolicy : public output_port_types::DefaultRetryPolicy<TimeUnit>
     }
 };
 
+class DownstreamDebugPublisher
+{
+  public:
+    using MessageType_t = sensor_msgs::msg::Image;
+    using Publisher_t = redoxi_works::StampedImagePub::Publisher_t;
+    inline static const cv::Scalar DefaultHeaderColor{255, 0, 0};
+    inline static constexpr double DefaultHeaderScale = 1.0;
+    inline static const rclcpp::QoS DefaultQoS = DefaultParams::DebugPublisherQoS;
+
+    //! Constructor for DownstreamDebugPublisher with concept assert
+    DownstreamDebugPublisher()
+    {
+        static_assert(RosPublisherConcept<DownstreamDebugPublisher>,
+                      "DownstreamDebugPublisher must satisfy RosPublisherConcept");
+    }
+    virtual ~DownstreamDebugPublisher() = default;
+
+    //! Initialize the DownstreamDebugPublisher with a shared pointer to a publisher
+    virtual void init(std::shared_ptr<Publisher_t> pub,
+                      std::optional<cv::Scalar> header_color = std::nullopt,
+                      std::optional<double> header_scale = std::nullopt)
+    {
+        m_pub = std::make_shared<redoxi_works::StampedImagePub>();
+        m_pub->init(pub);
+        m_header_color = header_color.value_or(DefaultHeaderColor);
+        m_header_scale = header_scale.value_or(DefaultHeaderScale);
+    }
+
+    //! Get the current publisher of the DownstreamDebugPublisher
+    virtual std::shared_ptr<Publisher_t> get_publisher() const
+    {
+        return m_pub->get_publisher();
+    }
+
+    //! Publish an image with the DownstreamDebugPublisher
+    virtual int publish(const cv::Mat &image)
+    {
+        return m_pub->publish(image, DefaultColorImageEncoding.data());
+    }
+
+    virtual int publish(const MessageType_t &msg)
+    {
+        return m_pub->publish(msg);
+    }
+
+    virtual int publish(const MessageType_t &msg,
+                        const std::string &header_text)
+    {
+        return m_pub->publish(msg, header_text, m_header_color, m_header_scale);
+    }
+
+  protected:
+    std::shared_ptr<redoxi_works::StampedImagePub> m_pub;
+    cv::Scalar m_header_color{DefaultHeaderColor};
+    double m_header_scale = DefaultHeaderScale;
+};
+
 //! Source data type for image output port
 //! This type must satisfy the DeliverySourceDataConcept
-class DeliverySourceData
+class DeliverySourceData : public output_port_types::SimpleImageSourceData
 {
   public:
     using FrameData_t = FrameWithMetadata;
-    using PubVisualizationMsgType_t = sensor_msgs::msg::Image;
     using FrameBundle_t = redoxi_public_msgs::msg::MultiDeviceFrame;
-    using PubDataMsgType_t = DeliveryGoalMsgType;
+
+    //! Visualization publisher type for image output port, override the default one in base class
+    using VisualizationPublisher_t = DownstreamDebugPublisher;
 
     DeliverySourceData()
     {
@@ -147,7 +205,7 @@ class DeliverySourceData
     }
 
     //! Convert the source data to a ROS message for publishing
-    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
+    int to_publish_visualization(PubVisualizationMsgType_t &msg) const override
     {
         // empty primary frame, skip
         if (m_primary_frame.is_empty()) {
@@ -161,31 +219,10 @@ class DeliverySourceData
         return 0;
     }
 
-    virtual int to_publish_data(PubDataMsgType_t &msg) const
+    int to_publish_data(PubDataMsgType_t &msg) const override
     {
-        image_utils::FrameMediator fm(m_primary_frame.image, m_primary_frame.get_encoding());
-        fm.to_frame_msg(msg.frame_bundle.primary_frame);
-
-        // for secondary frames
-        msg.frame_bundle.secondary_frames.resize(m_secondary_frames.size());
-        for (size_t i = 0; i < m_secondary_frames.size(); ++i) {
-            image_utils::FrameMediator fm(m_secondary_frames[i].image, m_secondary_frames[i].get_encoding());
-            fm.to_frame_msg(msg.frame_bundle.secondary_frames[i]);
-        }
-
+        to_publish_visualization(msg);
         return 0;
-    }
-
-    //! Get the UUID associated with this source data
-    virtual boost::uuids::uuid get_uuid() const
-    {
-        return m_uuid;
-    }
-
-    //! Set the UUID associated with this source data
-    virtual void set_uuid(const boost::uuids::uuid &uuid)
-    {
-        m_uuid = uuid;
     }
 
     virtual void from_frame_bundle(const FrameBundle_t &frame_bundle)
@@ -207,8 +244,6 @@ class DeliverySourceData
     std::any auxiliary_data;
 
   protected:
-    UUIDType m_uuid;
-
     FrameWithMetadata m_primary_frame;
     std::vector<FrameWithMetadata> m_secondary_frames;
 };
@@ -223,6 +258,13 @@ using DeliveryTargetDataBase =
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
   public:
+    using BaseType_t = output_port_types::DefaultTargetData<DeliveryActionType,
+                                                            RedoxiActionDataTrait<DeliveryActionType>,
+                                                            DeliverySourceData::PubVisualizationMsgType_t,
+                                                            DeliveryGoalMsgType>;
+    using VisualizationPublisher_t = DownstreamDebugPublisher;
+    using DataPublisher_t = SimpleRosPublisher<PubDataMsgType_t>;
+
     DeliveryTargetData()
     {
         static_assert(output_port_types::DeliveryTargetDataConcept<DeliveryTargetData>, "DeliveryTargetData must satisfy DeliveryTargetDataConcept");
@@ -241,17 +283,27 @@ class DeliveryTargetData : public DeliveryTargetDataBase
 
     int to_publish_data(PubDataMsgType_t &msg) const override
     {
-        msg.x_task_metadata = this->m_goal.x_task_metadata;
-        msg.frame_bundle = this->m_goal.frame_bundle;
-        msg.x_control = this->m_goal.x_control;
-        msg.x_uid = this->m_goal.x_uid;
+        // TODO: no effect?
+        //  msg.x_task_metadata = this->m_goal.x_task_metadata;
+        //  msg.frame_bundle = this->m_goal.frame_bundle;
+        //  msg.x_control = this->m_goal.x_control;
+        //  msg.x_uid = this->m_goal.x_uid;
+        //  to_publish_visualization(msg.primary_image);
+
+        // RDX_INFO_DEV(nullptr, __func__, false, "to_publish_data, primary_image encoding={}, data size={}",
+        //              msg.primary_image.encoding, msg.primary_image.data.size());
+        to_publish_visualization(msg.primary_image);
+
+        RDX_INFO_DEV(nullptr, __func__, false, "to_publish_data, primary_image encoding={}, data size={}",
+                     msg.primary_image.encoding, msg.primary_image.data.size());
         return 0;
     }
 
     // auxiliary data for easy extension without inheritance
     std::any auxiliary_data;
 };
-static_assert(output_port_types::DeliveryTargetDataConcept<DeliveryTargetData>, "DeliveryTargetData must satisfy DeliveryTargetDataConcept");
+static_assert(output_port_types::DeliveryTargetDataConcept<DeliveryTargetData>,
+              "DeliveryTargetData must satisfy DeliveryTargetDataConcept");
 
 //! Stamp data type for image output port (nothing to do here, right now)
 using DeliveryStampData = output_port_types::DefaultStampData;
@@ -317,107 +369,6 @@ static_assert(output_port_types::DeliveryRequestConcept<DeliveryRequest>, "Deliv
 using DeliveryTask = output_port_types::DefaultDeliveryTask<DeliveryRequest, DeliveryTargetData, RetryPolicy>;
 static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>, "DeliveryTask must satisfy DeliveryTaskConcept");
 
-using DownstreamDataPublisher = SimpleRosPublisher<DeliveryGoalMsgType>;
-// class DownstreamDataPublisher
-// {
-//   public:
-//     using MessageType_t = DeliveryGoalMsgType;
-//     using Publisher_t = rclcpp::Publisher<MessageType_t>;
-//     virtual ~DownstreamDataPublisher() = default;
-
-//     virtual void init(std::shared_ptr<Publisher_t> pub)
-//     {
-//         m_pub = pub;
-//     }
-
-//     virtual void set_publisher(std::shared_ptr<Publisher_t> pub)
-//     {
-//         m_pub = pub;
-//     }
-
-//     virtual std::shared_ptr<Publisher_t> get_publisher() const
-//     {
-//         return m_pub;
-//     }
-
-
-//     virtual int publish(const MessageType_t &msg)
-//     {
-//         m_pub->publish(msg);
-//         return 0;
-//     }
-
-//     //! Publish a message with an annotation, required by concept, but not used here
-//     //! @param annotation: not used, just ignored
-//     virtual int publish(const MessageType_t &msg,
-//                         const std::string &annotation)
-//     {
-//         (void)annotation;
-//         m_pub->publish(msg);
-//         return 0;
-//     }
-
-//   protected:
-//     std::shared_ptr<Publisher_t> m_pub;
-// };
-
-//! Downstream debug publisher type for image output port
-class DownstreamDebugPublisher
-{
-  public:
-    using MessageType_t = sensor_msgs::msg::Image;
-    using Publisher_t = redoxi_works::StampedImagePub::Publisher_t;
-    inline static const cv::Scalar DefaultHeaderColor{255, 0, 0};
-    inline static constexpr double DefaultHeaderScale = 1.0;
-    inline static const rclcpp::QoS DefaultQoS = DefaultParams::DebugPublisherQoS;
-
-    //! Constructor for DownstreamDebugPublisher with concept assert
-    DownstreamDebugPublisher()
-    {
-        static_assert(RosPublisherConcept<DownstreamDebugPublisher>,
-                      "DownstreamDebugPublisher must satisfy RosPublisherConcept");
-    }
-    virtual ~DownstreamDebugPublisher() = default;
-
-    //! Initialize the DownstreamDebugPublisher with a shared pointer to a publisher
-    virtual void init(std::shared_ptr<Publisher_t> pub,
-                      std::optional<cv::Scalar> header_color = std::nullopt,
-                      std::optional<double> header_scale = std::nullopt)
-    {
-        m_pub = std::make_shared<redoxi_works::StampedImagePub>();
-        m_pub->init(pub);
-        m_header_color = header_color.value_or(DefaultHeaderColor);
-        m_header_scale = header_scale.value_or(DefaultHeaderScale);
-    }
-
-    //! Get the current publisher of the DownstreamDebugPublisher
-    virtual std::shared_ptr<Publisher_t> get_publisher() const
-    {
-        return m_pub->get_publisher();
-    }
-
-    //! Publish an image with the DownstreamDebugPublisher
-    virtual int publish(const cv::Mat &image)
-    {
-        return m_pub->publish(image, DefaultColorImageEncoding.data());
-    }
-
-    virtual int publish(const MessageType_t &msg)
-    {
-        return m_pub->publish(msg);
-    }
-
-    virtual int publish(const MessageType_t &msg,
-                        const std::string &header_text)
-    {
-        return m_pub->publish(msg, header_text, m_header_color, m_header_scale);
-    }
-
-  protected:
-    std::shared_ptr<redoxi_works::StampedImagePub> m_pub;
-    cv::Scalar m_header_color{DefaultHeaderColor};
-    double m_header_scale = DefaultHeaderScale;
-};
 
 //! Downstream spec type with image publisher for image output port
 template <RosActionConcept ActionType,
@@ -521,8 +472,8 @@ static_assert(output_port_types::DownstreamConcept<Downstream>,
 
 //! Init config type for image output port
 using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
-                                                        DownstreamDataPublisher,
-                                                        DownstreamDataPublisher>;
+                                                        DeliverySourceData::DataPublisher_t,
+                                                        DeliveryTargetData::DataPublisher_t>;
 
 //! Image output port spec
 //! This type must satisfy the AsyncActionOutputPortSpecConcept
@@ -558,10 +509,10 @@ struct ImageActionOutputPortSpec {
     using SourceVisualizationPublisher_t = typename DownstreamSpec::SourceVisualizationPublisher_t;
 
     //! Source data publish message type
-    using SourcePubDataMsgType_t = typename DeliverySourceData_t::PubDataMsgType_t;
+    using SourcePubDataMsgType_t = DeliverySourceData_t::PubDataMsgType_t;
 
     //! Source data publisher type
-    using SourceDataPublisher_t = DownstreamDataPublisher;
+    using SourceDataPublisher_t = DeliverySourceData_t::DataPublisher_t;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
@@ -576,7 +527,7 @@ struct ImageActionOutputPortSpec {
     using TargetPubDataMsgType_t = typename DeliveryTargetData_t::PubDataMsgType_t;
 
     //! Target data publisher type
-    using TargetDataPublisher_t = DownstreamDataPublisher;
+    using TargetDataPublisher_t = DeliveryTargetData_t::DataPublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = output_port_types::DefaultStampData;

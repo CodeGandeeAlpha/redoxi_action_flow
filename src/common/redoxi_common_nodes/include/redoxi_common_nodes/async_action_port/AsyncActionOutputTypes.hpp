@@ -11,6 +11,7 @@
 #include <redoxi_common_nodes/async_action_port/output_port_concepts.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
+// #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 
 // default types for the async action output port
 namespace redoxi_works
@@ -37,30 +38,73 @@ using _SampleTargetVisPublisher = NoneRosPublisher<_SampleVisMsgType>;
 static_assert(RosPublisherConcept<_SampleTargetVisPublisher>,
               "_SampleTargetVisPublisher must satisfy RosPublisherConcept");
 
+//! In a rush? Just implement this class
+template <RosMessageConcept VisualizationMsgType,
+          RosMessageConcept DataMsgType>
+class DefaultDeliverySourceData
+{
+  public:
+    using PubVisualizationMsgType_t = VisualizationMsgType;
+    using PubDataMsgType_t = DataMsgType;
+    using VisualizationPublisher_t = SimpleRosPublisher<PubVisualizationMsgType_t>;
+    using DataPublisher_t = SimpleRosPublisher<PubDataMsgType_t>;
 
-//! Sample source data type, used to test whether the concepts are working
-struct _SampleSourceData {
-    using PubVisualizationMsgType_t = _SampleVisMsgType;
-    using PubDataMsgType_t = _SampleDataMsgType;
-    _SampleSourceData() = default;
+    virtual ~DefaultDeliverySourceData() = default;
 
-    int to_publish_visualization(PubVisualizationMsgType_t &) const
+    //! Convert to visualization message
+    virtual int to_publish_visualization(PubVisualizationMsgType_t &) const
     {
+        static_assert(RosPublisherConcept<VisualizationPublisher_t>,
+                      "VisualizationPublisher_t must satisfy RosPublisherConcept");
         return 0;
     }
 
-    int to_publish_data(PubDataMsgType_t &) const
+    //! Convert to data message for unreliable data transmission
+    virtual int to_publish_data(PubDataMsgType_t &) const
     {
+        static_assert(RosPublisherConcept<DataPublisher_t>,
+                      "DataPublisher_t must satisfy RosPublisherConcept");
         return 0;
     }
 
-    boost::uuids::uuid get_uuid() const
+    //! Get UUID
+    virtual UUIDType get_uuid() const
     {
-        return boost::uuids::uuid();
+        return m_uuid;
     }
+
+    //! Set UUID
+    virtual void set_uuid(UUIDType uuid)
+    {
+        m_uuid = uuid;
+    }
+
+  protected:
+    UUIDType m_uuid{0};
 };
+using _SampleSourceData = DefaultDeliverySourceData<_SampleVisMsgType, _SampleDataMsgType>;
 static_assert(DeliverySourceDataConcept<_SampleSourceData>,
               "_SampleSourceData must satisfy DeliverySourceDataConcept");
+
+//! Simple image source data, which always publishes the image as a visualization and data
+class SimpleImageSourceData : public DefaultDeliverySourceData<sensor_msgs::msg::Image, sensor_msgs::msg::Image>
+{
+  public:
+    using BaseType_t = DefaultDeliverySourceData<sensor_msgs::msg::Image, sensor_msgs::msg::Image>;
+    using BaseType_t::BaseType_t;
+};
+static_assert(DeliverySourceDataConcept<SimpleImageSourceData>,
+              "SimpleImageSourceData must satisfy DeliverySourceDataConcept");
+
+//! Simple string source data, which always publishes the string as a visualization and data
+class SimpleStringSourceData : public DefaultDeliverySourceData<std_msgs::msg::String, std_msgs::msg::String>
+{
+  public:
+    using BaseType_t = DefaultDeliverySourceData<std_msgs::msg::String, std_msgs::msg::String>;
+    using BaseType_t::BaseType_t;
+};
+static_assert(DeliverySourceDataConcept<SimpleStringSourceData>,
+              "SimpleStringSourceData must satisfy DeliverySourceDataConcept");
 
 //! Sample data publisher type, used to test whether the concepts are working
 using _SampleSourceDataPublisher = NoneRosPublisher<_SampleSourceData::PubDataMsgType_t>;
@@ -199,9 +243,16 @@ class DefaultTargetData
     //! The ROS message type that this target data wraps
     using ActionType_t = ActionType;
     using Goal_t = typename ActionType_t::Goal;
+    using ActionDataTrait_t = ActionDataTrait;
+
     using PubVisualizationMsgType_t = PubVisualizationMsgType;
     using PubDataMsgType_t = PubDataMsgType;
-    using ActionDataTrait_t = ActionDataTrait;
+
+    //! Visualization publisher type, you can override this in derived class with "using" clause
+    using VisualizationPublisher_t = SimpleRosPublisher<PubVisualizationMsgType>;
+
+    //! Data publisher type, you can override this in derived class with "using" clause
+    using DataPublisher_t = SimpleRosPublisher<PubDataMsgType>;
 
     virtual ~DefaultTargetData() = default;
     DefaultTargetData(const Goal_t &goal = Goal_t())

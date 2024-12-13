@@ -173,7 +173,6 @@ static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
 
 using Downstream = image_ports::types::DownstreamBaseWithImagePub<DetectionRequestActionType, DeliveryPolicy>;
 
-// using DownstreamDebugPublisher = Downstream::SourceVisualizationPublisher_t;
 using DownstreamSpec = typename Downstream::DownstreamSpec_t;
 
 //! Init config type for detection request output port
