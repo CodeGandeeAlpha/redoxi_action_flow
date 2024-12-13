@@ -371,39 +371,50 @@ int PSGTrackerPipelineNode::_create_frame_request_handler(const RuntimeConfig_t 
                ProcessHandler_t::InputActionResult_t *action_result,
                std::shared_ptr<const InputSourceData_t> source_data,
                ProcessHandler_t::ResourceToken_t &resource) {
+            RDX_INFO_DEV(this, __func__, true, "{}", "开始处理输入数据");
+
             // 将document数据放入document map中
+            RDX_INFO_DEV(this, __func__, true, "{}", "正在将document数据插入document map...");
             m_impl->m_document_map.synchronize()->insert({source_data->get_goal()->document.frame_bundle.primary_frame.metadata.frame_num,
                                                           std::make_shared<psg_private_msgs::msg::PsgDocument>(source_data->get_goal()->document)});
+            RDX_INFO_DEV(this, __func__, true, "{}", "document数据插入完成");
 
             // 将person数据放入person map中
+            RDX_INFO_DEV(this, __func__, true, "{}", "正在将person数据插入person map...");
             auto lock_ptr_person_map = m_impl->m_person_map.synchronize();
             for (const auto &person : source_data->get_goal()->document.persons) {
                 lock_ptr_person_map->insert({person.x_uid.uuid, std::make_shared<psg_private_msgs::msg::Person>(person)});
             }
+            RDX_INFO_DEV(this, __func__, true, "{}", "person数据插入完成");
 
             // 创建delivery request，并推送到output port model
+            RDX_INFO_DEV(this, __func__, true, "{}", "正在创建output source data...");
             // from input source data to output source data
             OutputSourceDataModel_t output_source_data;
             output_source_data.set_frame_bundle(source_data->get_goal()->document.frame_bundle);
             output_source_data.set_persons(source_data->get_goal()->document.persons);
+            RDX_INFO_DEV(this, __func__, true, "{}", "output source data创建完成");
 
-
+            RDX_INFO_DEV(this, __func__, true, "{}", "正在获取goal handle和control signal code...");
             auto goal_handle = source_data->get_goal_handle_future().get();
             auto control_signal_code = InputDataTrait_t::get_control_signal_code(*source_data->get_goal());
             RDX_INFO_DEV(this, __func__, true,
                          "on_process_input_data()中frame num: {}, control signal code: {}",
                          source_data->get_goal()->document.frame_bundle.primary_frame.metadata.frame_num, int(control_signal_code));
 
-
             // create delivery request
+            RDX_INFO_DEV(this, __func__, true, "{}", "正在创建delivery request...");
             auto delivery_request = _create_delivery_request(output_source_data, control_signal_code);
             *output_request = delivery_request;
+            RDX_INFO_DEV(this, __func__, true, "{}", "delivery request创建完成");
 
             // fill the action result, nothing to do
             (void)action_result;
 
             (void)output_enqueue_policy;
             (void)resource;
+
+            RDX_INFO_DEV(this, __func__, true, "{}", "输入数据处理完成");
             return 0;
         };
     return 0;

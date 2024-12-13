@@ -99,7 +99,7 @@ colcon build --packages-up-to $PackagesToBuild \
     -DJSON_STRUCT_OPT_BUILD_TESTS=OFF \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++
-    
+
 source install/setup.bash
 
 # Set CUDA_VISIBLE_DEVICES in WSL2 environment

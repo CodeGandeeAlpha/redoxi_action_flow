@@ -26,15 +26,8 @@ ExampleConfig = {
             "action_name": "",
             "goal_result_expire_time": 1000000,
         },
-        "output_port_pipeline_config": {
+        "output_port_config": {
             "_action_goal_type": "psg_private_msgs/action/ProcessDocument_Goal",
-            "downstream_specs": [],
-            "num_buffer_requests": 1,
-            "preserve_request_order": True,
-            "fallback_delivery_precondition": "dont_care",
-        },
-        "output_port_model_config": {
-            "_action_goal_type": "redoxi_public_msgs/action/ProcessDetectionByFrame_Goal",
             "downstream_specs": [],
             "num_buffer_requests": 1,
             "preserve_request_order": True,
@@ -68,8 +61,9 @@ ExampleConfig = {
 
 __all__ = (
     [
-        "PipelineBaseInitConfig",
-        "PipelineBaseRuntimeConfig",
+        "InoutBaseInitConfig",
+        "InoutBaseRuntimeConfig",
+        "InoutBaseNodeConfig",
     ]
     + commonTypes.__all__
     + portCfg.__all__
@@ -78,21 +72,25 @@ __all__ = (
 
 
 @define(kw_only=True)
-class PipelineBaseInitConfig(baseNodeCfg.BaseRosNodeInitConfig):
+class InoutBaseInitConfig(baseNodeCfg.BaseRosNodeInitConfig):
     input_port_config: portCfg.InputPortConfig | None = field(default=None)
-    output_port_pipeline_config: portCfg.OutputPortConfig | None = field(default=None)
-    output_port_model_config: portCfg.OutputPortConfig | None = field(default=None)
+    output_port_config: portCfg.OutputPortConfig | None = field(default=None)
+    create_debug_pub: bool = field(default=False)
+    debug_pub_queue_size: int = field(default=10)
+    debug_pub_task_enqueue_name: str = field(default="debug_port/task_enqueue")
+    debug_pub_task_drop_name: str = field(default="debug_port/task_drop")
 
 
 @define(kw_only=True)
-class PipelineBaseRuntimeConfig(baseNodeCfg.BaseRosNodeRuntimeConfig):
+class InoutBaseRuntimeConfig(baseNodeCfg.BaseRosNodeRuntimeConfig):
     frame_request_policy: portCfg.DeliveryPolicy = field(default=None)
     frame_enqueue_policy: portCfg.DeliveryPolicy = field(default=None)
     enable_blocking_mode: bool = field(default=False)
+    publish_to_debug_topic: bool = field(default=False)
+    document_interval: int = field(default=0)
 
 
 @define(kw_only=True)
-class PipelineBaseRuntimeConfig(baseNodeCfg.BaseRosNodeRuntimeConfig):
-    frame_request_policy: portCfg.DeliveryPolicy = field(default=None)
-    frame_enqueue_policy: portCfg.DeliveryPolicy = field(default=None)
-    enable_blocking_mode: bool = field(default=False)
+class InoutBaseNodeConfig(baseNodeCfg.BaseRosNodeConfig):
+    init_config: InoutBaseInitConfig = field(default=None)
+    runtime_config: InoutBaseRuntimeConfig = field(default=None)

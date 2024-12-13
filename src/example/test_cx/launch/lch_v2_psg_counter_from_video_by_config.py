@@ -10,13 +10,13 @@ import psg_common_py.configs.pipeline_base as psgPipelineBaseCfg
 import psg_common_py.configs.inout_base as psgInoutBaseCfg
 import psg_common_py.configs.psg_counter as psgCounterCfg
 import psg_common_py.configs.psg_tracker as psgTrackerCfg
-import yolo8_series.configs as yolo
+
 import json
 
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
     "log_level",
-    default_value="debug",
+    default_value="info",
     description="Logging level",
 )
 
@@ -193,42 +193,10 @@ psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
     ),
 )
 
-# cpp 姿态检测节点配置
-# psg_all_detector_cpp <-> yolo_body_pose_detection_node
-fn_model_nano = "/3d/chengxiao/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx"
-det_node_name = "yolo_body_pose_detection_node"
-det_node_params = yolo.Yolo8ModelNodeConfig(
-    init_config=yolo.Yolo8ModelInitConfig(
-        model_configs=[
-            {
-                "model_path": fn_model_nano,
-                "device_type": "cuda",
-                "device_index": 0,
-            },
-        ],
-        detection_request_config=yolo.DetectionRequestConfig(
-            input_port_config=yolo.InputPortConfig(
-                action_name="in/detection_request",
-            ),
-        ),
-        publish_visualization_topic="debug/visualization",
-        publish_probe_detection_done_topic="probe/detection_done",
-    ),
-    runtime_config=yolo.Yolo8ModelRuntimeConfig(
-        model_output_config=yolo.ModelPostprocessConfig(
-            conf_threshold=0.2,
-            iou_threshold=0.4,
-        ),
-        enable_blocking_mode=False,
-        enable_performance_probe=True,
-        enable_visualization=True,
-    ),
-)
-
-# PSG cpp 姿态检测pipeline节点配置
-# psg_all_detector_cpp <-> yolo_body_pose_detection_node
-psg_all_detector_cpp_node_pipeline_name = "psg_all_detector_cpp"
-psg_all_detector_cpp_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConfig(
+# PSG Pose Detector 节点配置
+# psg_pose_detector_node <-> psg_pose_detector_node_model
+psg_pose_detector_node_name = "pose_detector_node"
+psg_pose_detector_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConfig(
     init_config=psgPipelineBaseCfg.PipelineBaseInitConfig(
         create_debug_pub=True,
         input_port_config=psgPipelineBaseCfg.InputPortConfig(
@@ -246,8 +214,8 @@ psg_all_detector_cpp_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBase
         output_port_model_config=psgPipelineBaseCfg.OutputPortConfig(
             downstream_specs=[
                 psgPipelineBaseCfg.DownstreamSpec(
-                    name=det_node_name,
-                    action_name=f"/{det_node_name}/{det_node_params.init_config.detection_request_config.input_port_config.action_name}",
+                    name="rtm_pose_detector_node",
+                    action_name=f"/rtm_pose_detector_node/model_process_detections_action",
                 )
             ],
             data_topic_for_target_data="data_out/target_data_model",
@@ -257,16 +225,62 @@ psg_all_detector_cpp_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBase
         publish_to_debug_topic=False,
         enable_blocking_mode=False,
         pipeline_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
+            drop_strategy="drop_as_needed",
         ),
         pipeline_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
             precondition="no_precondition",
             drop_strategy="no_drop",
         ),
         model_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
+            drop_strategy="drop_as_needed",
+        ),
+        model_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
             precondition="no_precondition",
             drop_strategy="no_drop",
+        ),
+    ),
+)
+
+# PSG Detector 节点配置
+# psg_detector_node <-> psg_detector_node_model
+psg_detector_node_name = "detector_node"
+psg_detector_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConfig(
+    init_config=psgPipelineBaseCfg.PipelineBaseInitConfig(
+        create_debug_pub=True,
+        input_port_config=psgPipelineBaseCfg.InputPortConfig(
+            action_name="in/action",
+        ),
+        output_port_pipeline_config=psgPipelineBaseCfg.OutputPortConfig(
+            downstream_specs=[
+                psgPipelineBaseCfg.DownstreamSpec(
+                    name=psg_pose_detector_node_name,
+                    action_name=f"/{psg_pose_detector_node_name}/{psg_pose_detector_node_pipeline_json_params.init_config.input_port_config.action_name}",
+                )
+            ],
+            data_topic_for_target_data="data_out/target_data_pipeline",
+        ),
+        output_port_model_config=psgPipelineBaseCfg.OutputPortConfig(
+            downstream_specs=[
+                psgPipelineBaseCfg.DownstreamSpec(
+                    name="psg_detector",
+                    action_name=f"/psg_detector/model_process_frame_action",
+                )
+            ],
+            data_topic_for_target_data="data_out/target_data_model",
+        ),
+    ),
+    runtime_config=psgPipelineBaseCfg.PipelineBaseRuntimeConfig(
+        publish_to_debug_topic=False,
+        enable_blocking_mode=False,
+        pipeline_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
+            drop_strategy="drop_as_needed",
+        ),
+        pipeline_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
+        model_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
+            drop_strategy="drop_as_needed",
         ),
         model_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
             precondition="no_precondition",
@@ -276,7 +290,7 @@ psg_all_detector_cpp_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBase
 )
 
 # PSG主节点配置
-# psg_master_node -> psg_all_detector_cpp_node_pipeline
+# psg_master_node -> psg_detector_node
 psg_master_node_name = "psg_master_node"
 psg_master_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
     init_config=psgInoutBaseCfg.InoutBaseInitConfig(
@@ -287,8 +301,8 @@ psg_master_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
         output_port_config=psgInoutBaseCfg.OutputPortConfig(
             downstream_specs=[
                 psgInoutBaseCfg.DownstreamSpec(
-                    name=psg_all_detector_cpp_node_pipeline_name,
-                    action_name=f"/{psg_all_detector_cpp_node_pipeline_name}/{psg_all_detector_cpp_node_pipeline_json_params.init_config.input_port_config.action_name}",
+                    name=psg_detector_node_name,
+                    action_name=f"/{psg_detector_node_name}/{psg_detector_node_pipeline_json_params.init_config.input_port_config.action_name}",
                 )
             ],
             data_topic_for_target_data="data_out/target_data",
@@ -382,13 +396,40 @@ psg_master_node = Node(
 
 psg_detector_node = Node(
     package="test_cx",
-    executable="v2_psg_all_detector_cpp",
-    name=psg_all_detector_cpp_node_pipeline_name,
-    namespace=psg_all_detector_cpp_node_pipeline_name,
+    executable="v2_psg_detector",
+    name=psg_detector_node_name,
+    namespace=psg_detector_node_name,
     prefix=common_prefix,
     parameters=[
         {
-            "param_as_json_string": psg_all_detector_cpp_node_pipeline_json_params.to_json(
+            "param_as_json_string": psg_detector_node_pipeline_json_params.to_json(
+                ignore_none=True, compact=False
+            ),
+        },
+    ],
+    arguments=["--ros-args", "--log-level", [f"{psg_detector_node_name}:=", logger]]
+    + common_ros_args,
+)
+
+psg_detector_node_model = Node(
+    package="psg_detector",
+    executable="ddq_detector_node.py",
+    name="psg_detector",
+    namespace="psg_detector",
+    prefix=common_prefix,
+    arguments=["--ros-args", "--log-level", ["psg_detector:=", logger]]
+    + common_ros_args,
+)
+
+psg_pose_detector_node = Node(
+    package="test_cx",
+    executable="v2_psg_pose_detector",
+    name=psg_pose_detector_node_name,
+    namespace=psg_pose_detector_node_name,
+    prefix=common_prefix,
+    parameters=[
+        {
+            "param_as_json_string": psg_pose_detector_node_pipeline_json_params.to_json(
                 ignore_none=True, compact=False
             ),
         },
@@ -396,28 +437,19 @@ psg_detector_node = Node(
     arguments=[
         "--ros-args",
         "--log-level",
-        [f"{psg_all_detector_cpp_node_pipeline_name}:=", logger],
+        [f"{psg_pose_detector_node_name}:=", logger],
     ]
     + common_ros_args,
 )
 
-detection_node = Node(
-    package="test_package",
-    executable="yolo_body_pose_detection_node",
-    name=det_node_name,
-    namespace=det_node_name,
+psg_pose_detector_node_model = Node(
+    package="psg_pose_detector",
+    executable="rtm_pose_detector_node.py",
+    name="rtm_pose_detector_node",
+    namespace="rtm_pose_detector_node",
     prefix=common_prefix,
-    output="screen",
-    parameters=[
-        {
-            "param_as_json_string": det_node_params.to_json(
-                ignore_none=True, compact=False
-            ),
-        },
-    ],
-    arguments=["--ros-args", "--log-level", [f"{det_node_name}:=", logger]]
+    arguments=["--ros-args", "--log-level", ["rtm_pose_detector_node:=", logger]]
     + common_ros_args,
-    # arguments=["--ros-args", "--disable-external-lib-logs"],
 )
 
 psg_person_generator_node = Node(
@@ -477,11 +509,7 @@ psg_tracker_node = Node(
             ),
         },
     ],
-    arguments=[
-        "--ros-args",
-        "--log-level",
-        [f"{psg_tracker_node_name}:=", logger],
-    ]
+    arguments=["--ros-args", "--log-level", [f"{psg_tracker_node_name}:=", logger]]
     + common_ros_args,
 )
 
@@ -500,11 +528,7 @@ psg_counter_node = Node(
             ),
         },
     ],
-    arguments=[
-        "--ros-args",
-        "--log-level",
-        [f"{psg_counter_node_name}:=", logger],
-    ]
+    arguments=["--ros-args", "--log-level", [f"{psg_counter_node_name}:=", logger]]
     + common_ros_args,
 )
 
@@ -521,11 +545,7 @@ document_sink_node = Node(
             ),
         },
     ],
-    arguments=[
-        "--ros-args",
-        "--log-level",
-        [f"{document_sink_node_name}:=", logger],
-    ]
+    arguments=["--ros-args", "--log-level", [f"{document_sink_node_name}:=", logger]]
     + common_ros_args,
 )
 
@@ -547,7 +567,9 @@ def generate_launch_description():
             video_source_node,
             psg_master_node,
             psg_detector_node,
-            detection_node,
+            psg_detector_node_model,
+            psg_pose_detector_node,
+            psg_pose_detector_node_model,
             psg_person_generator_node,
             psg_tracker_pipeline_node,
             psg_tracker_node,

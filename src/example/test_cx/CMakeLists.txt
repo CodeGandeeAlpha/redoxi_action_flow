@@ -34,6 +34,7 @@ set(DEPENDENCIES
     video_reader_from_url
     psg_tracker
     psg_counter
+    test_package
     pluginlib)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb)

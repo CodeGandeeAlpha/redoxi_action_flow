@@ -8,15 +8,12 @@ import redoxi_common_py.configs.video_source_from_url as videoSrcCfg
 import psg_common_py.configs.psg_document_sink as psgDocSinkCfg
 import psg_common_py.configs.pipeline_base as psgPipelineBaseCfg
 import psg_common_py.configs.inout_base as psgInoutBaseCfg
-import psg_common_py.configs.psg_counter as psgCounterCfg
-import psg_common_py.configs.psg_tracker as psgTrackerCfg
 import yolo8_series.configs as yolo
-import json
 
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
     "log_level",
-    default_value="debug",
+    default_value="info",
     description="Logging level",
 )
 
@@ -47,149 +44,6 @@ document_sink_node_json_params = psgDocSinkCfg.PSGDocumentSinkNodeConfig(
     runtime_config=psgDocSinkCfg.PSGDocumentSinkNodeRuntimeConfig(
         enable_debug_topics=True,
         enable_blocking_mode=False,
-    ),
-)
-
-# PSG计数器节点配置
-# psg_tracker_pipeline_node -> psg_counter
-psg_counter_node_name = "psg_counter"
-psg_counter_node_json_params = psgCounterCfg.PSGCounterNodeConfig(
-    init_config=psgCounterCfg.PSGCounterInitConfig(
-        create_debug_pub=True,
-        passengerflow_config_path="/3d/chengxiao/data/passengerflow/fairmot_train_230907/psg_configs/20.22.6.30.json",
-        input_port_config=psgCounterCfg.InputPortConfig(
-            action_name="in/action",
-        ),
-        output_port_config=psgCounterCfg.OutputPortConfig(
-            downstream_specs=[
-                psgCounterCfg.DownstreamSpec(
-                    name=document_sink_node_name,
-                    action_name=f"/{document_sink_node_name}/{document_sink_node_json_params.init_config.input_port_config.action_name}",
-                )
-            ],
-            data_topic_for_target_data="data_out/target_data",
-        ),
-    ),
-    runtime_config=psgCounterCfg.PSGCounterRuntimeConfig(
-        step_interval=StepIntervals.VeryFast,
-        document_interval=0,
-        enable_blocking_mode=False,
-        publish_to_debug_topic=False,
-        frame_request_policy=psgCounterCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-        frame_enqueue_policy=psgCounterCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-    ),
-)
-
-
-class TrackerType:
-    DEEPSORT = 0
-    BOTSORT = 1
-
-
-# PSG跟踪器节点配置
-# psg_tracker_pipeline_node <-> psg_tracker_node
-psg_tracker_node_name = "psg_tracker_node"
-psg_tracker_node_json_params = psgTrackerCfg.PSGTrackerNodeConfig(
-    init_config=psgTrackerCfg.PSGTrackerInitConfig(
-        tracker_type=TrackerType.BOTSORT,
-        input_port_config=psgTrackerCfg.InputPortConfig(
-            action_name="in/action",
-        ),
-    ),
-    runtime_config=psgTrackerCfg.PSGTrackerRuntimeConfig(
-        enable_debug_topics=False,
-        enable_blocking_mode=False,
-    ),
-)
-
-# PSG跟踪器节点配置
-# psg_tracker_pipeline_node -> psg_tracker_node
-psg_tracker_node_pipeline_name = "psg_tracker_pipeline_node"
-psg_tracker_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConfig(
-    init_config=psgPipelineBaseCfg.PipelineBaseInitConfig(
-        create_debug_pub=True,
-        input_port_config=psgPipelineBaseCfg.InputPortConfig(
-            action_name="in/action",
-        ),
-        output_port_pipeline_config=psgPipelineBaseCfg.OutputPortConfig(
-            downstream_specs=[
-                psgPipelineBaseCfg.DownstreamSpec(
-                    name=psg_counter_node_name,
-                    action_name=f"/{psg_counter_node_name}/{psg_counter_node_json_params.init_config.input_port_config.action_name}",
-                )
-            ],
-            data_topic_for_target_data="data_out/target_data_pipeline",
-        ),
-        output_port_model_config=psgPipelineBaseCfg.OutputPortConfig(
-            downstream_specs=[
-                psgPipelineBaseCfg.DownstreamSpec(
-                    name=psg_tracker_node_name,
-                    action_name=f"/{psg_tracker_node_name}/{psg_tracker_node_json_params.init_config.input_port_config.action_name}",
-                )
-            ],
-            data_topic_for_target_data="data_out/target_data_model",
-        ),
-    ),
-    runtime_config=psgPipelineBaseCfg.PipelineBaseRuntimeConfig(
-        publish_to_debug_topic=False,
-        enable_blocking_mode=False,
-        pipeline_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-        pipeline_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-        model_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-        model_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-    ),
-)
-
-# PSG人员生成器节点配置
-# psg_all_detector_cpp -> psg_person_generator -> psg_tracker_pipeline_node
-psg_person_generator_node_name = "psg_person_generator"
-psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
-    init_config=psgInoutBaseCfg.InoutBaseInitConfig(
-        create_debug_pub=True,
-        input_port_config=psgInoutBaseCfg.InputPortConfig(
-            action_name="in/action",
-        ),
-        output_port_config=psgInoutBaseCfg.OutputPortConfig(
-            downstream_specs=[
-                psgInoutBaseCfg.DownstreamSpec(
-                    name=psg_tracker_node_pipeline_name,
-                    action_name=f"/{psg_tracker_node_pipeline_name}/{psg_tracker_node_pipeline_json_params.init_config.input_port_config.action_name}",
-                )
-            ],
-            data_topic_for_target_data="data_out/target_data",
-        ),
-    ),
-    runtime_config=psgInoutBaseCfg.InoutBaseRuntimeConfig(
-        step_interval=StepIntervals.VeryFast,
-        document_interval=0,
-        enable_blocking_mode=False,
-        publish_to_debug_topic=False,
-        frame_request_policy=psgInoutBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-        frame_enqueue_policy=psgInoutBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
     ),
 )
 
@@ -237,8 +91,8 @@ psg_all_detector_cpp_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBase
         output_port_pipeline_config=psgPipelineBaseCfg.OutputPortConfig(
             downstream_specs=[
                 psgPipelineBaseCfg.DownstreamSpec(
-                    name=psg_person_generator_node_name,
-                    action_name=f"/{psg_person_generator_node_name}/{psg_person_generator_node_json_params.init_config.input_port_config.action_name}",
+                    name=document_sink_node_name,
+                    action_name=f"/{document_sink_node_name}/{document_sink_node_json_params.init_config.input_port_config.action_name}",
                 )
             ],
             data_topic_for_target_data="data_out/target_data_pipeline",
@@ -275,8 +129,9 @@ psg_all_detector_cpp_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBase
     ),
 )
 
+
 # PSG主节点配置
-# psg_master_node -> psg_all_detector_cpp_node_pipeline
+# psg_master_node -> psg_detector_node
 psg_master_node_name = "psg_master_node"
 psg_master_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
     init_config=psgInoutBaseCfg.InoutBaseInitConfig(
@@ -420,94 +275,6 @@ detection_node = Node(
     # arguments=["--ros-args", "--disable-external-lib-logs"],
 )
 
-psg_person_generator_node = Node(
-    package="test_cx",
-    executable="v2_psg_person_generator",
-    output="screen",  # 将输出重定向到屏幕
-    emulate_tty=True,  # 保持颜色输出
-    name=psg_person_generator_node_name,
-    namespace=psg_person_generator_node_name,
-    prefix=common_prefix,
-    parameters=[
-        {
-            "param_as_json_string": psg_person_generator_node_json_params.to_json(
-                ignore_none=True, compact=False
-            ),
-        },
-    ],
-    arguments=[
-        "--ros-args",
-        "--log-level",
-        [f"{psg_person_generator_node_name}:=", logger],
-    ]
-    + common_ros_args,
-)
-
-psg_tracker_pipeline_node = Node(
-    package="test_cx",
-    executable="v2_psg_tracker_pipeline",
-    name=psg_tracker_node_pipeline_name,
-    namespace=psg_tracker_node_pipeline_name,
-    prefix=common_prefix,
-    parameters=[
-        {
-            "param_as_json_string": psg_tracker_node_pipeline_json_params.to_json(
-                ignore_none=True, compact=False
-            ),
-        },
-    ],
-    arguments=[
-        "--ros-args",
-        "--log-level",
-        [f"{psg_tracker_node_pipeline_name}:=", logger],
-    ]
-    + common_ros_args,
-)
-
-psg_tracker_node = Node(
-    package="test_cx",
-    executable="v2_psg_tracker",
-    name=psg_tracker_node_name,
-    namespace=psg_tracker_node_name,
-    prefix=common_prefix,
-    parameters=[
-        {
-            "param_as_json_string": psg_tracker_node_json_params.to_json(
-                ignore_none=True, compact=False
-            ),
-        },
-    ],
-    arguments=[
-        "--ros-args",
-        "--log-level",
-        [f"{psg_tracker_node_name}:=", logger],
-    ]
-    + common_ros_args,
-)
-
-psg_counter_node = Node(
-    package="test_cx",
-    executable="v2_psg_counter",
-    output="screen",  # 将输出重定向到屏幕
-    emulate_tty=True,  # 保持颜色输出
-    name=psg_counter_node_name,
-    namespace=psg_counter_node_name,
-    prefix=common_prefix,
-    parameters=[
-        {
-            "param_as_json_string": psg_counter_node_json_params.to_json(
-                ignore_none=True, compact=False
-            ),
-        },
-    ],
-    arguments=[
-        "--ros-args",
-        "--log-level",
-        [f"{psg_counter_node_name}:=", logger],
-    ]
-    + common_ros_args,
-)
-
 document_sink_node = Node(
     package="test_cx",
     executable="v2_document_sink",
@@ -521,11 +288,7 @@ document_sink_node = Node(
             ),
         },
     ],
-    arguments=[
-        "--ros-args",
-        "--log-level",
-        [f"{document_sink_node_name}:=", logger],
-    ]
+    arguments=["--ros-args", "--log-level", [f"{document_sink_node_name}:=", logger]]
     + common_ros_args,
 )
 
@@ -548,10 +311,6 @@ def generate_launch_description():
             psg_master_node,
             psg_detector_node,
             detection_node,
-            psg_person_generator_node,
-            psg_tracker_pipeline_node,
-            psg_tracker_node,
-            psg_counter_node,
             document_sink_node,
         ]
     )
