@@ -21,12 +21,12 @@ namespace redoxi_works::detection_ports::response_only::types
 using RetryPolicy = output_port_types::DefaultRetryPolicy<TimeUnit>;
 
 //! Source data type for detection output port
-class DeliverySourceData
+class DeliverySourceData : public output_port_types::SimpleImageSourceData
 {
   public:
-    using PubVisualizationMsgType_t = sensor_msgs::msg::Image;
     using ActionDataTrait_t = DetectionResponseActionDataTrait;
     using FrameData_t = image_ports::types::FrameWithMetadata;
+    using VisualizationPublisher_t = image_ports::types::DeliverySourceData::VisualizationPublisher_t;
 
     DeliverySourceData()
     {
@@ -37,14 +37,14 @@ class DeliverySourceData
 
     virtual ~DeliverySourceData() = default;
 
-    //! Get the UUID associated with this source data
-    virtual boost::uuids::uuid get_uuid() const
+    int to_publish_data(PubDataMsgType_t &msg) const override
     {
-        return uid;
+        to_publish_visualization(msg);
+        return 0;
     }
 
     //! Convert the source data to a ROS message for publishing
-    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
+    int to_publish_visualization(PubVisualizationMsgType_t &msg) const override
     {
         if (!frame_data.has_value() || frame_data->is_empty()) {
             // no image to publish
@@ -69,14 +69,11 @@ class DeliverySourceData
             }
         }
 
-
         //! Convert to ROS message using cv_bridge
         std_msgs::msg::Header header;
         header.stamp = rclcpp::Clock().now();
         cv_bridge::CvImage cv_bridge_img(header, encoding, output_image);
         cv_bridge_img.toImageMsg(msg);
-
-        // RDX_INFO_DEV(nullptr, __func__, "Converted image to ros message, encoding: {}, data size: {}", msg.encoding, msg.data.size());
 
         return 0;
     }
@@ -99,6 +96,7 @@ class DeliveryTargetData : public DeliveryTargetDataBase
 {
   public:
     using FrameData_t = image_ports::types::FrameWithMetadata;
+    using VisualizationPublisher_t = image_ports::types::DeliveryTargetData::VisualizationPublisher_t;
     DeliveryTargetData()
     {
         static_assert(output_port_types::DeliveryTargetDataConcept<DeliveryTargetData>,
@@ -110,7 +108,7 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     {
     }
 
-    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
+    int to_publish_visualization(PubVisualizationMsgType_t &msg) const override
     {
         DeliverySourceData tmp;
         tmp.detections = this->m_goal.detections;
@@ -178,24 +176,15 @@ using DeliveryTask = output_port_types::DefaultDeliveryTask<DeliveryRequest,
 static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
               "DeliveryTask must satisfy DeliveryTaskConcept");
 
-//! Downstream debug publisher type for detection output port
-// using DownstreamDebugPublisher = redoxi_works::image_ports::types::DownstreamDebugPublisher;
-
-//! Downstream spec type for detection output port
-// using DownstreamSpec = output_port_types::DefaultDownstreamSpec<DetectionResponseActionType,
-//                                                                 DeliveryPolicy,
-//                                                                 DownstreamDebugPublisher,
-//                                                                 DownstreamDebugPublisher>;
-
-
-using Downstream = image_ports::types::DownstreamBaseWithImagePub<
-    DetectionResponseActionType, DeliveryPolicy>;
-using DownstreamSpec = Downstream::DownstreamSpec_t;
+using Downstream = image_ports::types::DownstreamBaseWithImagePub<DetectionResponseActionType, DeliveryPolicy>;
+using DownstreamSpec = typename Downstream::DownstreamSpec_t;
 static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
               "DownstreamSpec must satisfy DownstreamSpecConcept");
 
 //! Init config type for detection output port
-using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;
+using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
+                                                        DeliverySourceData::DataPublisher_t,
+                                                        DeliveryTargetData::DataPublisher_t>;
 
 //! Downstream type for detection output port
 // using Downstream = output_port_types::DefaultDownstream<DownstreamSpec>;
@@ -228,7 +217,13 @@ struct DetectionResponseOutputPortSpec {
     using SourcePubVisualizationMsgType_t = DeliverySourceData::PubVisualizationMsgType_t;
 
     //! Source data publisher type
-    using SourceVisualizationPublisher_t = DownstreamSpec::SourceVisualizationPublisher_t;
+    using SourceVisualizationPublisher_t = DeliverySourceData_t::VisualizationPublisher_t;
+
+    //! Source data publish message type
+    using SourcePubDataMsgType_t = DeliverySourceData::PubDataMsgType_t;
+
+    //! Source data publisher type
+    using SourceDataPublisher_t = DeliverySourceData_t::DataPublisher_t;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
@@ -237,7 +232,13 @@ struct DetectionResponseOutputPortSpec {
     using TargetPubVisualizationMsgType_t = DeliveryTargetData::PubVisualizationMsgType_t;
 
     //! Target data publisher type
-    using TargetVisualizationPublisher_t = DownstreamSpec::TargetVisualizationPublisher_t;
+    using TargetVisualizationPublisher_t = DeliveryTargetData_t::VisualizationPublisher_t;
+
+    //! Target data publish message type
+    using TargetPubDataMsgType_t = DeliveryTargetData::PubDataMsgType_t;
+
+    //! Target data publisher type
+    using TargetDataPublisher_t = DeliveryTargetData_t::DataPublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;

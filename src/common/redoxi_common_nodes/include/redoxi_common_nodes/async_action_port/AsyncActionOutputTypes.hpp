@@ -3,6 +3,7 @@
 #include <optional>
 #include <typeinfo>
 #include <sensor_msgs/msg/image.hpp>
+#include <std_msgs/msg/string.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <rosidl_runtime_cpp/traits.hpp>
 #include <json_struct/json_struct.h>
@@ -10,6 +11,7 @@
 #include <redoxi_common_nodes/async_action_port/output_port_concepts.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
+// #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 
 // default types for the async action output port
 namespace redoxi_works
@@ -21,59 +23,93 @@ namespace output_port_types
 //! Sample action type, used to test whether the concepts are working
 using _SampleAction = redoxi_public_msgs::action::ProcessFrame;
 //! Sample image type, used to test whether the concepts are working
-using _SampleImage = sensor_msgs::msg::Image;
+using _SampleVisMsgType = sensor_msgs::msg::Image;
+//! Sample data message type, used to test whether the concepts are working
+using _SampleDataMsgType = std_msgs::msg::String;
 //! Sample time unit type, used to test whether the concepts are working
 using _TimeUnit = std::chrono::milliseconds;
 
-//! Sample publisher type, used to test whether the concepts are working
-struct _SampleSourcePublisher {
-    using MessageType_t = _SampleImage;
-    int publish(const MessageType_t &)
+using _SampleSourceVisPublisher = NoneRosPublisher<_SampleVisMsgType>;
+static_assert(RosPublisherConcept<_SampleSourceVisPublisher>,
+              "_SampleSourceVisPublisher must satisfy RosPublisherConcept");
+
+//! Sample target publisher type, used to test whether the concepts ar
+using _SampleTargetVisPublisher = NoneRosPublisher<_SampleVisMsgType>;
+static_assert(RosPublisherConcept<_SampleTargetVisPublisher>,
+              "_SampleTargetVisPublisher must satisfy RosPublisherConcept");
+
+//! In a rush? Just implement this class
+template <RosMessageConcept VisualizationMsgType,
+          RosMessageConcept DataMsgType>
+class DefaultDeliverySourceData
+{
+  public:
+    using PubVisualizationMsgType_t = VisualizationMsgType;
+    using PubDataMsgType_t = DataMsgType;
+    using VisualizationPublisher_t = SimpleRosPublisher<PubVisualizationMsgType_t>;
+    using DataPublisher_t = SimpleRosPublisher<PubDataMsgType_t>;
+
+    virtual ~DefaultDeliverySourceData() = default;
+
+    //! Convert to visualization message
+    virtual int to_publish_visualization(PubVisualizationMsgType_t &) const
     {
+        static_assert(RosPublisherConcept<VisualizationPublisher_t>,
+                      "VisualizationPublisher_t must satisfy RosPublisherConcept");
         return 0;
     }
-    int publish(const MessageType_t &, const std::string &)
+
+    //! Convert to data message for unreliable data transmission
+    virtual int to_publish_data(PubDataMsgType_t &) const
     {
+        static_assert(RosPublisherConcept<DataPublisher_t>,
+                      "DataPublisher_t must satisfy RosPublisherConcept");
         return 0;
     }
+
+    //! Get UUID
+    virtual UUIDType get_uuid() const
+    {
+        return m_uuid;
+    }
+
+    //! Set UUID
+    virtual void set_uuid(UUIDType uuid)
+    {
+        m_uuid = uuid;
+    }
+
+  protected:
+    UUIDType m_uuid{0};
 };
-static_assert(RosPublisherConcept<_SampleSourcePublisher>,
-              "_SampleSourcePublisher must satisfy RosPublisherConcept");
-
-//! Sample target publisher type, used to test whether the concepts are working
-struct _SampleTargetPublisher {
-    using MessageType_t = _SampleImage;
-    int publish(const MessageType_t &)
-    {
-        return 0;
-    }
-    int publish(const MessageType_t &, const std::string &)
-    {
-        return 0;
-    }
-};
-static_assert(RosPublisherConcept<_SampleTargetPublisher>,
-              "_SampleTargetPublisher must satisfy RosPublisherConcept");
-
-
-//! Sample source data type, used to test whether the concepts are working
-struct _SampleSourceData {
-    using PubVisualizationMsgType_t = _SampleImage;
-
-    _SampleSourceData() = default;
-
-    int to_publish_visualization(PubVisualizationMsgType_t &) const
-    {
-        return 0;
-    }
-
-    boost::uuids::uuid get_uuid() const
-    {
-        return boost::uuids::uuid();
-    }
-};
+using _SampleSourceData = DefaultDeliverySourceData<_SampleVisMsgType, _SampleDataMsgType>;
 static_assert(DeliverySourceDataConcept<_SampleSourceData>,
               "_SampleSourceData must satisfy DeliverySourceDataConcept");
+
+//! Simple image source data, which always publishes the image as a visualization and data
+class SimpleImageSourceData : public DefaultDeliverySourceData<sensor_msgs::msg::Image, sensor_msgs::msg::Image>
+{
+  public:
+    using BaseType_t = DefaultDeliverySourceData<sensor_msgs::msg::Image, sensor_msgs::msg::Image>;
+    using BaseType_t::BaseType_t;
+};
+static_assert(DeliverySourceDataConcept<SimpleImageSourceData>,
+              "SimpleImageSourceData must satisfy DeliverySourceDataConcept");
+
+//! Simple string source data, which always publishes the string as a visualization and data
+class SimpleStringSourceData : public DefaultDeliverySourceData<std_msgs::msg::String, std_msgs::msg::String>
+{
+  public:
+    using BaseType_t = DefaultDeliverySourceData<std_msgs::msg::String, std_msgs::msg::String>;
+    using BaseType_t::BaseType_t;
+};
+static_assert(DeliverySourceDataConcept<SimpleStringSourceData>,
+              "SimpleStringSourceData must satisfy DeliverySourceDataConcept");
+
+//! Sample data publisher type, used to test whether the concepts are working
+using _SampleSourceDataPublisher = NoneRosPublisher<_SampleSourceData::PubDataMsgType_t>;
+static_assert(RosPublisherConcept<_SampleSourceDataPublisher>,
+              "_SampleSourceDataPublisher must satisfy RosPublisherConcept");
 
 //! Sample action data trait
 using _SampleActionDataTrait = NoneActionDataTrait<_SampleAction>;
@@ -199,15 +235,24 @@ static_assert(RetryPolicyConcept<_SampleRetryPolicy>,
 
 template <RosActionConcept ActionType,
           ActionDataTraitConcept ActionDataTrait,
-          RosMessageConcept PublishMessageType>
+          RosMessageConcept PubVisualizationMsgType,
+          RosMessageConcept PubDataMsgType = typename ActionType::Goal>
 class DefaultTargetData
 {
   public:
     //! The ROS message type that this target data wraps
     using ActionType_t = ActionType;
     using Goal_t = typename ActionType_t::Goal;
-    using PubVisualizationMsgType_t = PublishMessageType;
     using ActionDataTrait_t = ActionDataTrait;
+
+    using PubVisualizationMsgType_t = PubVisualizationMsgType;
+    using PubDataMsgType_t = PubDataMsgType;
+
+    //! Visualization publisher type, you can override this in derived class with "using" clause
+    using VisualizationPublisher_t = SimpleRosPublisher<PubVisualizationMsgType>;
+
+    //! Data publisher type, you can override this in derived class with "using" clause
+    using DataPublisher_t = SimpleRosPublisher<PubDataMsgType>;
 
     virtual ~DefaultTargetData() = default;
     DefaultTargetData(const Goal_t &goal = Goal_t())
@@ -252,9 +297,18 @@ class DefaultTargetData
         ActionDataTrait_t::mark_with_control_signal(m_goal, code);
     }
 
-    //! Convert to publish message
+    //! Convert to visualization publish message
     virtual int to_publish_visualization(PubVisualizationMsgType_t &) const
     {
+        return 0;
+    }
+
+    //! Convert to data publish message
+    virtual int to_publish_data(PubDataMsgType_t &msg) const
+    {
+        if constexpr (std::is_same_v<PubDataMsgType_t, Goal_t>) {
+            msg = m_goal;
+        }
         return 0;
     }
 
@@ -272,9 +326,17 @@ class DefaultTargetData
   protected:
     Goal_t m_goal;
 };
-using _SampleTargetData = DefaultTargetData<_SampleAction, _SampleActionDataTrait, _SampleImage>;
+using _SampleTargetData = DefaultTargetData<_SampleAction, _SampleActionDataTrait, _SampleVisMsgType>;
 static_assert(DeliveryTargetDataConcept<_SampleTargetData>,
               "_SampleTargetData must satisfy DeliveryTargetDataConcept");
+
+//! Default implementation of target data publisher, using action goal as the message type
+//! Note that you will not be able to see this kind of message in rviz because it does not have a .msg file
+template <RosActionConcept TargetActionType>
+using DefaultTargetDataPublisher = SimpleRosPublisher<typename TargetActionType::Goal>;
+using _SampleTargetDataPublisher = DefaultTargetDataPublisher<_SampleAction>;
+static_assert(RosPublisherConcept<_SampleTargetDataPublisher>,
+              "_SampleTargetDataPublisher must satisfy RosPublisherConcept");
 
 struct DefaultStampData {
 };
@@ -614,20 +676,20 @@ static_assert(DeliveryTaskConcept<_SampleDeliveryTask>,
 //! Default implementation of downstream specification
 template <RosActionConcept ActionType,
           DeliveryPolicyConcept DeliveryPolicyType,
-          RosPublisherConcept SourceDataPublisherType,
-          RosPublisherConcept TargetDataPublisherType>
+          RosPublisherConcept SourceVisualizationPublisherType,
+          RosPublisherConcept TargetVisualizationPublisherType>
 class DefaultDownstreamSpec
 {
   public:
     using ActionType_t = ActionType;
     using DeliveryPolicy_t = DeliveryPolicyType;
-    using SourceVisualizationPublisher_t = SourceDataPublisherType;
-    using TargetVisualizationPublisher_t = TargetDataPublisherType;
+
+    using SourceVisualizationPublisher_t = SourceVisualizationPublisherType;
+    using TargetVisualizationPublisher_t = TargetVisualizationPublisherType;
     using SourcePubVisualizationMsgType_t = typename SourceVisualizationPublisher_t::MessageType_t;
     using TargetPubVisualizationMsgType_t = typename TargetVisualizationPublisher_t::MessageType_t;
 
     virtual ~DefaultDownstreamSpec() = default;
-
 
     //! Get the name
     virtual const std::string &get_name() const
@@ -814,17 +876,24 @@ class DefaultDownstreamSpec
               JS_MEMBER(debug_topic_target_data_failed));
 };
 using _SampleDownstreamSpec = DefaultDownstreamSpec<_SampleAction, _SampleDeliveryPolicy,
-                                                    _SampleSourcePublisher, _SampleTargetPublisher>;
+                                                    _SampleSourceVisPublisher, _SampleTargetVisPublisher>;
 static_assert(DownstreamSpecConcept<_SampleDownstreamSpec>,
               "_SampleDownstreamSpec must satisfy DownstreamSpecConcept");
 
 //! Implementation of InitConfigConcept
-template <DownstreamSpecConcept TDownstreamSpec>
+template <DownstreamSpecConcept TDownstreamSpec,
+          RosPublisherConcept TSourceDataPublisher,
+          RosPublisherConcept TTargetDataPublisher>
 class DefaultInitConfig
 {
   public:
     //! Type aliases
     using DownstreamSpec_t = TDownstreamSpec;
+    using SourceDataPublisher_t = TSourceDataPublisher;
+    using TargetDataPublisher_t = TTargetDataPublisher;
+    using SourcePubDataMsgType_t = typename SourceDataPublisher_t::MessageType_t;
+    using TargetPubDataMsgType_t = typename TargetDataPublisher_t::MessageType_t;
+
     virtual ~DefaultInitConfig() = default;
 
     //! Get downstream specs (const)
@@ -881,8 +950,35 @@ class DefaultInitConfig
         this->fallback_delivery_precondition = precondition;
     }
 
+    //! Get data topic for source data
+    virtual std::optional<std::string> get_data_topic_for_source_data() const
+    {
+        return this->data_topic_for_source_data;
+    }
+
+    //! Set data topic for source data
+    virtual void set_data_topic_for_source_data(const std::optional<std::string> &topic)
+    {
+        this->data_topic_for_source_data = topic;
+    }
+
+    //! Get data topic for target data
+    virtual std::optional<std::string> get_data_topic_for_target_data() const
+    {
+        return this->data_topic_for_target_data;
+    }
+
+    //! Set data topic for target data
+    virtual void set_data_topic_for_target_data(const std::optional<std::string> &topic)
+    {
+        this->data_topic_for_target_data = topic;
+    }
+
   protected: // no m_ prefix so that you can use json serialization easier
     std::vector<DownstreamSpec_t> downstream_specs;
+    std::optional<std::string> data_topic_for_source_data;
+    std::optional<std::string> data_topic_for_target_data;
+
     int num_buffer_requests{1};
     bool preserve_request_order{true};
     DeliveryPrecondition fallback_delivery_precondition{DeliveryPrecondition::DontCare};
@@ -893,9 +989,12 @@ class DefaultInitConfig
               JS_MEMBER(downstream_specs),
               JS_MEMBER(num_buffer_requests),
               JS_MEMBER(preserve_request_order),
-              JS_MEMBER(fallback_delivery_precondition));
+              JS_MEMBER(fallback_delivery_precondition),
+              JS_MEMBER(data_topic_for_source_data),
+              JS_MEMBER(data_topic_for_target_data));
 };
-using _SampleInitConfig = DefaultInitConfig<_SampleDownstreamSpec>;
+using _SampleInitConfig = DefaultInitConfig<_SampleDownstreamSpec,
+                                            _SampleSourceDataPublisher, _SampleTargetDataPublisher>;
 static_assert(InitConfigConcept<_SampleInitConfig>,
               "_SampleInitConfig must satisfy InitConfigConcept");
 
@@ -910,6 +1009,7 @@ class DefaultDownstream
     using ActionClient_t = rclcpp_action::Client<ActionType_t>;
     using GoalHandle_t = typename ActionClient_t::GoalHandle;
     using SendGoalOptions_t = typename ActionClient_t::SendGoalOptions;
+
     using SourcePubVisualizationMsgType_t = typename DownstreamSpec_t::SourcePubVisualizationMsgType_t;
     using TargetPubVisualizationMsgType_t = typename DownstreamSpec_t::TargetPubVisualizationMsgType_t;
     using SourceVisualizationPublisher_t = typename DownstreamSpec_t::SourceVisualizationPublisher_t;
@@ -1011,6 +1111,7 @@ class DefaultDownstream
   protected:
     DownstreamSpec_t m_downstream_spec;
     typename ActionClient_t::SharedPtr m_action_client;
+
     std::shared_ptr<SourceVisualizationPublisher_t> m_debug_pub_source_data_sending;
     std::shared_ptr<SourceVisualizationPublisher_t> m_debug_pub_source_data_succeeded;
     std::shared_ptr<SourceVisualizationPublisher_t> m_debug_pub_source_data_failed;
@@ -1067,6 +1168,15 @@ concept AsyncActionOutputPortSpecConcept = requires(T t)
     requires RosPublisherConcept<typename T::SourceVisualizationPublisher_t>;
     requires std::same_as<typename T::SourceVisualizationPublisher_t::MessageType_t, typename T::SourcePubVisualizationMsgType_t>;
 
+    //! Source data publish message type
+    typename T::SourcePubDataMsgType_t;
+    requires std::same_as<typename T::SourcePubDataMsgType_t, typename T::DeliverySourceData_t::PubDataMsgType_t>;
+
+    //! Publisher types for downstream data publishing
+    typename T::SourceDataPublisher_t;
+    requires RosPublisherConcept<typename T::SourceDataPublisher_t>;
+    requires std::same_as<typename T::SourceDataPublisher_t::MessageType_t, typename T::SourcePubDataMsgType_t>;
+
     //! Target data type
     typename T::DeliveryTargetData_t;
     requires DeliveryTargetDataConcept<typename T::DeliveryTargetData_t>;
@@ -1080,6 +1190,15 @@ concept AsyncActionOutputPortSpecConcept = requires(T t)
     typename T::TargetVisualizationPublisher_t;
     requires RosPublisherConcept<typename T::TargetVisualizationPublisher_t>;
     requires std::same_as<typename T::TargetVisualizationPublisher_t::MessageType_t, typename T::TargetPubVisualizationMsgType_t>;
+
+    //! Target data publish message type
+    typename T::TargetPubDataMsgType_t;
+    requires std::same_as<typename T::TargetPubDataMsgType_t, typename T::DeliveryTargetData_t::PubDataMsgType_t>;
+
+    //! Publisher types for downstream data publishing
+    typename T::TargetDataPublisher_t;
+    requires RosPublisherConcept<typename T::TargetDataPublisher_t>;
+    requires std::same_as<typename T::TargetDataPublisher_t::MessageType_t, typename T::TargetPubDataMsgType_t>;
 
     //! Stamp type
     typename T::DeliveryStamp_t;
@@ -1144,14 +1263,24 @@ struct _SampleAsyncActionOutputPortSpec {
     using DeliveryTargetData_t = _SampleTargetData;
 
     //! Source publisher type
-    using SourceVisualizationPublisher_t = _SampleSourcePublisher;
+    using SourceVisualizationPublisher_t = _SampleSourceVisPublisher;
     //! Target publisher type
-    using TargetVisualizationPublisher_t = _SampleTargetPublisher;
+    using TargetVisualizationPublisher_t = _SampleTargetVisPublisher;
+
+    //! Source data publisher type
+    using SourceDataPublisher_t = _SampleSourceDataPublisher;
+    //! Target data publisher type
+    using TargetDataPublisher_t = _SampleTargetDataPublisher;
 
     //! Source publish message type
     using SourcePubVisualizationMsgType_t = typename SourceVisualizationPublisher_t::MessageType_t;
     //! Target publish message type
     using TargetPubVisualizationMsgType_t = typename TargetVisualizationPublisher_t::MessageType_t;
+    //! Source publish data message type
+    using SourcePubDataMsgType_t = typename SourceDataPublisher_t::MessageType_t;
+    //! Target publish data message type
+    using TargetPubDataMsgType_t = typename TargetDataPublisher_t::MessageType_t;
+
     //! Delivery policy type
     using DeliveryPolicy_t = _SampleDeliveryPolicy;
     //! Stamp type

@@ -46,13 +46,16 @@ constexpr DefaultTimeUnit_t GoalHandleTimeout = std::chrono::milliseconds(3000);
 
 //! publisher queue size when the topic is intended to be used for debugging
 constexpr int DebugPublisherQueueSize = 10;
+constexpr int DataPublisherQueueSize = 50;
 
 //! QoS for the debug publisher
 const rclcpp::QoS DebugPublisherQoS = rclcpp::SensorDataQoS();
 
+//! QoS for the data publisher, reliable and with larger history depth
+const rclcpp::QoS DataPublisherQoS = rclcpp::QoS(DataPublisherQueueSize).reliable();
+
 // used for performance probing
 const rclcpp::QoS ProbePublisherQoS = rclcpp::RosoutQoS();
-// const rclcpp::QoS DebugPublisherQoS = rclcpp::QoS(DebugPublisherQueueSize).reliable();
 
 } // namespace DefaultParams
 

@@ -73,3 +73,5 @@ class OutputPortConfig(commonTypes.JsonConvertible):
     fallback_delivery_precondition: commonTypes.DeliveryPrecondition = field(
         default=commonTypes.DefaultSettings.delivery_precondition
     )
+    data_topic_for_source_data: str | None = field(default=None)
+    data_topic_for_target_data: str | None = field(default=None)

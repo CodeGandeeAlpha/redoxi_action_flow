@@ -9,6 +9,7 @@
 #include <limits>
 #include <map>
 
+#include <rclcpp/rclcpp.hpp>
 #include <unique_identifier_msgs/msg/uuid.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <json_struct/json_struct.h>
@@ -134,19 +135,107 @@ concept RosActionConcept = requires
 template <typename T>
 concept RosPublisherConcept = requires(T pub)
 {
-    //! Publish a message, without additional text
+    //! Publish a message, without annotation text
     typename T::MessageType_t;
+
+    //! Inner publisher type
+    typename T::Publisher_t;
+    requires std::same_as<typename T::Publisher_t, rclcpp::Publisher<typename T::MessageType_t>>;
+
     requires RosMessageConcept<typename T::MessageType_t>;
     {
         pub.publish(std::declval<const typename T::MessageType_t &>())
         } -> std::same_as<int>;
 
-    //! Publish a message with additional text
+    //! Publish a message with annotation text
     {
         pub.publish(std::declval<const typename T::MessageType_t &>(),
                     std::declval<const std::string &>())
         } -> std::same_as<int>;
+
+    //! Get the inner publisher
+    {
+        std::declval<const T &>().get_publisher()
+        } -> std::same_as<std::shared_ptr<typename T::Publisher_t>>;
+
+    //! init with inner publisher
+    {
+        pub.init(std::declval<std::shared_ptr<typename T::Publisher_t>>())
+        } -> std::same_as<void>;
 };
+
+//! None publisher type, used as dummy publisher for when no publisher is available
+template <RosMessageConcept MessageType>
+class NoneRosPublisher
+{
+  public:
+    using MessageType_t = MessageType;
+    using Publisher_t = rclcpp::Publisher<MessageType>;
+    virtual ~NoneRosPublisher() = default;
+
+    virtual std::shared_ptr<Publisher_t> get_publisher() const
+    {
+        return nullptr;
+    }
+
+    virtual void init(std::shared_ptr<Publisher_t> pub)
+    {
+        (void)pub;
+    }
+
+    virtual int publish(const MessageType_t &) const
+    {
+        return 0;
+    }
+
+    virtual int publish(const MessageType_t &, const std::string &) const
+    {
+        return 0;
+    }
+};
+static_assert(RosPublisherConcept<NoneRosPublisher<int>>,
+              "NoneRosPublisher must satisfy RosPublisherConcept");
+
+//! Simple ROS publisher, just a wrapper around the ros publisher
+template <RosMessageConcept MessageType>
+class SimpleRosPublisher
+{
+  public:
+    using MessageType_t = MessageType;
+    using Publisher_t = rclcpp::Publisher<MessageType>;
+    virtual ~SimpleRosPublisher() = default;
+
+    virtual void init(std::shared_ptr<Publisher_t> pub)
+    {
+        m_publisher = pub;
+    }
+
+    virtual int publish(const MessageType_t &msg) const
+    {
+        if (m_publisher) {
+            m_publisher->publish(msg);
+        }
+        return 0;
+    }
+
+    virtual int publish(const MessageType_t &msg, const std::string &) const
+    {
+        if (m_publisher) {
+            m_publisher->publish(msg);
+        }
+        return 0;
+    }
+
+    virtual std::shared_ptr<Publisher_t> get_publisher() const
+    {
+        return m_publisher;
+    }
+
+  protected:
+    std::shared_ptr<Publisher_t> m_publisher;
+};
+static_assert(RosPublisherConcept<SimpleRosPublisher<int>>,
+              "SimpleRosPublisher must satisfy RosPublisherConcept");
 
 //! Concept to check if a type is std::chrono::duration
 template <typename T>

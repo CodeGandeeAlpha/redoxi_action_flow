@@ -13,6 +13,11 @@ StampedImagePub::StampedImagePub(rclcpp::Node *node, const std::string &topic_na
     init(node, topic_name, qos);
 }
 
+void StampedImagePub::init(std::shared_ptr<Publisher_t> pub)
+{
+    m_pub = pub;
+}
+
 int StampedImagePub::init(rclcpp::Node *node,
                           const std::string &topic_name,
                           std::optional<rclcpp::QoS> qos)

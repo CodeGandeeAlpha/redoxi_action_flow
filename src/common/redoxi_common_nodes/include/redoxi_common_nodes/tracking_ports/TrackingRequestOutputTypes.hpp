@@ -21,9 +21,10 @@ using RetryPolicy = redoxi_works::output_port_types::DefaultRetryPolicy<TimeUnit
 class DeliverySourceData
 {
   public:
-    using PubVisualizationMsgType_t = sensor_msgs::msg::Image;
     using Detection_t = redoxi_public_msgs::msg::Detection;
     using FrameData_t = image_ports::types::FrameWithMetadata;
+    using PubVisualizationMsgType_t = sensor_msgs::msg::Image;
+    using PubDataMsgType_t = TrackingRequestActionType::Goal;
 
   public:
     virtual ~DeliverySourceData() = default;
@@ -37,6 +38,13 @@ class DeliverySourceData
     void set_uuid(const UUIDType &uid)
     {
         this->uid = uid;
+    }
+
+    virtual int to_publish_data(PubDataMsgType_t &msg) const
+    {
+        msg.detections = detections;
+        frame_data.to_frame_msg(msg.frame_bundle.primary_frame);
+        return 0;
     }
 
     // to publish message
@@ -192,12 +200,13 @@ using DeliveryTask = output_port_types::DefaultDeliveryTask<DeliveryRequest,
 static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
               "DeliveryTask must satisfy DeliveryTaskConcept");
 
-using Downstream = image_ports::types::DownstreamBaseWithImagePub<
-    TrackingRequestActionType, DeliveryPolicy>;
+using Downstream = image_ports::types::DownstreamBaseWithImagePub<TrackingRequestActionType, DeliveryPolicy>;
 using DownstreamSpec = Downstream::DownstreamSpec_t;
 
 //! Init config type for detection request output port
-using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;
+using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
+                                                        NoneRosPublisher<DeliverySourceData::PubDataMsgType_t>,
+                                                        SimpleRosPublisher<DeliveryTargetData::PubDataMsgType_t>>;
 
 //! Detection request output port spec
 struct TrackingRequestOutputPortSpec {
@@ -229,6 +238,12 @@ struct TrackingRequestOutputPortSpec {
     //! Source data publisher type
     using SourceVisualizationPublisher_t = DownstreamSpec::SourceVisualizationPublisher_t;
 
+    //! Source publish data message type
+    using SourcePubDataMsgType_t = typename DeliverySourceData::PubDataMsgType_t;
+
+    //! Source data publisher type
+    using SourceDataPublisher_t = InitConfig::SourceDataPublisher_t;
+
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
 
@@ -237,6 +252,12 @@ struct TrackingRequestOutputPortSpec {
 
     //! Target data publisher type
     using TargetVisualizationPublisher_t = DownstreamSpec::TargetVisualizationPublisher_t;
+
+    //! Target publish data message type
+    using TargetPubDataMsgType_t = typename DeliveryTargetData::PubDataMsgType_t;
+
+    //! Target data publisher type
+    using TargetDataPublisher_t = InitConfig::TargetDataPublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;

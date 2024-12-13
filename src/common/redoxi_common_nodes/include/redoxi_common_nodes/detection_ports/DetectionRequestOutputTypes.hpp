@@ -39,7 +39,7 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     {
     }
 
-    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
+    int to_publish_visualization(PubVisualizationMsgType_t &msg) const override
     {
         auto vis_image = get_visualization_frame();
         if (vis_image.is_empty()) {
@@ -161,13 +161,14 @@ using DeliveryTask = output_port_types::DefaultDeliveryTask<DeliveryRequest,
 static_assert(output_port_types::DeliveryTaskConcept<DeliveryTask>,
               "DeliveryTask must satisfy DeliveryTaskConcept");
 
-using Downstream = image_ports::types::DownstreamBaseWithImagePub<
-    DetectionRequestActionType, DeliveryPolicy>;
-// using DownstreamDebugPublisher = Downstream::SourceVisualizationPublisher_t;
-using DownstreamSpec = Downstream::DownstreamSpec_t;
+using Downstream = image_ports::types::DownstreamBaseWithImagePub<DetectionRequestActionType, DeliveryPolicy>;
+
+using DownstreamSpec = typename Downstream::DownstreamSpec_t;
 
 //! Init config type for detection request output port
-using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec>;
+using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
+                                                        SimpleRosPublisher<typename DeliverySourceData::PubDataMsgType_t>,
+                                                        SimpleRosPublisher<typename DeliveryTargetData::PubDataMsgType_t>>;
 
 //! Detection request output port spec
 struct DetectionRequestOutputPortSpec {
@@ -194,19 +195,31 @@ struct DetectionRequestOutputPortSpec {
     using DeliverySourceData_t = DeliverySourceData;
 
     //! Source data publish message type
-    using SourcePubVisualizationMsgType_t = DeliverySourceData::PubVisualizationMsgType_t;
+    using SourcePubVisualizationMsgType_t = typename DeliverySourceData::PubVisualizationMsgType_t;
 
     //! Source data publisher type
-    using SourceVisualizationPublisher_t = DownstreamSpec::SourceVisualizationPublisher_t;
+    using SourceVisualizationPublisher_t = typename DownstreamSpec::SourceVisualizationPublisher_t;
+
+    //! Source publish data message type
+    using SourcePubDataMsgType_t = typename DeliverySourceData::PubDataMsgType_t;
+
+    //! Source data publisher type
+    using SourceDataPublisher_t = typename InitConfig::SourceDataPublisher_t;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
 
     //! Target data publish message type
-    using TargetPubVisualizationMsgType_t = DeliveryTargetData::PubVisualizationMsgType_t;
+    using TargetPubVisualizationMsgType_t = typename DeliveryTargetData::PubVisualizationMsgType_t;
 
     //! Target data publisher type
-    using TargetVisualizationPublisher_t = DownstreamSpec::TargetVisualizationPublisher_t;
+    using TargetVisualizationPublisher_t = typename DownstreamSpec::TargetVisualizationPublisher_t;
+
+    //! Target publish data message type
+    using TargetPubDataMsgType_t = typename DeliveryTargetData::PubDataMsgType_t;
+
+    //! Target data publisher type
+    using TargetDataPublisher_t = typename InitConfig::TargetDataPublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;

@@ -22,6 +22,7 @@ PackagesToBuild="redoxi_common_nodes \
                  yolo8_series \
                  test_package \
                  universal_mot_trackers \
+                 test_hz_py \
                  rosboard"
 
 # PackagesToBuild="universal_mot_trackers \
