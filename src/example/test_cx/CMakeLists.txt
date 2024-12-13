@@ -30,11 +30,10 @@ set(DEPENDENCIES
     psg_frame_det_source_sink
     psg_person_generator
     psg_pose_detector
-    video_reader_orbbec
+    # video_reader_orbbec
     video_reader_from_url
     psg_tracker
     psg_counter
-    test_package
     pluginlib)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb)
@@ -66,15 +65,16 @@ option(BUILD_TEST_UUID_CONVERSION "Build test_uuid_conversion target" OFF)
 option(BUILD_TEST_V2_JSON_EXAMPLES "Build test_v2_json_examples target" OFF)
 option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2 "Build test_simple_action_generator_v2 target" OFF)
 option(BUILD_TEST_V2_VIDEO_SINK "Build test_v2_video_sink target" OFF)
-option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target" ON)
+option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target" OFF)
 option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
+option(BUILD_TEST_V2_ORBBEC_VIDEO_SOURCE "Build test_v2_orbbec_video_source target" OFF)
+
 option(BUILD_TEST_PSG_MASTER_NODE "Build test_psg_master_node target" ON)
 option(BUILD_TEST_V2_DOCUMENT_SINK "Build test_v2_document_sink target" ON)
 option(BUILD_TEST_V2_PSG_DETECTOR "Build test_v2_psg_detector target" ON)
 option(BUILD_TEST_V2_PSG_FRAME_DET_SOURCE_SINK "Build test_v2_psg_frame_det_source_sink target" ON)
 option(BUILD_TEST_V2_PSG_PERSON_GENERATOR "Build test_v2_psg_person_generator target" ON)
 option(BUILD_TEST_V2_PSG_POSE_DETECTOR "Build test_v2_psg_pose_detector target" ON)
-option(BUILD_TEST_V2_ORBBEC_VIDEO_SOURCE "Build test_v2_orbbec_video_source target" ON)
 option(BUILD_TEST_V2_PSG_TRACKER_PIPELINE "Build test_v2_psg_tracker_pipeline target" ON)
 option(BUILD_TEST_V2_PSG_TRACKER "Build test_v2_psg_tracker target" ON)
 option(BUILD_TEST_V2_VIDEO_URL_FLUSH "Build test_v2_video_url_flush target" ON)
