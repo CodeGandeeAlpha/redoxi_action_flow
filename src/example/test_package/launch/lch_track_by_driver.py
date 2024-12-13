@@ -184,7 +184,7 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
                 ),
             ],
             # data_topic_for_source_data="data_out/source_data",
-            data_topic_for_target_data="data_out/target_data",
+            # data_topic_for_target_data="data_out/target_data",
         ),
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
