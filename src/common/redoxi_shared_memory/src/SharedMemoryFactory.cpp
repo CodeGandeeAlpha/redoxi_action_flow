@@ -83,5 +83,13 @@ SharedMemoryConfig SharedMemoryFactory::get_shm_config_from_node(const rclcpp::N
 
     return config;
 }
+//! Get the shared memory config from env variables
+SharedMemoryConfig SharedMemoryFactory::get_shm_config_from_env()
+{
+    SharedMemoryConfig config;
+    config.service_type = get_shm_service_name_from_env();
+    config.region_key = get_shm_region_key_from_env();
+    return config;
+}
 
 } // namespace redoxi_works::shared_memory

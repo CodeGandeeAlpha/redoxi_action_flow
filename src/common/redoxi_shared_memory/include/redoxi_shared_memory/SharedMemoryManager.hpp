@@ -15,7 +15,13 @@ class SharedMemoryManager
 
     //! Get a shared memory client by config, create if not exists
     //! @return shared memory client pointer, nullptr if failed
-    static std::shared_ptr<SharedMemoryClient> get_client(const SharedMemoryConfig &config);
+    std::shared_ptr<SharedMemoryClient> get_client(const SharedMemoryConfig &config);
+
+    //! remove a shared memory client by config
+    void remove_client(const SharedMemoryConfig &config);
+
+    //! Get default client
+    std::shared_ptr<SharedMemoryClient> get_default_client(rclcpp::Node *node = nullptr);
 
     //! Delete copy constructor and assignment operator
     SharedMemoryManager(const SharedMemoryManager &) = delete;

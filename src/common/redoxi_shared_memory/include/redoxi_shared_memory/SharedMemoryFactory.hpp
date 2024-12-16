@@ -58,6 +58,11 @@ struct SharedMemoryConfig {
         return !(*this == other);
     }
 
+    bool is_valid() const
+    {
+        return !service_type.empty() && !region_key.empty();
+    }
+
     JS_OBJECT(JS_MEMBER(_env_config_region_key),
               JS_MEMBER(_env_config_service_name),
               JS_MEMBER(_node_config_region_key),
@@ -87,9 +92,6 @@ class SharedMemoryFactory
 
     //! Get the shared memory config from env variables
     static SharedMemoryConfig get_shm_config_from_env();
-
-    //! Get the default shared memory config, either from node parameters or env variables
-    static SharedMemoryConfig get_default_shm_config(const rclcpp::Node *node);
 
   private:
     //! Get the shared memory service type from environment variables
