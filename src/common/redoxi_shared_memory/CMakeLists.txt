@@ -17,7 +17,7 @@ find_package(json_struct REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_library(redoxi_shared_memory src/redoxi_shared_memory.cpp src/SharedMemoryFactory.cpp)
+add_library(redoxi_shared_memory src/redoxi_shared_memory.cpp src/SharedMemoryFactory.cpp src/SharedMemoryManager.cpp)
 add_library(redoxi_shared_memory::redoxi_shared_memory ALIAS redoxi_shared_memory)
 target_compile_features(redoxi_shared_memory PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 target_include_directories(redoxi_shared_memory PUBLIC
