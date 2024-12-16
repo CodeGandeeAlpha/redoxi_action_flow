@@ -60,4 +60,14 @@ std::shared_ptr<SharedMemoryClient> SharedMemoryManager::get_default_client(rclc
     }
 }
 
+int SharedMemoryManager::remove_client(const SharedMemoryConfig &config)
+{
+    auto it = m_clients_by_config.find(config);
+    if (it != m_clients_by_config.end()) {
+        m_clients_by_config.erase(it);
+        return 0;
+    }
+    return -1;
+}
+
 } // namespace redoxi_works::shared_memory

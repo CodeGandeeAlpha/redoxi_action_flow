@@ -218,7 +218,7 @@ int RedoxiVideoReaderBase::_on_delivery_task_begin(TargetData_t &target_data,
     if (oid.key.has_value()) {
         shm_token.object_key = oid.key.value();
     }
-    shm_token.service_name = m_shm_client->get_service_name();
+    shm_token.service_name = m_shm_client->get_service_type();
     shm_token.region_key = m_shm_client->get_region_key();
     shm_token.object_size = img.total() * img.elemSize();
     return 0;

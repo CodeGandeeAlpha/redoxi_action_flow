@@ -2,6 +2,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <redoxi_shared_memory/SharedMemoryClient.hpp>
 #include <redoxi_shared_memory/SharedMemoryFactory.hpp>
+#include <redoxi_shared_memory/SharedMemoryManager.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <spdlog/spdlog.h>
 #include <string>
@@ -19,12 +20,17 @@ int main(int argc, char **argv)
     // do this so that we have rclcpp loggers
     rclcpp::init(argc, argv);
 
-    pluginlib::ClassLoader<rdx_shm::SharedMemoryClient> shm_loader("redoxi_shared_memory",
-                                                                   "redoxi_works::shared_memory::SharedMemoryClient");
+    // pluginlib::ClassLoader<rdx_shm::SharedMemoryClient> shm_loader("redoxi_shared_memory",
+    //                                                                "redoxi_works::shared_memory::SharedMemoryClient");
+    rdx_shm::SharedMemoryConfig config;
+    config = rdx_shm::SharedMemoryFactory::get_shm_config_from_env();
+    rdx::RDX_INFO_DEV(nullptr, __func__, "shm config, service type: {}, region key: {}",
+                      config.service_type, config.region_key);
 
     try {
         // auto client = shm_loader.createSharedInstance("redoxi_works::shared_memory::VineyardShmClient");
-        auto client = rdx_shm::SharedMemoryFactory::create_client_by_env();
+        // auto client = rdx_shm::SharedMemoryFactory::create_client_by_config(config);
+        auto client = rdx_shm::SharedMemoryManager::get_instance().get_default_client();
         if (!client) {
             spdlog::error("Failed to create shared memory client");
             return -1;

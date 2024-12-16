@@ -18,7 +18,8 @@ class SharedMemoryManager
     std::shared_ptr<SharedMemoryClient> get_client(const SharedMemoryConfig &config);
 
     //! remove a shared memory client by config
-    void remove_client(const SharedMemoryConfig &config);
+    //! @return 0 if success, -1 if failed (client not found)
+    int remove_client(const SharedMemoryConfig &config);
 
     //! Get default client
     std::shared_ptr<SharedMemoryClient> get_default_client(rclcpp::Node *node = nullptr);
