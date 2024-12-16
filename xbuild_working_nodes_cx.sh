@@ -33,8 +33,6 @@ PackagesToBuild="redoxi_video_reader \
                  psg_tracker \
                  video_reader_from_url \
                  psg_counter \
-                 psg_common_py \
-                 test_package \
                  test_cx"
 
 
@@ -105,10 +103,5 @@ colcon build --packages-up-to $PackagesToBuild \
     -DCMAKE_CXX_STANDARD=20 \
     -DCMAKE_CXX_STANDARD_REQUIRED=ON \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-    -DJSON_STRUCT_OPT_INSTALL=ON \
-    -DBUILD_SHARED_LIBS=ON \
-    -DJSON_STRUCT_OPT_BUILD_EXAMPLES=OFF \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
-    -DJSON_STRUCT_OPT_BUILD_TESTS=OFF
+    -DJSON_STRUCT_OPT_INSTALL=ON
 source install/setup.bash

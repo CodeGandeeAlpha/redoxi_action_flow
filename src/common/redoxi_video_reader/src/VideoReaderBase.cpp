@@ -47,14 +47,14 @@ int RedoxiVideoReaderBase::_open()
 
     // create shm client
     auto shm_config = shared_memory::SharedMemoryFactory::get_shm_config_from_node(this);
-    RDX_INFO_DEV(this, __func__, "Creating shm client, region key={}, service name={}",
-                 shm_config.region_key, shm_config.service_name);
+    RDX_INFO_DEV(this, __func__, "Creating shm client, region key={}, service type={}",
+                 shm_config.region_key, shm_config.service_type);
     auto shm_client = shared_memory::SharedMemoryFactory::create_client_by_config(shm_config);
     if (shm_client == nullptr) {
         RDX_INFO_DEV(this, __func__, "{}", "Failed to create shm client, not using shared memory");
     } else {
-        RDX_INFO_DEV(this, __func__, "Created shm client, region key={}, service name={}",
-                     shm_config.region_key, shm_config.service_name);
+        RDX_INFO_DEV(this, __func__, "Created shm client, region key={}, service type={}",
+                     shm_config.region_key, shm_config.service_type);
         m_shm_client = shm_client;
     }
 
