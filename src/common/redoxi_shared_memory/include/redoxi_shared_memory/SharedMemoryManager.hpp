@@ -32,7 +32,7 @@ class SharedMemoryManager
     std::shared_ptr<SharedMemoryClient> _get_client(const SharedMemoryConfig &config);
 
     //! Map of region key to shared memory clients
-    std::map<std::string, std::shared_ptr<SharedMemoryClient>> m_clients;
+    std::map<SharedMemoryConfig, std::shared_ptr<SharedMemoryClient>> m_clients_by_config;
 };
 
 } // namespace redoxi_works::shared_memory

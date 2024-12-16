@@ -1,4 +1,5 @@
 #include <redoxi_shared_memory/SharedMemoryFactory.hpp>
+#include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <cstdlib>
 #include <pluginlib/class_loader.hpp>
 #include <rcutils/logging_macros.h>
@@ -18,20 +19,21 @@ std::shared_ptr<SharedMemoryClient> SharedMemoryFactory::create_client_by_config
 
     // now, both should be set
     if (service_type.empty() || region_key.empty()) {
-        RCUTILS_LOG_INFO("Service type or region key is not set, cannot create shm client");
+        RDX_INFO_DEV(nullptr, __func__, "{}",
+                     "Service type or region key is not set, cannot create shm client");
         return nullptr;
     }
 
     auto client = create_client_by_service_type(service_type);
     if (!client) {
-        RCUTILS_LOG_ERROR("Failed to create shm client");
+        RDX_INFO_DEV(nullptr, __func__, "{}", "Failed to create shm client");
         return nullptr;
     }
 
     // connect to shm
     auto ret = client->connect(region_key);
     if (ret != 0) {
-        RCUTILS_LOG_ERROR("Failed to connect to shm");
+        RDX_INFO_DEV(nullptr, __func__, "{}", "Failed to connect to shm");
         return nullptr;
     }
 

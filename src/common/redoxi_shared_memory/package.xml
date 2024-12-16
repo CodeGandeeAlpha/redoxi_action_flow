@@ -9,6 +9,8 @@
 
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
 
+  <depend>redoxi_common_cpp</depend>
+  
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
   <depend>rcutils</depend>

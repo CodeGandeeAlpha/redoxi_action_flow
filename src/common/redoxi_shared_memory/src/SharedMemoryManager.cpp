@@ -1,4 +1,5 @@
 #include <redoxi_shared_memory/SharedMemoryManager.hpp>
+#include <redoxi_common_cpp/ros_utils/common.hpp>
 
 namespace redoxi_works::shared_memory
 {
@@ -16,21 +17,16 @@ std::shared_ptr<SharedMemoryClient> SharedMemoryManager::get_client(const Shared
 
 std::shared_ptr<SharedMemoryClient> SharedMemoryManager::_get_client(const SharedMemoryConfig &config)
 {
-    //! Use region key as unique identifier for clients
-    std::string key = config.region_key;
-    if (key.empty() && config.read_setting_from_env) {
-        key = SharedMemoryFactory::get_shm_region_key_from_env();
-    }
-
-    auto it = m_clients.find(key);
-    if (it != m_clients.end()) {
+    //! Use config as unique identifier for clients
+    auto it = m_clients_by_config.find(config);
+    if (it != m_clients_by_config.end()) {
         return it->second;
     }
 
     //! Create new client if not found
     auto client = SharedMemoryFactory::create_client_by_config(config);
     if (client) {
-        m_clients[key] = client;
+        m_clients_by_config[config] = client;
     }
     return client;
 }

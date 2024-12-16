@@ -13,6 +13,7 @@ find_package(rclcpp REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(rcutils REQUIRED)
 find_package(json_struct REQUIRED)
+find_package(redoxi_common_cpp REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -31,7 +32,7 @@ target_link_libraries(redoxi_shared_memory PUBLIC ${OpenCV_LIBS} json_struct::js
 # which is appropriate when building the dll but not consuming it.
 target_compile_definitions(redoxi_shared_memory PRIVATE "REDOXI_SHARED_MEMORY_BUILDING_LIBRARY")
 
-ament_target_dependencies(redoxi_shared_memory PUBLIC pluginlib rclcpp rcutils)
+ament_target_dependencies(redoxi_shared_memory PUBLIC pluginlib rclcpp rcutils redoxi_common_cpp)
 
 install(
   DIRECTORY include/
@@ -72,6 +73,7 @@ ament_export_dependencies(
   pluginlib
   OpenCV
   json_struct
+  redoxi_common_cpp
 )
 
 
