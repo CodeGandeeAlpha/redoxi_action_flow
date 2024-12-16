@@ -153,19 +153,6 @@ int PSGTracker::_start()
         RDX_INFO_DEV(this, __func__, false, "{}", "input port started");
     }
 
-    // create shm client
-    {
-        auto shm_config = shared_memory::SharedMemoryFactory::get_shm_config_from_node(this);
-        m_shm_client = shared_memory::SharedMemoryFactory::create_client_by_config(shm_config);
-        if (!m_shm_client) {
-            RDX_INFO_DEV(this, __func__, false, "Failed to create shm client, service name = {}, region key = {}",
-                         shm_config.service_name, shm_config.region_key);
-        } else {
-            RDX_INFO_DEV(this, __func__, false, "Created shm client, service name = {}, region key = {}",
-                         shm_config.service_name, shm_config.region_key);
-        }
-    }
-
     // step thread and state will be handled by base class
     return 0;
 }

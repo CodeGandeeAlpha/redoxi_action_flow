@@ -15,10 +15,29 @@ display_help() {
     echo "  $0 --verbose --debug"
 }
 
+# PackagesToBuild="redoxi_video_reader \
+#                  redoxi_common_nodes \
+#                  redoxi_shared_memory \
+#                 #  redoxi_shm_v6d \
+#                  redoxi_inference \
+#                  redoxi_inference_onnx \
+#                  rosboard \
+#                  psg_common \
+#                  psg_master_node \
+#                  psg_document_sink \
+#                  psg_detector \
+#                  psg_all_detector_cpp \
+#                  psg_frame_det_source_sink \
+#                  psg_person_generator \
+#                  psg_pose_detector \
+#                  psg_tracker \
+#                  video_reader_from_url \
+#                  psg_counter \
+#                  test_cx"
+
 PackagesToBuild="redoxi_video_reader \
                  redoxi_common_nodes \
                  redoxi_shared_memory \
-                 redoxi_shm_v6d \
                  redoxi_inference \
                  redoxi_inference_onnx \
                  rosboard \
@@ -35,18 +54,6 @@ PackagesToBuild="redoxi_video_reader \
                  psg_counter \
                  test_cx"
 
-
-# PackagesToBuild="
-#                  redoxi_public_msgs \
-#                  psg_private_msgs \
-#                  "
-# PackagesToBuild="redoxi_common_nodes \
-#                  redoxi_shared_memory \
-#                  redoxi_shm_v6d \
-#                  test_package \
-#                  rosboard \
-#                  psg_detector
-#                  "
 
 # Check if --help flag is provided
 if [[ "$*" == *"--help"* ]]; then
