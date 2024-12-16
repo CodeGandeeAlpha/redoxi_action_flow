@@ -75,12 +75,14 @@ option(BUILD_TEST_V2_PSG_DETECTOR "Build test_v2_psg_detector target" ON)
 option(BUILD_TEST_V2_PSG_FRAME_DET_SOURCE_SINK "Build test_v2_psg_frame_det_source_sink target" ON)
 option(BUILD_TEST_V2_PSG_PERSON_GENERATOR "Build test_v2_psg_person_generator target" ON)
 option(BUILD_TEST_V2_PSG_POSE_DETECTOR "Build test_v2_psg_pose_detector target" ON)
-option(BUILD_TEST_V2_PSG_TRACKER_PIPELINE "Build test_v2_psg_tracker_pipeline target" ON)
+option(BUILD_TEST_V2_PSG_TRACKER_PIPELINE "Build test_v2_psg_tracker_pipeline target" OFF)
 option(BUILD_TEST_V2_PSG_TRACKER "Build test_v2_psg_tracker target" ON)
 option(BUILD_TEST_V2_VIDEO_URL_FLUSH "Build test_v2_video_url_flush target" ON)
 option(BUILD_TEST_V2_PSG_COUNTER "Build test_v2_psg_counter target" ON)
 option(BUILD_TEST_V2_PSG_ALL_DETECTOR_CPP "Build test_v2_psg_all_detector_cpp target" OFF)
 option(BUILD_TEST_V2_PSG_ALL_DETECTOR_CPP_DRIVER "Build test_v2_psg_all_detector_cpp_driver target" ON)
+option(BUILD_TEST_V2_PSG_TRACKER_DRIVER "Build test_v2_psg_tracker_driver target" ON)
+
 # Function to configure a target
 function(configure_target target_name)
   add_executable(${target_name} src/${target_name}.cpp)
@@ -215,6 +217,10 @@ endif()
 
 if(BUILD_TEST_V2_PSG_ALL_DETECTOR_CPP_DRIVER)
   configure_target(v2_psg_all_detector_cpp_driver)
+endif()
+
+if(BUILD_TEST_V2_PSG_TRACKER_DRIVER)
+  configure_target(v2_psg_tracker_driver)
 endif()
 
 # Install targets

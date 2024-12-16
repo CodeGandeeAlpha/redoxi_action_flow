@@ -111,25 +111,24 @@ psg_tracker_node_json_params = psgTrackerCfg.PSGTrackerNodeConfig(
 
 # PSG跟踪器节点配置
 # psg_tracker_pipeline_node -> psg_tracker_node
-psg_tracker_node_pipeline_name = "psg_tracker_pipeline_node"
-psg_tracker_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConfig(
-    init_config=psgPipelineBaseCfg.PipelineBaseInitConfig(
-        create_debug_pub=True,
-        input_port_config=psgPipelineBaseCfg.InputPortConfig(
+psg_tracker_node_driver_name = "psg_tracker_driver"
+psg_tracker_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeConfig(
+    init_config=psgDriverBaseCfg.DriverBaseInitConfig(
+        input_port_config=psgDriverBaseCfg.InputPortConfig(
             action_name="in/action",
         ),
-        output_port_pipeline_config=psgPipelineBaseCfg.OutputPortConfig(
+        output_port_config=psgDriverBaseCfg.OutputPortConfig(
             downstream_specs=[
-                psgPipelineBaseCfg.DownstreamSpec(
+                psgDriverBaseCfg.DownstreamSpec(
                     name=psg_counter_node_name,
                     action_name=f"/{psg_counter_node_name}/{psg_counter_node_json_params.init_config.input_port_config.action_name}",
                 )
             ],
             data_topic_for_target_data="data_out/target_data_pipeline",
         ),
-        output_port_model_config=psgPipelineBaseCfg.OutputPortConfig(
+        callee_request_port_config=psgDriverBaseCfg.OutputPortConfig(
             downstream_specs=[
-                psgPipelineBaseCfg.DownstreamSpec(
+                psgDriverBaseCfg.DownstreamSpec(
                     name=psg_tracker_node_name,
                     action_name=f"/{psg_tracker_node_name}/{psg_tracker_node_json_params.init_config.input_port_config.action_name}",
                 )
@@ -137,25 +136,8 @@ psg_tracker_node_pipeline_json_params = psgPipelineBaseCfg.PipelineBaseNodeConfi
             data_topic_for_target_data="data_out/target_data_model",
         ),
     ),
-    runtime_config=psgPipelineBaseCfg.PipelineBaseRuntimeConfig(
-        publish_to_debug_topic=False,
+    runtime_config=psgDriverBaseCfg.DriverBaseRuntimeConfig(
         enable_blocking_mode=False,
-        # pipeline_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
-        #     precondition="no_precondition",
-        #     drop_strategy="no_drop",
-        # ),
-        # pipeline_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
-        #     precondition="no_precondition",
-        #     drop_strategy="no_drop",
-        # ),
-        # model_enqueue_policy=psgPipelineBaseCfg.DeliveryPolicy(
-        #     precondition="no_precondition",
-        #     drop_strategy="no_drop",
-        # ),
-        # model_request_policy=psgPipelineBaseCfg.DeliveryPolicy(
-        #     precondition="no_precondition",
-        #     drop_strategy="no_drop",
-        # ),
     ),
 )
 
@@ -171,8 +153,8 @@ psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
         output_port_config=psgInoutBaseCfg.OutputPortConfig(
             downstream_specs=[
                 psgInoutBaseCfg.DownstreamSpec(
-                    name=psg_tracker_node_pipeline_name,
-                    action_name=f"/{psg_tracker_node_pipeline_name}/{psg_tracker_node_pipeline_json_params.init_config.input_port_config.action_name}",
+                    name=psg_tracker_node_driver_name,
+                    action_name=f"/{psg_tracker_node_driver_name}/{psg_tracker_node_driver_json_params.init_config.input_port_config.action_name}",
                 )
             ],
             data_topic_for_target_data="data_out/target_data",
@@ -370,7 +352,7 @@ psg_master_node = Node(
     + common_ros_args,
 )
 
-psg_detector_node = Node(
+psg_detector_driver_node = Node(
     package="test_cx",
     executable="v2_psg_all_detector_cpp_driver",
     name=psg_all_detector_cpp_node_driver_name,
@@ -433,15 +415,15 @@ psg_person_generator_node = Node(
     + common_ros_args,
 )
 
-psg_tracker_pipeline_node = Node(
+psg_tracker_driver_node = Node(
     package="test_cx",
-    executable="v2_psg_tracker_pipeline",
-    name=psg_tracker_node_pipeline_name,
-    namespace=psg_tracker_node_pipeline_name,
+    executable="v2_psg_tracker_driver",
+    name=psg_tracker_node_driver_name,
+    namespace=psg_tracker_node_driver_name,
     prefix=common_prefix,
     parameters=[
         {
-            "param_as_json_string": psg_tracker_node_pipeline_json_params.to_json(
+            "param_as_json_string": psg_tracker_node_driver_json_params.to_json(
                 ignore_none=True, compact=False
             ),
         },
@@ -449,7 +431,7 @@ psg_tracker_pipeline_node = Node(
     arguments=[
         "--ros-args",
         "--log-level",
-        [f"{psg_tracker_node_pipeline_name}:=", logger],
+        [f"{psg_tracker_node_driver_name}:=", logger],
     ]
     + common_ros_args,
 )
@@ -536,10 +518,10 @@ def generate_launch_description():
             log_level_arg,
             video_source_node,
             psg_master_node,
-            psg_detector_node,
+            psg_detector_driver_node,
             detection_node,
             psg_person_generator_node,
-            psg_tracker_pipeline_node,
+            psg_tracker_driver_node,
             psg_tracker_node,
             psg_counter_node,
             document_sink_node,
