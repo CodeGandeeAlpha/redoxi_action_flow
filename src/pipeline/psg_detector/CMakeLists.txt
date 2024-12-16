@@ -19,6 +19,7 @@ find_package(psg_common REQUIRED)
 
 set(pipeline_srcfiles
   src/Pipeline.cpp
+  src/Driver.cpp
   src/PipelineTypes.cpp
   src/StampedFramePub.cpp
   src/StampedStrPub.cpp

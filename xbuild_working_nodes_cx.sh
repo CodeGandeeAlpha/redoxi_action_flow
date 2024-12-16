@@ -37,11 +37,13 @@ display_help() {
 
 PackagesToBuild="redoxi_video_reader \
                  redoxi_common_nodes \
+                 redoxi_common_py \
                  redoxi_shared_memory \
                  redoxi_inference \
                  redoxi_inference_onnx \
                  rosboard \
                  psg_common \
+                 psg_common_py \
                  psg_master_node \
                  psg_document_sink \
                  psg_detector \
@@ -52,7 +54,8 @@ PackagesToBuild="redoxi_video_reader \
                  psg_tracker \
                  video_reader_from_url \
                  psg_counter \
-                 test_cx"
+                 test_cx \
+                 test_package"
 
 
 # Check if --help flag is provided

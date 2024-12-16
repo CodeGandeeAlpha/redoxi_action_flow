@@ -40,6 +40,9 @@ int PSGAllDetectorCppDriver::_on_process_callee_result(OutputTypes::OutputReques
 
     output_pipeline_source_data.set_document(document);
     output_request->set_source_data(output_pipeline_source_data);
+
+    const auto signal_code = callee_request.get_control_signal_code();
+    output_request->set_control_signal_code(signal_code);
     return 0;
 }
 

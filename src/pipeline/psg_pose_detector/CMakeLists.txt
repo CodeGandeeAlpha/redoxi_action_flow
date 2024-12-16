@@ -18,6 +18,7 @@ find_package(psg_detector REQUIRED)
 
 set(pipeline_srcfiles
   src/Pipeline.cpp
+  src/Driver.cpp
   src/PipelineTypes.cpp
 )
 

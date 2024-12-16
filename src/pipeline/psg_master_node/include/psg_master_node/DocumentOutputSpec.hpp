@@ -69,6 +69,33 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
         m_document = document;
     }
 
+    //! convert to publish message
+    int to_publish_visualization(PubVisualizationMsgType_t &msg) const override
+    {
+        if (auxiliary_data.has_value()) {
+            std::string auxiliary_data_str = std::any_cast<std::string>(auxiliary_data);
+
+            if (auxiliary_data_str == "image") {
+                image_utils::FrameMediator fm(&this->m_document.frame_bundle.primary_frame);
+                fm.to_image_msg(msg);
+            } else if (auxiliary_data_str == "detection") {
+                // TODO: 画检测框
+            } else if (auxiliary_data_str == "pose") {
+                // TODO: 画姿态
+            } else if (auxiliary_data_str == "person") {
+                // TODO: 画人
+            } else if (auxiliary_data_str == "track") {
+                // TODO: 画跟踪框
+            } else if (auxiliary_data_str == "counter") {
+                // TODO: 画计数
+            } else {
+                // RDX_ERROR_DEV(this, __func__, true, "{}", "Unknown auxiliary data type");
+                return -1;
+            }
+        }
+        return 0;
+    }
+
     // auxiliary data for easy extension without inheritance
     std::any auxiliary_data;
 
