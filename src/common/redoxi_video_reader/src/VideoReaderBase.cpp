@@ -46,11 +46,11 @@ int RedoxiVideoReaderBase::_open()
     _reset_frame_number();
 
     auto shm_client = shared_memory::SharedMemoryFactory::get_instance().get_default_client(this);
-    if (shm_client == nullptr) {
+    if (!shm_client.lock()) {
         RDX_INFO_DEV(this, __func__, "{}", "Failed to create shm client, not using shared memory");
     } else {
         RDX_INFO_DEV(this, __func__, "Created shm client, region key={}, service type={}",
-                     shm_client->get_region_key(), shm_client->get_service_type());
+                     shm_client.lock()->get_region_key(), shm_client.lock()->get_service_type());
         m_shm_client = shm_client;
     }
 
@@ -174,12 +174,13 @@ int RedoxiVideoReaderBase::_on_delivery_task_begin(TargetData_t &target_data,
     auto msg_uuid_str = boost::uuids::to_string(request.get_source_data().get_uuid());
 
     // shm client is not initialized, do nothing
-    if (!m_shm_client) {
+    if (!m_shm_client.lock()) {
         return 0;
     }
+    auto shm_client = m_shm_client.lock();
 
     // shm client is not connected, do nothing
-    if (!m_shm_client->is_connected()) {
+    if (!shm_client->is_connected()) {
         RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Shm client is not connected", msg_uuid_str);
         return 0;
     }
@@ -194,13 +195,13 @@ int RedoxiVideoReaderBase::_on_delivery_task_begin(TargetData_t &target_data,
     // send image to shm
     RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] Uploading image to shm", msg_uuid_str);
     shared_memory::ObjectIdentifier oid;
-    auto datablock = m_shm_client->create_datablock();
+    auto datablock = shm_client->create_datablock();
     if (!datablock) {
         RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to create datablock", msg_uuid_str);
         return -1;
     }
     datablock->from_cvmat(img);
-    bool put_ok = m_shm_client->put_data(&oid, datablock.get(), nullptr) == 0;
+    bool put_ok = shm_client->put_data(&oid, datablock.get(), nullptr) == 0;
     if (!put_ok) {
         RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to put data to shm", msg_uuid_str);
         return -1;
@@ -214,8 +215,8 @@ int RedoxiVideoReaderBase::_on_delivery_task_begin(TargetData_t &target_data,
     if (oid.key.has_value()) {
         shm_token.object_key = oid.key.value();
     }
-    shm_token.service_name = m_shm_client->get_service_type();
-    shm_token.region_key = m_shm_client->get_region_key();
+    shm_token.service_name = shm_client->get_service_type();
+    shm_token.region_key = shm_client->get_region_key();
     shm_token.object_size = img.total() * img.elemSize();
     return 0;
 }
@@ -229,7 +230,8 @@ int RedoxiVideoReaderBase::_on_delivery_task_finish(TargetData_t &target_data,
         return 0;
     }
 
-    if (!m_shm_client || !m_shm_client->is_connected()) {
+    auto shm_client = m_shm_client.lock();
+    if (!shm_client || !shm_client->is_connected()) {
         // shm client is not initialized or not connected, do nothing, no shared memory to remove
         return 0;
     }
@@ -247,7 +249,7 @@ int RedoxiVideoReaderBase::_on_delivery_task_finish(TargetData_t &target_data,
         if (!shm_token.object_key.empty()) {
             oid.key = shm_token.object_key;
         }
-        auto ret = m_shm_client->delete_object(oid);
+        auto ret = m_shm_client.lock()->delete_object(oid);
         if (ret != 0) {
             RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to delete object from shm", msg_uuid_str);
             return -1;

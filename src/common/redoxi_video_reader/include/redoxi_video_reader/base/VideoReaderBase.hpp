@@ -186,7 +186,7 @@ class RedoxiVideoReaderBase : public common_nodes::OpenCloseNode
     StampedImagePub m_pub_task_drop;
 
     //! shared memory client
-    std::shared_ptr<shared_memory::SharedMemoryClient> m_shm_client;
+    std::weak_ptr<shared_memory::SharedMemoryClient> m_shm_client;
 
   private:
     // frame number last read by this reader, which is, the frame number of PREVIOUS frame

@@ -22,6 +22,7 @@ find_package(rclcpp_action REQUIRED)
 find_package(redoxi_public_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(json_struct REQUIRED)
+find_package(redoxi_ros_logging REQUIRED)
 
 set(source_files
     src/redoxi_common_cpp.cpp src/redoxi_ros_util.cpp
@@ -52,7 +53,8 @@ ament_target_dependencies(
   rcpputils
   redoxi_public_msgs
   rclcpp_action
-  cv_bridge)
+  cv_bridge
+  redoxi_ros_logging)
 
 # Causes the visibility macros to use dllexport rather than dllimport, which is
 # appropriate when building the dll but not consuming it.
@@ -93,6 +95,7 @@ ament_export_dependencies(
   nlohmann_json
   fmt
   OpenCV
-  json_struct)
+  json_struct
+  redoxi_ros_logging)
 
 ament_package()

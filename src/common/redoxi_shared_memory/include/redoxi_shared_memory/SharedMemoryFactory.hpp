@@ -16,14 +16,14 @@ class SharedMemoryFactory
 
     //! Get a shared memory client by config, create if not exists
     //! @return shared memory client pointer, nullptr if failed
-    std::shared_ptr<SharedMemoryClient> get_client(const SharedMemoryConfig &config);
+    std::weak_ptr<SharedMemoryClient> get_client(const SharedMemoryConfig &config);
 
     //! Get default client from ros node's parameters or env variables
-    std::shared_ptr<SharedMemoryClient> get_default_client(rclcpp::Node *node = nullptr);
+    std::weak_ptr<SharedMemoryClient> get_default_client(rclcpp::Node *node = nullptr);
 
     //! remove a shared memory client from the cache
     //! @return 0 if success, -1 if failed (client not found)
-    int destroy_client(std::shared_ptr<SharedMemoryClient> client);
+    int destroy_client(std::weak_ptr<SharedMemoryClient> client);
 
     //! Get the shared memory config from a ros node's parameters
     SharedMemoryConfig get_shm_config_from_node(const rclcpp::Node *node);
@@ -35,13 +35,14 @@ class SharedMemoryFactory
     SharedMemoryConfig get_default_shm_config(const rclcpp::Node *node);
 
     //! Delete copy constructor and assignment operator
-    // SharedMemoryFactory(const SharedMemoryFactory &) = delete;
-    // SharedMemoryFactory &operator=(const SharedMemoryFactory &) = delete;
-    // SharedMemoryFactory() = default;
-    ~SharedMemoryFactory();
+    SharedMemoryFactory(const SharedMemoryFactory &) = delete;
+    SharedMemoryFactory &operator=(const SharedMemoryFactory &) = delete;
 
   private:
     struct Impl;
+
+    SharedMemoryFactory() = default;
+    ~SharedMemoryFactory() = default;
 
     //! Create a shared memory client based on the service type
     //! @return an uninitialized shared memory client, you need to connect it to the shared memory region before use, nullptr if failed

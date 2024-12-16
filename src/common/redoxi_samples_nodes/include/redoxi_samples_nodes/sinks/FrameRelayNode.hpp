@@ -89,7 +89,7 @@ class FrameRelayNode : public common_nodes::StartStopNode
     StampedImagePub m_pub_relayed_frame;
     StampedImagePub m_pub_frame_accepted;
     StampedImagePub m_pub_frame_rejected;
-    std::shared_ptr<shared_memory::SharedMemoryClient> m_shm_client;
+    std::weak_ptr<shared_memory::SharedMemoryClient> m_shm_client;
 };
 
 } // namespace redoxi_works

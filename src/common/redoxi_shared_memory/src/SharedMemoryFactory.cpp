@@ -1,5 +1,5 @@
 #include <redoxi_shared_memory/SharedMemoryFactory.hpp>
-#include <redoxi_common_cpp/ros_utils/common.hpp>
+#include <redoxi_ros_logging/redoxi_ros_logging.hpp>
 #include <cstdlib>
 #include <pluginlib/class_loader.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -50,16 +50,16 @@ SharedMemoryConfig SharedMemoryFactory::get_default_shm_config(const rclcpp::Nod
     }
 }
 
-int SharedMemoryFactory::destroy_client(std::shared_ptr<SharedMemoryClient> client)
+int SharedMemoryFactory::destroy_client(std::weak_ptr<SharedMemoryClient> client)
 {
-    if (!client) {
+    if (!client.lock()) {
         return -1;
     }
 
     // look for the client in the cache
     SharedMemoryConfig config;
-    config.region_key = client->get_region_key();
-    config.service_type = client->get_service_type();
+    config.region_key = client.lock()->get_region_key();
+    config.service_type = client.lock()->get_service_type();
     auto it = m_clients_by_config.find(config);
     if (it != m_clients_by_config.end()) {
         RDX_INFO_DEV(nullptr, __func__, "removing client of service type {} and region key {} in cache",
@@ -73,22 +73,22 @@ int SharedMemoryFactory::destroy_client(std::shared_ptr<SharedMemoryClient> clie
     return -1;
 }
 
-std::shared_ptr<SharedMemoryClient> SharedMemoryFactory::get_default_client(rclcpp::Node *node)
+std::weak_ptr<SharedMemoryClient> SharedMemoryFactory::get_default_client(rclcpp::Node *node)
 {
     SharedMemoryConfig config = get_default_shm_config(node);
     if (!config.is_valid()) {
         RDX_WARN_DEV(nullptr, __func__, "invalid config, service type {} and region key {}, skipping",
                      config.service_type, config.region_key);
-        return nullptr;
+        return std::weak_ptr<SharedMemoryClient>();
     }
     return get_client(config);
 }
 
-std::shared_ptr<SharedMemoryClient> SharedMemoryFactory::get_client(const SharedMemoryConfig &config)
+std::weak_ptr<SharedMemoryClient> SharedMemoryFactory::get_client(const SharedMemoryConfig &config)
 {
     if (!config.is_valid()) {
         RDX_INFO_DEV(nullptr, __func__, "{}", "Invalid config, cannot create shm client");
-        return nullptr;
+        return std::weak_ptr<SharedMemoryClient>();
     }
 
     // do we already have a client of this config?
@@ -108,7 +108,7 @@ std::shared_ptr<SharedMemoryClient> SharedMemoryFactory::get_client(const Shared
     auto client = _create_client_by_config(config);
     if (!client) {
         RDX_INFO_DEV(nullptr, __func__, "{}", "failed to create shm client");
-        return nullptr;
+        return std::weak_ptr<SharedMemoryClient>();
     }
 
     // add to cache
@@ -199,14 +199,14 @@ SharedMemoryConfig SharedMemoryFactory::get_shm_config_from_env()
     return config;
 }
 
-SharedMemoryFactory::~SharedMemoryFactory()
-{
-    // destroy all clients
-    RDX_INFO_DEV(nullptr, __func__, "{}", "destroying all clients");
-    m_clients_by_config.clear();
-    // RDX_INFO_DEV(nullptr, __func__, "unloading library for class {}", ShmBaseClassName);
-    // m_impl->loader->unloadLibraryForClass(ShmBaseClassName);
-    // m_impl = nullptr;
-}
+// SharedMemoryFactory::~SharedMemoryFactory()
+// {
+//     // destroy all clients
+//     RDX_INFO_DEV(nullptr, __func__, "{}", "destroying all clients");
+//     m_clients_by_config.clear();
+//     // RDX_INFO_DEV(nullptr, __func__, "unloading library for class {}", ShmBaseClassName);
+//     // m_impl->loader->unloadLibraryForClass(ShmBaseClassName);
+//     // m_impl = nullptr;
+// }
 
 } // namespace redoxi_works::shared_memory
