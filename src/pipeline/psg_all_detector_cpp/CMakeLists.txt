@@ -17,6 +17,7 @@ find_package(psg_common REQUIRED)
 
 set(pipeline_srcfiles
   src/Pipeline.cpp
+  src/Driver.cpp
 )
 
 add_library(psg_all_detector_cpp ${pipeline_srcfiles})

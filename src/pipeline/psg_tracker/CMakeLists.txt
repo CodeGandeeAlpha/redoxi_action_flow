@@ -18,6 +18,7 @@ find_package(redoxi_shared_memory REQUIRED)
 
 set(pipeline_srcfiles
   src/Pipeline.cpp
+  src/Driver.cpp
   src/PSGTracker.cpp
   src/PSGTrackerTypes.cpp
 )
