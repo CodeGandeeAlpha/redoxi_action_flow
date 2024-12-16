@@ -2,7 +2,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include <redoxi_shared_memory/SharedMemoryClient.hpp>
 #include <redoxi_shared_memory/SharedMemoryFactory.hpp>
-#include <redoxi_shared_memory/SharedMemoryManager.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <spdlog/spdlog.h>
 #include <string>
@@ -23,19 +22,24 @@ int main(int argc, char **argv)
     // pluginlib::ClassLoader<rdx_shm::SharedMemoryClient> shm_loader("redoxi_shared_memory",
     //                                                                "redoxi_works::shared_memory::SharedMemoryClient");
     rdx_shm::SharedMemoryConfig config;
-    config = rdx_shm::SharedMemoryFactory::get_shm_config_from_env();
+    config = rdx_shm::SharedMemoryFactory::get_instance().get_shm_config_from_env();
     rdx::RDX_INFO_DEV(nullptr, __func__, "shm config, service type: {}, region key: {}",
                       config.service_type, config.region_key);
 
     try {
         // auto client = shm_loader.createSharedInstance("redoxi_works::shared_memory::VineyardShmClient");
         // auto client = rdx_shm::SharedMemoryFactory::create_client_by_config(config);
-        auto client = rdx_shm::SharedMemoryManager::get_instance().get_default_client();
+        auto client = rdx_shm::SharedMemoryFactory::get_instance().get_default_client();
         if (!client) {
             spdlog::error("Failed to create shared memory client");
             return -1;
         }
         spdlog::info("Client created");
+
+        // destroy the client
+        // spdlog::info("Destroying client");
+        // rdx_shm::SharedMemoryFactory::get_instance().destroy_client(client);
+        // spdlog::info("Client destroyed");
 
         // connect to vineyard
         if (!client->is_connected()) {
@@ -94,15 +98,6 @@ int main(int argc, char **argv)
             else
                 spdlog::error("Remove from vineyard failed");
         }
-
-        // disconnect from vineyard
-        // {
-        //     auto ret = client->close();
-        //     if (ret == 0)
-        //         spdlog::info("Client closed");
-        //     else
-        //         spdlog::error("Client failed to close");
-        // }
     } catch (const pluginlib::PluginlibException &ex) {
         RCLCPP_ERROR(rclcpp::get_logger("test_v6d_plugin"), "The plugin failed to load for some reason. Error: %s", ex.what());
     }

@@ -83,14 +83,12 @@ int FrameRelayNode::_start()
 
     // create shm client
     {
-        auto shm_config = shared_memory::SharedMemoryFactory::get_shm_config_from_node(this);
-        m_shm_client = shared_memory::SharedMemoryFactory::create_client_by_config(shm_config);
+        m_shm_client = shared_memory::SharedMemoryFactory::get_instance().get_default_client(this);
         if (!m_shm_client) {
-            RDX_INFO_DEV(this, __func__, false, "Failed to create shm client, service type = {}, region key = {}",
-                         shm_config.service_type, shm_config.region_key);
+            RDX_INFO_DEV(this, __func__, false, "{}", "Failed to create shm client");
         } else {
             RDX_INFO_DEV(this, __func__, false, "Created shm client, service type = {}, region key = {}",
-                         shm_config.service_type, shm_config.region_key);
+                         m_shm_client->get_service_type(), m_shm_client->get_region_key());
         }
     }
 

@@ -14,6 +14,7 @@ VineyardShmClient::VineyardShmClient()
 
 VineyardShmClient::~VineyardShmClient()
 {
+    RDX_INFO_DEV(_get_logger(), __func__, "{}", "destroying vineyard shm client");
 }
 
 std::string VineyardShmClient::get_service_type() const
