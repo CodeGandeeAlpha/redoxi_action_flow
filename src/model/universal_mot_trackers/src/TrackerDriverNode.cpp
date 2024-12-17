@@ -11,6 +11,7 @@ int TrackerDriverNode::_on_process_input_request(CalleeTypes::RequestOutputReque
 {
     (void)out_upstream_result;
     (void)resource_token;
+    (void)out_callee_enqueue_policy;
 
     // using CalleeDataTrait_t = CalleeTypes::RequestOutputActionDataTrait_t;
     using RequestDataTrait_t = InputTypes::ActionDataTrait_t;
@@ -50,30 +51,44 @@ int TrackerDriverNode::_on_process_callee_result(OutputTypes::OutputRequest_t *o
     (void)out_downstream_enqueue_policy;
     (void)downstream;
 
-    // check control signal code first
-    auto signal_code = callee_request.get_control_signal_code();
-    if (signal_code != ControlSignalCode::Normal) {
-        // just set it and return
-        out_downstream_request->set_control_signal_code(signal_code);
-        return 0;
-    }
+    // copy control signal code and source task metadata
+    out_downstream_request->copy_meta_info_from(callee_request);
 
-    // track the uuid
+    // get the source data
     auto &ds_source_data = out_downstream_request->get_source_data();
     auto msg_uuid = callee_request.get_source_data().get_uuid();
-    ds_source_data.set_uuid(msg_uuid);
-
     RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Got tracked result",
+                 UUIDTrait::to_string(msg_uuid));
+
+    // get all tracked targets, and pass them to output port
+    auto &track_targets = callee_result->track_targets;
+    ds_source_data.set_track_targets(track_targets);
+
+    // also pass the frame
+    auto &frame_data = callee_request.get_source_data().get_primary_frame();
+    ds_source_data.set_primary_frame(frame_data);
+
+    return 0;
+}
+
+cv::Mat TrackerDriverNode::_draw_tracked_result(const CalleeTypes::RequestOutputActionResult_t &callee_result,
+                                                const CalleeTypes::RequestOutputRequest_t &callee_request,
+                                                const CalleeTypes::Downstream_t &downstream)
+{
+    (void)downstream;
+    // get the source data
+    auto msg_uuid = callee_request.get_source_data().get_uuid();
+    RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Drawing tracked result",
                  UUIDTrait::to_string(msg_uuid));
 
     // get the tracked result and draw it on the image
     const auto &input_frame = callee_request.get_source_data().get_primary_frame();
     image_utils::FrameMediator fm(input_frame.image, input_frame.metadata);
-    auto canvas = fm.to_cv_image_shared().clone();
+    auto canvas = fm.to_cv_image_copy();
 
     // draw the tracked result
     std::vector<redoxi_public_msgs::msg::Detection> dets;
-    for (const auto &track_target : callee_result->track_targets) {
+    for (const auto &track_target : callee_result.track_targets) {
         auto det = track_target.predicted_detection;
 
         // FIXME: using track_id as category is not good but works for now
@@ -91,15 +106,7 @@ int TrackerDriverNode::_on_process_callee_result(OutputTypes::OutputRequest_t *o
     draw_opts.colorization_mode = decltype(draw_opts.colorization_mode)::SemanticIdentity;
     image_utils::draw_detections(&canvas, dets, draw_opts);
 
-    // set the image
-    auto output_frame = input_frame;
-    output_frame.image = canvas;
-    ds_source_data.set_primary_frame(output_frame);
-
-    // done
-    RDX_INFO_DEV(nullptr, __func__, true, "[msg_uuid={}] Converted tracked result to image",
-                 UUIDTrait::to_string(msg_uuid));
-    return 0;
+    return canvas;
 }
 
 } // namespace redoxi_works::model_nodes::universal_mot_trackers

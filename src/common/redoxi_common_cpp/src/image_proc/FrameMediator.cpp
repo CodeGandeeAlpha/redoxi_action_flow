@@ -96,6 +96,16 @@ int FrameMediator::to_cv_image_copy(cv::Mat &cv_image, std::optional<std::string
     return 0;
 }
 
+cv::Mat FrameMediator::to_cv_image_copy(std::optional<std::string> encoding) const
+{
+    cv::Mat cv_image;
+    auto ret = to_cv_image_copy(cv_image, encoding);
+    if (ret != 0) {
+        return cv::Mat();
+    }
+    return cv_image;
+}
+
 cv::Mat FrameMediator::to_cv_image_shared() const
 {
     if (m_frame_msg) {

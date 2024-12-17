@@ -116,16 +116,34 @@ class CallActionDriverBase : public OpenCloseNode
     int _update_init_config(std::shared_ptr<BaseInitConfig_t> init_config) override;
     int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config) override;
 
-    //! after the request is received from the input port
-    //! this is the data-processing callback of the input port handler
+    /**
+     * @brief After the request is received from the input port, process it
+     * @details This is the data-processing callback of the input port handler
+     * @param[out] out_callee_request The request to be sent to the callee,
+     *        with the meta info (e.g., signal code, task metadata, etc) copied from source data
+     * @param[out] out_callee_enqueue_policy The delivery policy for the callee request,
+     *        already set to handle special signal code correctly
+     * @param[out] out_upstream_result The result to be sent back upstream
+     * @param[in] source_data The source data received from upstream
+     * @param[in] resource_token Resource token for accessing shared resources
+     * @return 0 on success, non-zero on failure
+     */
     virtual int _on_process_input_request(typename CalleeTypes::RequestOutputRequest_t *out_callee_request,
                                           std::optional<typename CalleeTypes::RequestOutputDeliveryPolicy_t> *out_callee_enqueue_policy,
                                           typename InputTypes::ActionResult_t *out_upstream_result,
                                           std::shared_ptr<const typename InputTypes::SourceData_t> source_data,
                                           typename InputRequestHandler_t::ResourceToken_t &resource_token);
 
-    //! after the result is received from the callee, create output request for sending to output port
-    //! you can also modify the output request enqueue policy here, or just leave it unchanged
+    /**
+     * @brief After receiving result from callee, create output request for sending to output port
+     * @details You can also modify the output request enqueue policy here, or just leave it unchanged
+     * @param[out] out_downstream_request The output request to be sent downstream, with the meta info copied from callee request
+     * @param[out] out_downstream_enqueue_policy The delivery policy for the output request, already set to handle special signal code correctly
+     * @param[in] callee_result The result received from the callee
+     * @param[in] callee_request The original request sent to the callee
+     * @param[in] downstream The downstream information
+     * @return 0 on success, non-zero on failure
+     */
     virtual int _on_process_callee_result(typename OutputTypes::OutputRequest_t *out_downstream_request,
                                           typename OutputTypes::OutputDeliveryPolicy_t *out_downstream_enqueue_policy,
                                           std::shared_ptr<const typename CalleeTypes::RequestOutputActionResult_t> callee_result,
@@ -152,7 +170,8 @@ class CallActionDriverBase : public OpenCloseNode
                                           const typename CalleeTypes::RequestOutputPort_t::Downstream_t &downstream);
 
     //! after the request is received from the input port
-    //! this is the data-processing callback of the input port handler
+    //! this is the data-processing callback of the input port handler, so policy will be set correctly to handle special signal code
+    //! unless you override it in the callback
     int _internal_process_input_request(typename CalleeTypes::RequestOutputRequest_t *out_callee_request,
                                         std::optional<typename CalleeTypes::RequestOutputDeliveryPolicy_t> *out_callee_enqueue_policy,
                                         typename InputTypes::ActionResult_t *out_upstream_result,
@@ -202,10 +221,11 @@ class CallActionDriverBase : public OpenCloseNode
                                         const typename CalleeTypes::Downstream_t &downstream)
     {
         // pass along task metadata and signal code
-        auto task_metadata = callee_request.get_source_task_metadata();
-        auto signal_code = callee_request.get_control_signal_code();
-        out_downstream_request->set_source_task_metadata(task_metadata);
-        out_downstream_request->set_control_signal_code(signal_code);
+        // auto task_metadata = callee_request.get_source_task_metadata();
+        // auto signal_code = callee_request.get_control_signal_code();
+        // out_downstream_request->set_source_task_metadata(task_metadata);
+        // out_downstream_request->set_control_signal_code(signal_code);
+        out_downstream_request->copy_meta_info_from(callee_request);
 
         // call class member function
         auto ret_member = _on_process_callee_result(out_downstream_request,
