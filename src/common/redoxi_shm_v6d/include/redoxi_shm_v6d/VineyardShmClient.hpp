@@ -2,6 +2,7 @@
 
 #include <redoxi_shm_v6d/redoxi_shm_v6d.hpp>
 #include <redoxi_shared_memory/SharedMemoryClient.hpp>
+#include <redoxi_shared_memory/ExpirationCache.hpp>
 #include <vineyard/client/client.h>
 #include <vineyard/basic/ds/tensor.h>
 namespace redoxi_works::shared_memory
@@ -26,20 +27,17 @@ class VineyardShmClient : public SharedMemoryClient
     using SharedMemoryClient::get_data;
 
     // SharedMemoryClient interface, KeyValueStore is VineyardParams object
-    int connect(const std::string &region_key, const KeyValueStore *params = nullptr) override;
-
-    // Expiration config
-    // void set_expiration_config(const MemoryBlockExpirationConfig *expiration_config) override;
-    // const MemoryBlockExpirationConfig *get_expiration_config() const override;
-
-    //! Get the region key, empty string if not set yet
-    std::string get_region_key() const override;
-
-    // get the service name of this shared memory service
-    std::string get_service_type() const override;
+    int connect(const SharedMemoryConfig &config,
+                std::shared_ptr<KeyValueStore> additional_params = nullptr) override;
 
     //! Check if the client is connected
     bool is_connected() const override;
+
+    //! Get the connection config of the shared memory client, provided during the connect call.
+    const SharedMemoryConfig &get_connection_config() const override;
+
+    //! Get the connection params of the shared memory client, provided during the connect call.
+    std::shared_ptr<const KeyValueStore> get_connection_params() const override;
 
     //! Close the client
     int close() override;
@@ -60,14 +58,8 @@ class VineyardShmClient : public SharedMemoryClient
                       const KeyValueStore *metadata = nullptr) override;
 
     // SharedMemoryClient interface
-    void set_parent_node(rclcpp::Node *node) override;
-    rclcpp::Node *get_parent_node() override;
-    const rclcpp::Node *get_parent_node() const override;
-
-    // SharedMemoryClient interface
     std::shared_ptr<DataBlock> create_datablock() const override;
     std::shared_ptr<KeyValueStore> create_kvstore() const override;
-
 
     // --- Vineyard specific methods ---
   public:
@@ -86,11 +78,15 @@ class VineyardShmClient : public SharedMemoryClient
   private:
     std::shared_ptr<vineyard::Client> m_client;
     rclcpp::Node *m_node = nullptr;
-    std::string m_region_key;
-    rclcpp::Logger _get_logger() const;
 
-    // Expiration config
-    std::optional<MemoryBlockExpirationConfig> m_expiration_config;
+    // connection config, common to all shm clients
+    SharedMemoryConfig m_config;
+
+    // specific params for this shm client
+    std::shared_ptr<VineyardParams> m_additional_params;
+
+    // Expiration cache
+    ExpirationCache m_expiration_cache;
 };
 
 } // namespace redoxi_works::shared_memory

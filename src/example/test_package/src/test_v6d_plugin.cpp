@@ -43,7 +43,7 @@ int main(int argc, char **argv)
 
         // connect to vineyard
         if (!client->is_connected()) {
-            auto ret = client->connect(vineyard_socket);
+            auto ret = client->connect(config);
             if (ret == 0)
                 spdlog::info("Client connected to vineyard");
             else

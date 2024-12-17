@@ -21,10 +21,10 @@ struct _ExpirationConfig {
     std::string _time_unit = "us(1e-6s)";
 
     //! default alive duration for each shm block, if not set, then use the default_alive_duration
-    std::optional<TimeUnit_t> default_alive_duration;
+    TimeUnit_t default_alive_duration = TimeUnit_t::max();
 
     //! max alive duration for each shm block, will override any alive duration set in the shm block if it is longer than this value
-    std::optional<TimeUnit_t> max_alive_duration;
+    TimeUnit_t max_alive_duration = TimeUnit_t::max();
 
     JS_OBJECT(JS_MEMBER(default_alive_duration), JS_MEMBER(max_alive_duration));
 };
@@ -83,7 +83,7 @@ struct MemoryBlockExpirationConfig {
     //! @return The action to take for the expired block
     std::function<MemoryBlockExpirationAction(
         const ObjectIdentifier &object_id,
-        std::weak_ptr<SharedMemoryClient> client,
+        SharedMemoryClient *client,
         const TimePoint_t &time_now,
         const MemoryBlockExpirationConfig &config)>
         on_expired;

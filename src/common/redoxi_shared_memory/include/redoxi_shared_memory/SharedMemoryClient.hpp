@@ -13,38 +13,23 @@ class SharedMemoryClient
   public:
     SharedMemoryClient() = default;
     virtual ~SharedMemoryClient() = default;
-    /**
-     * @brief Connect to a shared memory region.
-     *
-     * Establishes a connection to a specified shared memory region using the provided key.
-     *
-     * @param region_key The unique key identifying the shared memory region.
-     * @param params Optional parameters for connection, can be user-defined.
-     * @return 0 if the connection is successful, -1 if it fails.
-     */
-    virtual int connect(const std::string &region_key, const KeyValueStore *params = nullptr) = 0;
 
-    // /**
-    //  * @brief Set the expiration config for the shared memory client, which will affect all the data blocks put into the shared memory region.
-    //  *
-    //  * @param expiration_config The expiration config to be set. If nullptr, it will clear the expiration config.
-    //  */
-    // virtual void set_expiration_config(const MemoryBlockExpirationConfig *expiration_config) = 0;
-
-    // /**
-    //  * @brief Get the expiration config for the shared memory client, which will affect all the data blocks put into the shared memory region.
-    //  *
-    //  * @return The expiration config, nullptr if not set.
-    //  */
-    // virtual const MemoryBlockExpirationConfig *get_expiration_config() const = 0;
+    virtual int connect(const SharedMemoryConfig &config,
+                        std::shared_ptr<KeyValueStore> additional_params = nullptr) = 0;
 
     /**
-     * @brief Get the service name of the shared memory region.
+     * @brief Get the config of the shared memory client, provided during the connect call.
+     *
+     * @return The config of the shared memory client.
      */
-    virtual std::string get_service_type() const = 0;
+    virtual const SharedMemoryConfig &get_connection_config() const = 0;
 
-    //! Get the region key, empty string if not connected
-    virtual std::string get_region_key() const = 0;
+    /**
+     * @brief Get the connection params of the shared memory client, provided during the connect call.
+     *
+     * @return The connection params of the shared memory client.
+     */
+    virtual std::shared_ptr<const KeyValueStore> get_connection_params() const = 0;
 
     /**
      * @brief Put data into the shared memory region.
@@ -121,27 +106,6 @@ class SharedMemoryClient
      * @return 0 if the closure is successful, -1 if it fails.
      */
     virtual int close() = 0;
-
-    /**
-     * @brief Set the parent node for the shared memory client, mainly used for logging.
-     *
-     * @param node The parent node. If nullptr, no logging will be done.
-     */
-    virtual void set_parent_node(rclcpp::Node *node) = 0;
-
-    /**
-     * @brief Get the parent node for the shared memory client, mainly used for logging.
-     *
-     * @return The parent node.
-     */
-    virtual rclcpp::Node *get_parent_node() = 0;
-
-    /**
-     * @brief Get the parent node for the shared memory client, mainly used for logging.
-     *
-     * @return The parent node.
-     */
-    virtual const rclcpp::Node *get_parent_node() const = 0;
 
     /**
      * @brief Create a local data block, which is used for uploading local data to shared memory,

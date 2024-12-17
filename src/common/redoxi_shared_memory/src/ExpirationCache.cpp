@@ -1,3 +1,4 @@
+#include <rclcpp/rclcpp.hpp>
 #include <redoxi_shared_memory/ExpirationCache.hpp>
 #include <boost/bimap.hpp>
 #include <boost/bimap/multiset_of.hpp>
@@ -78,15 +79,60 @@ struct ExpirationCache::Impl {
         m_cache;
 };
 
-ExpirationCache::ExpirationCache(std::weak_ptr<SharedMemoryClient> client)
+ExpirationCache::ExpirationCache(SharedMemoryClient *client)
     : m_impl(std::make_shared<Impl>()), m_client(client)
 {
+    // register shutdown callback, on shutdown, stop the auto eviction thread and evict all expired memory blocks
+    rclcpp::on_shutdown(std::function<void()>([this]() {
+        reset();
+    }));
+}
+
+void ExpirationCache::reset()
+{
+    stop_auto_evict();
+    evict_expired_memory_blocks(true);
+}
+
+ExpirationCache::~ExpirationCache()
+{
+    reset();
+}
+
+int ExpirationCache::start_auto_evict(TimeUnit_t check_interval)
+{
+    if (m_auto_evict_thread && m_auto_evict_running) {
+        RDX_WARN_DEV(nullptr, __func__, "{}", "Auto eviction thread already running");
+        return -1;
+    }
+
+    m_auto_evict_running = true;
+    m_auto_evict_thread = std::make_shared<std::thread>([this, check_interval]() {
+        while (m_auto_evict_running) {
+            evict_expired_memory_blocks();
+            std::this_thread::sleep_for(check_interval);
+        }
+    });
+    return 0;
+}
+
+int ExpirationCache::stop_auto_evict()
+{
+    m_auto_evict_running = false;
+    if (m_auto_evict_thread) {
+        m_auto_evict_thread->join();
+        m_auto_evict_thread = nullptr;
+    }
+    return 0;
 }
 
 int ExpirationCache::add_memory_block(
     const ObjectIdentifier &object_id, const MemoryBlockExpirationConfig &expiration_config)
 {
     RDX_INFO_DEV(nullptr, __func__, "Adding memory block to expiration cache: {}", object_id.to_string());
+
+    // if alive_duration is not set, treat it as no expiration
+    // this is handled in DataBlockInfo constructor
     auto data_block_info = DataBlockInfo(object_id, expiration_config);
     auto &left = m_impl->m_cache.left;
     auto it = left.find(object_id);
@@ -104,10 +150,13 @@ int ExpirationCache::add_memory_block(
     return 0;
 }
 
-int64_t ExpirationCache::evict_expired_memory_blocks()
+int64_t ExpirationCache::evict_expired_memory_blocks(bool force_evict_all)
 {
     auto &right = m_impl->m_cache.right;
     auto time_now = std::chrono::system_clock::now();
+    if (force_evict_all) {
+        time_now = TimePoint_t::max();
+    }
     auto range = right.range(bimaps::unbounded, bimaps::_key <= time_now);
 
     if (range.first == range.second) {
@@ -125,21 +174,24 @@ int64_t ExpirationCache::evict_expired_memory_blocks()
         RDX_INFO_DEV(nullptr, __func__, "Processing expired block: {}", object_id.to_string());
 
         // have callback? call it
+        MemoryBlockExpirationAction action = MemoryBlockExpirationAction::DontCare;
         if (data_block_info.expiration_config.on_expired) {
             RDX_INFO_DEV(nullptr, __func__, "Calling expiration callback for block: {}", object_id.to_string());
-            data_block_info.expiration_config.on_expired(object_id, m_client, time_now, data_block_info.expiration_config);
+            action = data_block_info.expiration_config.on_expired(object_id, m_client, time_now, data_block_info.expiration_config);
         }
 
-        // delete the object from shm service, if client is still valid
-        if (auto client = m_client.lock()) {
+        // delete the object from shm service
+        if (action != MemoryBlockExpirationAction::Keep) {
             RDX_INFO_DEV(nullptr, __func__, "Deleting expired block from shared memory: {}", object_id.to_string());
-            client->delete_object(object_id);
-        }
+            m_client->delete_object(object_id);
 
-        // remove from cache
-        RDX_INFO_DEV(nullptr, __func__, "Removing expired block from cache: {}", object_id.to_string());
-        right.erase(it);
-        num_evicted++;
+            // remove from cache
+            RDX_INFO_DEV(nullptr, __func__, "Removing expired block from cache: {}", object_id.to_string());
+            right.erase(it);
+            num_evicted++;
+        } else {
+            RDX_INFO_DEV(nullptr, __func__, "Keeping expired block: {} as requested", object_id.to_string());
+        }
     }
 
     RDX_INFO_DEV(nullptr, __func__, "Completed eviction, removed {} expired blocks", num_evicted);

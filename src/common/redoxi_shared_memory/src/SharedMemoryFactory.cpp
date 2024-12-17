@@ -57,9 +57,7 @@ int SharedMemoryFactory::destroy_client(std::weak_ptr<SharedMemoryClient> client
     }
 
     // look for the client in the cache
-    SharedMemoryConfig config;
-    config.region_key = client.lock()->get_region_key();
-    config.service_type = client.lock()->get_service_type();
+    SharedMemoryConfig config = client.lock()->get_connection_config();
     auto it = m_clients_by_config.find(config);
     if (it != m_clients_by_config.end()) {
         RDX_INFO_DEV(nullptr, __func__, "removing client of service type {} and region key {} in cache",
@@ -138,7 +136,7 @@ std::shared_ptr<SharedMemoryClient> SharedMemoryFactory::_create_client_by_confi
     }
 
     // connect to shm
-    auto ret = client->connect(region_key);
+    auto ret = client->connect(config);
     if (ret != 0) {
         RDX_INFO_DEV(nullptr, __func__, "{}", "Failed to connect to shm");
         return nullptr;
