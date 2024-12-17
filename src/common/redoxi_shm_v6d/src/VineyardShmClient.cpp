@@ -14,12 +14,18 @@ VineyardShmClient::VineyardShmClient()
 
 VineyardShmClient::~VineyardShmClient()
 {
+    RDX_INFO_DEV(_get_logger(), __func__, "{}", "destroying vineyard shm client");
 }
 
-const std::string &VineyardShmClient::get_service_name() const
+std::string VineyardShmClient::get_service_type() const
 {
-    static const std::string name = shm_service_types::Vineyard;
+    static const std::string name = config_values::service_types::Vineyard.data();
     return name;
+}
+
+std::string VineyardShmClient::get_region_key() const
+{
+    return m_region_key;
 }
 
 rclcpp::Logger VineyardShmClient::_get_logger() const
@@ -29,11 +35,6 @@ rclcpp::Logger VineyardShmClient::_get_logger() const
         return m_node->get_logger();
     }
     return logger;
-}
-
-const std::string &VineyardShmClient::get_region_key() const
-{
-    return m_region_key;
 }
 
 int VineyardShmClient::connect(const std::string &region_key,

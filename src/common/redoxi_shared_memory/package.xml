@@ -8,8 +8,6 @@
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
-
-  <depend>redoxi_common_cpp</depend>
   
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
@@ -17,6 +15,7 @@
   <depend>json_struct</depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
+  <depend>redoxi_ros_logging</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

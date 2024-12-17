@@ -1,8 +1,8 @@
 #pragma once
 
 #include <string>
-#include <redoxi_shared_memory/redoxi_shared_memory.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <redoxi_shared_memory/SharedMemoryTypes.hpp>
 
 
 namespace redoxi_works
@@ -29,10 +29,10 @@ class SharedMemoryClient
     /**
      * @brief Get the service name of the shared memory region.
      */
-    virtual const std::string &get_service_name() const = 0;
+    virtual std::string get_service_type() const = 0;
 
     //! Get the region key, empty string if not connected
-    virtual const std::string &get_region_key() const = 0;
+    virtual std::string get_region_key() const = 0;
 
     /**
      * @brief Put data into the shared memory region.

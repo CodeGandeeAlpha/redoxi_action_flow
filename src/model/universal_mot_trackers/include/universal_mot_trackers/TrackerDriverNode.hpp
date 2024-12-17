@@ -4,7 +4,7 @@
 #include <redoxi_common_nodes/detection_ports/DetectionResponseInputPort.hpp>
 // #include <redoxi_common_nodes/detection_ports/DetectionRequestOutputPort.hpp>
 #include <redoxi_common_nodes/tracking_ports/TrackingRequestOutputPort.hpp>
-#include <redoxi_common_nodes/image_ports/AsyncImageOutputPort.hpp>
+#include <redoxi_common_nodes/tracking_ports/TrackingResponseOutputPort.hpp>
 #include <universal_mot_trackers/UniversalMotTrackerNode.hpp>
 #include <redoxi_common_nodes/driver_nodes/CallActionDriverBase.hpp>
 
@@ -14,7 +14,7 @@ namespace redoxi_works::model_nodes::universal_mot_trackers
 // computed detections -> tracking request -> (tracked result) -> image output
 using TrackerDriverRequestPort = detection_ports::response_only::DetectionResponseInputPort;
 using TrackerDriverCalleePort = tracking_ports::request_response::TrackingRequestOutputPort;
-using TrackerDriverOutputPort = image_ports::AsyncImageOutputPort;
+using TrackerDriverOutputPort = tracking_ports::response_only::TrackingResponseOutputPort;
 
 class TrackerDriverNode : public common_nodes::drivers::CallActionDriverBase<
                               TrackerDriverRequestPort,
@@ -39,5 +39,9 @@ class TrackerDriverNode : public common_nodes::drivers::CallActionDriverBase<
                                   std::shared_ptr<const CalleeTypes::RequestOutputActionResult_t> callee_result,
                                   const CalleeTypes::RequestOutputRequest_t &callee_request,
                                   const CalleeTypes::Downstream_t &downstream) override;
+
+    cv::Mat _draw_tracked_result(const CalleeTypes::RequestOutputActionResult_t &callee_result,
+                                 const CalleeTypes::RequestOutputRequest_t &callee_request,
+                                 const CalleeTypes::Downstream_t &downstream);
 };
 } // namespace redoxi_works::model_nodes::universal_mot_trackers

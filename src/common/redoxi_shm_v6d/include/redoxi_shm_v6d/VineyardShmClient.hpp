@@ -29,7 +29,10 @@ class VineyardShmClient : public SharedMemoryClient
     int connect(const std::string &region_key, const KeyValueStore *params = nullptr) override;
 
     //! Get the region key, empty string if not set yet
-    const std::string &get_region_key() const override;
+    std::string get_region_key() const override;
+
+    // get the service name of this shared memory service
+    std::string get_service_type() const override;
 
     //! Check if the client is connected
     bool is_connected() const override;
@@ -60,8 +63,6 @@ class VineyardShmClient : public SharedMemoryClient
     std::shared_ptr<DataBlock> create_datablock() const override;
     std::shared_ptr<KeyValueStore> create_kvstore() const override;
 
-    // get the service name of this shared memory service
-    const std::string &get_service_name() const override;
 
     // --- Vineyard specific methods ---
   public:

@@ -60,14 +60,13 @@ option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2
        "Build test_simple_action_generator_v2 target" OFF)
 option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target"
        ON)
-option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
 option(BUILD_ONNX_HELLO_WORLD "Build onnx_hello_world target" OFF)
 option(BUILD_ONNX_INFERENCE_API "Build onnx_inference_api target" OFF)
 option(BUILD_ONNX_YOLO8POSE "Build onnx_yolo8pose target" OFF)
 option(BUILD_ONNX_YOLO8DET "Build onnx_yolo8det target" OFF)
 option(BUILD_TEST_DRIVER_NODE "Build test_driver_node target" OFF)
 option(BUILD_TEST_FRAME_PROXY "Build test_frame_proxy target" OFF)
-option(BUILD_TEST_JSON_STRUCT "Build test_json_struct target" ON)
+option(BUILD_TEST_JSON_STRUCT "Build test_json_struct target" OFF)
 option(BUILD_VIDEO_FROM_URL_NODE "Build video_from_url_node target" ON)
 option(BUILD_YOLO_BODY_POSE_DETECTION_NODE
        "Build yolo_body_pose_detection_node target" ON)
@@ -78,6 +77,7 @@ option(BUILD_DETECTION_DRIVER_NODE "Build detection_driver_node target" ON)
 option(BUILD_MOT_TRACKER_NODE "Build mot_tracker_node target" ON)
 option(BUILD_MOT_TRACKER_DRIVER "Build mot_tracker_driver target" ON)
 option(BUILD_FRAME_RELAY_NODE "Build frame_relay_node target" ON)
+option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" ON)
 
 # Function to configure a target
 function(configure_target target_name)

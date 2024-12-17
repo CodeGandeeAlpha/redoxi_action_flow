@@ -242,15 +242,18 @@ int UniversalMotTrackerNode::_handle_input_data(InputPortHandler_t::InputActionR
                 auto index = it_orig_det->second;
                 const auto &orig_det = goal->detections[index];
                 msg.true_detection = orig_det;
+                msg.true_detection.semantic_identity.value = msg.track_id;
+                msg.true_detection.semantic_identity.confidence = msg.confidence;
             }
         }
 
         // create a predicted detection, with richer information
         // TODO: save all information of the tracked target here
         msg.predicted_detection = msg.true_detection; // inherit whatever is in true_detection first
-        msg.predicted_detection.category = msg.track_id;
+        msg.predicted_detection.semantic_identity.value = msg.track_id;
         msg.predicted_detection.bbox = msg.track_bbox;
-        msg.predicted_detection.confidence = msg.confidence;
+        // msg.predicted_detection.confidence = msg.confidence; // this is undefined
+        msg.predicted_detection.semantic_identity.confidence = msg.confidence;
 
         // pend to sending list
         msg_track_targets.push_back(msg);

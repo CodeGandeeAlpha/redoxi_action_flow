@@ -556,6 +556,20 @@ class DefaultDeliveryRequest
         m_source_task_metadata = metadata;
     }
 
+    //! copy meta info from another request, including control signal code, source task metadata, stamp, etc
+    template <DeliveryRequestConcept OtherRequestType>
+    void copy_meta_info_from(const OtherRequestType &other)
+    {
+        m_control_signal_code = other.get_control_signal_code();
+        m_source_task_metadata = other.get_source_task_metadata();
+
+        // FIXME: shall we copy stamp?
+        // copy stamp if compatible
+        if constexpr (std::is_same_v<StampType_t, typename OtherRequestType::StampType_t>) {
+            m_stamp = other.get_stamp();
+        }
+    }
+
     //! Send goal options
     SendGoalOptions_t send_goal_options;
 
@@ -962,6 +976,18 @@ class DefaultInitConfig
         this->data_topic_for_source_data = topic;
     }
 
+    //! Get visualization topic for source data
+    virtual std::optional<std::string> get_visualization_topic_for_source_data() const
+    {
+        return this->visualization_topic_for_source_data;
+    }
+
+    //! Set visualization topic for source data
+    virtual void set_visualization_topic_for_source_data(const std::optional<std::string> &topic)
+    {
+        this->visualization_topic_for_source_data = topic;
+    }
+
     //! Get data topic for target data
     virtual std::optional<std::string> get_data_topic_for_target_data() const
     {
@@ -974,10 +1000,24 @@ class DefaultInitConfig
         this->data_topic_for_target_data = topic;
     }
 
+    //! Get visualization topic for target data
+    virtual std::optional<std::string> get_visualization_topic_for_target_data() const
+    {
+        return this->visualization_topic_for_target_data;
+    }
+
+    //! Set visualization topic for target data
+    virtual void set_visualization_topic_for_target_data(const std::optional<std::string> &topic)
+    {
+        this->visualization_topic_for_target_data = topic;
+    }
+
   protected: // no m_ prefix so that you can use json serialization easier
     std::vector<DownstreamSpec_t> downstream_specs;
     std::optional<std::string> data_topic_for_source_data;
     std::optional<std::string> data_topic_for_target_data;
+    std::optional<std::string> visualization_topic_for_source_data;
+    std::optional<std::string> visualization_topic_for_target_data;
 
     int num_buffer_requests{1};
     bool preserve_request_order{true};
@@ -991,7 +1031,9 @@ class DefaultInitConfig
               JS_MEMBER(preserve_request_order),
               JS_MEMBER(fallback_delivery_precondition),
               JS_MEMBER(data_topic_for_source_data),
-              JS_MEMBER(data_topic_for_target_data));
+              JS_MEMBER(data_topic_for_target_data),
+              JS_MEMBER(visualization_topic_for_source_data),
+              JS_MEMBER(visualization_topic_for_target_data));
 };
 using _SampleInitConfig = DefaultInitConfig<_SampleDownstreamSpec,
                                             _SampleSourceDataPublisher, _SampleTargetDataPublisher>;
@@ -1092,7 +1134,7 @@ class DefaultDownstream
         m_node = node;
 
         // create action client
-        RDX_LOG_DEBUG(node, __func__, "Creating action client for action '{}'", spec.get_action_name());
+        RDX_INFO_DEV(node, __func__, "Creating action client for action '{}'", spec.get_action_name());
         m_action_client = rclcpp_action::create_client<ActionType_t>(node, spec.get_action_name());
         if (m_action_client == nullptr) {
             RDX_RAISE_ERROR("[{}()]: Failed to create action client for action '{}'", __func__, spec.get_action_name());
@@ -1103,7 +1145,7 @@ class DefaultDownstream
             RDX_RAISE_ERROR("[{}()]: Failed to wait for action server for action '{}'", __func__, spec.get_action_name());
         }
 
-        RDX_LOG_DEBUG(node, __func__, "Action client for action '{}' created", spec.get_action_name());
+        RDX_INFO_DEV(node, __func__, "Action client for action '{}' created", spec.get_action_name());
 
         return 0;
     }

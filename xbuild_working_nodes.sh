@@ -25,8 +25,9 @@ PackagesToBuild="redoxi_common_nodes \
                  test_hz_py \
                  rosboard"
 
-# PackagesToBuild="universal_mot_trackers \
-#                  rosboard"
+# PackagesToBuild="redoxi_shared_memory \
+#                  redoxi_shm_v6d \
+#                  test_package"
 
 # Check if --help flag is provided
 if [[ "$*" == *"--help"* ]]; then
@@ -62,16 +63,6 @@ fi
 # PackagesToBuild="stream_worker psg_common psg_private_msgs psg_public_msgs video_reader"
 
 echo "Building with BUILD_TYPE=$BUILD_TYPE"
-
-# colcon build --packages-select $PackagesToBuild \
-#     $VERBOSE \
-#     --parallel-workers $NUM_JOBS \
-#     --symlink-install \
-#     --cmake-args \
-#     -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-#     -DCMAKE_CXX_STANDARD=17 \
-#     -DCMAKE_CXX_STANDARD_REQUIRED=ON \
-#     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 # required by json_struct to use std data types
 # note that json_struct does not name these flags consistently,

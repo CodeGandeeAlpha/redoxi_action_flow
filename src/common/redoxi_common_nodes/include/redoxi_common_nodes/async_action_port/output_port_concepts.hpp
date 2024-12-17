@@ -417,9 +417,19 @@ concept InitConfigConcept = requires(T t)
         std::declval<const T &>().get_data_topic_for_source_data()
         } -> std::same_as<std::optional<std::string>>;
 
+    //! Must have method to get source visualization topic
+    {
+        std::declval<const T &>().get_visualization_topic_for_source_data()
+        } -> std::same_as<std::optional<std::string>>;
+
     //! Must have method to get target data publish topic
     {
         std::declval<const T &>().get_data_topic_for_target_data()
+        } -> std::same_as<std::optional<std::string>>;
+
+    //! Must have method to get target visualization topic
+    {
+        std::declval<const T &>().get_visualization_topic_for_target_data()
         } -> std::same_as<std::optional<std::string>>;
 };
 

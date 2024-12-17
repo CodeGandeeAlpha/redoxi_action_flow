@@ -57,6 +57,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
     using SourceDataPublisher_t = typename TSpec::SourceDataPublisher_t;
     using TargetDataPublisher_t = typename TSpec::TargetDataPublisher_t;
+    using SourceVisualizationPublisher_t = typename TSpec::SourceVisualizationPublisher_t;
+    using TargetVisualizationPublisher_t = typename TSpec::TargetVisualizationPublisher_t;
 
     // synchronous action sender
     using SyncActionSender_t = SyncActionSender<ActionType_t, TimeUnit_t>;
@@ -464,12 +466,28 @@ class AsyncActionOutputPort : public IStartStopProtocol
             m_data_pub_source_data->init(inner_pub);
         }
 
+        auto qos_source_visualization = DefaultParams::DebugPublisherQoS;
+        auto visualization_topic_for_source_data = init_config.get_visualization_topic_for_source_data();
+        if (visualization_topic_for_source_data.has_value()) {
+            m_vis_pub_source_data = std::make_shared<SourceVisualizationPublisher_t>();
+            auto inner_pub = parent_node->create_publisher<typename SourceVisualizationPublisher_t::MessageType_t>(visualization_topic_for_source_data.value(), qos_source_visualization);
+            m_vis_pub_source_data->init(inner_pub);
+        }
+
         auto qos_target_data = DefaultParams::DataPublisherQoS;
         auto data_topic_for_target_data = init_config.get_data_topic_for_target_data();
         if (data_topic_for_target_data.has_value()) {
             m_data_pub_target_data = std::make_shared<TargetDataPublisher_t>();
             auto inner_pub = parent_node->create_publisher<typename TargetDataPublisher_t::MessageType_t>(data_topic_for_target_data.value(), qos_target_data);
             m_data_pub_target_data->init(inner_pub);
+        }
+
+        auto qos_target_visualization = DefaultParams::DebugPublisherQoS;
+        auto visualization_topic_for_target_data = init_config.get_visualization_topic_for_target_data();
+        if (visualization_topic_for_target_data.has_value()) {
+            m_vis_pub_target_data = std::make_shared<TargetVisualizationPublisher_t>();
+            auto inner_pub = parent_node->create_publisher<typename TargetVisualizationPublisher_t::MessageType_t>(visualization_topic_for_target_data.value(), qos_target_visualization);
+            m_vis_pub_target_data->init(inner_pub);
         }
 
         return 0;
@@ -638,9 +656,6 @@ class AsyncActionOutputPort : public IStartStopProtocol
      * @brief Publish data message when successfully sent to downstream
      * @param source_data The source data to publish, if nullptr, no source data will be published
      * @param target_data The target data to publish, if nullptr, no target data will be published
-     * @param ds The downstream node to publish to
-     * @param ith_attempt Current attempt number
-     * @param max_attempts Maximum number of attempts allowed
      * @return 0 on success, otherwise return error code
      */
     virtual int _publish_data_message(const SourceData_t *source_data,
@@ -659,6 +674,34 @@ class AsyncActionOutputPort : public IStartStopProtocol
             if (pub != nullptr) {
                 typename TargetData_t::PubDataMsgType_t target_pub_msg;
                 target_data->to_publish_data(target_pub_msg);
+                pub->publish(target_pub_msg);
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * @brief Publish visualization message to visualization topics
+     * @param source_data The source data to publish, if nullptr, no source data will be published
+     * @param target_data The target data to publish, if nullptr, no target data will be published
+     * @return 0 on success, otherwise return error code
+     */
+    virtual int _publish_visualization_message(const SourceData_t *source_data,
+                                               const TargetData_t *target_data)
+    {
+        if (source_data != nullptr) {
+            auto pub = m_vis_pub_source_data;
+            if (pub != nullptr) {
+                typename SourceData_t::PubVisualizationMsgType_t source_pub_msg;
+                source_data->to_publish_visualization(source_pub_msg);
+                pub->publish(source_pub_msg);
+            }
+        }
+        if (target_data != nullptr) {
+            auto pub = m_vis_pub_target_data;
+            if (pub != nullptr) {
+                typename TargetData_t::PubVisualizationMsgType_t target_pub_msg;
+                target_data->to_publish_visualization(target_pub_msg);
                 pub->publish(target_pub_msg);
             }
         }
@@ -775,6 +818,14 @@ class AsyncActionOutputPort : public IStartStopProtocol
             auto ret = _publish_data_message(&task.get_request().get_source_data(), &target_data);
             if (ret != 0) {
                 RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Failed to publish data message");
+            }
+        }
+
+        // publish visualization message
+        {
+            auto ret = _publish_visualization_message(&task.get_request().get_source_data(), &target_data);
+            if (ret != 0) {
+                RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Failed to publish visualization message");
             }
         }
 
@@ -1060,6 +1111,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
     std::shared_ptr<SourceDataPublisher_t> m_data_pub_source_data;
     std::shared_ptr<TargetDataPublisher_t> m_data_pub_target_data;
 
+    // visualization publishers
+    std::shared_ptr<SourceVisualizationPublisher_t> m_vis_pub_source_data;
+    std::shared_ptr<TargetVisualizationPublisher_t> m_vis_pub_target_data;
 
   protected:
     // callback functions

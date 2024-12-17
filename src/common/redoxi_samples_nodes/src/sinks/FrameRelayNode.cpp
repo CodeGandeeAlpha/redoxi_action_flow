@@ -83,14 +83,13 @@ int FrameRelayNode::_start()
 
     // create shm client
     {
-        auto shm_config = shared_memory::SharedMemoryFactory::get_shm_config_from_node(this);
-        m_shm_client = shared_memory::SharedMemoryFactory::create_client_by_config(shm_config);
-        if (!m_shm_client) {
-            RDX_INFO_DEV(this, __func__, false, "Failed to create shm client, service type = {}, region key = {}",
-                         shm_config.service_type, shm_config.region_key);
+        m_shm_client = shared_memory::SharedMemoryFactory::get_instance().get_default_client(this);
+        auto shm_client = m_shm_client.lock();
+        if (!shm_client) {
+            RDX_INFO_DEV(this, __func__, false, "{}", "Failed to create shm client");
         } else {
             RDX_INFO_DEV(this, __func__, false, "Created shm client, service type = {}, region key = {}",
-                         shm_config.service_type, shm_config.region_key);
+                         shm_client->get_service_type(), shm_client->get_region_key());
         }
     }
 
@@ -197,7 +196,8 @@ int FrameRelayNode::_parse_frame(cv::Mat *output,
 
     // parse from shm
     auto &shm_token = source_data.get_goal()->frame_bundle.primary_frame.shm_token;
-    if (shm_token.object_size >= 0 && m_shm_client && m_shm_client->is_connected()) {
+    auto shm_client = m_shm_client.lock();
+    if (shm_token.object_size >= 0 && shm_client && shm_client->is_connected()) {
         shared_memory::ObjectIdentifier oid;
         if (shm_token.object_id != 0) {
             oid.id = shm_token.object_id;
@@ -207,7 +207,7 @@ int FrameRelayNode::_parse_frame(cv::Mat *output,
         }
         RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Getting data from shm with object id {}",
                      boost::uuids::to_string(msg_uuid), oid.id.value_or(0));
-        auto datablock = m_shm_client->get_data(oid);
+        auto datablock = shm_client->get_data(oid);
         if (!datablock) {
             RDX_INFO_DEV(this, __func__, false,
                          "[msg_uuid={}] Failed to get data from shm", boost::uuids::to_string(msg_uuid));
@@ -225,7 +225,7 @@ int FrameRelayNode::_parse_frame(cv::Mat *output,
         // after reading, delete the data from shm
         RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Deleting data from shm",
                      boost::uuids::to_string(msg_uuid));
-        auto delete_ok = m_shm_client->delete_object(oid) == 0;
+        auto delete_ok = shm_client->delete_object(oid) == 0;
         if (!delete_ok) {
             RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to delete data from shm",
                          boost::uuids::to_string(msg_uuid));

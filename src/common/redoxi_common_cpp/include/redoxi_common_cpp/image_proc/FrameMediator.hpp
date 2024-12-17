@@ -89,6 +89,14 @@ class FrameMediator
      */
     int to_cv_image_copy(cv::Mat &cv_image, std::optional<std::string> encoding = std::nullopt) const;
 
+
+    /**
+     * @brief Get a copy of the frame image.
+     * @param encoding Optional target encoding.
+     * @return The copied cv::Mat, empty if failed (or the image is actually empty)
+     */
+    cv::Mat to_cv_image_copy(std::optional<std::string> encoding = std::nullopt) const;
+
     /**
      * @brief Get shared cv::Mat view of the frame.
      * @return The shared cv::Mat view.

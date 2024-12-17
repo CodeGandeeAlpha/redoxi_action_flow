@@ -44,9 +44,11 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
         }
 
         // get cv mat from frame data, draw detections on it, and convert to ros message
+        image_utils::DrawDetectionsOptions opt;
+        opt.colorization_mode = image_utils::DrawDetectionsOptions::ColorizationMode::SemanticIdentity;
         image_utils::FrameMediator fm_input(frame_data.image, frame_data.get_encoding());
         cv::Mat output_image = fm_input.to_cv_image_shared().clone();
-        image_utils::draw_detections(&output_image, detections);
+        image_utils::draw_detections(&output_image, detections, opt);
 
         // draw and publish it
         image_utils::FrameMediator fm_output(output_image, frame_data.get_encoding());
@@ -132,6 +134,7 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         DeliverySourceData tmp;
         tmp.set_primary_frame(frame_data);
         tmp.set_track_targets(m_goal.track_targets);
+        // RDX_INFO_DEV(nullptr, __func__, true, "[track_targets={}]", m_goal.track_targets.size());
         tmp.to_publish_visualization(msg);
         return 0;
     }
@@ -173,6 +176,8 @@ class DeliveryRequest : public DeliveryRequestBase
 
         goal.track_targets = source_data.get_track_targets();
         source_data.get_primary_frame().to_frame_msg(goal.frame_bundle.primary_frame);
+        target_data.frame_data = source_data.get_primary_frame();
+
         // standard properties will be set by the base class
 
         return 0;
@@ -205,11 +210,11 @@ using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
                                                         DeliveryTargetData::DataPublisher_t>;
 
 //! Detection request output port spec
-struct TrackingRequestOutputPortSpec {
-    TrackingRequestOutputPortSpec()
+struct TrackingResponseOutputPortSpec {
+    TrackingResponseOutputPortSpec()
     {
-        static_assert(output_port_types::AsyncActionOutputPortSpecConcept<TrackingRequestOutputPortSpec>,
-                      "TrackingRequestOutputPortSpec must satisfy AsyncActionOutputPortSpecConcept");
+        static_assert(output_port_types::AsyncActionOutputPortSpecConcept<TrackingResponseOutputPortSpec>,
+                      "TrackingResponseOutputPortSpec must satisfy AsyncActionOutputPortSpecConcept");
     }
 
     //! Action type and related types
