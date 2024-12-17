@@ -3,11 +3,13 @@
 #include <redoxi_shared_memory/visibility_control.h>
 #include <chrono>
 #include <optional>
-#include <string_view>
 #include <string>
 #include <tuple>
+#include <fmt/core.h>
+#include <fmt/ranges.h>
 #include <json_struct/json_struct.h>
 #include <opencv2/opencv.hpp>
+#include <redoxi_basic_cpp/interops/json_struct_conversion.hpp>
 
 namespace redoxi_works::shared_memory::detail
 {
@@ -28,7 +30,7 @@ struct _ExpirationConfig {
 };
 } // namespace redoxi_works::shared_memory::detail
 
-
+//! config keys for shared memory
 namespace redoxi_works::shared_memory::config_keys
 {
 namespace node
@@ -44,6 +46,7 @@ constexpr std::string_view RegionKey = "RDX_SHM_REGION_KEY";
 } // namespace env
 } // namespace redoxi_works::shared_memory::config_keys
 
+//! config values for shared memory
 namespace redoxi_works::shared_memory::config_values
 {
 namespace service_types
@@ -55,7 +58,8 @@ constexpr std::string_view Vineyard = "vineyard";
 namespace redoxi_works::shared_memory
 {
 struct DataBlock;
-
+struct ObjectIdentifier;
+class SharedMemoryClient;
 enum class MemoryBlockExpirationAction {
     DontCare = 0, //!< do not care about the expired block, let the system decide what to do
     Remove = 1,   //!< remove the expired block
@@ -66,30 +70,31 @@ struct MemoryBlockExpirationConfig {
     using TimeUnit_t = detail::TimeUnit_t;
     using TimePoint_t = detail::TimePoint_t;
 
-    MemoryBlockExpirationConfig()
-        : time_created(std::chrono::system_clock::now())
-    {
-    }
-
-    //! alive duration, if set, the shared memory block will be removed from shm service after this duration.
+    //! alive duration, the shared memory block will be removed from shm service after this duration.
     //! note that the actual alive duration may be longer than the configured duration, but will not be shorter.
     //! if not set, the shared memory block will not expire. If set to 0, the shared memory block will expire immediately.
     std::optional<TimeUnit_t> alive_duration;
 
-    //! time when the shared memory block is created, automatically set by the constructor
-    //! you can change it to set the expiration time
-    TimePoint_t time_created;
-
-    //! callback when the shared memory block is expired, but not yet removed from shm service
-    //! @param data_block the data block that is expired
-    //! @param time_now the current time
-    //! @param config the expiration config
-    std::function<MemoryBlockExpirationAction(const DataBlock &data_block,
-                                              const TimePoint_t &time_now,
-                                              const MemoryBlockExpirationConfig &config)>
+    //! Callback when the shared memory block is expired but not yet removed from shm service
+    //! @param object_id The object identifier of the expired shared memory block
+    //! @param client The weak pointer to the shared memory client
+    //! @param time_now The current time
+    //! @param config The expiration config
+    //! @return The action to take for the expired block
+    std::function<MemoryBlockExpirationAction(
+        const ObjectIdentifier &object_id,
+        std::weak_ptr<SharedMemoryClient> client,
+        const TimePoint_t &time_now,
+        const MemoryBlockExpirationConfig &config)>
         on_expired;
 
-    JS_OBJECT(JS_MEMBER(alive_duration), JS_MEMBER(time_created));
+    std::string to_string() const
+    {
+        return fmt::format("MemoryBlockExpirationConfig(alive_duration={})",
+                           alive_duration.value_or(std::chrono::seconds(-1)).count());
+    }
+
+    JS_OBJECT(JS_MEMBER(alive_duration));
 };
 
 struct SharedMemoryConfig {
@@ -150,6 +155,51 @@ struct ObjectIdentifier {
 
     std::optional<int64_t> id = std::nullopt;
     std::optional<std::string> key = std::nullopt;
+
+    std::string to_string() const
+    {
+        std::vector<std::string> parts;
+        if (id.has_value()) {
+            parts.push_back(fmt::format("id={}", id.value()));
+        } else {
+            parts.push_back("id=std::nullopt");
+        }
+        if (key.has_value()) {
+            parts.push_back(fmt::format("key='{}'", key.value()));
+        } else {
+            parts.push_back("key=std::nullopt");
+        }
+        if (parts.empty()) {
+            return "ObjectIdentifier()";
+        }
+        return fmt::format("ObjectIdentifier({})", fmt::join(parts, ", "));
+    }
+
+    bool operator<(const ObjectIdentifier &other) const
+    {
+        // compare id first, then key
+        if (id.has_value() && other.id.has_value()) {
+            return id.value() < other.id.value();
+        }
+
+        // if some id is not set, then compare key
+        if (key.has_value() && other.key.has_value()) {
+            return key.value() < other.key.value();
+        }
+
+        // if one id is set and the other is not, then the id is smaller
+        if (id.has_value() && !other.id.has_value()) {
+            return true;
+        }
+
+        // if one key is set and the other is not, then the key is smaller
+        if (key.has_value() && !other.key.has_value()) {
+            return true;
+        }
+
+        // if both id and key are not set, then they are equal
+        return false;
+    }
 };
 
 //! Connect params for shared memory client, customize by subclass
@@ -379,5 +429,40 @@ struct DefaultDataBlock : public DataBlock {
     DefaultDataBlock() = default;
 };
 } // namespace detail
-
 } // namespace redoxi_works::shared_memory
+
+namespace JS
+{
+struct MemoryBlockExpirationActionMapper {
+    using EnumType_t = redoxi_works::shared_memory::MemoryBlockExpirationAction;
+    using Mapper_t = MemoryBlockExpirationActionMapper;
+
+    MemoryBlockExpirationActionMapper()
+    {
+        static_assert(EnumStringMapperConcept<MemoryBlockExpirationActionMapper>, "MemoryBlockExpirationActionMapper must satisfy EnumStringMapperConcept");
+    }
+
+    static inline const std::map<std::string, EnumType_t> str_to_enum = {
+        {"dont_care", EnumType_t::DontCare},
+        {"remove", EnumType_t::Remove},
+        {"keep", EnumType_t::Keep},
+    };
+
+    static inline const std::map<EnumType_t, std::string> enum_to_str = {
+        {EnumType_t::DontCare, "dont_care"},
+        {EnumType_t::Remove, "remove"},
+        {EnumType_t::Keep, "keep"},
+    };
+
+    static inline const std::map<std::string, EnumType_t> &get_str_to_enum()
+    {
+        return str_to_enum;
+    }
+
+    static inline const std::map<EnumType_t, std::string> &get_enum_to_str()
+    {
+        return enum_to_str;
+    }
+};
+
+} // namespace JS

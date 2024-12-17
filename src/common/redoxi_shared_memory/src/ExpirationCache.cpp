@@ -1,0 +1,149 @@
+#include <redoxi_shared_memory/ExpirationCache.hpp>
+#include <boost/bimap.hpp>
+#include <boost/bimap/multiset_of.hpp>
+#include <boost/bimap/support/lambda.hpp>
+#include <redoxi_basic_cpp/logging/ros_logging.hpp>
+
+namespace bimaps = boost::bimaps;
+
+namespace redoxi_works::shared_memory
+{
+
+struct DataBlockInfo {
+    using TimePoint_t = MemoryBlockExpirationConfig::TimePoint_t;
+    using TimeUnit_t = MemoryBlockExpirationConfig::TimeUnit_t;
+
+    DataBlockInfo()
+        : time_created(std::chrono::system_clock::now())
+    {
+    }
+
+    DataBlockInfo(const ObjectIdentifier &object_id,
+                  const MemoryBlockExpirationConfig &expiration_config)
+        : object_id(object_id),
+          expiration_config(expiration_config),
+          time_created(std::chrono::system_clock::now())
+    {
+        if (expiration_config.alive_duration.has_value()) {
+            time_to_evict = time_created + expiration_config.alive_duration.value();
+        }
+    }
+
+    ObjectIdentifier object_id;
+    MemoryBlockExpirationConfig expiration_config;
+    TimePoint_t time_created;
+    TimePoint_t time_to_evict = TimePoint_t::max(); // default to no expiration
+
+    //! Comparison operators for use in std::map
+    bool operator<(const DataBlockInfo &other) const
+    {
+        return time_to_evict < other.time_to_evict;
+    }
+
+    bool operator==(const DataBlockInfo &other) const
+    {
+        return time_to_evict == other.time_to_evict;
+    }
+
+    bool operator!=(const DataBlockInfo &other) const
+    {
+        return !(*this == other);
+    }
+
+    //! Compare with a time point to check if this block is expired
+    bool operator<=(const TimePoint_t &time_point) const
+    {
+        return time_to_evict <= time_point;
+    }
+
+    bool operator>=(const TimePoint_t &time_point) const
+    {
+        return time_to_evict >= time_point;
+    }
+
+    bool operator>(const TimePoint_t &time_point) const
+    {
+        return time_to_evict > time_point;
+    }
+
+    bool operator<(const TimePoint_t &time_point) const
+    {
+        return time_to_evict < time_point;
+    }
+};
+
+struct ExpirationCache::Impl {
+    bimaps::bimap<bimaps::set_of<ObjectIdentifier>,
+                  bimaps::multiset_of<DataBlockInfo>>
+        m_cache;
+};
+
+ExpirationCache::ExpirationCache(std::weak_ptr<SharedMemoryClient> client)
+    : m_impl(std::make_shared<Impl>()), m_client(client)
+{
+}
+
+int ExpirationCache::add_memory_block(
+    const ObjectIdentifier &object_id, const MemoryBlockExpirationConfig &expiration_config)
+{
+    RDX_INFO_DEV(nullptr, __func__, "Adding memory block to expiration cache: {}", object_id.to_string());
+    auto data_block_info = DataBlockInfo(object_id, expiration_config);
+    auto &left = m_impl->m_cache.left;
+    auto it = left.find(object_id);
+    if (it != left.end()) {
+        // Update existing entry
+        RDX_INFO_DEV(nullptr, __func__, "Updating existing entry: {}", object_id.to_string());
+        left.replace_data(it, data_block_info);
+    } else {
+        // Insert new entry
+        RDX_INFO_DEV(nullptr, __func__, "Inserting new entry: {}, with expiration config: {}",
+                     object_id.to_string(), expiration_config.to_string());
+        left.insert(std::make_pair(object_id, data_block_info));
+    }
+
+    return 0;
+}
+
+int64_t ExpirationCache::evict_expired_memory_blocks()
+{
+    auto &right = m_impl->m_cache.right;
+    auto time_now = std::chrono::system_clock::now();
+    auto range = right.range(bimaps::unbounded, bimaps::_key <= time_now);
+
+    if (range.first == range.second) {
+        // no expired blocks found
+        return 0;
+    } else {
+        RDX_INFO_DEV(nullptr, __func__, "Found {} expired blocks", std::distance(range.first, range.second));
+    }
+
+    int64_t num_evicted = 0;
+    for (auto it = range.first; it != range.second; ++it) {
+        auto object_id = it->get_left();
+        auto &data_block_info = it->get_right();
+
+        RDX_INFO_DEV(nullptr, __func__, "Processing expired block: {}", object_id.to_string());
+
+        // have callback? call it
+        if (data_block_info.expiration_config.on_expired) {
+            RDX_INFO_DEV(nullptr, __func__, "Calling expiration callback for block: {}", object_id.to_string());
+            data_block_info.expiration_config.on_expired(object_id, m_client, time_now, data_block_info.expiration_config);
+        }
+
+        // delete the object from shm service, if client is still valid
+        if (auto client = m_client.lock()) {
+            RDX_INFO_DEV(nullptr, __func__, "Deleting expired block from shared memory: {}", object_id.to_string());
+            client->delete_object(object_id);
+        }
+
+        // remove from cache
+        RDX_INFO_DEV(nullptr, __func__, "Removing expired block from cache: {}", object_id.to_string());
+        right.erase(it);
+        num_evicted++;
+    }
+
+    RDX_INFO_DEV(nullptr, __func__, "Completed eviction, removed {} expired blocks", num_evicted);
+    return num_evicted;
+}
+
+} // namespace redoxi_works::shared_memory

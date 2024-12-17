@@ -14,12 +14,20 @@ namespace redoxi_works::shared_memory
 class ExpirationCache
 {
   public:
-    ExpirationCache();
-    ~ExpirationCache();
+    ExpirationCache(std::weak_ptr<SharedMemoryClient> client);
 
+    // add a memory block to the cache
+    // return 0 if success, -1 if failed
+    int add_memory_block(const ObjectIdentifier &object_id,
+                         const MemoryBlockExpirationConfig &expiration_config);
+
+    // check and evict expired memory blocks
+    // return the number of expired memory blocks
+    int64_t evict_expired_memory_blocks();
 
   private:
     struct Impl;
+    std::shared_ptr<Impl> m_impl;
     std::weak_ptr<SharedMemoryClient> m_client;
 };
 

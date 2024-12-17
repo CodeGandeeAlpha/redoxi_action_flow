@@ -14,7 +14,7 @@ find_package(json_struct REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(Boost REQUIRED)
-
+find_package(fmt REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -25,7 +25,11 @@ target_compile_features(redoxi_basic_cpp PUBLIC c_std_99 cxx_std_17)  # Require 
 target_include_directories(redoxi_basic_cpp PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_link_libraries(redoxi_basic_cpp PUBLIC Boost::boost json_struct::json_struct)
+target_link_libraries(redoxi_basic_cpp PUBLIC
+  Boost::boost
+  json_struct::json_struct
+  fmt::fmt
+)
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
@@ -70,7 +74,8 @@ ament_export_dependencies(
   rcutils
   Boost
   rclcpp_action
-  )
+  fmt
+)
 
 ament_export_include_directories(
   include

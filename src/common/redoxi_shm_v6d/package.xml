@@ -10,7 +10,7 @@
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
 
   <depend>redoxi_shared_memory</depend>
-  <depend>redoxi_common_cpp</depend>
+  <depend>redoxi_basic_cpp</depend>
   <depend>pluginlib</depend>
 
   <test_depend>ament_lint_auto</test_depend>

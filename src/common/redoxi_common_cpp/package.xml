@@ -15,9 +15,11 @@
   <depend>rclcpp</depend>
   <depend>rcpputils</depend>
   <depend>rclcpp_action</depend>
-  <depend>redoxi_public_msgs</depend>
   <depend>cv_bridge</depend>
   <depend>json_struct</depend>
+
+  <depend>redoxi_public_msgs</depend>
+  <depend>redoxi_shared_memory</depend>
 
   <!-- cpp libraries -->
   <depend>nlohmann-json3-dev</depend>

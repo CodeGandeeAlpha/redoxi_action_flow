@@ -10,7 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(vineyard REQUIRED)
 find_package(redoxi_shared_memory REQUIRED)
-find_package(redoxi_common_cpp REQUIRED)
+find_package(redoxi_basic_cpp REQUIRED)
 find_package(pluginlib REQUIRED)
 pluginlib_export_plugin_description_file(redoxi_shared_memory plugins.xml)
 # uncomment the following section in order to fill in
@@ -34,7 +34,7 @@ target_compile_definitions(redoxi_shm_v6d PRIVATE "REDOXI_SHM_V6D_BUILDING_LIBRA
 
 ament_target_dependencies(redoxi_shm_v6d PUBLIC
   redoxi_shared_memory
-  redoxi_common_cpp
+  redoxi_basic_cpp
   pluginlib
 )
 
@@ -65,7 +65,7 @@ endif()
 ament_export_dependencies(
   vineyard
   redoxi_shared_memory
-  redoxi_common_cpp
+  redoxi_basic_cpp
 )
 
 ament_export_include_directories(

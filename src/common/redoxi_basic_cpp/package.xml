@@ -3,7 +3,7 @@
 <package format="3">
   <name>redoxi_basic_cpp</name>
   <version>0.0.0</version>
-  <description>Basic c++ utilities which does not depend on any custom packages, only depends on 3rd party libraries</description>
+  <description>Basic c++ utilities which does NOT depend on any custom packages, only depends on system or 3rd party libraries</description>
   <maintainer email="igamenovoer@xx.com">igamenovoer</maintainer>
   <license>TODO: License declaration</license>
 
@@ -16,6 +16,7 @@
   <depend>json_struct</depend>
 
   <depend>libboost-dev</depend>
+  <depend>libfmt-dev</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
