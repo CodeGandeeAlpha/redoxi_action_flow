@@ -404,19 +404,29 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
     //! convert to publish message
     int to_publish_visualization(PubVisualizationMsgType_t &msg) const override
     {
+        RDX_INFO_DEV(nullptr, __func__, false, "{}", "调用document output port的to_publish_visualization()");
+        auto task_uuid = to_boost_uuid(m_document.x_task_metadata.source_task_uid);
+        RDX_INFO_DEV(nullptr, __func__, true, "[task={}] Got goal handle",
+                     UUIDTrait::to_string(task_uuid));
+
         if (auxiliary_data.has_value()) {
             std::string auxiliary_data_str = std::any_cast<std::string>(auxiliary_data);
 
             if (auxiliary_data_str == "image") {
+                RDX_INFO_DEV(nullptr, __func__, false, "{}", "开始绘制图像");
                 image_utils::FrameMediator fm(&this->m_document.frame_bundle.primary_frame);
                 fm.to_image_msg(msg);
             } else if (auxiliary_data_str == "detection") {
+                RDX_INFO_DEV(nullptr, __func__, false, "{}", "开始绘制检测结果");
                 create_debug_image_for_detection_visualization(msg);
             } else if (auxiliary_data_str == "pose") {
+                RDX_INFO_DEV(nullptr, __func__, false, "{}", "开始绘制姿态结果");
                 create_debug_image_for_pose_visualization(msg);
             } else if (auxiliary_data_str == "person") {
+                RDX_INFO_DEV(nullptr, __func__, false, "{}", "开始绘制person结果");
                 create_debug_image_for_person_visualization(msg);
             } else if (auxiliary_data_str == "track") {
+                RDX_INFO_DEV(nullptr, __func__, false, "{}", "开始绘制track结果");
                 create_debug_image_for_track_visualization(msg);
             } else {
                 return -1;

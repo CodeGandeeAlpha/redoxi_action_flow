@@ -14,7 +14,7 @@ int PSGTrackerDriver::_on_process_callee_result(OutputTypes::OutputRequest_t *ou
 
     OutputTypes::OutputSourceData_t output_pipeline_source_data;
     // 设置auxiliary_data的类型，用于可视化
-    output_pipeline_source_data.auxiliary_data = std::string("tracker");
+    output_pipeline_source_data.auxiliary_data = std::string("track");
     // 根据frame_number获取document
     RDX_LOG_DEBUG(this, __func__, false, "开始从document map中获取document", 0);
     auto document = m_document_map.synchronize()->at(callee_request.get_source_data().get_frame_bundle().primary_frame.metadata.frame_num);

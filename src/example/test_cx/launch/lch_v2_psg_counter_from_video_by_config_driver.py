@@ -124,6 +124,7 @@ psg_tracker_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeConfig(
                 )
             ],
             data_topic_for_target_data="data_out/target_data_pipeline",
+            visualization_topic_for_source_data="debug/source_data_visualization",
         ),
         callee_request_port_config=psgDriverBaseCfg.OutputPortConfig(
             downstream_specs=[
@@ -191,6 +192,7 @@ psg_pose_detector_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeConfi
                 )
             ],
             data_topic_for_target_data="data_out/target_data_pipeline",
+            visualization_topic_for_source_data="debug/source_data_visualization",
         ),
         callee_request_port_config=psgDriverBaseCfg.OutputPortConfig(
             downstream_specs=[
@@ -223,6 +225,7 @@ psg_detector_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeConfig(
                 )
             ],
             data_topic_for_target_data="data_out/target_data_pipeline",
+            visualization_topic_for_source_data="debug/source_data_visualization",
         ),
         callee_request_port_config=psgDriverBaseCfg.OutputPortConfig(
             downstream_specs=[

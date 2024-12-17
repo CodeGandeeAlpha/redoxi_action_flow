@@ -15,7 +15,7 @@ int PSGAllDetectorCppDriver::_on_process_callee_result(OutputTypes::OutputReques
     OutputTypes::OutputSourceData_t output_pipeline_source_data;
 
     // 设置auxiliary_data的类型，用于可视化
-    output_pipeline_source_data.auxiliary_data = std::string("detector");
+    output_pipeline_source_data.auxiliary_data = std::string("detection");
 
     psg_private_msgs::msg::PsgDocument document;
     callee_request.get_source_data().get_primary_frame().to_frame_msg(document.frame_bundle.primary_frame);

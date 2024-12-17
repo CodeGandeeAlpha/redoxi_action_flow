@@ -13,6 +13,10 @@ int PSGPoseDetectorDriver::_on_process_callee_result(OutputTypes::OutputRequest_
     (void)output_enqueue_policy;
 
     OutputTypes::OutputSourceData_t output_pipeline_source_data;
+
+    // 设置auxiliary_data的类型，用于可视化
+    output_pipeline_source_data.auxiliary_data = std::string("pose");
+
     // 根据frame_number获取document
     RDX_LOG_DEBUG(this, __func__, "{}", "开始从document map中获取document");
     auto document = m_document_map.synchronize()->at(callee_request.get_source_data().get_frame_bundle().primary_frame.metadata.frame_num);
