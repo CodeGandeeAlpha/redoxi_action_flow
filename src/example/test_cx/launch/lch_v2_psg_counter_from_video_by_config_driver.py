@@ -16,7 +16,7 @@ import json
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
     "log_level",
-    default_value="info",
+    default_value="debug",
     description="Logging level",
 )
 

@@ -60,6 +60,12 @@ int PSGPoseDetectorDriver::_on_process_input_request(InputRequestHandler_t::Outp
     auto msg_uuid = InputTypes::ActionDataTrait_t::get_uuid(*source_data->get_goal());
     auto msg_uuid_str = boost::uuids::to_string(msg_uuid);
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Creating request from source data", msg_uuid_str);
+
+    // 将document数据放入document map中
+    m_document_map.synchronize()->insert({source_data->get_goal()->document.frame_bundle.primary_frame.metadata.frame_num,
+                                          std::make_shared<psg_private_msgs::msg::PsgDocument>(source_data->get_goal()->document)});
+
+    //! 从输入数据创建输出数据
     CalleeTypes::RequestOutputSourceData_t output_source_data;
     output_source_data.set_frame_bundle(source_data->get_goal()->document.frame_bundle);
     output_source_data.set_detections(source_data->get_goal()->document.detections);
