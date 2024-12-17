@@ -83,10 +83,10 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
             #         create_debug_pub=True,
             #     ),
             # ],
-            data_topic_for_source_data="data_msg/source_data",
-            visualization_topic_for_source_data="vis_msg/source_data",
-            data_topic_for_target_data="data_msg/target_data",
-            visualization_topic_for_target_data="vis_msg/target_data",
+            data_topic_for_source_data="data_msg/source_data",  # source data msg is image, transmission is reliable, better smoothness in visualization
+            visualization_topic_for_source_data="vis_msg/source_data",  # source visualization msg is image, but transmission is unreliable, may drop frames
+            data_topic_for_target_data="data_msg/target_data",  # target data msg is tracking result, transmission is reliable, can be used for data processing
+            visualization_topic_for_target_data="vis_msg/target_data",  # target visualization msg is image, but transmission is unreliable, may drop frames
         ),
         callee_request_port_config=motTrackersDriverCfg.OutputPortConfig(
             downstream_specs=[
