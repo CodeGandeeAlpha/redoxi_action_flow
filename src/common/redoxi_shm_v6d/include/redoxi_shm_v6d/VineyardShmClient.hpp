@@ -29,8 +29,8 @@ class VineyardShmClient : public SharedMemoryClient
     int connect(const std::string &region_key, const KeyValueStore *params = nullptr) override;
 
     // Expiration config
-    void set_expiration_config(const MemoryBlockExpirationConfig *expiration_config) override;
-    const MemoryBlockExpirationConfig *get_expiration_config() const override;
+    // void set_expiration_config(const MemoryBlockExpirationConfig *expiration_config) override;
+    // const MemoryBlockExpirationConfig *get_expiration_config() const override;
 
     //! Get the region key, empty string if not set yet
     std::string get_region_key() const override;

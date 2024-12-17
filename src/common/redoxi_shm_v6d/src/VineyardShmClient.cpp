@@ -312,19 +312,19 @@ std::shared_ptr<KeyValueStore> VineyardShmClient::create_kvstore() const
     return std::make_shared<VineyardParams>();
 }
 
-void VineyardShmClient::set_expiration_config(const MemoryBlockExpirationConfig *expiration_config)
-{
-    if (expiration_config) {
-        m_expiration_config = *expiration_config;
-    } else {
-        m_expiration_config = std::nullopt;
-    }
-}
+// void VineyardShmClient::set_expiration_config(const MemoryBlockExpirationConfig *expiration_config)
+// {
+//     if (expiration_config) {
+//         m_expiration_config = *expiration_config;
+//     } else {
+//         m_expiration_config = std::nullopt;
+//     }
+// }
 
-const MemoryBlockExpirationConfig *VineyardShmClient::get_expiration_config() const
-{
-    return m_expiration_config.has_value() ? &m_expiration_config.value() : nullptr;
-}
+// const MemoryBlockExpirationConfig *VineyardShmClient::get_expiration_config() const
+// {
+//     return m_expiration_config.has_value() ? &m_expiration_config.value() : nullptr;
+// }
 
 } // namespace redoxi_works::shared_memory
 
