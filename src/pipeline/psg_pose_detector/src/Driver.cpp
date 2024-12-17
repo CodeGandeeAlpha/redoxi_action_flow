@@ -67,7 +67,13 @@ int PSGPoseDetectorDriver::_on_process_input_request(InputRequestHandler_t::Outp
 
     //! 从输入数据创建输出数据
     CalleeTypes::RequestOutputSourceData_t output_source_data;
+
+    // 设置auxiliary_data的类型，用于可视化
+    output_source_data.auxiliary_data = std::string("pose");
+
+    // 设置frame_bundle
     output_source_data.set_frame_bundle(source_data->get_goal()->document.frame_bundle);
+    // 设置detections
     output_source_data.set_detections(source_data->get_goal()->document.detections);
 
     //! 根据种类挑选出body的detections，并记录其在document中的索引

@@ -69,6 +69,338 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
         m_document = document;
     }
 
+    cv::Scalar get_color(const int id) const
+    {
+        int idx = id * 3;
+        cv::Scalar color((37 * idx) % 255, (17 * idx) % 255, (29 * idx) % 255);
+        return color;
+    }
+
+    //! create debug image for detection visualization
+    void create_debug_image_for_detection_visualization(PubVisualizationMsgType_t &msg) const
+    {
+        //! 转换raw image到cv::Mat
+        image_utils::FrameMediator fm(&m_document.frame_bundle.primary_frame);
+        cv::Mat cv_image;
+        fm.to_cv_image_copy(cv_image);
+        auto encoding = fm.get_encoding();
+
+        //! 为不同类别设置不同颜色
+        std::map<int, cv::Scalar> class_colors = {
+            {0, cv::Scalar(0, 255, 0)}, // 人-绿色
+            {1, cv::Scalar(0, 0, 255)}, // 头-红色
+            {2, cv::Scalar(255, 0, 0)}, // 脸-蓝色
+        };
+
+        //! 在图像上画bbox
+        for (const auto &detection : m_document.detections) {
+            //! 获取bbox坐标
+            int x = static_cast<int>(detection.bbox.x);
+            int y = static_cast<int>(detection.bbox.y);
+            int width = static_cast<int>(detection.bbox.width);
+            int height = static_cast<int>(detection.bbox.height);
+
+            //! 获取类别对应的颜色
+            cv::Scalar color = class_colors[detection.category];
+
+            //! 画框
+            cv::rectangle(cv_image,
+                          cv::Point(x, y),
+                          cv::Point(x + width, y + height),
+                          color, 2);
+
+            //! 添加类别标签
+            std::string label = std::to_string(detection.category) + " " +
+                                std::to_string(detection.confidence).substr(0, 4);
+            cv::putText(cv_image, label,
+                        cv::Point(x, y - 10),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.5,
+                        color, 2);
+        }
+
+        //! 转回sensor_msgs/Image
+        image_utils::FrameMediator fm_cv_image(cv_image, encoding);
+        fm_cv_image.to_image_msg(msg);
+    }
+
+    //! create debug image for pose visualization
+    void create_debug_image_for_pose_visualization(PubVisualizationMsgType_t &msg) const
+    {
+        //! 转换raw image到cv::Mat
+        cv::Mat cv_image;
+        image_utils::FrameMediator fm(&m_document.frame_bundle.primary_frame);
+        fm.to_cv_image_copy(cv_image);
+
+        //! 为关键点设置颜色
+        cv::Scalar keypoint_color(0, 255, 0); // 绿色
+        cv::Scalar line_color(255, 255, 0);   // 黄色
+
+        //! 在图像上画关键点和骨架连接
+        for (const auto &detection : m_document.detections) {
+            const auto &keypoints = detection.keypoints;
+
+            //! 在访问数组或指针前添加检查
+            if (keypoints.keypoints_2.empty() || keypoints.confidence.empty()) {
+                continue;
+            }
+
+            //! 画出17个关键点
+            for (size_t i = 0; i < keypoints.keypoints_2.size(); i++) {
+                if (keypoints.confidence[i] > 0.3) { // 只画置信度大于0.3的点
+                    //! 记录关键点的位置和置信度
+                    cv::circle(cv_image,
+                               cv::Point(keypoints.keypoints_2[i].x, keypoints.keypoints_2[i].y),
+                               3, keypoint_color, -1);
+                }
+            }
+
+            //! 画出骨架连接
+            //! COCO数据集的17个关键点连接对
+            const std::vector<std::pair<int, int>> skeleton = {
+                {5, 7}, {7, 9}, {6, 8}, {8, 10}, // 手臂
+                {11, 13},
+                {13, 15},
+                {12, 14},
+                {14, 16}, // 腿
+                {5, 6},
+                {5, 11},
+                {6, 12},  // 躯干
+                {11, 12}, // 臀部
+                {1, 2},
+                {1, 3},
+                {2, 4},
+                {3, 5},
+                {4, 6} // 头部和肩膀
+            };
+
+            for (const auto &bone : skeleton) {
+                if (keypoints.confidence[bone.first] > 0.3 && keypoints.confidence[bone.second] > 0.3) {
+                    //! 记录骨架连接的起点和终点
+                    cv::line(cv_image,
+                             cv::Point(keypoints.keypoints_2[bone.first].x, keypoints.keypoints_2[bone.first].y),
+                             cv::Point(keypoints.keypoints_2[bone.second].x, keypoints.keypoints_2[bone.second].y),
+                             line_color, 2);
+                }
+            }
+        }
+
+        //! 转回sensor_msgs/Image
+        image_utils::FrameMediator fm_cv_image(cv_image, "bgr8");
+        fm_cv_image.to_image_msg(msg);
+    }
+
+    //! create debug image for person visualization
+    void create_debug_image_for_person_visualization(PubVisualizationMsgType_t &msg) const
+    {
+        //! 转换raw image到cv::Mat
+        cv::Mat cv_image;
+        image_utils::FrameMediator fm(&m_document.frame_bundle.primary_frame);
+        fm.to_cv_image_copy(cv_image);
+
+        //! 在图像上画person相关的框和keypoints
+        for (const auto &person : m_document.persons) {
+            //! 随机生成颜色
+            cv::Scalar color = cv::Scalar(rand() % 256, rand() % 256, rand() % 256);
+
+            //! 获取body bbox坐标
+            if (person.true_body.category == 0) {
+                int x = static_cast<int>(person.true_body.bbox.x);
+                int y = static_cast<int>(person.true_body.bbox.y);
+                int width = static_cast<int>(person.true_body.bbox.width);
+                int height = static_cast<int>(person.true_body.bbox.height);
+
+                //! 画body bbox
+                cv::rectangle(cv_image,
+                              cv::Point(x, y),
+                              cv::Point(x + width, y + height),
+                              color, 2);
+            }
+
+            //! 画body keypoints
+            const auto &keypoints = person.true_body.keypoints;
+
+            //! 在访问数组或指针前添加检查
+            if (!keypoints.keypoints_2.empty() && !keypoints.confidence.empty()) {
+                //! 画出17个关键点
+                for (size_t i = 0; i < keypoints.keypoints_2.size(); i++) {
+                    if (keypoints.confidence[i] > 0.3) { // 只画置信度大于0.3的点
+                        //! 记录关键点的位置和置信度
+                        cv::circle(cv_image,
+                                   cv::Point(keypoints.keypoints_2[i].x, keypoints.keypoints_2[i].y),
+                                   3, color, -1);
+                    }
+                }
+
+                //! 画出骨架连接
+                //! COCO数据集的17个关键点连接对
+                const std::vector<std::pair<int, int>> skeleton = {
+                    {5, 7}, {7, 9}, {6, 8}, {8, 10}, // 手臂
+                    {11, 13},
+                    {13, 15},
+                    {12, 14},
+                    {14, 16}, // 腿
+                    {5, 6},
+                    {5, 11},
+                    {6, 12},  // 躯干
+                    {11, 12}, // 臀部
+                    {1, 2},
+                    {1, 3},
+                    {2, 4},
+                    {3, 5},
+                    {4, 6} // 头部和肩膀
+                };
+
+                for (const auto &bone : skeleton) {
+                    if (keypoints.confidence[bone.first] > 0.3 && keypoints.confidence[bone.second] > 0.3) {
+                        //! 记录骨架连接的起点和终点
+                        cv::line(cv_image,
+                                 cv::Point(keypoints.keypoints_2[bone.first].x, keypoints.keypoints_2[bone.first].y),
+                                 cv::Point(keypoints.keypoints_2[bone.second].x, keypoints.keypoints_2[bone.second].y),
+                                 color, 2);
+                    }
+                }
+            }
+
+            //! 画head bbox
+            if (person.true_head.category == 1) {
+                int x = static_cast<int>(person.true_head.bbox.x);
+                int y = static_cast<int>(person.true_head.bbox.y);
+                int width = static_cast<int>(person.true_head.bbox.width);
+                int height = static_cast<int>(person.true_head.bbox.height);
+
+                //! 画head bbox
+                cv::rectangle(cv_image,
+                              cv::Point(x, y),
+                              cv::Point(x + width, y + height),
+                              color, 2);
+            }
+
+            //! 画face bbox
+            if (person.true_face.category == 2) {
+                int x = static_cast<int>(person.true_face.bbox.x);
+                int y = static_cast<int>(person.true_face.bbox.y);
+                int width = static_cast<int>(person.true_face.bbox.width);
+                int height = static_cast<int>(person.true_face.bbox.height);
+
+                //! 画face bbox
+                cv::rectangle(cv_image,
+                              cv::Point(x, y),
+                              cv::Point(x + width, y + height),
+                              color, 2);
+            }
+        }
+
+        //! 转回sensor_msgs/Image
+        image_utils::FrameMediator fm_cv_image(cv_image, "bgr8");
+        fm_cv_image.to_image_msg(msg);
+    }
+
+    //! create debug image for track visualization
+    void create_debug_image_for_track_visualization(PubVisualizationMsgType_t &msg) const
+    {
+        //! 转换raw image到cv::Mat
+        cv::Mat cv_image;
+        image_utils::FrameMediator fm(&m_document.frame_bundle.primary_frame);
+        fm.to_cv_image_copy(cv_image);
+
+        //! 在图像上画关键点和骨架连接
+        for (const auto &person : m_document.persons) {
+            //! 根据person的track_id设置颜色
+            cv::Scalar color = get_color(person.track_id);
+
+            //! 获取body bbox坐标
+            if (person.true_body.category == 0) {
+                int x = static_cast<int>(person.true_body.bbox.x);
+                int y = static_cast<int>(person.true_body.bbox.y);
+                int width = static_cast<int>(person.true_body.bbox.width);
+                int height = static_cast<int>(person.true_body.bbox.height);
+
+                //! 画body bbox
+                cv::rectangle(cv_image,
+                              cv::Point(x, y),
+                              cv::Point(x + width, y + height),
+                              color, 2);
+            }
+
+            //! 画body keypoints
+            const auto &keypoints = person.true_body.keypoints;
+
+            //! 在访问数组或指针前添加检查
+            if (!keypoints.keypoints_2.empty() && !keypoints.confidence.empty()) {
+                //! 画出17个关键点
+                for (size_t i = 0; i < keypoints.keypoints_2.size(); i++) {
+                    if (keypoints.confidence[i] > 0.3) { // 只画置信度大于0.3的点
+                        //! 记录关键点的位置和置信度
+                        cv::circle(cv_image,
+                                   cv::Point(keypoints.keypoints_2[i].x, keypoints.keypoints_2[i].y),
+                                   3, color, -1);
+                    }
+                }
+
+                //! 画出骨架连接
+                //! COCO数据集的17个关键点连接对
+                const std::vector<std::pair<int, int>> skeleton = {
+                    {5, 7}, {7, 9}, {6, 8}, {8, 10}, // 手臂
+                    {11, 13},
+                    {13, 15},
+                    {12, 14},
+                    {14, 16}, // 腿
+                    {5, 6},
+                    {5, 11},
+                    {6, 12},  // 躯干
+                    {11, 12}, // 臀部
+                    {1, 2},
+                    {1, 3},
+                    {2, 4},
+                    {3, 5},
+                    {4, 6} // 头部和肩膀
+                };
+
+                for (const auto &bone : skeleton) {
+                    if (keypoints.confidence[bone.first] > 0.3 && keypoints.confidence[bone.second] > 0.3) {
+                        //! 记录骨架连接的起点和终点
+                        cv::line(cv_image,
+                                 cv::Point(keypoints.keypoints_2[bone.first].x, keypoints.keypoints_2[bone.first].y),
+                                 cv::Point(keypoints.keypoints_2[bone.second].x, keypoints.keypoints_2[bone.second].y),
+                                 color, 2);
+                    }
+                }
+            }
+
+            //! 画head bbox
+            if (person.true_head.category == 1) {
+                int x = static_cast<int>(person.true_head.bbox.x);
+                int y = static_cast<int>(person.true_head.bbox.y);
+                int width = static_cast<int>(person.true_head.bbox.width);
+                int height = static_cast<int>(person.true_head.bbox.height);
+
+                //! 画head bbox
+                cv::rectangle(cv_image,
+                              cv::Point(x, y),
+                              cv::Point(x + width, y + height),
+                              color, 2);
+            }
+
+            //! 画face bbox
+            if (person.true_face.category == 2) {
+                int x = static_cast<int>(person.true_face.bbox.x);
+                int y = static_cast<int>(person.true_face.bbox.y);
+                int width = static_cast<int>(person.true_face.bbox.width);
+                int height = static_cast<int>(person.true_face.bbox.height);
+
+                //! 画face bbox
+                cv::rectangle(cv_image,
+                              cv::Point(x, y),
+                              cv::Point(x + width, y + height),
+                              color, 2);
+            }
+        }
+
+        //! 转回sensor_msgs/Image
+        image_utils::FrameMediator fm_cv_image(cv_image, "bgr8");
+        fm_cv_image.to_image_msg(msg);
+    }
+
     //! convert to publish message
     int to_publish_visualization(PubVisualizationMsgType_t &msg) const override
     {
@@ -79,17 +411,14 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
                 image_utils::FrameMediator fm(&this->m_document.frame_bundle.primary_frame);
                 fm.to_image_msg(msg);
             } else if (auxiliary_data_str == "detection") {
-                // TODO: 画检测框
+                create_debug_image_for_detection_visualization(msg);
             } else if (auxiliary_data_str == "pose") {
-                // TODO: 画姿态
+                create_debug_image_for_pose_visualization(msg);
             } else if (auxiliary_data_str == "person") {
-                // TODO: 画人
+                create_debug_image_for_person_visualization(msg);
             } else if (auxiliary_data_str == "track") {
-                // TODO: 画跟踪框
-            } else if (auxiliary_data_str == "counter") {
-                // TODO: 画计数
+                create_debug_image_for_track_visualization(msg);
             } else {
-                // RDX_ERROR_DEV(this, __func__, true, "{}", "Unknown auxiliary data type");
                 return -1;
             }
         }

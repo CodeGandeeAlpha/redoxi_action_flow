@@ -15,6 +15,9 @@ int PSGDetectorDriver::_on_process_callee_result(OutputTypes::OutputRequest_t *o
     RDX_INFO_DEV(this, __func__, false, "{}", "开始处理检测结果");
 
     OutputTypes::OutputSourceData_t output_pipeline_source_data;
+    // 设置auxiliary_data的类型，用于可视化
+    output_pipeline_source_data.auxiliary_data = std::string("detector");
+
     RDX_INFO_DEV(this, __func__, false, "{}", "从callee请求中获取文档数据");
     auto document = callee_request.get_source_data().get_document();
 
