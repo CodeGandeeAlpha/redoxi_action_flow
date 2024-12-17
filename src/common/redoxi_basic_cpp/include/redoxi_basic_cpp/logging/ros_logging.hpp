@@ -1,7 +1,6 @@
-#ifndef REDOXI_ROS_LOGGING__REDOXI_ROS_LOGGING_HPP_
-#define REDOXI_ROS_LOGGING__REDOXI_ROS_LOGGING_HPP_
+#pragma once
 
-#include "redoxi_ros_logging/visibility_control.h"
+#include "redoxi_basic_cpp/visibility_control.h"
 
 #include <thread>
 #include <atomic>
@@ -462,5 +461,3 @@ using logging::RDX_RAISE_ERROR;
 
 // for production debug
 #define RDX_DEBUG_PRODUCTION redoxi_works::logging::RDX_LOG_DEBUG_2
-
-#endif // REDOXI_ROS_LOGGING__REDOXI_ROS_LOGGING_HPP_

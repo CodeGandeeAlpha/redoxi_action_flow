@@ -1,30 +1,96 @@
 #pragma once
 
 #include <redoxi_shared_memory/visibility_control.h>
+#include <chrono>
+#include <optional>
 #include <string_view>
 #include <string>
 #include <tuple>
 #include <json_struct/json_struct.h>
 #include <opencv2/opencv.hpp>
 
-namespace redoxi_works::shared_memory
+namespace redoxi_works::shared_memory::detail
 {
-namespace config_keys::node
+using TimeUnit_t = std::chrono::microseconds;
+using TimePoint_t = std::chrono::time_point<std::chrono::system_clock>;
+
+//! internal config for expiration, used as part of the shared memory config
+struct _ExpirationConfig {
+    std::string _time_unit = "us(1e-6s)";
+
+    //! default alive duration for each shm block, if not set, then use the default_alive_duration
+    std::optional<TimeUnit_t> default_alive_duration;
+
+    //! max alive duration for each shm block, will override any alive duration set in the shm block if it is longer than this value
+    std::optional<TimeUnit_t> max_alive_duration;
+
+    JS_OBJECT(JS_MEMBER(default_alive_duration), JS_MEMBER(max_alive_duration));
+};
+} // namespace redoxi_works::shared_memory::detail
+
+
+namespace redoxi_works::shared_memory::config_keys
+{
+namespace node
 {
 constexpr std::string_view ServiceType = "shm_service_type";
 constexpr std::string_view RegionKey = "shm_region_key";
-} // namespace config_keys::node
+} // namespace node
 
-namespace config_keys::env
+namespace env
 {
 constexpr std::string_view ServiceType = "RDX_SHM_SERVICE_TYPE";
 constexpr std::string_view RegionKey = "RDX_SHM_REGION_KEY";
-} // namespace config_keys::env
+} // namespace env
+} // namespace redoxi_works::shared_memory::config_keys
 
-namespace config_values::service_types
+namespace redoxi_works::shared_memory::config_values
+{
+namespace service_types
 {
 constexpr std::string_view Vineyard = "vineyard";
-} // namespace config_values::service_types
+} // namespace service_types
+} // namespace redoxi_works::shared_memory::config_values
+
+namespace redoxi_works::shared_memory
+{
+struct DataBlock;
+
+enum class MemoryBlockExpirationAction {
+    DontCare = 0, //!< do not care about the expired block, let the system decide what to do
+    Remove = 1,   //!< remove the expired block
+    Keep = 2,     //!< keep the expired block, do not remove it
+};
+
+struct MemoryBlockExpirationConfig {
+    using TimeUnit_t = detail::TimeUnit_t;
+    using TimePoint_t = detail::TimePoint_t;
+
+    MemoryBlockExpirationConfig()
+        : time_created(std::chrono::system_clock::now())
+    {
+    }
+
+    //! alive duration, if set, the shared memory block will be removed from shm service after this duration.
+    //! note that the actual alive duration may be longer than the configured duration, but will not be shorter.
+    //! if not set, the shared memory block will not expire. If set to 0, the shared memory block will expire immediately.
+    std::optional<TimeUnit_t> alive_duration;
+
+    //! time when the shared memory block is created, automatically set by the constructor
+    //! you can change it to set the expiration time
+    TimePoint_t time_created;
+
+    //! callback when the shared memory block is expired, but not yet removed from shm service
+    //! @param data_block the data block that is expired
+    //! @param time_now the current time
+    //! @param config the expiration config
+    std::function<MemoryBlockExpirationAction(const DataBlock &data_block,
+                                              const TimePoint_t &time_now,
+                                              const MemoryBlockExpirationConfig &config)>
+        on_expired;
+
+    JS_OBJECT(JS_MEMBER(alive_duration), JS_MEMBER(time_created));
+};
 
 struct SharedMemoryConfig {
     // shm configuration keys and values, just for documentations, do not modify them
@@ -43,6 +109,9 @@ struct SharedMemoryConfig {
     // service name, if not given, then read from env variable
     // if given, ignore env variable
     std::string service_type;
+
+    // expiration config
+    std::optional<detail::_ExpirationConfig> expiration_config;
 
     //! Comparison operators for use in std::map
     bool operator<(const SharedMemoryConfig &other) const
@@ -71,7 +140,8 @@ struct SharedMemoryConfig {
               JS_MEMBER(_node_config_service_name),
               JS_MEMBER(_service_type_vineyard),
               JS_MEMBER(region_key),
-              JS_MEMBER(service_type));
+              JS_MEMBER(service_type),
+              JS_MEMBER(expiration_config));
 };
 
 

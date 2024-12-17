@@ -1,5 +1,5 @@
 #include <redoxi_shared_memory/SharedMemoryFactory.hpp>
-#include <redoxi_ros_logging/redoxi_ros_logging.hpp>
+#include <redoxi_basic_cpp/logging/ros_logging.hpp>
 #include <cstdlib>
 #include <pluginlib/class_loader.hpp>
 #include <rclcpp/rclcpp.hpp>

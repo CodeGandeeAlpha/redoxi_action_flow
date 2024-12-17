@@ -150,8 +150,11 @@ bool VineyardShmClient::is_connected() const
 
 int VineyardShmClient::put_data(ObjectIdentifier *output_object_id,
                                 const DataBlock *data_block,
-                                const KeyValueStore *metadata)
+                                const KeyValueStore *metadata,
+                                const MemoryBlockExpirationConfig *expiration_config)
 {
+    (void)expiration_config;
+
     RDX_INFO_DEV(_get_logger(), __func__, "{}", "putting data to vineyard");
     //! Cast the DataBlock and KeyValueStore into internal classes
     auto _data_block = dynamic_cast<const VineyardDataBlock *>(data_block);
@@ -307,6 +310,20 @@ std::shared_ptr<DataBlock> VineyardShmClient::create_datablock() const
 std::shared_ptr<KeyValueStore> VineyardShmClient::create_kvstore() const
 {
     return std::make_shared<VineyardParams>();
+}
+
+void VineyardShmClient::set_expiration_config(const MemoryBlockExpirationConfig *expiration_config)
+{
+    if (expiration_config) {
+        m_expiration_config = *expiration_config;
+    } else {
+        m_expiration_config = std::nullopt;
+    }
+}
+
+const MemoryBlockExpirationConfig *VineyardShmClient::get_expiration_config() const
+{
+    return m_expiration_config.has_value() ? &m_expiration_config.value() : nullptr;
 }
 
 } // namespace redoxi_works::shared_memory

@@ -3,53 +3,14 @@
 
 #include "redoxi_common_cpp/visibility_control.h"
 #include <string>
-#include <chrono>
-#include <type_traits>
 #include <numeric>
 
-#include <array>
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_io.hpp>
-#include <boost/uuid/uuid_generators.hpp>
+#include <redoxi_basic_cpp/configs/rdx_configs.hpp>
+#include <redoxi_basic_cpp/types/rdx_uuid.hpp>
+#include <redoxi_basic_cpp/concepts/basic_concepts.hpp>
 
 namespace redoxi_works
 {
-//! UUID type for redoxi works
-//! Note: UUID when created, is not guaranteed to be all 0, you need to UUIDType uid{0} to make it all 0
-using UUIDType = boost::uuids::uuid;
-
-//! Trait for UUID, handling conversion between string, array and UUID type
-struct UUIDTrait {
-    static UUIDType generate()
-    {
-        return boost::uuids::random_generator()();
-    }
-
-    static std::string to_string(const UUIDType &uuid)
-    {
-        return boost::uuids::to_string(uuid);
-    }
-
-    static std::array<uint8_t, 16> to_array(const UUIDType &uuid)
-    {
-        std::array<uint8_t, 16> output;
-        std::copy(uuid.begin(), uuid.end(), output.begin());
-        return output;
-    }
-
-    static UUIDType from_string(const std::string &str)
-    {
-        return boost::uuids::string_generator()(str);
-    }
-
-    static UUIDType from_array(const std::array<uint8_t, 16> &arr)
-    {
-        UUIDType uuid;
-        std::copy(arr.begin(), arr.end(), uuid.begin());
-        return uuid;
-    }
-};
-
 // default timeout in ms
 const double DefaultTimeoutMs = 10000;
 // default max number of retries
@@ -60,40 +21,6 @@ const double DefaultNodeStepIntervalMs = 1;
 // default image encodings, in ros2 sensor_msgs::image_encodings format
 constexpr const std::string_view DefaultColorImageEncoding = "rgb8";
 constexpr const std::string_view DefaultMonoImageEncoding = "mono8";
-
-// default time unit for processing and waiting
-using DefaultTimeUnit_t = std::chrono::microseconds;
-
-/**
- * @brief Get the name of the time unit based on the std::chrono::duration type.
- *
- * @tparam DurationType The std::chrono::duration type.
- * @return constexpr const char* The name of the time unit.
- */
-template <typename DurationType>
-constexpr const char *_get_time_unit_name()
-{
-    if constexpr (std::is_same_v<DurationType, std::chrono::hours>) {
-        return "hours";
-    } else if constexpr (std::is_same_v<DurationType, std::chrono::minutes>) {
-        return "minutes";
-    } else if constexpr (std::is_same_v<DurationType, std::chrono::seconds>) {
-        return "seconds";
-    } else if constexpr (std::is_same_v<DurationType, std::chrono::milliseconds>) {
-        return "ms(1e-3)";
-    } else if constexpr (std::is_same_v<DurationType, std::chrono::microseconds>) {
-        return "us(1e-6)";
-    } else if constexpr (std::is_same_v<DurationType, std::chrono::nanoseconds>) {
-        return "ns(1e-9)";
-    } else {
-        return "unknown";
-    }
-}
-
-inline constexpr const char *get_default_time_unit_name()
-{
-    return _get_time_unit_name<DefaultTimeUnit_t>();
-}
 
 // globally accessible parameters in ROS related to this application
 namespace RosParams
@@ -192,47 +119,12 @@ inline constexpr const char *NodeStatusCodeToString(int status_code)
     }
 }
 
-
 namespace SignalCode
 {
 const int RUN = 0;
 const int FLUSH = 1;
 const int TERMINATE = 2;
 }; // namespace SignalCode
-
-// hacky stuff
-namespace hacky
-{
-
-/**
- * @brief Type trait to check if a type is a std::chrono::duration
- * @details Usage:
- * template <typename T, typename = std::enable_if_t<is_duration<T>::value>>
- * void function(T duration) { ... }
- *
- * Or in C++20:
- * template <typename T>
- *     requires is_duration<T>::value
- * void function(T duration) { ... }
- */
-template <typename T, typename = void>
-struct is_duration : std::false_type {
-};
-
-/**
- * @brief Specialization for types that satisfy the requirements of std::chrono::duration
- * @tparam T The type to check
- * @details This trait is true for types that have a count() method, a rep type,
- *          a period type, and are convertible to std::chrono::duration
- */
-template <typename T>
-struct is_duration<T, std::void_t<decltype(std::declval<T>().count()),
-                                  typename T::rep,
-                                  typename T::period>> : std::is_convertible<T, std::chrono::duration<typename T::rep,
-                                                                                                      typename T::period>> {
-};
-
-} // namespace hacky
 
 
 } // namespace redoxi_works

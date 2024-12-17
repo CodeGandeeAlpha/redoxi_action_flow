@@ -5,9 +5,7 @@
 #include <redoxi_shared_memory/SharedMemoryTypes.hpp>
 
 
-namespace redoxi_works
-{
-namespace shared_memory
+namespace redoxi_works::shared_memory
 {
 
 class SharedMemoryClient
@@ -27,6 +25,20 @@ class SharedMemoryClient
     virtual int connect(const std::string &region_key, const KeyValueStore *params = nullptr) = 0;
 
     /**
+     * @brief Set the expiration config for the shared memory client, which will affect all the data blocks put into the shared memory region.
+     *
+     * @param expiration_config The expiration config to be set. If nullptr, it will clear the expiration config.
+     */
+    virtual void set_expiration_config(const MemoryBlockExpirationConfig *expiration_config) = 0;
+
+    /**
+     * @brief Get the expiration config for the shared memory client, which will affect all the data blocks put into the shared memory region.
+     *
+     * @return The expiration config, nullptr if not set.
+     */
+    virtual const MemoryBlockExpirationConfig *get_expiration_config() const = 0;
+
+    /**
      * @brief Get the service name of the shared memory region.
      */
     virtual std::string get_service_type() const = 0;
@@ -42,11 +54,13 @@ class SharedMemoryClient
      * @param output_object_id The identifier for the stored data block.
      * @param data_block The data block to be stored.
      * @param metadata Optional metadata associated with the data block.
+     * @param expiration_config Optional expiration config for the data block, if nullptr, then use the default expiration config
      * @return 0 if the operation is successful, -1 if it fails.
      */
     virtual int put_data(ObjectIdentifier *output_object_id,
                          const DataBlock *data_block,
-                         const KeyValueStore *metadata = nullptr) = 0;
+                         const KeyValueStore *metadata = nullptr,
+                         const MemoryBlockExpirationConfig *expiration_config = nullptr) = 0;
 
     /**
      * @brief Retrieve data from the shared memory region.
@@ -146,6 +160,4 @@ class SharedMemoryClient
     virtual std::shared_ptr<KeyValueStore> create_kvstore() const = 0;
 };
 
-} // namespace shared_memory
-
-} // namespace redoxi_works
+} // namespace redoxi_works::shared_memory

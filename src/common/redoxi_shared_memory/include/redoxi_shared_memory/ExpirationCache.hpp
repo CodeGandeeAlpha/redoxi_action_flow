@@ -8,14 +8,14 @@ namespace redoxi_works::shared_memory
 {
 
 /**
- * @brief SharedMemoryExpirationCache is a cache that stores the expiration time of the shared memory blocks.
+ * @brief ExpirationCache is a cache that stores the expiration time of the shared memory blocks.
  * It is used to control the expiration of the shared memory blocks, and remove them from shm service when they are expired.
  */
-class SharedMemoryExpirationCache
+class ExpirationCache
 {
   public:
-    SharedMemoryExpirationCache();
-    ~SharedMemoryExpirationCache();
+    ExpirationCache();
+    ~ExpirationCache();
 
 
   private:

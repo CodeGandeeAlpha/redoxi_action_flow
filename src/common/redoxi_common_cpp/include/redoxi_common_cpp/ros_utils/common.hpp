@@ -5,7 +5,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <builtin_interfaces/msg/time.hpp>
-#include <redoxi_ros_logging/redoxi_ros_logging.hpp>
+#include <redoxi_basic_cpp/logging/ros_logging.hpp>
 #include <redoxi_common_cpp/redoxi_common_cpp.hpp>
 
 namespace redoxi_works

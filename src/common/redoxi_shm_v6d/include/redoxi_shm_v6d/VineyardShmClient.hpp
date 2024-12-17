@@ -28,6 +28,10 @@ class VineyardShmClient : public SharedMemoryClient
     // SharedMemoryClient interface, KeyValueStore is VineyardParams object
     int connect(const std::string &region_key, const KeyValueStore *params = nullptr) override;
 
+    // Expiration config
+    void set_expiration_config(const MemoryBlockExpirationConfig *expiration_config) override;
+    const MemoryBlockExpirationConfig *get_expiration_config() const override;
+
     //! Get the region key, empty string if not set yet
     std::string get_region_key() const override;
 
@@ -43,7 +47,8 @@ class VineyardShmClient : public SharedMemoryClient
     // SharedMemoryClient interface, DataBlock is VineyardDataBlock object, KeyValueStore is VineyardParams object
     int put_data(ObjectIdentifier *output_object_id,
                  const DataBlock *data_block,
-                 const KeyValueStore *metadata = nullptr) override;
+                 const KeyValueStore *metadata = nullptr,
+                 const MemoryBlockExpirationConfig *expiration_config = nullptr) override;
 
     // SharedMemoryClient interface, DataBlock is VineyardDataBlock object, KeyValueStore is VineyardParams object
     int get_data(DataBlock *output_data_block,
@@ -83,6 +88,9 @@ class VineyardShmClient : public SharedMemoryClient
     rclcpp::Node *m_node = nullptr;
     std::string m_region_key;
     rclcpp::Logger _get_logger() const;
+
+    // Expiration config
+    std::optional<MemoryBlockExpirationConfig> m_expiration_config;
 };
 
 } // namespace redoxi_works::shared_memory

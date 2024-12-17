@@ -15,19 +15,20 @@ display_help() {
     echo "  $0 --verbose --debug"
 }
 
-PackagesToBuild="redoxi_common_nodes \
-                 redoxi_inference \
-                 redoxi_inference_onnx \
-                 redoxi_dnn_models \
-                 yolo8_series \
-                 test_package \
-                 universal_mot_trackers \
-                 test_hz_py \
-                 rosboard"
+# PackagesToBuild="redoxi_common_nodes \
+#                  redoxi_inference \
+#                  redoxi_inference_onnx \
+#                  redoxi_dnn_models \
+#                  yolo8_series \
+#                  test_package \
+#                  universal_mot_trackers \
+#                  test_hz_py \
+#                  rosboard"
 
-# PackagesToBuild="redoxi_shared_memory \
-#                  redoxi_shm_v6d \
-#                  test_package"
+PackagesToBuild="redoxi_shared_memory \
+                 redoxi_shm_v6d \
+                 redoxi_basic_cpp \
+                 test_package"
 
 # Check if --help flag is provided
 if [[ "$*" == *"--help"* ]]; then
