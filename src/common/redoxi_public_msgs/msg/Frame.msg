@@ -2,7 +2,7 @@
 unique_identifier_msgs/UUID x_uid
 Control x_control
 # same group id means the same object
-unique_identifier_msgs/UUID x_group_uid
+redoxi_public_msgs/TaskMetadata x_task_metadata
 
 FrameMetadata metadata
 

@@ -30,7 +30,7 @@ int PSGPoseDetectorDriver::_on_process_callee_result(OutputTypes::OutputRequest_
             RDX_LOG_DEBUG(this, __func__, "{}", "基于x_group_id匹配keypoints");
             for (size_t i = 0; i < callee_result->keypoints.size(); ++i) {
                 for (size_t j = 0; j < document->detections.size(); ++j) {
-                    if (document->detections[j].x_uid == callee_result->keypoints[i].x_group_uid) {
+                    if (document->detections[j].x_uid == callee_result->keypoints[i].x_task_metadata.source_task_uid) {
                         document->detections[j].keypoints = callee_result->keypoints[i];
                         break;
                     }

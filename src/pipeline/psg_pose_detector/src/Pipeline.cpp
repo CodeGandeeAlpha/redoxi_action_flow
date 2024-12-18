@@ -603,7 +603,7 @@ void PSGPoseDetectorNode::_get_model_result()
                 RDX_LOG_DEBUG(this, __func__, "{}", "基于x_group_id匹配keypoints");
                 for (size_t i = 0; i < result->keypoints.size(); ++i) {
                     for (size_t j = 0; j < document->detections.size(); ++j) {
-                        if (document->detections[j].x_uid == result->keypoints[i].x_group_uid) {
+                        if (document->detections[j].x_uid == result->keypoints[i].x_task_metadata.source_task_uid) {
                             document->detections[j].keypoints = result->keypoints[i];
                             break;
                         }

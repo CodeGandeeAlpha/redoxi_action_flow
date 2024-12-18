@@ -1,8 +1,8 @@
 # see PassengerFlow/include/PassengerFlow/Scene/EventZoneData.h for detail
 unique_identifier_msgs/UUID x_uid
 redoxi_public_msgs/Control x_control
-# same group id means the same object
-unique_identifier_msgs/UUID x_group_uid
+# same task uid means the same object
+redoxi_public_msgs/TaskMetadata x_task_metadata
 
 int64 event_type
 string event_zone_name

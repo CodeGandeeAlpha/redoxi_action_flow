@@ -28,17 +28,17 @@ int PSGTrackerDriver::_on_process_callee_result(OutputTypes::OutputRequest_t *ou
                       "处理track_target - track_id:{}, track_status:{}, uuid:{}",
                       track_target.track_id,
                       track_target.track_status.bitmask,
-                      boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
+                      boost::uuids::to_string(to_boost_uuid(track_target.x_task_metadata.source_task_uid.uuid)));
 
         // 1. 将track_targets中的track_id和person_id进行匹配，并赋予跟踪的id
         {
             auto lock_ptr_person_map = m_person_map.synchronize();
-            if (lock_ptr_person_map->find(track_target.x_group_uid.uuid) != lock_ptr_person_map->end()) {
-                auto &person = (*lock_ptr_person_map)[track_target.x_group_uid.uuid];
+            if (lock_ptr_person_map->find(track_target.x_task_metadata.source_task_uid.uuid) != lock_ptr_person_map->end()) {
+                auto &person = (*lock_ptr_person_map)[track_target.x_task_metadata.source_task_uid.uuid];
                 person->track_id = track_target.track_id;
                 RDX_LOG_DEBUG(this, __func__, false,
                               "更新person track_id - uuid:{}, track_id:{}",
-                              boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)),
+                              boost::uuids::to_string(to_boost_uuid(track_target.x_task_metadata.source_task_uid.uuid)),
                               track_target.track_id);
                 person->body = track_target.predicted_detection;
             }
@@ -46,7 +46,7 @@ int PSGTrackerDriver::_on_process_callee_result(OutputTypes::OutputRequest_t *ou
 
         // 2. 将track_target中的track_id写入document中的persons
         for (auto &person : document->persons) {
-            if (person.x_uid == track_target.x_group_uid) {
+            if (person.x_uid == track_target.x_task_metadata.source_task_uid) {
                 person.track_id = track_target.track_id;
                 person.body = track_target.predicted_detection;
                 break;
@@ -57,19 +57,19 @@ int PSGTrackerDriver::_on_process_callee_result(OutputTypes::OutputRequest_t *ou
         // if track_target is new, create a new trajectory
         if (track_target.track_status.bitmask & redoxi_public_msgs::msg::TrackObjectStatus::NEW_BIT) {
             m_closed_trajectory_map[track_target.track_id] = std::vector<PSGTrackerDriver::ArrayUUID>();
-            m_closed_trajectory_map[track_target.track_id].push_back(track_target.x_group_uid.uuid);
+            m_closed_trajectory_map[track_target.track_id].push_back(track_target.x_task_metadata.source_task_uid.uuid);
             RDX_LOG_DEBUG(this, __func__, false,
                           "创建新轨迹 - track_id:{}, uuid:{}",
                           track_target.track_id,
-                          boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
+                          boost::uuids::to_string(to_boost_uuid(track_target.x_task_metadata.source_task_uid.uuid)));
         }
         // if track_target is open, add it to trajectory
         else if (track_target.track_status.bitmask & redoxi_public_msgs::msg::TrackObjectStatus::OPEN_BIT) {
-            m_closed_trajectory_map[track_target.track_id].push_back(track_target.x_group_uid.uuid);
+            m_closed_trajectory_map[track_target.track_id].push_back(track_target.x_task_metadata.source_task_uid.uuid);
             RDX_LOG_DEBUG(this, __func__, false,
                           "添加到现有轨迹 - track_id:{}, uuid:{}",
                           track_target.track_id,
-                          boost::uuids::to_string(to_boost_uuid(track_target.x_group_uid.uuid)));
+                          boost::uuids::to_string(to_boost_uuid(track_target.x_task_metadata.source_task_uid.uuid)));
         }
         // if track_target is close, get trajectory and remove it from buffer
         else if (track_target.track_status.bitmask & redoxi_public_msgs::msg::TrackObjectStatus::CLOSE_BIT) {
