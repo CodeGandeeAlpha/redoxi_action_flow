@@ -11,8 +11,8 @@ namespace redoxi_works::shared_memory
 {
 
 struct DataBlockInfo {
-    using TimePoint_t = MemoryBlockExpirationConfig::TimePoint_t;
-    using TimeUnit_t = MemoryBlockExpirationConfig::TimeUnit_t;
+    using TimePoint_t = detail::TimePoint_t;
+    using TimeUnit_t = detail::TimeUnit_t;
 
     DataBlockInfo()
         : time_created(std::chrono::system_clock::now())
@@ -20,18 +20,30 @@ struct DataBlockInfo {
     }
 
     DataBlockInfo(const ObjectIdentifier &object_id,
-                  const MemoryBlockExpirationConfig &expiration_config)
+                  const ShmPutOptions &put_options)
         : object_id(object_id),
-          expiration_config(expiration_config),
+          put_options(put_options),
           time_created(std::chrono::system_clock::now())
     {
-        if (expiration_config.alive_duration.has_value()) {
-            time_to_evict = time_created + expiration_config.alive_duration.value();
+        if (put_options.alive_duration.has_value()) {
+            time_to_evict = time_created + put_options.alive_duration.value();
+        }
+
+        if (put_options.alive_until.has_value()) {
+            auto alive_until = put_options.alive_until.value();
+            if (alive_until < time_created) {
+                RDX_WARN_DEV(nullptr, __func__, "{}", "alive_until is in the past, ignore it");
+            } else {
+                if (alive_until < time_to_evict) {
+                    // using the shorter one as deadline
+                    time_to_evict = alive_until;
+                }
+            }
         }
     }
 
     ObjectIdentifier object_id;
-    MemoryBlockExpirationConfig expiration_config;
+    ShmPutOptions put_options;
     TimePoint_t time_created;
     TimePoint_t time_to_evict = TimePoint_t::max(); // default to no expiration
 
@@ -127,13 +139,13 @@ int ExpirationCache::stop_auto_evict()
 }
 
 int ExpirationCache::add_memory_block(
-    const ObjectIdentifier &object_id, const MemoryBlockExpirationConfig &expiration_config)
+    const ObjectIdentifier &object_id, const ShmPutOptions &put_options)
 {
     RDX_INFO_DEV(nullptr, __func__, "Adding memory block to expiration cache: {}", object_id.to_string());
 
     // if alive_duration is not set, treat it as no expiration
     // this is handled in DataBlockInfo constructor
-    auto data_block_info = DataBlockInfo(object_id, expiration_config);
+    auto data_block_info = DataBlockInfo(object_id, put_options);
     auto &left = m_impl->m_cache.left;
     auto it = left.find(object_id);
     if (it != left.end()) {
@@ -142,8 +154,8 @@ int ExpirationCache::add_memory_block(
         left.replace_data(it, data_block_info);
     } else {
         // Insert new entry
-        RDX_INFO_DEV(nullptr, __func__, "Inserting new entry: {}, with expiration config: {}",
-                     object_id.to_string(), expiration_config.to_string());
+        RDX_INFO_DEV(nullptr, __func__, "Inserting new entry: {}, with put options: {}",
+                     object_id.to_string(), put_options.to_string());
         left.insert(std::make_pair(object_id, data_block_info));
     }
 
@@ -174,14 +186,14 @@ int64_t ExpirationCache::evict_expired_memory_blocks(bool force_evict_all)
         RDX_INFO_DEV(nullptr, __func__, "Processing expired block: {}", object_id.to_string());
 
         // have callback? call it
-        MemoryBlockExpirationAction action = MemoryBlockExpirationAction::DontCare;
-        if (data_block_info.expiration_config.on_expired) {
+        ShmPutOptions::ExpiredAction action = ShmPutOptions::ExpiredAction::DontCare;
+        if (data_block_info.put_options.on_expired) {
             RDX_INFO_DEV(nullptr, __func__, "Calling expiration callback for block: {}", object_id.to_string());
-            action = data_block_info.expiration_config.on_expired(object_id, m_client, time_now, data_block_info.expiration_config);
+            action = data_block_info.put_options.on_expired(object_id, m_client, time_now, data_block_info.put_options);
         }
 
         // delete the object from shm service
-        if (action != MemoryBlockExpirationAction::Keep) {
+        if (action != ShmPutOptions::ExpiredAction::Keep) {
             RDX_INFO_DEV(nullptr, __func__, "Deleting expired block from shared memory: {}", object_id.to_string());
             m_client->delete_object(object_id);
 

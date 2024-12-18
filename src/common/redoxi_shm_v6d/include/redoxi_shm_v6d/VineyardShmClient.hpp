@@ -46,7 +46,7 @@ class VineyardShmClient : public SharedMemoryClient
     int put_data(ObjectIdentifier *output_object_id,
                  const DataBlock *data_block,
                  const KeyValueStore *metadata = nullptr,
-                 const MemoryBlockExpirationConfig *expiration_config = nullptr) override;
+                 std::optional<ShmPutOptions> put_options = std::nullopt) override;
 
     // SharedMemoryClient interface, DataBlock is VineyardDataBlock object, KeyValueStore is VineyardParams object
     int get_data(DataBlock *output_data_block,

@@ -39,13 +39,13 @@ class SharedMemoryClient
      * @param output_object_id The identifier for the stored data block.
      * @param data_block The data block to be stored.
      * @param metadata Optional metadata associated with the data block.
-     * @param expiration_config Optional expiration config for the data block, if nullptr, then use the default expiration config
+     * @param put_options Optional put options for the data block, if not set, then use the default put options
      * @return 0 if the operation is successful, -1 if it fails.
      */
     virtual int put_data(ObjectIdentifier *output_object_id,
                          const DataBlock *data_block,
                          const KeyValueStore *metadata = nullptr,
-                         const MemoryBlockExpirationConfig *expiration_config = nullptr) = 0;
+                         std::optional<ShmPutOptions> put_options = std::nullopt) = 0;
 
     /**
      * @brief Retrieve data from the shared memory region.

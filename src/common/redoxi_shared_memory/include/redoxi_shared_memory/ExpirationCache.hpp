@@ -25,7 +25,7 @@ class ExpirationCache
     // add a memory block to the cache
     // return 0 if success, -1 if failed
     int add_memory_block(const ObjectIdentifier &object_id,
-                         const MemoryBlockExpirationConfig &expiration_config);
+                         const ShmPutOptions &put_options);
 
     // check and evict expired memory blocks
     // return the number of expired memory blocks

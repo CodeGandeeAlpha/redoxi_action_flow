@@ -5,29 +5,18 @@
 #include <optional>
 #include <string>
 #include <tuple>
+#include <variant>
 #include <fmt/core.h>
 #include <fmt/ranges.h>
 #include <json_struct/json_struct.h>
 #include <opencv2/opencv.hpp>
 #include <redoxi_basic_cpp/interops/json_struct_conversion.hpp>
+#include <redoxi_basic_cpp/configs/rdx_configs.hpp>
 
 namespace redoxi_works::shared_memory::detail
 {
-using TimeUnit_t = std::chrono::microseconds;
+using TimeUnit_t = DefaultTimeUnit_t;
 using TimePoint_t = std::chrono::time_point<std::chrono::system_clock>;
-
-//! internal config for expiration, used as part of the shared memory config
-struct _ExpirationConfig {
-    std::string _time_unit = "us(1e-6s)";
-
-    //! default alive duration for each shm block, if not set, then use the default_alive_duration
-    TimeUnit_t default_alive_duration = TimeUnit_t::max();
-
-    //! max alive duration for each shm block, will override any alive duration set in the shm block if it is longer than this value
-    TimeUnit_t max_alive_duration = TimeUnit_t::max();
-
-    JS_OBJECT(JS_MEMBER(default_alive_duration), JS_MEMBER(max_alive_duration));
-};
 } // namespace redoxi_works::shared_memory::detail
 
 //! config keys for shared memory
@@ -66,14 +55,15 @@ enum class MemoryBlockExpirationAction {
     Keep = 2,     //!< keep the expired block, do not remove it
 };
 
-struct MemoryBlockExpirationConfig {
+struct ShmPutOptions {
     using TimeUnit_t = detail::TimeUnit_t;
     using TimePoint_t = detail::TimePoint_t;
+    using ExpiredAction = MemoryBlockExpirationAction;
 
-    //! alive duration, the shared memory block will be removed from shm service after this duration.
-    //! note that the actual alive duration may be longer than the configured duration, but will not be shorter.
-    //! if not set, the shared memory block will not expire. If set to 0, the shared memory block will expire immediately.
+    // expiration control
+    // if both alive_duration and alive_until are set, use the shorter one
     std::optional<TimeUnit_t> alive_duration;
+    std::optional<TimePoint_t> alive_until;
 
     //! Callback when the shared memory block is expired but not yet removed from shm service
     //! @param object_id The object identifier of the expired shared memory block
@@ -81,23 +71,30 @@ struct MemoryBlockExpirationConfig {
     //! @param time_now The current time
     //! @param config The expiration config
     //! @return The action to take for the expired block
-    std::function<MemoryBlockExpirationAction(
+    std::function<ExpiredAction(
         const ObjectIdentifier &object_id,
         SharedMemoryClient *client,
         const TimePoint_t &time_now,
-        const MemoryBlockExpirationConfig &config)>
+        const ShmPutOptions &put_options)>
         on_expired;
 
     std::string to_string() const
     {
-        return fmt::format("MemoryBlockExpirationConfig(alive_duration={})",
-                           alive_duration.value_or(std::chrono::seconds(-1)).count());
+        return fmt::format("ShmPutOptions(alive_duration={}, alive_until={})",
+                           alive_duration.value_or(std::chrono::seconds(-1)).count(),
+                           alive_until.has_value() ? std::to_string(alive_until->time_since_epoch().count()) : "None");
     }
 
-    JS_OBJECT(JS_MEMBER(alive_duration));
+    JS_OBJECT(JS_MEMBER(alive_duration), JS_MEMBER(alive_until));
 };
 
 struct SharedMemoryConfig {
+    using TimeUnit_t = detail::TimeUnit_t;
+    using TimePoint_t = detail::TimePoint_t;
+
+    // time unit
+    std::string _time_unit = _get_time_unit_name<TimeUnit_t>();
+
     // shm configuration keys and values, just for documentations, do not modify them
     std::string _env_config_service_type = config_keys::env::ServiceType.data();
     std::string _env_config_region_key = config_keys::env::RegionKey.data();
@@ -115,8 +112,9 @@ struct SharedMemoryConfig {
     // if given, ignore env variable
     std::string service_type;
 
-    // expiration config
-    std::optional<detail::_ExpirationConfig> expiration_config;
+    // expiration control
+    std::optional<TimeUnit_t> default_alive_duration;
+    std::optional<TimeUnit_t> max_alive_duration;
 
     //! Comparison operators for use in std::map
     bool operator<(const SharedMemoryConfig &other) const
@@ -139,14 +137,17 @@ struct SharedMemoryConfig {
         return !service_type.empty() && !region_key.empty();
     }
 
-    JS_OBJECT(JS_MEMBER(_env_config_region_key),
-              JS_MEMBER(_env_config_service_name),
-              JS_MEMBER(_node_config_region_key),
-              JS_MEMBER(_node_config_service_name),
-              JS_MEMBER(_service_type_vineyard),
-              JS_MEMBER(region_key),
-              JS_MEMBER(service_type),
-              JS_MEMBER(expiration_config));
+    JS_OBJECT(
+        JS_MEMBER(_time_unit),
+        JS_MEMBER(_env_config_region_key),
+        JS_MEMBER(_env_config_service_name),
+        JS_MEMBER(_node_config_region_key),
+        JS_MEMBER(_node_config_service_name),
+        JS_MEMBER(_service_type_vineyard),
+        JS_MEMBER(region_key),
+        JS_MEMBER(service_type),
+        JS_MEMBER(default_alive_duration),
+        JS_MEMBER(max_alive_duration));
 };
 
 

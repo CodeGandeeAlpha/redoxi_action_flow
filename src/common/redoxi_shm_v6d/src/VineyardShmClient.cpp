@@ -156,10 +156,8 @@ std::shared_ptr<const KeyValueStore> VineyardShmClient::get_connection_params() 
 int VineyardShmClient::put_data(ObjectIdentifier *output_object_id,
                                 const DataBlock *data_block,
                                 const KeyValueStore *metadata,
-                                const MemoryBlockExpirationConfig *expiration_config)
+                                std::optional<ShmPutOptions> put_options)
 {
-    (void)expiration_config;
-
     RDX_INFO_DEV(nullptr, __func__, "{}", "putting data to vineyard");
     //! Cast the DataBlock and KeyValueStore into internal classes
     auto _data_block = dynamic_cast<const VineyardDataBlock *>(data_block);
@@ -196,27 +194,32 @@ int VineyardShmClient::put_data(ObjectIdentifier *output_object_id,
 
     // register expiration config
     if (put_return_code == 0) {
-        // expiration is only activated if expiration_config is provided or m_config.expiration_config is set
-        if (expiration_config || m_config.expiration_config.has_value()) {
-            MemoryBlockExpirationConfig _expire_config;
+        bool has_default_expiration_control = m_config.default_alive_duration.has_value() || m_config.max_alive_duration.has_value();
+        bool has_user_expiration_control = put_options.has_value() && (put_options->alive_duration.has_value() || put_options->alive_until.has_value());
 
-            if (expiration_config) {
+        // expiration is only activated if expiration_config is provided or m_config.expiration_config is set
+        if (has_default_expiration_control || has_user_expiration_control) {
+            ShmPutOptions opt;
+
+            if (has_user_expiration_control) {
                 // if user provides expiration_config, use it
-                _expire_config = *expiration_config;
+                opt = *put_options;
             } else {
                 // if user does not provide expiration_config, use the default alive duration from m_config
-                _expire_config.alive_duration = m_config.expiration_config->default_alive_duration;
-            }
-
-            // clamp the alive duration to the max alive duration from m_config
-            if (m_config.expiration_config.has_value()) {
-                if (_expire_config.alive_duration > m_config.expiration_config->max_alive_duration) {
-                    _expire_config.alive_duration = m_config.expiration_config->max_alive_duration;
+                if (m_config.default_alive_duration.has_value()) {
+                    opt.alive_duration = m_config.default_alive_duration.value();
+                } else {
+                    opt.alive_duration = m_config.max_alive_duration.value();
                 }
             }
 
+            // clamp the alive duration to the max alive duration from m_config
+            if (m_config.max_alive_duration.has_value()) {
+                opt.alive_duration = std::min(opt.alive_duration.value(), m_config.max_alive_duration.value());
+            }
+
             // add to expiration cache
-            m_expiration_cache.add_memory_block({.id = object_id}, _expire_config);
+            m_expiration_cache.add_memory_block({.id = object_id}, opt);
         }
     }
     return put_return_code;
