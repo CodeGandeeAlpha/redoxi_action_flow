@@ -46,8 +46,8 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
         // get cv mat from frame data, draw detections on it, and convert to ros message
         image_utils::DrawDetectionsOptions opt;
         opt.colorization_mode = image_utils::DrawDetectionsOptions::ColorizationMode::SemanticIdentity;
-        image_utils::FrameMediator fm_input(frame_data.image, frame_data.get_encoding());
-        cv::Mat output_image = fm_input.to_cv_image_shared().clone();
+        auto fm_input = frame_data.to_frame_mediator();
+        cv::Mat output_image = fm_input.to_cv_image_copy();
         image_utils::draw_detections(&output_image, detections, opt);
 
         // draw and publish it
@@ -175,7 +175,8 @@ class DeliveryRequest : public DeliveryRequestBase
         const auto &source_data = this->m_source_data;
 
         goal.track_targets = source_data.get_track_targets();
-        source_data.get_primary_frame().to_frame_msg(goal.frame_bundle.primary_frame);
+        auto fm = source_data.get_primary_frame().to_frame_mediator();
+        fm.to_frame_msg(goal.frame_bundle.primary_frame);
         target_data.frame_data = source_data.get_primary_frame();
 
         // standard properties will be set by the base class

@@ -43,7 +43,7 @@ class DeliverySourceData
     virtual int to_publish_data(PubDataMsgType_t &msg) const
     {
         msg.detections = detections;
-        frame_data.to_frame_msg(msg.frame_bundle.primary_frame);
+        frame_data.to_frame_mediator().to_frame_msg(msg.frame_bundle.primary_frame);
         return 0;
     }
 
@@ -55,8 +55,8 @@ class DeliverySourceData
         }
 
         // get cv mat from frame data, draw detections on it, and convert to ros message
-        image_utils::FrameMediator fm_input(frame_data.image, frame_data.get_encoding());
-        cv::Mat output_image = fm_input.to_cv_image_shared().clone();
+        auto fm_input = frame_data.to_frame_mediator();
+        cv::Mat output_image = fm_input.to_cv_image_copy();
         image_utils::draw_detections(&output_image, detections);
 
         image_utils::FrameMediator fm_output(output_image, frame_data.get_encoding());
@@ -177,7 +177,7 @@ class DeliveryRequest : public DeliveryRequestBase
         const auto &source_data = this->m_source_data;
 
         goal.detections = source_data.get_detections();
-        source_data.get_primary_frame().to_frame_msg(goal.frame_bundle.primary_frame);
+        source_data.get_primary_frame().to_frame_mediator().to_frame_msg(goal.frame_bundle.primary_frame);
         // standard properties will be set by the base class
 
         return 0;

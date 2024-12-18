@@ -67,22 +67,6 @@ struct FrameWithMetadata {
         }
     }
 
-    // int to_frame_msg(Frame_t &frame) const
-    // {
-    //     if (is_empty()) {
-    //         frame = Frame_t();
-    //     } else {
-    //         if (std::holds_alternative<RawData_t>(this->data)) {
-    //             const auto &raw_data = std::get<RawData_t>(this->data);
-    //             image_utils::FrameMediator fm(raw_data.image, raw_data.metadata);
-    //             fm.to_frame_msg(frame);
-    //         } else {
-    //             frame = std::get<Frame_t>(this->data);
-    //         }
-    //     }
-    //     return 0;
-    // }
-
     image_utils::FrameMediator to_frame_mediator() const
     {
         if (std::holds_alternative<Frame_t>(this->data)) {
@@ -97,6 +81,30 @@ struct FrameWithMetadata {
     {
         this->data = frame;
         return 0;
+    }
+
+    int from_raw_data(const RawData_t &raw_data)
+    {
+        this->data = raw_data;
+        return 0;
+    }
+
+    Metadata_t &get_metadata()
+    {
+        if (std::holds_alternative<Frame_t>(this->data)) {
+            return std::get<Frame_t>(this->data).metadata;
+        } else {
+            return std::get<RawData_t>(this->data).metadata;
+        }
+    }
+
+    const Metadata_t &get_metadata() const
+    {
+        if (std::holds_alternative<Frame_t>(this->data)) {
+            return std::get<Frame_t>(this->data).metadata;
+        } else {
+            return std::get<RawData_t>(this->data).metadata;
+        }
     }
 };
 
@@ -338,12 +346,8 @@ class DeliveryRequest : public DeliveryRequestBase
         // fill primary frame
         {
             const auto &primary_frame = m_source_data.get_primary_frame();
-            primary_frame.to_frame_msg(goal.frame_bundle.primary_frame);
-
-            // FIXME: source data encoding is wrong, different from request
-            RDX_INFO_DEV(nullptr, __func__, false, "in target data goal, raw image encoding={}, in metadata={}",
-                         goal.frame_bundle.primary_frame.raw_image.encoding,
-                         goal.frame_bundle.primary_frame.metadata.encoding);
+            auto fm = primary_frame.to_frame_mediator();
+            fm.to_frame_msg(goal.frame_bundle.primary_frame);
         }
 
         // fill secondary frames
@@ -352,7 +356,8 @@ class DeliveryRequest : public DeliveryRequestBase
             goal.frame_bundle.secondary_frames.resize(secondary_frames.size());
             for (size_t i = 0; i < secondary_frames.size(); ++i) {
                 const auto &frame = secondary_frames[i];
-                frame.to_frame_msg(goal.frame_bundle.secondary_frames[i]);
+                auto fm = frame.to_frame_mediator();
+                fm.to_frame_msg(goal.frame_bundle.secondary_frames[i]);
             }
         }
 

@@ -32,7 +32,7 @@ int TrackerDriverNode::_on_process_input_request(CalleeTypes::RequestOutputReque
     const auto &det_msg = detector_source_data.get_goal()->detections;
     tracker_source_data.set_detections(det_msg);
     auto &frame_data = tracker_source_data.get_primary_frame();
-    frame_data.from_frame_msg_copy(detector_source_data.get_goal()->frame_bundle.primary_frame);
+    frame_data.from_frame_msg(detector_source_data.get_goal()->frame_bundle.primary_frame);
 
     // track the uuid
     tracker_source_data.set_uuid(msg_uuid);
@@ -84,7 +84,7 @@ cv::Mat TrackerDriverNode::_draw_tracked_result(const CalleeTypes::RequestOutput
 
     // get the tracked result and draw it on the image
     const auto &input_frame = callee_request.get_source_data().get_primary_frame();
-    image_utils::FrameMediator fm(input_frame.image, input_frame.metadata);
+    auto fm = input_frame.to_frame_mediator();
     auto canvas = fm.to_cv_image_copy();
 
     // draw the tracked result

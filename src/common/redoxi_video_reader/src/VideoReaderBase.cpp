@@ -180,12 +180,14 @@ int RedoxiVideoReaderBase::_update_runtime_config(std::shared_ptr<BaseRuntimeCon
     m_primary_output_port->set_callback_on_request_enqueued([this, output_image_size](DeliveryRequest_t &request) {
         (void)this;
         // resize image if needed
-        auto original_size = request.get_source_data().get_primary_frame().image.size();
-        if ((output_image_size.width <= 0 && output_image_size.height <= 0) || output_image_size == original_size) {
+        auto original_width = request.get_source_data().get_primary_frame().get_metadata().width;
+        auto original_height = request.get_source_data().get_primary_frame().get_metadata().height;
+        if ((output_image_size.width <= 0 && output_image_size.height <= 0) || output_image_size == cv::Size(original_width, original_height)) {
             return;
         }
 
-        auto image = request.get_source_data().get_primary_frame().image;
+        auto fm = request.get_source_data().get_primary_frame().to_frame_mediator();
+        auto image = fm.to_cv_image_shared();
 
         // empty image? skip processing
         if (image.empty()) {
@@ -196,23 +198,22 @@ int RedoxiVideoReaderBase::_update_runtime_config(std::shared_ptr<BaseRuntimeCon
         if (output_image_size.width > 0 && output_image_size.height > 0) {
             cv::resize(image, resized_image, output_image_size);
         } else if (output_image_size.width > 0) {
-            int new_height = static_cast<int>(original_size.height * (static_cast<double>(output_image_size.width) / original_size.width));
+            int new_height = static_cast<int>(original_height * (static_cast<double>(output_image_size.width) / original_width));
             new_height = std::max(1, new_height);
             cv::resize(image, resized_image, cv::Size(output_image_size.width, new_height));
         } else if (output_image_size.height > 0) {
-            int new_width = static_cast<int>(original_size.width * (static_cast<double>(output_image_size.height) / original_size.height));
+            int new_width = static_cast<int>(original_width * (static_cast<double>(output_image_size.height) / original_height));
             new_width = std::max(1, new_width);
             cv::resize(image, resized_image, cv::Size(new_width, output_image_size.height));
         }
 
         SourceData_t::FrameData_t frame_data;
-        frame_data.image = resized_image;
-        frame_data.metadata = request.get_source_data().get_primary_frame().metadata;
+        frame_data.from_raw_data({.image = resized_image, .metadata = fm.get_metadata()});
 
         // update size info
         // frame_data.metadata.width = resized_image.cols;
         // frame_data.metadata.height = resized_image.rows;
-        image_utils::FrameMediator::make_metadata_compatible(&frame_data.metadata, resized_image);
+        image_utils::FrameMediator::make_metadata_compatible(&frame_data.get_metadata(), resized_image);
 
         // RDX_INFO_DEV(this, __func__, "after resized, frame number={}, width={}, height={}",
         //              frame_data.metadata.frame_num,
@@ -351,8 +352,7 @@ void RedoxiVideoReaderBase::_step()
         // push request to output port
         bool success = false;
         if (!user_reject) {
-            image_utils::FrameMediator fm(source_data.get_primary_frame().image,
-                                          source_data.get_primary_frame().metadata);
+            auto fm = source_data.get_primary_frame().to_frame_mediator();
             auto frame_number = fm.get_frame_number();
             auto source_frame_index = fm.get_source_frame_index();
             auto source_frame_timestamp = fm.get_source_timestamp_flat();

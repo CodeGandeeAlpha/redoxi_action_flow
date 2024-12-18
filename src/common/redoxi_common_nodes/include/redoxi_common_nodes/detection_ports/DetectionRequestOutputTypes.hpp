@@ -46,8 +46,8 @@ class DeliveryTargetData : public DeliveryTargetDataBase
             return -1;
         }
 
-        image_utils::FrameMediator fm(vis_image.image, vis_image.get_encoding());
-        auto canvas = vis_image.image.clone();
+        auto fm = vis_image.to_frame_mediator();
+        auto canvas = fm.to_cv_image_copy();
         image_utils::draw_detections(&canvas, detections);
 
         //! Convert drawn image to ROS message using cv_bridge
@@ -64,10 +64,8 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         if (!m_visualization_frame.is_empty()) {
             return m_visualization_frame;
         } else {
-            image_utils::FrameMediator fm(&m_goal.frame_bundle.primary_frame);
             FrameData_t output;
-            fm.to_cv_image_copy(output.image);
-            output.metadata = m_goal.frame_bundle.primary_frame.metadata;
+            output.from_frame_msg(m_goal.frame_bundle.primary_frame);
             return output;
         }
     }
@@ -127,7 +125,7 @@ class DeliveryRequest : public DeliveryRequestBase
         // convert primary frame to goal
         {
             const auto &frame_data = source_data.get_primary_frame();
-            frame_data.to_frame_msg(goal.frame_bundle.primary_frame);
+            frame_data.to_frame_mediator().to_frame_msg(goal.frame_bundle.primary_frame);
         }
 
         // convert secondary frame to goal
@@ -135,7 +133,7 @@ class DeliveryRequest : public DeliveryRequestBase
             auto &secondary_frame = source_data.get_secondary_frames();
             goal.frame_bundle.secondary_frames.clear();
             for (auto &frame : secondary_frame) {
-                frame.to_frame_msg(goal.frame_bundle.secondary_frames.emplace_back());
+                frame.to_frame_mediator().to_frame_msg(goal.frame_bundle.secondary_frames.emplace_back());
             }
         }
 

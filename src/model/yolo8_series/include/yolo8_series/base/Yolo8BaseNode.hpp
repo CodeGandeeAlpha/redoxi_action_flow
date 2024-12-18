@@ -254,7 +254,7 @@ int Yolo8BaseNode<TModel>::_process_detection_result(typename ByImageRequest::Ou
     }
 
     ImageRequestOutputPort::SourceData_t::FrameData_t frame_data;
-    frame_data.from_frame_msg_copy(source_data.get_goal()->frame_bundle.primary_frame);
+    frame_data.from_frame_msg(source_data.get_goal()->frame_bundle.primary_frame);
     output_source_data->frame_data = frame_data;
 
     // set the image

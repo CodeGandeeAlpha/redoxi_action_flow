@@ -52,8 +52,9 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
         }
 
         const auto &frame_data = this->frame_data.value();
-        cv::Mat output_image = frame_data.image.clone();
-        auto encoding = frame_data.get_encoding();
+        auto fm = frame_data.to_frame_mediator();
+        cv::Mat output_image = fm.to_cv_image_copy();
+        auto encoding = fm.get_encoding();
 
         //! Draw detections on the image
         for (const auto &detection : detections) {
@@ -153,7 +154,8 @@ class DeliveryRequest : public DeliveryRequestBase
         goal.detections = source_data.detections;
         target_data.frame_data = source_data.frame_data;
         if (source_data.frame_data.has_value()) {
-            source_data.frame_data->to_frame_msg(goal.frame_bundle.primary_frame);
+            auto fm = source_data.frame_data->to_frame_mediator();
+            fm.to_frame_msg(goal.frame_bundle.primary_frame);
         }
         // standard information is handled by base class
         return 0;

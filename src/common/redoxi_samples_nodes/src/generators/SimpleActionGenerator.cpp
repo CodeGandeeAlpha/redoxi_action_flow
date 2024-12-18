@@ -32,12 +32,11 @@ SimpleActionGenerator::ReadFrameResult
     random_image_with_text(random_frame, frame_size, frame_text);
 
     image_utils::FrameMediator fm(random_frame, runtime_config->output_image_encoding);
-    source_data.get_primary_frame().image = fm.to_cv_image_shared();
-    source_data.get_primary_frame().metadata = fm.get_metadata();
+    source_data.get_primary_frame().from_raw_data({.image = fm.to_cv_image_shared(), .metadata = fm.get_metadata()});
 
     // must do it this way to ensure thread safety
     int64_t current_frame_number = _increment_frame_number_by(frame_number, 1);
-    source_data.get_primary_frame().metadata.frame_num = current_frame_number;
+    source_data.get_primary_frame().get_metadata().frame_num = current_frame_number;
 
     return ReadFrameResult::OK;
 }
@@ -70,15 +69,7 @@ void SimpleActionGenerator::_step_send_by_tbb_graph()
 
     //! Put the delivery request into the frame delivery node
     auto msg_uuid = delivery_request.get_source_data().get_uuid();
-    auto frame_num = delivery_request.get_source_data().get_primary_frame().metadata.frame_num;
-    // {
-    //     auto ok = m_primary_output_port->try_push_request(delivery_request);
-    //     if (!ok) {
-    //         RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] put data FAILED", boost::uuids::to_string(msg_uuid));
-    //     } else {
-    //         RDX_INFO_DEV(this, __func__, true, "[msg_uuid={}] put data SUCCESS", boost::uuids::to_string(msg_uuid));
-    //     }
-    // }
+    auto frame_num = delivery_request.get_source_data().get_primary_frame().get_metadata().frame_num;
 
     const auto &downstreams = m_primary_output_port->get_downstreams();
     for (const auto &downstream : downstreams) {

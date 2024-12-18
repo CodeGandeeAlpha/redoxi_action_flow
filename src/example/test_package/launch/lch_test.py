@@ -192,7 +192,7 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
         ),
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
-        step_interval=StepIntervals.VerySlow,
+        step_interval=StepIntervals.Medium,
         video_start_time=0,
         video_end_time=-1,
         frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
