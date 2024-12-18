@@ -235,6 +235,7 @@ int64_t ExpirationCache::evict_expired_memory_blocks(bool force_evict_all)
     auto range = right.range(bimaps::unbounded, bimaps::_key <= time_now);
 
     if (range.first == range.second) {
+        RDX_INFO_DEV(nullptr, __func__, "{}", "No expired blocks found, releasing cache mutex");
         // no expired blocks found
         return 0;
     } else {

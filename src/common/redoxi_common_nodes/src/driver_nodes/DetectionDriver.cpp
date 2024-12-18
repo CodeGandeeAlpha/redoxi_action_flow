@@ -1,4 +1,5 @@
 #include <redoxi_common_nodes/driver_nodes/DetectionDriver.hpp>
+#include <redoxi_common_cpp/ros_utils/shm_utils.hpp>
 
 namespace redoxi_works::common_nodes::drivers
 {
@@ -32,7 +33,18 @@ int DetectionDriver::_on_process_input_request(InputRequestHandler_t::OutputRequ
 
     auto msg_uuid = InputTypes::ActionDataTrait_t::get_uuid(*source_data->get_goal());
     auto msg_uuid_str = boost::uuids::to_string(msg_uuid);
-    image_utils::FrameMediator fm(&source_data->get_goal()->frame_bundle.primary_frame);
+    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Processing input request", msg_uuid_str);
+
+    const auto &primary_frame = source_data->get_goal()->frame_bundle.primary_frame;
+    image_utils::FrameMediator fm(&primary_frame);
+
+    // do we have shared memory?
+    {
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Checking frame shm token readability", msg_uuid_str);
+        auto is_readable = shm_utils::ShmTokenTraits::is_readable_by_default_client(primary_frame.shm_token);
+        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Frame shm token readability: {}",
+                     msg_uuid_str, is_readable ? "true" : "false");
+    }
 
     const auto frame_number = fm.get_frame_number();
     const auto source_frame_index = fm.get_source_frame_index();

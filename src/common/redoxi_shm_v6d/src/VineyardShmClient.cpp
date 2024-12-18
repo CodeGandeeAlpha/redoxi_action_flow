@@ -245,6 +245,7 @@ int VineyardShmClient::get_data(DataBlock *output_data_block,
     }
 
     try {
+        RDX_DEBUG_DEV(nullptr, __func__, "{}", "validating input parameters");
         // data block must be VineyardDataBlock, metadata must be VineyardParams, if they are not nullptr
         VineyardDataBlock *data_block = nullptr;
         VineyardParams *metadata = nullptr;
@@ -252,18 +253,19 @@ int VineyardShmClient::get_data(DataBlock *output_data_block,
         if (output_data_block) {
             data_block = dynamic_cast<VineyardDataBlock *>(output_data_block);
             if (!data_block) {
-                RDX_INFO_DEV(nullptr, __func__, "{}", "data block type mismatch, should be VineyardDataBlock");
+                RDX_DEBUG_DEV(nullptr, __func__, "{}", "data block type mismatch, should be VineyardDataBlock");
                 return -1;
             }
         }
         if (output_metadata) {
             metadata = dynamic_cast<VineyardParams *>(output_metadata);
             if (!metadata) {
-                RDX_INFO_DEV(nullptr, __func__, "{}", "metadata type mismatch, should be VineyardParams");
+                RDX_DEBUG_DEV(nullptr, __func__, "{}", "metadata type mismatch, should be VineyardParams");
                 return -1;
             }
         }
 
+        RDX_DEBUG_DEV(nullptr, __func__, "{}", "getting object id from identifier");
         //! Get object ID from identifier
         vineyard::ObjectID object_id = 0;
         if (identifier.id.has_value()) {
@@ -273,23 +275,30 @@ int VineyardShmClient::get_data(DataBlock *output_data_block,
             return -1;
         }
 
+        RDX_DEBUG_DEV(nullptr, __func__, "getting object {} from vineyard", object_id);
         //! Get object from vineyard
         auto tensor = get_tensor_by_v6d_id<uint8_t>(object_id, m_client.get());
         if (!tensor) {
-            RDX_INFO_DEV(nullptr, __func__, "{}", "object not found in vineyard");
+            RDX_DEBUG_DEV(nullptr, __func__, "{}", "object not found in vineyard");
             return -1;
         }
 
+        RDX_DEBUG_DEV(nullptr, __func__, "{}", "converting tensor to cv::Mat");
         //! convert to cv::Mat, note that even if the tensor is raw bytes, it will be still converted to cv::Mat
         cv::Mat mat = from_v6d_tensor_to_cvmat(tensor);
-        data_block->from_cvmat(mat);
-        data_block->tensor = tensor; // hold this, otherwise data may be deleted by vineyard
-        data_block->m_is_writable = false;
-        data_block->m_has_remote_data = true;
-        data_block->m_has_local_data = false;
 
+        if (data_block) {
+            data_block->from_cvmat(mat);
+            data_block->tensor = tensor; // hold this, otherwise data may be deleted by vineyard
+            data_block->m_is_writable = false;
+            data_block->m_has_remote_data = true;
+            data_block->m_has_local_data = false;
+        }
+
+        RDX_DEBUG_DEV(nullptr, __func__, "{}", "get data completed successfully");
         return 0;
     } catch (const std::exception &e) {
+        RDX_DEBUG_DEV(nullptr, __func__, "get data failed with error: {}", e.what());
         //! Handle any exceptions that might occur during data get operation
         return -1;
     }

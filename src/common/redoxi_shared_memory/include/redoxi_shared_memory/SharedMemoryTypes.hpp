@@ -151,8 +151,20 @@ struct SharedMemoryConfig {
 struct ObjectIdentifier {
     using RawPtr = ObjectIdentifier *;
 
+    // invalid object id is 0 (nullptr)
+    static inline constexpr int64_t INVALID_OBJECT_ID = 0;
+
     std::optional<int64_t> id = std::nullopt;
     std::optional<std::string> key = std::nullopt;
+
+    bool is_empty() const
+    {
+        bool has_id = id.has_value() && id.value() != INVALID_OBJECT_ID;
+        bool has_key = key.has_value() && !key.value().empty();
+
+        // empty if both id and key are not set
+        return !has_id && !has_key;
+    }
 
     std::string to_string() const
     {

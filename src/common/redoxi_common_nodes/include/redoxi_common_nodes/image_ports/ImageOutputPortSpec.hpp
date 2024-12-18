@@ -1,6 +1,7 @@
 #pragma once
 
 #include <any>
+#include <variant>
 #include <boost/uuid/uuid_generators.hpp>
 #include <builtin_interfaces/msg/time.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -9,9 +10,13 @@
 
 #include <redoxi_common_cpp/image_proc/utils.hpp>
 #include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
+
 #include <redoxi_common_cpp/redoxi_concepts.hpp>
 #include <redoxi_common_nodes/async_action_port/AsyncActionOutputTypes.hpp>
+
+#include <redoxi_common_cpp/ros_utils/shm_utils.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
+
 #include <redoxi_public_msgs/action/process_frame.hpp>
 #include <redoxi_public_msgs/msg/frame_metadata.hpp>
 // #include <redoxi_public_msgs/msg/process_frame_goal.hpp>
@@ -28,46 +33,69 @@ struct FrameWithMetadata {
     using Metadata_t = redoxi_public_msgs::msg::FrameMetadata;
     using Frame_t = redoxi_public_msgs::msg::Frame;
 
-    cv::Mat image;
-    Metadata_t metadata;
+    struct RawData {
+        cv::Mat image;
+        Metadata_t metadata;
+    };
+    using RawData_t = RawData;
+
+    // cv::Mat image;
+    // Metadata_t metadata;
+    std::variant<RawData_t, Frame_t> data = RawData_t();
 
     bool is_empty() const
     {
-        return image.empty();
-    }
-
-    const std::string &get_encoding() const
-    {
-        return metadata.encoding;
-    }
-
-    int to_frame_msg(Frame_t &frame) const
-    {
-        if (is_empty()) {
-            frame = Frame_t();
-        } else {
-            image_utils::FrameMediator fm(image, metadata);
-            fm.to_frame_msg(frame);
+        bool has_cv_mat = false;
+        if (std::holds_alternative<RawData_t>(this->data)) {
+            has_cv_mat = !std::get<RawData_t>(this->data).image.empty();
         }
-        return 0;
+
+        bool has_frame_msg = false;
+        if (std::holds_alternative<Frame_t>(this->data)) {
+            const auto &frame_data = std::get<Frame_t>(this->data);
+            has_frame_msg = !frame_data.raw_image.data.empty() || !shm_utils::ShmTokenTraits::is_valid(frame_data.shm_token);
+        }
+        return has_cv_mat || has_frame_msg;
+    }
+
+    std::string get_encoding() const
+    {
+        if (std::holds_alternative<Frame_t>(this->data)) {
+            return std::get<Frame_t>(this->data).metadata.encoding;
+        } else {
+            return std::get<RawData_t>(this->data).metadata.encoding;
+        }
+    }
+
+    // int to_frame_msg(Frame_t &frame) const
+    // {
+    //     if (is_empty()) {
+    //         frame = Frame_t();
+    //     } else {
+    //         if (std::holds_alternative<RawData_t>(this->data)) {
+    //             const auto &raw_data = std::get<RawData_t>(this->data);
+    //             image_utils::FrameMediator fm(raw_data.image, raw_data.metadata);
+    //             fm.to_frame_msg(frame);
+    //         } else {
+    //             frame = std::get<Frame_t>(this->data);
+    //         }
+    //     }
+    //     return 0;
+    // }
+
+    image_utils::FrameMediator to_frame_mediator() const
+    {
+        if (std::holds_alternative<Frame_t>(this->data)) {
+            return image_utils::FrameMediator(&std::get<Frame_t>(this->data));
+        } else {
+            return image_utils::FrameMediator(std::get<RawData_t>(this->data).image, std::get<RawData_t>(this->data).metadata);
+        }
     }
 
     //! create from frame message, with data copied from the frame message
-    int from_frame_msg_copy(const Frame_t &frame)
+    int from_frame_msg(const Frame_t &frame)
     {
-        image_utils::FrameMediator fm(&frame);
-        fm.to_cv_image_copy(image);
-        metadata = fm.get_metadata();
-        return 0;
-    }
-
-    //! create from frame message, with data shared with the frame message
-    //! you must ensure the frame message is not destroyed before the frame data
-    int from_frame_msg_shared(const redoxi_public_msgs::msg::Frame &frame)
-    {
-        image_utils::FrameMediator fm(&frame);
-        image = fm.to_cv_image_shared();
-        metadata = fm.get_metadata();
+        this->data = frame;
         return 0;
     }
 };
@@ -211,7 +239,7 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
         }
 
         // convert primary frame to ROS message
-        image_utils::FrameMediator fm(m_primary_frame.image, m_primary_frame.get_encoding());
+        auto fm = m_primary_frame.to_frame_mediator();
         fm.to_image_msg(msg);
 
         auto header = msg.header;
@@ -230,16 +258,12 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
 
     virtual void from_frame_bundle(const FrameBundle_t &frame_bundle)
     {
-        image_utils::FrameMediator fm(&frame_bundle.primary_frame);
-        fm.to_cv_image_copy(m_primary_frame.image);
-        m_primary_frame.metadata = fm.get_metadata();
+        m_primary_frame.from_frame_msg(frame_bundle.primary_frame);
 
         // for secondary frames
         m_secondary_frames.resize(frame_bundle.secondary_frames.size());
         for (size_t i = 0; i < frame_bundle.secondary_frames.size(); ++i) {
-            image_utils::FrameMediator fm(&frame_bundle.secondary_frames[i]);
-            fm.to_cv_image_copy(m_secondary_frames[i].image);
-            m_secondary_frames[i].metadata = fm.get_metadata();
+            m_secondary_frames[i].from_frame_msg(frame_bundle.secondary_frames[i]);
         }
     }
 

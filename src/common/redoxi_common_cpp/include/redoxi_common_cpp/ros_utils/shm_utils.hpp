@@ -43,5 +43,59 @@ struct ShmTokenTraits {
         bool is_service_type_compatible = shm_config.service_type == token.service_type;
         return is_token_valid && is_service_type_compatible;
     }
+
+    static shared_memory::ObjectIdentifier get_object_identifier(const TokenMsg_t &token)
+    {
+        shared_memory::ObjectIdentifier output;
+        if (token.object_id != token.INVALID_OBJECT_ID) {
+            output.id = token.object_id;
+        }
+        if (!token.object_key.empty()) {
+            output.key = token.object_key;
+        }
+        return output;
+    }
+
+    // readable by default client?
+    static bool is_readable_by_default_client(const TokenMsg_t &token)
+    {
+        auto shm_client = shared_memory::SharedMemoryFactory::get_instance().get_default_client().lock();
+        if (!shm_client) {
+            RDX_INFO_DEV(nullptr, __func__, "{}", "Failed to get default client");
+            return false;
+        } else {
+            RDX_INFO_DEV(nullptr, __func__, "{}", "Got default client");
+        }
+
+        auto is_compatible = is_client_and_token_compatible(shm_client.get(), token);
+        if (!is_compatible) {
+            RDX_INFO_DEV(nullptr, __func__, "Token is not compatible with default client, token.service_type={}, token.region_key={}, shm_config.service_type={}, shm_config.region_key={}",
+                         token.service_type, token.region_key, shm_client->get_shm_config().service_type, shm_client->get_shm_config().region_key);
+            return false;
+        } else {
+            RDX_INFO_DEV(nullptr, __func__, "Token is compatible with default client, token.service_type={}, token.region_key={}, shm_config.service_type={}, shm_config.region_key={}",
+                         token.service_type, token.region_key, shm_client->get_shm_config().service_type, shm_client->get_shm_config().region_key);
+        }
+
+        // check if the token is readable by the default client
+        auto object_id = get_object_identifier(token);
+        if (object_id.is_empty()) {
+            RDX_INFO_DEV(nullptr, __func__, "{}", "Token is empty");
+            return false;
+        } else {
+            RDX_INFO_DEV(nullptr, __func__, "Token is not empty, object id={}", object_id.to_string());
+        }
+
+        auto got_data = shm_client->get_data(nullptr, nullptr, object_id) == 0;
+        if (!got_data) {
+            RDX_INFO_DEV(nullptr, __func__, "Failed to get data from shared memory, object_id={}",
+                         object_id.to_string());
+        } else {
+            RDX_INFO_DEV(nullptr, __func__, "Got data from shared memory, object_id={}",
+                         object_id.to_string());
+        }
+
+        return got_data;
+    }
 };
 } // namespace redoxi_works::shm_utils

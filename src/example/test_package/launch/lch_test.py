@@ -143,13 +143,14 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
             action_name="in/frame",
         ),
         output_port_config=detDriverCfg.OutputPortConfig(
-            downstream_specs=[
-                detDriverCfg.DownstreamSpec(
-                    name=tracker_driver_node_name,
-                    action_name=f"/{tracker_driver_node_name}/{tracker_driver_node_params.init_config.input_port_config.action_name}",
-                    create_debug_pub=True,
-                ),
-            ],
+            # downstream_specs=[
+            #     detDriverCfg.DownstreamSpec(
+            #         name=tracker_driver_node_name,
+            #         action_name=f"/{tracker_driver_node_name}/{tracker_driver_node_params.init_config.input_port_config.action_name}",
+            #         create_debug_pub=True,
+            #     ),
+            # ],
+            visualization_topic_for_target_data="vis_msg/target_data",
         ),
         callee_request_port_config=detDriverCfg.OutputPortConfig(
             downstream_specs=[
@@ -177,23 +178,21 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
         video_url=fn_video,
         auto_replay=True,
         primary_output_spec=videoSrcCfg.OutputPortConfig(
-            # downstream_specs=[
-            #     videoSrcCfg.DownstreamSpec(
-            #         name=det_driver_node_name,
-            #         action_name=f"/{det_driver_node_name}/{det_driver_node_params.init_config.input_port_config.action_name}",
-            #         delivery_policy=videoSrcCfg.DeliveryPolicy(
-            #             drop_strategy=videoSrcCfg.DropStrategy.DontCare,
-            #         ),
-            #         create_debug_pub=True,
-            #     ),
-            # ],
-            # data_topic_for_source_data="data_msg/source_data",
-            # data_topic_for_target_data="data_msg/target_data",
+            downstream_specs=[
+                videoSrcCfg.DownstreamSpec(
+                    name=det_driver_node_name,
+                    action_name=f"/{det_driver_node_name}/{det_driver_node_params.init_config.input_port_config.action_name}",
+                    delivery_policy=videoSrcCfg.DeliveryPolicy(
+                        drop_strategy=videoSrcCfg.DropStrategy.DontCare,
+                    ),
+                    create_debug_pub=True,
+                ),
+            ],
             visualization_topic_for_target_data="vis_msg/target_data",
         ),
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
-        step_interval=StepIntervals.Medium,
+        step_interval=StepIntervals.VerySlow,
         video_start_time=0,
         video_end_time=-1,
         frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
@@ -326,9 +325,9 @@ def generate_launch_description():
         [
             *env_var_settings,
             log_level_arg,
-            # detection_node,
+            detection_node,
             video_src_node,
-            # det_driver_node,
+            det_driver_node,
             # tracking_node,
             # tracking_driver_node,
             # frame_relay_node,
