@@ -19,6 +19,7 @@ PackagesToBuild="redoxi_common_nodes \
                  redoxi_inference \
                  redoxi_inference_onnx \
                  redoxi_dnn_models \
+                 redoxi_shm_v6d \
                  yolo8_series \
                  test_package \
                  universal_mot_trackers \

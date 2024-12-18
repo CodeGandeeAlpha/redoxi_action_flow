@@ -6,8 +6,11 @@
 #include <std_msgs/msg/header.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <redoxi_shared_memory/SharedMemoryTypes.hpp>
 #include <redoxi_public_msgs/msg/frame.hpp>
 #include <redoxi_public_msgs/msg/frame_metadata.hpp>
+#include <redoxi_common_cpp/redoxi_options.hpp>
+
 
 namespace redoxi_works::image_utils
 {
@@ -21,6 +24,8 @@ class FrameMediator
     using Metadata_t = redoxi_public_msgs::msg::FrameMetadata;
     using FrameMsg_t = redoxi_public_msgs::msg::Frame;
     using ImageMsg_t = sensor_msgs::msg::Image;
+    using MsgStorageOptions_t = options::MessageStorageOptions;
+
     inline constexpr static std::string_view AssumedEncoding_3ch_u8 = "bgr8";
     inline constexpr static std::string_view AssumedEncoding_1ch_u8 = "mono8";
     inline constexpr static std::string_view AssumedEncoding_3ch_u16 = "bgr16";
@@ -98,6 +103,14 @@ class FrameMediator
     cv::Mat to_cv_image_copy(std::optional<std::string> encoding = std::nullopt) const;
 
     /**
+     * @brief Get shared cv::Mat view of the frame, the memory is shared with the frame message
+     * @param cv_image Output cv::Mat image.
+     * @return 0 on success.
+     * @note Assumes the frame message is valid and the memory is not freed
+     */
+    int to_cv_image_shared(cv::Mat &output) const;
+
+    /**
      * @brief Get shared cv::Mat view of the frame.
      * @return The shared cv::Mat view.
      * @note Assumes underlying frame data remains valid
@@ -109,12 +122,14 @@ class FrameMediator
      * @brief Convert to frame message with optional encoding conversion.
      * @param frame_msg Output frame message.
      * @param encoding Optional target encoding.
+     * @param storage_options Optional storage options.
      * @return 0 on success.
      * @note Assumes if encoding is provided, it's a valid OpenCV format
      * @note Assumes conversion between source and target encoding is possible
      */
     int to_frame_msg(redoxi_public_msgs::msg::Frame &frame_msg,
-                     std::optional<std::string> encoding = std::nullopt) const;
+                     std::optional<std::string> encoding = std::nullopt,
+                     MsgStorageOptions_t storage_options = MsgStorageOptions_t()) const;
 
     /**
      * @brief Convert to image message with optional encoding conversion.

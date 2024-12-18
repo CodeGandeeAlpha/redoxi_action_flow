@@ -72,9 +72,14 @@ int FrameMediator::to_cv_image_copy(cv::Mat &cv_image, std::optional<std::string
     std::string source_encoding = get_encoding();
 
     // read as shared first
-    cv::Mat shared_cv_image = to_cv_image_shared();
+    cv::Mat shared_cv_image;
+    auto ret_shared_image = to_cv_image_shared(shared_cv_image);
+    if (ret_shared_image != 0) {
+        cv_image = cv::Mat();
+        return ret_shared_image;
+    }
 
-    // got shared image?
+    // got non empty shared image?
     if (!shared_cv_image.empty()) {
         // same encoding?
         if (source_encoding == target_encoding) {
@@ -85,7 +90,9 @@ int FrameMediator::to_cv_image_copy(cv::Mat &cv_image, std::optional<std::string
             auto cv_img_ptr = std::make_shared<cv_bridge::CvImage>(std_msgs::msg::Header(),
                                                                    source_encoding, shared_cv_image);
             auto converted_cv_img_ptr = cv_bridge::cvtColor(cv_img_ptr, target_encoding);
-            cv_image = converted_cv_img_ptr->image;
+
+            // just be safe, copy the image
+            converted_cv_img_ptr->image.copyTo(cv_image);
         }
         return 0;
     } else {
@@ -93,94 +100,6 @@ int FrameMediator::to_cv_image_copy(cv::Mat &cv_image, std::optional<std::string
         cv_image = cv::Mat();
         return 0;
     }
-
-    // auto empty_return = [&]() {
-    //     cv_image = cv::Mat();
-    //     return -1;
-    // };
-
-    // if (m_frame_msg) {
-    //     // having a message at hand, try to read the frame,
-    //     // read from raw data first, if not available, read from shm, if still failed, return empty cv::Mat
-    //     const auto &raw_image = m_frame_msg->raw_image;
-    //     const auto &shm_token = m_frame_msg->shm_token;
-
-    //     // do we have raw data?
-    //     if (!raw_image.data.empty()) {
-    //         // have raw data, use it
-    //         auto cv_img = cv_bridge::toCvCopy(raw_image, target_encoding);
-    //         cv_image = cv_img->image;
-    //     } else if (shm_utils::ShmTokenTraits::is_valid(shm_token)) {
-    //         // get the default shm client for reading the frame
-    //         auto shm_client = shared_memory::SharedMemoryFactory::get_instance().get_default_client().lock();
-    //         if (!shm_client) {
-    //             RDX_WARN_DEV(nullptr, __func__, "no shm client available for service type={}",
-    //                          shm_token.service_type);
-    //             return empty_return();
-    //         }
-
-    //         // check if the client is compatible with the token, return empty cv::Mat if not
-    //         if (!shm_utils::ShmTokenTraits::is_client_and_token_compatible(shm_client.get(), shm_token)) {
-    //             RDX_WARN_DEV(nullptr, __func__, "shm client is not compatible with the token, client.service_type={}, token.service_type={}",
-    //                          shm_client->get_shm_config().service_type, shm_token.service_type);
-    //             return empty_return();
-    //         }
-
-    //         // now read it from client
-    //         shared_memory::ObjectIdentifier obj_id;
-    //         if (shm_token.object_id != shm_token.INVALID_OBJECT_ID) {
-    //             obj_id.id = shm_token.object_id;
-    //         } else if (!shm_token.object_key.empty()) {
-    //             obj_id.key = shm_token.object_key;
-    //         } else {
-    //             RDX_RAISE_ERROR("[f={}] invalid object identifier", __func__);
-    //         }
-
-    //         // read from shm
-    //         cv::Mat output_cvmat;
-    //         auto data_block = shm_client->get_data(obj_id);
-    //         if (!data_block) {
-    //             RDX_WARN_DEV(nullptr, __func__, "failed to read data block from shm, obj_id={}", obj_id.to_string());
-    //             return empty_return();
-    //         }
-    //         auto got_cvmat_from_shm = data_block->get_as_cvmat(&output_cvmat);
-    //         if (got_cvmat_from_shm != 0) {
-    //             RDX_WARN_DEV(nullptr, __func__, "failed to get cv::Mat from data block, obj_id={}", obj_id.to_string());
-    //             return empty_return();
-    //         }
-
-    //         // convert encoding if needed
-    //         if (source_encoding != target_encoding) {
-    //             auto cv_img_ptr = std::make_shared<cv_bridge::CvImage>(std_msgs::msg::Header(),
-    //                                                                    source_encoding, output_cvmat);
-    //             auto converted_cv_img_ptr = cv_bridge::cvtColor(cv_img_ptr, target_encoding);
-    //             cv_image = converted_cv_img_ptr->image; // this is already a copy
-    //         } else {
-    //             // no copy? just use the output_cvmat
-    //             output_cvmat.copyTo(cv_image);
-    //         }
-
-    //         return 0;
-    //     }
-    // } else if (m_frame.empty()) {
-    //     // no message, no frame, return empty cv::Mat
-    //     cv_image = cv::Mat();
-    // } else {
-    //     // no message, but have a frame, return it, no need to deal with shm
-    //     if (source_encoding == target_encoding) {
-    //         RDX_INFO_DEV(nullptr, __func__, "source encoding={}, target encoding={}, no conversion",
-    //                      source_encoding, target_encoding);
-    //         cv_image = m_frame.clone();
-    //     } else {
-    //         RDX_INFO_DEV(nullptr, __func__, "source encoding={}, target encoding={}, convert encoding",
-    //                      source_encoding, target_encoding);
-    //         auto cv_img_ptr = std::make_shared<cv_bridge::CvImage>(std_msgs::msg::Header(),
-    //                                                                source_encoding, m_frame);
-    //         auto converted_cv_img_ptr = cv_bridge::cvtColor(cv_img_ptr, target_encoding);
-    //         cv_image = converted_cv_img_ptr->image;
-    //     }
-    // }
-    // return 0;
 }
 
 cv::Mat FrameMediator::to_cv_image_copy(std::optional<std::string> encoding) const
@@ -193,12 +112,23 @@ cv::Mat FrameMediator::to_cv_image_copy(std::optional<std::string> encoding) con
     return cv_image;
 }
 
-cv::Mat FrameMediator::to_cv_image_shared() const
+int FrameMediator::to_cv_image_shared(cv::Mat &output) const
 {
     if (!m_frame_msg) {
         // no frame message, return the frame itself
-        return m_frame;
+        output = m_frame;
+        return 0;
     }
+
+    auto return_error = [&]() {
+        output = cv::Mat();
+        return -1;
+    };
+
+    auto return_ok_but_empty = [&]() {
+        output = cv::Mat();
+        return 0;
+    };
 
     // have frame message, try to read the frame from it
     const auto &raw_image = m_frame_msg->raw_image;
@@ -208,14 +138,15 @@ cv::Mat FrameMediator::to_cv_image_shared() const
         // have raw data, use it
         auto dummy = std::make_shared<int>(); // required by cv_bridge
         auto cv_img = cv_bridge::toCvShare(raw_image, dummy);
-        return cv_img->image;
+        output = cv_img->image;
+        return 0;
     } else {
         // try shm
 
         // do we have a valid shm token?
         if (!shm_utils::ShmTokenTraits::is_valid(shm_token)) {
             // no, return empty cv::Mat
-            return cv::Mat();
+            return return_ok_but_empty();
         }
 
         // get the default shm client for reading the frame
@@ -224,14 +155,14 @@ cv::Mat FrameMediator::to_cv_image_shared() const
             // no shm client, return empty cv::Mat
             RDX_WARN_DEV(nullptr, __func__, "no shm client available for service type={}",
                          shm_token.service_type);
-            return cv::Mat();
+            return return_ok_but_empty();
         }
 
         // check if the client is compatible with the token, return empty cv::Mat if not
         if (!shm_utils::ShmTokenTraits::is_client_and_token_compatible(shm_client.get(), shm_token)) {
             RDX_WARN_DEV(nullptr, __func__, "shm client is not compatible with the token, client.service_type={}, token.service_type={}",
                          shm_client->get_shm_config().service_type, shm_token.service_type);
-            return cv::Mat();
+            return return_error();
         }
 
         // now read it from client
@@ -241,7 +172,8 @@ cv::Mat FrameMediator::to_cv_image_shared() const
         } else if (!shm_token.object_key.empty()) {
             obj_id.key = shm_token.object_key;
         } else {
-            RDX_RAISE_ERROR("[f={}] invalid object identifier", __func__);
+            RDX_WARN_DEV(nullptr, __func__, "invalid object identifier {}", obj_id.to_string());
+            return return_error();
         }
 
         // read from shm
@@ -249,15 +181,26 @@ cv::Mat FrameMediator::to_cv_image_shared() const
         auto data_block = shm_client->get_data(obj_id);
         if (!data_block) {
             RDX_WARN_DEV(nullptr, __func__, "failed to read data block from shm, obj_id={}", obj_id.to_string());
-            return cv::Mat();
+            return return_error();
         }
         auto got_cvmat_from_shm = data_block->get_as_cvmat(&output_cvmat);
         if (got_cvmat_from_shm != 0) {
             RDX_WARN_DEV(nullptr, __func__, "failed to get cv::Mat from data block, obj_id={}", obj_id.to_string());
-            return cv::Mat();
+            return return_error();
         }
-        return output_cvmat;
+        output = output_cvmat;
+        return 0;
     }
+}
+
+cv::Mat FrameMediator::to_cv_image_shared() const
+{
+    cv::Mat output;
+    auto ret = to_cv_image_shared(output);
+    if (ret != 0) {
+        return cv::Mat();
+    }
+    return output;
 }
 
 int FrameMediator::to_image_msg(sensor_msgs::msg::Image &image_msg,
@@ -303,13 +246,105 @@ int FrameMediator::to_image_msg(sensor_msgs::msg::Image &image_msg,
 }
 
 int FrameMediator::to_frame_msg(redoxi_public_msgs::msg::Frame &frame_msg,
-                                std::optional<std::string> encoding) const
+                                std::optional<std::string> encoding,
+                                MsgStorageOptions_t storage_options) const
 {
-    //! Convert image to frame message with optional encoding conversion
-    auto ret = to_image_msg(frame_msg.raw_image, encoding);
-    frame_msg.metadata = m_frame_metadata;
-    make_metadata_compatible(&frame_msg.metadata, frame_msg.raw_image);
-    return ret;
+    bool use_shm = false;
+    std::shared_ptr<shared_memory::SharedMemoryClient> shm_client;
+    std::string source_encoding = get_encoding();
+    std::string target_encoding = encoding.value_or(source_encoding);
+
+    switch (storage_options.storage_type) {
+        case MsgStorageOptions_t::StorageType::Auto:
+            // do we have a client?
+            shm_client = shared_memory::SharedMemoryFactory::get_instance().get_default_client().lock();
+            use_shm = shm_client != nullptr; // make decision based on whether we have a client
+            break;
+        case MsgStorageOptions_t::StorageType::RosSerialized:
+            use_shm = false;
+            break;
+        case MsgStorageOptions_t::StorageType::SharedMemory:
+            shm_client = shared_memory::SharedMemoryFactory::get_instance().get_default_client().lock();
+            use_shm = true; // no matter what, use shm
+            break;
+    }
+
+    //! Convert image to frame message with optional encoding conversion and storage options
+    if (!use_shm) {
+        RDX_INFO_DEV(nullptr, __func__, "{}", "not using shared memory, converting image to frame message");
+        // not using shared memory, just convert it normally
+        auto ret = to_image_msg(frame_msg.raw_image, encoding);
+        frame_msg.metadata = m_frame_metadata;
+        make_metadata_compatible(&frame_msg.metadata, frame_msg.raw_image);
+        return ret;
+    } else {
+        // you want to use shm
+        RDX_INFO_DEV(nullptr, __func__, "{}", "using shared memory");
+        if (m_frame_msg) {
+            // we have a frame message, is it already in shared memory and encoding is the same?
+            const auto &shm_token = m_frame_msg->shm_token;
+            if (shm_utils::ShmTokenTraits::is_valid(shm_token) && source_encoding == target_encoding) {
+                // yes, just copy it
+                RDX_INFO_DEV(nullptr, __func__, "{}", "frame message is already in shared memory, encoding is the same, just copy token");
+                frame_msg = *m_frame_msg;
+                return 0;
+            }
+        }
+
+        // get cv mat of this frame
+        RDX_INFO_DEV(nullptr, __func__, "{}", "need to convert image to cv::Mat");
+        cv::Mat output_image;
+        bool got_cvmat = false;
+        if (source_encoding == target_encoding) {
+            // same encoding, better not to copy
+            RDX_INFO_DEV(nullptr, __func__, "{}", "same encoding, better not to copy");
+            got_cvmat = to_cv_image_shared(output_image) == 0;
+        } else {
+            // different encoding, have to copy
+            RDX_INFO_DEV(nullptr, __func__, "{}", "different encoding, have to copy");
+            got_cvmat = to_cv_image_copy(output_image, encoding) == 0;
+        }
+
+        if (!got_cvmat) {
+            // cannot get anything, return error
+            RDX_INFO_DEV(nullptr, __func__, "{}", "cannot get anything, return error");
+            return -1;
+        } else if (output_image.empty()) {
+            // empty image, no need to write to shm
+            RDX_INFO_DEV(nullptr, __func__, "{}", "empty image, no need to write to shm");
+            return 0;
+        } else {
+            // got something to write, check if we have a client
+            if (!shm_client) {
+                // you want to use shm but no client available, this is error
+                RDX_RAISE_ERROR("[f={}] no shm client available, but requested to use shm", __func__);
+            }
+
+            // now we have a client, put the frame into it
+            auto &shm_token = frame_msg.shm_token;
+            shared_memory::ObjectIdentifier obj_id;
+            auto data_block = shm_client->create_datablock();
+            data_block->from_cvmat(output_image);
+            RDX_INFO_DEV(nullptr, __func__, "putting data block into shm, image width={}, height={}, channels={}, encoding={}",
+                         output_image.cols, output_image.rows, output_image.channels(), target_encoding);
+            auto ret = shm_client->put_data(&obj_id, data_block.get(), nullptr, storage_options.shm_put_options);
+            if (ret != 0) {
+                RDX_WARN_DEV(nullptr, __func__, "failed to put data block into shm, obj_id={}", obj_id.to_string());
+                return ret;
+            } else {
+                RDX_INFO_DEV(nullptr, __func__, "put data block into shm, obj_id={}", obj_id.to_string());
+            }
+
+            // success, update the frame message
+            frame_msg.shm_token = shm_token;
+            frame_msg.metadata = m_frame_metadata;
+            make_metadata_compatible(&frame_msg.metadata, output_image);
+            frame_msg.metadata.encoding = target_encoding;
+            RDX_INFO_DEV(nullptr, __func__, "shm frame message is created, object id={}, width={}, height={}, encoding={}",
+                         obj_id.to_string(), frame_msg.metadata.width, frame_msg.metadata.height, frame_msg.metadata.encoding);
+            return 0;
+        }
+    }
 }
 
 // Getter implementations
