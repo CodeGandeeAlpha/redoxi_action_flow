@@ -13,7 +13,7 @@ VineyardShmClient::VineyardShmClient()
     m_expiration_cache.set_on_evict_callback(
         [this](const ObjectIdentifier &object_id, const ExpirationCache &cache) {
             (void)cache;
-            delete_object(object_id, nullptr);
+            _delete_object(object_id, nullptr);
             return 0;
         });
     m_expiration_cache.start_auto_evict();
@@ -73,7 +73,7 @@ int VineyardShmClient::close()
     }
 }
 
-int VineyardShmClient::put_data(vineyard::ObjectID *object_id, const cv::Mat &mat)
+int VineyardShmClient::put_data_direct(vineyard::ObjectID *object_id, const cv::Mat &mat)
 {
     RDX_INFO_DEV(nullptr, __func__, "putting cv::Mat to vineyard, rows={}, cols={}, type={}", mat.rows, mat.cols, mat.type());
     try {
@@ -93,7 +93,7 @@ int VineyardShmClient::put_data(vineyard::ObjectID *object_id, const cv::Mat &ma
         if (object_id) {
             *object_id = sealed->id();
         }
-        RDX_INFO_DEV(nullptr, __func__, "{}", "OK, data put to vineyard");
+        RDX_INFO_DEV(nullptr, __func__, "OK, data put to vineyard, object id={}", sealed->id());
         return 0;
     } catch (const std::exception &e) {
         // Handle any exceptions that might occur during the process
@@ -102,8 +102,8 @@ int VineyardShmClient::put_data(vineyard::ObjectID *object_id, const cv::Mat &ma
     }
 }
 
-int VineyardShmClient::put_data(vineyard::ObjectID *output_object_id,
-                                const uint8_t *data, size_t size)
+int VineyardShmClient::put_data_direct(vineyard::ObjectID *output_object_id,
+                                       const uint8_t *data, size_t size)
 {
     RDX_INFO_DEV(nullptr, __func__, "putting raw data to vineyard, size={}", size);
     try {
@@ -186,46 +186,53 @@ int VineyardShmClient::put_data(ObjectIdentifier *output_object_id,
     if (_data_block->get_as_cvmat(&output_mat) == 0) {
         RDX_INFO_DEV(nullptr, __func__, "{}", "found cv::Mat, put as cv::Mat");
         // found cv::Mat, put as cv::Mat
-        put_return_code = put_data(&object_id, output_mat);
+        put_return_code = put_data_direct(&object_id, output_mat);
     } else if (_data_block->get_as_bytes_ref(&data, &size) == 0) {
         RDX_INFO_DEV(nullptr, __func__, "{}", "found raw data, put as raw data");
         // put as raw data
-        put_return_code = put_data(&object_id, data, size);
+        put_return_code = put_data_direct(&object_id, data, size);
     }
 
     if (put_return_code == 0 && output_object_id) {
+        RDX_INFO_DEV(nullptr, __func__, "setting output object id={}", object_id);
         *output_object_id = {.id = object_id};
     }
 
     // register expiration config
     if (put_return_code == 0) {
+        RDX_INFO_DEV(nullptr, __func__, "{}", "configuring expiration settings");
         ShmPutOptions opt;
         if (put_options.has_value()) {
-            // use the provided put_options if possible
+            RDX_INFO_DEV(nullptr, __func__, "{}", "using user provided put options");
             opt = put_options.value();
         }
 
         if (!opt.alive_duration.has_value()) {
-            // no value? use the default alive duration from m_config
+            RDX_INFO_DEV(nullptr, __func__, "{}", "no alive duration set, using default from config");
             opt.alive_duration = m_config.default_alive_duration;
         }
 
         if (!opt.alive_duration.has_value()) {
-            // still no value? use the max alive duration from m_config
+            RDX_INFO_DEV(nullptr, __func__, "{}", "no default alive duration, using max from config");
             opt.alive_duration = m_config.max_alive_duration;
         }
 
         // expiration is only activated if alive duration is set
         if (opt.alive_duration.has_value()) {
+            RDX_INFO_DEV(nullptr, __func__, "alive duration set to {} microseconds", opt.alive_duration.value().count());
             // clamp the alive duration to the max alive duration from m_config
             if (m_config.max_alive_duration.has_value()) {
                 opt.alive_duration = std::min(opt.alive_duration.value(), m_config.max_alive_duration.value());
+                RDX_INFO_DEV(nullptr, __func__, "clamped alive duration to {} microseconds", opt.alive_duration.value().count());
             }
 
             // add to expiration cache
+            RDX_INFO_DEV(nullptr, __func__, "adding object {} to expiration cache", object_id);
             m_expiration_cache.add_memory_block({.id = object_id}, opt);
         }
     }
+
+    RDX_INFO_DEV(nullptr, __func__, "{}", "put data finished");
     return put_return_code;
 }
 

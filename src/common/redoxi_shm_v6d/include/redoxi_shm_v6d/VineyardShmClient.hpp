@@ -76,10 +76,10 @@ class VineyardShmClient : public SharedMemoryClient
     std::shared_ptr<vineyard::Client> get_client() const;
 
     //! Put cv::Mat into vineyard
-    int put_data(vineyard::ObjectID *output_object_id, const cv::Mat &mat);
+    int put_data_direct(vineyard::ObjectID *output_object_id, const cv::Mat &mat);
 
     //! put raw data to vineyard
-    int put_data(vineyard::ObjectID *output_object_id, const uint8_t *data, size_t size);
+    int put_data_direct(vineyard::ObjectID *output_object_id, const uint8_t *data, size_t size);
 
     //! Get cv::Mat from vineyard
     std::shared_ptr<VineyardTensor_u8> get_data(vineyard::ObjectID object_id);

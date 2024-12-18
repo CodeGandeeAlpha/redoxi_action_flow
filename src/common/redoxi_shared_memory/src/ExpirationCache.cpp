@@ -80,7 +80,7 @@ struct ExpirationCache::Impl {
         m_cache;
 
     // mutex for cache operations
-    std::mutex m_cache_mutex;
+    std::recursive_mutex m_cache_mutex;
 };
 
 ExpirationCache::ExpirationCache()
@@ -138,9 +138,11 @@ void ExpirationCache::set_on_evict_callback(OnEvictCallback_t callback)
 int ExpirationCache::add_memory_block(
     const ObjectIdentifier &object_id, const ShmPutOptions &put_options)
 {
-    std::lock_guard<std::mutex> lock(m_impl->m_cache_mutex);
+    RDX_INFO_DEV(nullptr, __func__, "Adding memory block to expiration cache: {}, put options: {}",
+                 object_id.to_string(), put_options.to_string());
+    std::scoped_lock lock(m_impl->m_cache_mutex);
 
-    RDX_INFO_DEV(nullptr, __func__, "Adding memory block to expiration cache: {}", object_id.to_string());
+    RDX_INFO_DEV(nullptr, __func__, "{}", "cache mutex locked");
 
     // if alive_duration is not set, treat it as no expiration
     // this is handled in DataBlockInfo constructor
@@ -161,9 +163,13 @@ int ExpirationCache::add_memory_block(
     return 0;
 }
 
+// FIXME: code duplication with evict_expired_memory_blocks, should be refactored
 int ExpirationCache::remove_memory_block(const ObjectIdentifier &object_id, bool treat_it_as_expired)
 {
-    std::lock_guard<std::mutex> lock(m_impl->m_cache_mutex);
+    RDX_INFO_DEV(nullptr, __func__, "removing memory block from cache, object id={}, as expired={}",
+                 object_id.to_string(), treat_it_as_expired);
+    std::scoped_lock lock(m_impl->m_cache_mutex);
+    RDX_INFO_DEV(nullptr, __func__, "{}", "cache mutex locked");
 
     // look up the object id in the cache
     auto &left_map = m_impl->m_cache.left;
@@ -212,11 +218,14 @@ int ExpirationCache::remove_memory_block(const ObjectIdentifier &object_id, bool
         m_impl->m_cache.left.erase(it);
         return 0;
     }
+    RDX_INFO_DEV(nullptr, __func__, "{}", "cache mutex unlocked, removed memory block");
 }
 
 int64_t ExpirationCache::evict_expired_memory_blocks(bool force_evict_all)
 {
-    std::lock_guard<std::mutex> lock(m_impl->m_cache_mutex);
+    RDX_INFO_DEV(nullptr, __func__, "{}", "evicting expired memory blocks");
+    std::scoped_lock lock(m_impl->m_cache_mutex);
+    RDX_INFO_DEV(nullptr, __func__, "{}", "cache mutex locked");
 
     auto &right = m_impl->m_cache.right;
     auto time_now = std::chrono::system_clock::now();
@@ -232,7 +241,7 @@ int64_t ExpirationCache::evict_expired_memory_blocks(bool force_evict_all)
         RDX_INFO_DEV(nullptr, __func__, "Found {} expired blocks", std::distance(range.first, range.second));
     }
 
-    int64_t num_evicted = 0;
+    std::vector<ObjectIdentifier> object_ids_to_evict;
     for (auto it = range.first; it != range.second; ++it) {
         auto object_id = it->get_left();
         auto &data_block_info = it->get_right();
@@ -248,9 +257,9 @@ int64_t ExpirationCache::evict_expired_memory_blocks(bool force_evict_all)
 
         // delete the object from shm service
         if (action != ShmPutOptions::ExpiredAction::Keep) {
-            // remove from cache
+            // mark for removal from cache
             RDX_INFO_DEV(nullptr, __func__, "Removing expired block from cache: {}", object_id.to_string());
-            right.erase(it);
+            object_ids_to_evict.push_back(object_id);
 
             // call the callback
             if (m_on_evict_callback) {
@@ -263,15 +272,18 @@ int64_t ExpirationCache::evict_expired_memory_blocks(bool force_evict_all)
                     RDX_INFO_DEV(nullptr, __func__, "Evict callback succeeded for block: {}", object_id.to_string());
                 }
             }
-
-            num_evicted++;
         } else {
             RDX_INFO_DEV(nullptr, __func__, "Keeping expired block: {} as requested", object_id.to_string());
         }
     }
 
-    RDX_INFO_DEV(nullptr, __func__, "Completed eviction, removed {} expired blocks", num_evicted);
-    return num_evicted;
+    // remove the expired blocks from cache
+    for (const auto &object_id : object_ids_to_evict) {
+        m_impl->m_cache.left.erase(object_id);
+    }
+
+    RDX_INFO_DEV(nullptr, __func__, "Completed eviction, removed {} expired blocks", object_ids_to_evict.size());
+    return object_ids_to_evict.size();
 }
 
 } // namespace redoxi_works::shared_memory

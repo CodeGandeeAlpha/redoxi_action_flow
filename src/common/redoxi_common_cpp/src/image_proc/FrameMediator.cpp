@@ -215,10 +215,20 @@ int FrameMediator::to_image_msg(sensor_msgs::msg::Image &image_msg,
         const auto &raw_image = m_frame_msg->raw_image;
 
         if (raw_image.data.empty()) {
-            //! For empty raw image, just copy as-is
-            image_msg = raw_image;
-            image_msg.encoding = target_encoding;
+            // empty, try to get it from shm
+            cv::Mat shm_cv_image;
+            auto ret = to_cv_image_shared(shm_cv_image);
+            if (ret != 0) {
+                RDX_WARN_DEV(nullptr, __func__, "failed to get cv::Mat from shm, ret={}", ret);
+                return ret;
+            }
+
+            // convert shm_cv_image to image msg
+            auto bridge_image = std::make_shared<cv_bridge::CvImage>(std_msgs::msg::Header(), source_encoding, shm_cv_image);
+            auto converted_cv_img_ptr = cv_bridge::cvtColor(bridge_image, target_encoding);
+            image_msg = *converted_cv_img_ptr->toImageMsg();
         } else {
+            // we have raw image, just use it
             if (source_encoding == target_encoding) {
                 //! If encodings match, copy raw image directly
                 image_msg = raw_image;
@@ -247,14 +257,16 @@ int FrameMediator::to_image_msg(sensor_msgs::msg::Image &image_msg,
 
 int FrameMediator::to_frame_msg(redoxi_public_msgs::msg::Frame &frame_msg,
                                 std::optional<std::string> encoding,
-                                MsgStorageOptions_t storage_options) const
+                                std::optional<MsgStorageOptions_t> storage_options) const
 {
+    MsgStorageOptions_t _storage_options = storage_options.value_or(MsgStorageOptions_t());
+
     bool use_shm = false;
     std::shared_ptr<shared_memory::SharedMemoryClient> shm_client;
     std::string source_encoding = get_encoding();
     std::string target_encoding = encoding.value_or(source_encoding);
 
-    switch (storage_options.storage_type) {
+    switch (_storage_options.storage_type) {
         case MsgStorageOptions_t::StorageType::Auto:
             // do we have a client?
             shm_client = shared_memory::SharedMemoryFactory::get_instance().get_default_client().lock();
@@ -327,7 +339,7 @@ int FrameMediator::to_frame_msg(redoxi_public_msgs::msg::Frame &frame_msg,
             data_block->from_cvmat(output_image);
             RDX_INFO_DEV(nullptr, __func__, "putting data block into shm, image width={}, height={}, channels={}, encoding={}",
                          output_image.cols, output_image.rows, output_image.channels(), target_encoding);
-            auto ret = shm_client->put_data(&obj_id, data_block.get(), nullptr, storage_options.shm_put_options);
+            auto ret = shm_client->put_data(&obj_id, data_block.get(), nullptr, _storage_options.shm_put_options);
             if (ret != 0) {
                 RDX_WARN_DEV(nullptr, __func__, "failed to put data block into shm, obj_id={}", obj_id.to_string());
                 return ret;
@@ -336,12 +348,22 @@ int FrameMediator::to_frame_msg(redoxi_public_msgs::msg::Frame &frame_msg,
             }
 
             // success, update the frame message
+            // TODO: this part should be encapsulated in a function
+            shm_token.object_id = obj_id.id.value();
+            shm_token.object_key = obj_id.key.value_or("");
+            {
+                size_t size;
+                data_block->get_as_bytes_ref(nullptr, &size);
+                shm_token.object_size = size;
+            }
+            shm_token.region_key = shm_client->get_shm_config().region_key;
+            shm_token.service_type = shm_client->get_shm_config().service_type;
             frame_msg.shm_token = shm_token;
             frame_msg.metadata = m_frame_metadata;
             make_metadata_compatible(&frame_msg.metadata, output_image);
             frame_msg.metadata.encoding = target_encoding;
             RDX_INFO_DEV(nullptr, __func__, "shm frame message is created, object id={}, width={}, height={}, encoding={}",
-                         obj_id.to_string(), frame_msg.metadata.width, frame_msg.metadata.height, frame_msg.metadata.encoding);
+                         frame_msg.shm_token.object_id, frame_msg.metadata.width, frame_msg.metadata.height, frame_msg.metadata.encoding);
             return 0;
         }
     }
@@ -499,7 +521,16 @@ bool FrameMediator::is_compatible(const ImageMsg_t &image_msg, const Metadata_t 
 
 bool FrameMediator::is_compatible(const FrameMsg_t &frame_msg, const Metadata_t &metadata)
 {
-    return is_compatible(frame_msg.raw_image, metadata);
+    const auto &raw_image = frame_msg.raw_image;
+
+    if (!raw_image.data.empty()) {
+        return is_compatible(raw_image, metadata);
+    } else {
+        // FIXME: this is not correct, shm image may not be compatible with metadata, leave it for now
+        bool size_compatible = frame_msg.metadata.width == metadata.width && frame_msg.metadata.height == metadata.height;
+        bool encoding_compatible = frame_msg.metadata.encoding == metadata.encoding;
+        return size_compatible && encoding_compatible;
+    }
 }
 
 } // namespace redoxi_works::image_utils

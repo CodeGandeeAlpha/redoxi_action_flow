@@ -122,14 +122,14 @@ class FrameMediator
      * @brief Convert to frame message with optional encoding conversion.
      * @param frame_msg Output frame message.
      * @param encoding Optional target encoding.
-     * @param storage_options Optional storage options.
+     * @param storage_options Optional storage options, if not set, use default options
      * @return 0 on success.
      * @note Assumes if encoding is provided, it's a valid OpenCV format
      * @note Assumes conversion between source and target encoding is possible
      */
     int to_frame_msg(redoxi_public_msgs::msg::Frame &frame_msg,
                      std::optional<std::string> encoding = std::nullopt,
-                     MsgStorageOptions_t storage_options = MsgStorageOptions_t()) const;
+                     std::optional<MsgStorageOptions_t> storage_options = std::nullopt) const;
 
     /**
      * @brief Convert to image message with optional encoding conversion.

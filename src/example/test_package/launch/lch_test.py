@@ -6,6 +6,17 @@ from launch.actions import DeclareLaunchArgument
 import json
 
 import yolo8_series.configs as yolo
+import redoxi_common_py.configs.detection_relay as detRelayCfg
+import redoxi_common_py.configs.video_source_from_url as videoSrcCfg
+import redoxi_common_py.configs.detection_driver as detDriverCfg
+import redoxi_common_py.configs.frame_relay as frameRelayCfg
+import universal_mot_trackers.node_configs as motTrackersCfg
+import universal_mot_trackers.driver_configs as motTrackersDriverCfg
+
+try:
+    from attrs import asdict
+except ImportError:
+    from attr import asdict
 
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
@@ -18,70 +29,88 @@ log_level_arg = DeclareLaunchArgument(
 class StepIntervals:
     VerySlow = 3000000
     Slow = 200000
-    Medium = 20000
+    Medium = 1000000 / 25
     Fast = 5000
     VeryFast = 1000
 
 
-InputPortQueueSize = 10
+# the graph structure is:
+# video_source -> detection_driver -> tracker_driver -> frame_relay
+#                       |                   |
+#                    detector           tracker
 
-FrameInputActionName = "in/frame"
-DetectionRequestInputActionName = "in/detection_request"
-DetectionRequestOutputActionName = "out/detection_request"
-DetectionResponseInputActionName = "in/detection_response"
-DetectionResponseOutputActionName = "out/detection_response"
+# tracker_driver -> frame_relay
+frame_relay_node_name = "frame_relay"
+frame_relay_node_params = frameRelayCfg.FrameRelayNodeConfig(
+    init_config=frameRelayCfg.FrameRelayNodeInitConfig(
+        input_port_config=frameRelayCfg.InputPortConfig(
+            action_name="in/frame",
+        ),
+        publish_topic="out/relayed_frame",
+    ),
+)
 
-DetectionNodeName = "detector"
-DetectionNodeInputActionName = DetectionRequestInputActionName
+# tracker_driver <-> tracker
+tracker_node_name = "tracker"
+tracker_node_params = motTrackersCfg.UniversalMotTrackersNodeConfig(
+    init_config=motTrackersCfg.UniversalMotTrackersInitConfig(
+        input_port_config=motTrackersCfg.InputPortConfig(
+            action_name="in/track_request",
+        ),
+        publish_visualization_topic="vis/tracking",
+        # preferred_image_size={"width": 1920, "height": 1080},
+    ),
+    runtime_config=motTrackersCfg.UniversalMotTrackersRuntimeConfig(
+        enable_blocking_mode=False,
+        enable_visualization=True,
+    ),
+)
 
-VideoSourceNodeName = "video_source"
+# tracker_driver -> frame_relay
+#       |
+#    tracker
+tracker_driver_node_name = "tracker_driver"
+tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
+    init_config=motTrackersDriverCfg.TrackerDriverInitConfig(
+        input_port_config=motTrackersDriverCfg.InputPortConfig(
+            action_name="in/detections",
+        ),
+        output_port_config=motTrackersDriverCfg.OutputPortConfig(
+            # downstream_specs=[
+            #     motTrackersDriverCfg.DownstreamSpec(
+            #         name=frame_relay_node_name,
+            #         action_name=f"/{frame_relay_node_name}/{frame_relay_node_params.init_config.input_port_config.action_name}",
+            #         create_debug_pub=True,
+            #     ),
+            # ],
+            data_topic_for_source_data="data_msg/source_data",  # source data msg is image, transmission is reliable, better smoothness in visualization
+            visualization_topic_for_source_data="vis_msg/source_data",  # source visualization msg is image, but transmission is unreliable, may drop frames
+            data_topic_for_target_data="data_msg/target_data",  # target data msg is tracking result, transmission is reliable, can be used for data processing
+            visualization_topic_for_target_data="vis_msg/target_data",  # target visualization msg is image, but transmission is unreliable, may drop frames
+        ),
+        callee_request_port_config=motTrackersDriverCfg.OutputPortConfig(
+            downstream_specs=[
+                motTrackersDriverCfg.DownstreamSpec(
+                    name=tracker_node_name,
+                    action_name=f"/{tracker_node_name}/{tracker_node_params.init_config.input_port_config.action_name}",
+                ),
+            ],
+        ),
+    ),
+    runtime_config=motTrackersDriverCfg.TrackerDriverRuntimeConfig(
+        enable_blocking_mode=False,
+    ),
+)
 
-DetectionDriverNodeName = "driver"
 
-
-# fn_model_nano = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-dynbatch.onnx"
-fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx"
-fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-# fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
-
-DetectionRelayNodeName = "detection_relay"
-DetectionRelayInputActionName = DetectionResponseInputActionName
-
-# Common config settings
-CommonTimeConfig = {
-    "_time_unit": "us(1e-6)",
-}
-
-CommonRuntimeConfig = {
-    **CommonTimeConfig,
-    "enable_blocking_mode": False,
-    "step_interval": StepIntervals.Fast,
-}
-
-CommonInputPortConfig = {
-    "buffer_capacity": 1,
-    "goal_result_expire_time": 1000000,
-}
-
-CommonDeliveryPolicy = {
-    "retry_policy": {
-        "fallback_number_of_retry": 3,
-        "fallback_wait_time_between_retry": 5000,
-        "fallback_wait_time_retry_response": 100000,
-    },
-    "precondition": "dont_care",
-    "drop_strategy": "no_drop",
-}
-
-CommonOutputPortConfig = {
-    "num_buffer_requests": 1,
-    "preserve_request_order": True,
-    "fallback_delivery_precondition": "dont_care",
-}
-
-det_node_params = yolo.Yolo8ModelConfig(
-    declare_params={},
-    init_config=yolo.InitConfig(
+# detection_driver <-> detector
+# fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx"
+fn_model = r"/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8m-pose-dynbatch.onnx"
+# fn_model = r"/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx"
+# fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s-pose.onnx"
+det_node_name = "detector"
+det_node_params = yolo.Yolo8ModelNodeConfig(
+    init_config=yolo.Yolo8ModelInitConfig(
         model_configs=[
             {
                 "model_path": fn_model,
@@ -89,208 +118,195 @@ det_node_params = yolo.Yolo8ModelConfig(
                 "device_index": 0,
             },
         ],
+        detection_request_config=yolo.DetectionRequestConfig(
+            input_port_config=yolo.InputPortConfig(
+                action_name="in/detection_request",
+            ),
+        ),
+    ),
+    runtime_config=yolo.Yolo8ModelRuntimeConfig(
+        model_output_config=yolo.ModelPostprocessConfig(
+            conf_threshold=0.3,
+            iou_threshold=0.5,
+            selected_class_ids=[0],  # 0=person (ultralytics convention)
+        )
     ),
 )
 
-# det_node_params = {
-#     "declare_params": {},
-#     "init_config": {
-#         **CommonTimeConfig,
-#         "model_configs": [
-#             {
-#                 "model_path": fn_model,
-#                 "device_type": "cuda",
-#                 "device_index": 0,
-#             },
-#         ],
-#         "detection_request_config": {
-#             "input_port_config": {
-#                 **CommonInputPortConfig,
-#                 "action_name": DetectionNodeInputActionName,
-#             }
-#         },
-#         "visualization_topic": "debug/visualization",
-#     },
-#     "runtime_config": {
-#         **CommonRuntimeConfig,
-#         "model_output_config": {"conf_threshold": 0.35, "iou_threshold": 0.5},
-#         "enable_visualization": True,
-#         "enable_performance_probe": True,
-#     },
-# }
-
-video_source_params = {
-    "declare_params": {},
-    "init_config": {
-        **CommonTimeConfig,
-        "video_url": fn_video,
-        "auto_replay": True,
-        "primary_output_spec": {
-            "_action_goal_type": "redoxi_public_msgs/action/ProcessFrame_Goal",
-            "downstream_specs": [
-                {
-                    "name": DetectionDriverNodeName,
-                    "action_name": f"/{DetectionDriverNodeName}/{FrameInputActionName}",
-                    "delivery_policy": CommonDeliveryPolicy,
-                    "create_debug_pub": True,
-                },
+# detection_driver -> tracker_driver
+#       |
+#    detector
+det_driver_node_name = "detection_driver"
+det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
+    init_config=detDriverCfg.DetectionDriverInitConfig(
+        input_port_config=detDriverCfg.InputPortConfig(
+            action_name="in/frame",
+        ),
+        output_port_config=detDriverCfg.OutputPortConfig(
+            downstream_specs=[
+                detDriverCfg.DownstreamSpec(
+                    name=tracker_driver_node_name,
+                    action_name=f"/{tracker_driver_node_name}/{tracker_driver_node_params.init_config.input_port_config.action_name}",
+                    create_debug_pub=True,
+                ),
             ],
-            **CommonOutputPortConfig,
-        },
-        "create_debug_pub": False,
-        "debug_pub_queue_size": 10,
-        "debug_pub_task_enqueue_name": "debug_port/task_enqueue",
-        "debug_pub_task_drop_name": "debug_port/task_drop",
-    },
-    "runtime_config": {
-        **CommonRuntimeConfig,
-        "video_start_time": 0,
-        "video_end_time": -1,
-        "frame_interval": 0,
-        "output_image_size": {"width": 1024, "height": -1},
-        "output_image_encoding": "bgr8",
-        "publish_to_debug_topic": True,
-        "frame_enqueue_policy": CommonDeliveryPolicy,
-    },
-}
-
-detection_relay_params = {
-    "declare_params": {},
-    "init_config": {
-        **CommonTimeConfig,
-        "input_port_config": {
-            "_action_goal_type": "redoxi_public_msgs/action/ProcessDetections_Goal",
-            "buffer_capacity": InputPortQueueSize,
-            "action_name": DetectionResponseInputActionName,
-            "goal_result_expire_time": 1000000,
-        },
-        "publish_detection_topic": "out/relayed_detection",
-        "publish_visualization_topic": "out/relayed_visualization",
-    },
-    "runtime_config": {
-        **CommonRuntimeConfig,
-        "enable_visualization": True,
-    },
-}
-
-detection_driver_params = {
-    "declare_params": {},
-    "init_config": {
-        **CommonTimeConfig,
-        "input_port_config": {
-            **CommonInputPortConfig,
-            "_action_goal_type": "redoxi_public_msgs/action/ProcessFrame_Goal",
-            "action_name": FrameInputActionName,
-        },
-        "output_port_config": {
-            "_action_goal_type": "redoxi_public_msgs/action/ProcessDetections_Goal",
-            "downstream_specs": [
-                {
-                    "name": DetectionRelayNodeName,
-                    "action_name": f"/{DetectionRelayNodeName}/{DetectionRelayInputActionName}",
-                    "delivery_policy": CommonDeliveryPolicy,
-                    "create_debug_pub": False,
-                },
+        ),
+        callee_request_port_config=detDriverCfg.OutputPortConfig(
+            downstream_specs=[
+                detDriverCfg.DownstreamSpec(
+                    name=det_node_name,
+                    action_name=f"/{det_node_name}/{det_node_params.init_config.detection_request_config.input_port_config.action_name}",
+                ),
             ],
-            **CommonOutputPortConfig,
-        },
-        "callee_request_port_config": {
-            "_action_goal_type": "redoxi_public_msgs/action/ProcessDetectionsByFrame_Goal",
-            "downstream_specs": [
-                {
-                    "name": DetectionNodeName,
-                    "action_name": f"/{DetectionNodeName}/{DetectionNodeInputActionName}",
-                    "delivery_policy": CommonDeliveryPolicy,
-                    "create_debug_pub": True,
-                },
-            ],
-            **CommonOutputPortConfig,
-        },
-    },
-    "runtime_config": {
-        **CommonRuntimeConfig,
-        "callee_request_enqueue_policy": CommonDeliveryPolicy,
-        "driver_output_enqueue_policy": CommonDeliveryPolicy,
-    },
-}
+        ),
+    ),
+    runtime_config=detDriverCfg.DetectionDriverRuntimeConfig(
+        enable_blocking_mode=False,
+    ),
+)
+
+# video_source -> detection_driver
+video_src_node_name = "video_source"
+fn_video = r"/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+# fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
+# fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.mp4"
+# fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/new-york.mp4"
+# fn_video = r"/soft/workspace/code/psf_ros2_ws/data/dancetrack/dancetrack-0039.mp4"
+video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
+    init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
+        video_url=fn_video,
+        auto_replay=True,
+        primary_output_spec=videoSrcCfg.OutputPortConfig(
+            # downstream_specs=[
+            #     videoSrcCfg.DownstreamSpec(
+            #         name=det_driver_node_name,
+            #         action_name=f"/{det_driver_node_name}/{det_driver_node_params.init_config.input_port_config.action_name}",
+            #         delivery_policy=videoSrcCfg.DeliveryPolicy(
+            #             drop_strategy=videoSrcCfg.DropStrategy.DontCare,
+            #         ),
+            #         create_debug_pub=True,
+            #     ),
+            # ],
+            # data_topic_for_source_data="data_msg/source_data",
+            # data_topic_for_target_data="data_msg/target_data",
+            visualization_topic_for_target_data="vis_msg/target_data",
+        ),
+    ),
+    runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
+        step_interval=StepIntervals.Medium,
+        video_start_time=0,
+        video_end_time=-1,
+        frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
+            drop_strategy=videoSrcCfg.DropStrategy.DontCare,
+        ),
+        # output_image_size={"width": 1920, "height": 1080},
+        # output_image_size={"width": 1024, "height": -1},
+    ),
+)
 
 # common_prefix = ["valgrind --tool=callgrind --dump-instr=yes -v --instr-atstart=no"]
 common_prefix = None
 # common_ros_args = ["--disable-external-lib-logs"]
 common_ros_args = []
 
-detection_node = Node(
+frame_relay_node = Node(
     package="test_package",
-    executable="yolo_object_detection_node",
-    name=DetectionNodeName,
-    namespace=DetectionNodeName,
+    executable="frame_relay_node",
+    name=frame_relay_node_name,
+    namespace=frame_relay_node_name,
     prefix=common_prefix,
     output="screen",
     parameters=[
         {
-            "param_as_json_string": json.dumps(det_node_params, separators=(",", ":")),
-        },
-    ],
-    arguments=["--ros-args", "--log-level", [f"{DetectionNodeName}:=", logger]]
-    + common_ros_args,
-    # arguments=["--ros-args", "--disable-external-lib-logs"],
-)
-
-video_source_node = Node(
-    package="test_package",
-    executable="video_from_url_node",
-    name=VideoSourceNodeName,
-    namespace=VideoSourceNodeName,
-    output="screen",
-    parameters=[
-        {
-            "param_as_json_string": json.dumps(
-                video_source_params, separators=(",", ":")
+            "param_as_json_string": frame_relay_node_params.to_json(
+                ignore_none=True, compact=False
             ),
         },
     ],
-    prefix=common_prefix,
-    arguments=["--ros-args", "--log-level", [f"{VideoSourceNodeName}:=", logger]]
-    + common_ros_args,
-    # arguments=["--ros-args", "--disable-external-lib-logs"],
 )
 
-detection_relay_node = Node(
-    package="test_package",
-    executable="detection_relay_node",
-    name=DetectionRelayNodeName,
-    namespace=DetectionRelayNodeName,
-    output="screen",
-    parameters=[
-        {
-            "param_as_json_string": json.dumps(
-                detection_relay_params, separators=(",", ":")
-            ),
-        },
-    ],
-    prefix=common_prefix,
-    arguments=["--ros-args", "--log-level", [f"{DetectionRelayNodeName}:=", logger]]
-    + common_ros_args,
-    # arguments=["--ros-args", "--disable-external-lib-logs"],
-)
-
-detection_driver_node = Node(
+det_driver_node = Node(
     package="test_package",
     executable="detection_driver_node",
-    name=DetectionDriverNodeName,
-    namespace=DetectionDriverNodeName,
+    name=det_driver_node_name,
+    namespace=det_driver_node_name,
+    prefix=common_prefix,
     output="screen",
     parameters=[
         {
-            "param_as_json_string": json.dumps(
-                detection_driver_params, separators=(",", ":")
+            "param_as_json_string": det_driver_node_params.to_json(
+                ignore_none=True, compact=False
             ),
         },
     ],
+)
+
+video_src_node = Node(
+    package="test_package",
+    executable="video_from_url_node",
+    name=video_src_node_name,
+    namespace=video_src_node_name,
     prefix=common_prefix,
-    arguments=["--ros-args", "--log-level", [f"{DetectionRelayNodeName}:=", logger]]
+    output="screen",
+    parameters=[
+        {
+            "param_as_json_string": video_src_node_params.to_json(
+                ignore_none=True, compact=False
+            ),
+        },
+    ],
+)
+
+detection_node = Node(
+    package="test_package",
+    # executable="yolo_object_detection_node",
+    executable="yolo_body_pose_detection_node",
+    name=det_node_name,
+    namespace=det_node_name,
+    prefix=common_prefix,
+    output="screen",
+    parameters=[
+        {
+            "param_as_json_string": det_node_params.to_json(
+                ignore_none=True, compact=False
+            ),
+        },
+    ],
+    arguments=["--ros-args", "--log-level", [f"{det_node_name}:=", logger]]
     + common_ros_args,
     # arguments=["--ros-args", "--disable-external-lib-logs"],
+)
+
+tracking_node = Node(
+    package="test_package",
+    executable="mot_tracker_node",
+    name=tracker_node_name,
+    namespace=tracker_node_name,
+    prefix=common_prefix,
+    output="screen",
+    parameters=[
+        {
+            "param_as_json_string": tracker_node_params.to_json(
+                ignore_none=True, compact=False
+            ),
+        },
+    ],
+)
+
+tracking_driver_node = Node(
+    package="test_package",
+    executable="mot_tracker_driver",
+    name=tracker_driver_node_name,
+    namespace=tracker_driver_node_name,
+    prefix=common_prefix,
+    output="screen",
+    parameters=[
+        {
+            "param_as_json_string": tracker_driver_node_params.to_json(
+                ignore_none=True, compact=False
+            ),
+        },
+    ],
 )
 
 
@@ -310,9 +326,11 @@ def generate_launch_description():
         [
             *env_var_settings,
             log_level_arg,
-            video_source_node,
-            detection_driver_node,
-            detection_node,
-            detection_relay_node,
+            # detection_node,
+            video_src_node,
+            # det_driver_node,
+            # tracking_node,
+            # tracking_driver_node,
+            # frame_relay_node,
         ]
     )
