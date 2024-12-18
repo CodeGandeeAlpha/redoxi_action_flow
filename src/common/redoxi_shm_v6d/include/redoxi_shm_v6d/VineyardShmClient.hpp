@@ -34,7 +34,7 @@ class VineyardShmClient : public SharedMemoryClient
     bool is_connected() const override;
 
     //! Get the connection config of the shared memory client, provided during the connect call.
-    const SharedMemoryConfig &get_connection_config() const override;
+    const SharedMemoryConfig &get_shm_config() const override;
 
     //! Get the connection params of the shared memory client, provided during the connect call.
     std::shared_ptr<const KeyValueStore> get_connection_params() const override;
@@ -62,6 +62,11 @@ class VineyardShmClient : public SharedMemoryClient
     std::shared_ptr<KeyValueStore> create_kvstore() const override;
 
     // eviction control
+    void set_default_alive_duration(std::optional<TimeUnit_t> default_alive_duration) override;
+    void set_max_alive_duration(std::optional<TimeUnit_t> max_alive_duration) override;
+    std::optional<TimeUnit_t> get_default_alive_duration() const override;
+    std::optional<TimeUnit_t> get_max_alive_duration() const override;
+
     void _evict_expired_data_blocks(bool force = false) override;
     void _set_auto_evict_enabled(bool enable) override;
     bool _get_auto_evict_enabled() const override;
@@ -81,7 +86,6 @@ class VineyardShmClient : public SharedMemoryClient
 
   private:
     std::shared_ptr<vineyard::Client> m_client;
-    rclcpp::Node *m_node = nullptr;
 
     // connection config, common to all shm clients
     SharedMemoryConfig m_config;

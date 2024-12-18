@@ -29,18 +29,6 @@ struct DataBlockInfo {
         if (put_options.alive_duration.has_value()) {
             time_to_evict = time_created + put_options.alive_duration.value();
         }
-
-        if (put_options.alive_until.has_value()) {
-            auto alive_until = put_options.alive_until.value();
-            if (alive_until < time_created) {
-                RDX_WARN_DEV(nullptr, __func__, "{}", "alive_until is in the past, ignore it");
-            } else {
-                if (alive_until < time_to_evict) {
-                    // using the shorter one as deadline
-                    time_to_evict = alive_until;
-                }
-            }
-        }
     }
 
     ObjectIdentifier object_id;

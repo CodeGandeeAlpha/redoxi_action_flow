@@ -46,7 +46,7 @@ int RedoxiVideoReaderBase::_open()
     _reset_frame_number();
 
     auto shm_client = shared_memory::SharedMemoryFactory::get_instance().get_default_client(this);
-    const auto &config = shm_client.lock()->get_connection_config();
+    const auto &config = shm_client.lock()->get_shm_config();
     if (!shm_client.lock()) {
         RDX_INFO_DEV(this, __func__, "{}", "Failed to create shm client, not using shared memory");
     } else {
@@ -217,7 +217,7 @@ int RedoxiVideoReaderBase::_on_delivery_task_begin(TargetData_t &target_data,
         shm_token.object_key = oid.key.value();
     }
 
-    const auto &config = shm_client->get_connection_config();
+    const auto &config = shm_client->get_shm_config();
     shm_token.service_name = config.service_type;
     shm_token.region_key = config.region_key;
     shm_token.object_size = img.total() * img.elemSize();

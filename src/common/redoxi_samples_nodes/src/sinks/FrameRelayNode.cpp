@@ -85,7 +85,7 @@ int FrameRelayNode::_start()
     {
         m_shm_client = shared_memory::SharedMemoryFactory::get_instance().get_default_client(this);
         auto shm_client = m_shm_client.lock();
-        const auto &config = shm_client->get_connection_config();
+        const auto &config = shm_client->get_shm_config();
         if (!shm_client) {
             RDX_INFO_DEV(this, __func__, false, "{}", "Failed to create shm client");
         } else {

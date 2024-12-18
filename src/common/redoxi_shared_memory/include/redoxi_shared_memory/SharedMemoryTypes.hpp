@@ -61,9 +61,8 @@ struct ShmPutOptions {
     using ExpiredAction = MemoryBlockExpirationAction;
 
     // expiration control
-    // if both alive_duration and alive_until are set, use the shorter one
+    // the alive duration is the duration of the block from the time it is put into the shm service
     std::optional<TimeUnit_t> alive_duration;
-    std::optional<TimePoint_t> alive_until;
 
     //! Callback when the shared memory block is expired but not yet removed from shm service
     //! @param object_id The object identifier of the expired shared memory block
@@ -80,9 +79,8 @@ struct ShmPutOptions {
 
     std::string to_string() const
     {
-        return fmt::format("ShmPutOptions(alive_duration={}, alive_until={})",
-                           alive_duration.value_or(std::chrono::seconds(-1)).count(),
-                           alive_until.has_value() ? std::to_string(alive_until->time_since_epoch().count()) : "None");
+        return fmt::format("ShmPutOptions(alive_duration={})",
+                           alive_duration.value_or(std::chrono::seconds(-1)).count());
     }
 
     JS_OBJECT(JS_MEMBER(alive_duration), JS_MEMBER(alive_until));

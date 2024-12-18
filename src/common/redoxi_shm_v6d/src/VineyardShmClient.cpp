@@ -143,7 +143,7 @@ bool VineyardShmClient::is_connected() const
     return m_client != nullptr && m_client->Connected();
 }
 
-const SharedMemoryConfig &VineyardShmClient::get_connection_config() const
+const SharedMemoryConfig &VineyardShmClient::get_shm_config() const
 {
     return m_config;
 }
@@ -194,25 +194,24 @@ int VineyardShmClient::put_data(ObjectIdentifier *output_object_id,
 
     // register expiration config
     if (put_return_code == 0) {
-        bool has_default_expiration_control = m_config.default_alive_duration.has_value() || m_config.max_alive_duration.has_value();
-        bool has_user_expiration_control = put_options.has_value() && (put_options->alive_duration.has_value() || put_options->alive_until.has_value());
+        ShmPutOptions opt;
+        if (put_options.has_value()) {
+            // use the provided put_options if possible
+            opt = put_options.value();
+        }
 
-        // expiration is only activated if expiration_config is provided or m_config.expiration_config is set
-        if (has_default_expiration_control || has_user_expiration_control) {
-            ShmPutOptions opt;
+        if (!opt.alive_duration.has_value()) {
+            // no value? use the default alive duration from m_config
+            opt.alive_duration = m_config.default_alive_duration;
+        }
 
-            if (has_user_expiration_control) {
-                // if user provides expiration_config, use it
-                opt = *put_options;
-            } else {
-                // if user does not provide expiration_config, use the default alive duration from m_config
-                if (m_config.default_alive_duration.has_value()) {
-                    opt.alive_duration = m_config.default_alive_duration.value();
-                } else {
-                    opt.alive_duration = m_config.max_alive_duration.value();
-                }
-            }
+        if (!opt.alive_duration.has_value()) {
+            // still no value? use the max alive duration from m_config
+            opt.alive_duration = m_config.max_alive_duration;
+        }
 
+        // expiration is only activated if alive duration is set
+        if (opt.alive_duration.has_value()) {
             // clamp the alive duration to the max alive duration from m_config
             if (m_config.max_alive_duration.has_value()) {
                 opt.alive_duration = std::min(opt.alive_duration.value(), m_config.max_alive_duration.value());
@@ -345,6 +344,26 @@ void VineyardShmClient::_set_auto_evict_enabled(bool enable)
 bool VineyardShmClient::_get_auto_evict_enabled() const
 {
     return m_expiration_cache.is_auto_evict_enabled();
+}
+
+void VineyardShmClient::set_default_alive_duration(std::optional<TimeUnit_t> default_alive_duration)
+{
+    m_config.default_alive_duration = default_alive_duration;
+}
+
+void VineyardShmClient::set_max_alive_duration(std::optional<TimeUnit_t> max_alive_duration)
+{
+    m_config.max_alive_duration = max_alive_duration;
+}
+
+std::optional<VineyardShmClient::TimeUnit_t> VineyardShmClient::get_default_alive_duration() const
+{
+    return m_config.default_alive_duration;
+}
+
+std::optional<VineyardShmClient::TimeUnit_t> VineyardShmClient::get_max_alive_duration() const
+{
+    return m_config.max_alive_duration;
 }
 
 } // namespace redoxi_works::shared_memory

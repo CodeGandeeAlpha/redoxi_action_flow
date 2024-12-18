@@ -36,6 +36,10 @@ int main(int argc, char **argv)
         }
         spdlog::info("Client created");
 
+        // set default alive duration to 1 seconds
+        client->set_default_alive_duration(std::chrono::seconds(1));
+        client->set_max_alive_duration(std::chrono::seconds(3));
+
         // destroy the client
         // spdlog::info("Destroying client");
         // rdx_shm::SharedMemoryFactory::get_instance().destroy_client(client);
@@ -55,7 +59,7 @@ int main(int argc, char **argv)
         cv::randu(mat, cv::Scalar(0), cv::Scalar(255));
 
         rdx_shm::ShmPutOptions put_options;
-        put_options.alive_duration = std::chrono::seconds(1);
+        // put_options.alive_duration = std::chrono::seconds(0.5);
         put_options.on_expired = [](
                                      const rdx_shm::ObjectIdentifier &oid,
                                      rdx_shm::SharedMemoryClient *client,
@@ -101,7 +105,7 @@ int main(int argc, char **argv)
 
         // wait for the object to expire
         spdlog::info("Waiting for the object to expire");
-        std::this_thread::sleep_for(put_options.alive_duration.value() + std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::seconds(5));
 
         // get it again
         {

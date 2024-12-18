@@ -11,6 +11,9 @@ namespace redoxi_works::shared_memory
 class SharedMemoryClient
 {
   public:
+    using TimeUnit_t = detail::TimeUnit_t;
+    using TimePoint_t = detail::TimePoint_t;
+
     SharedMemoryClient() = default;
     virtual ~SharedMemoryClient() = default;
 
@@ -22,7 +25,7 @@ class SharedMemoryClient
      *
      * @return The config of the shared memory client.
      */
-    virtual const SharedMemoryConfig &get_connection_config() const = 0;
+    virtual const SharedMemoryConfig &get_shm_config() const = 0;
 
     /**
      * @brief Get the connection params of the shared memory client, provided during the connect call.
@@ -124,6 +127,16 @@ class SharedMemoryClient
     virtual std::shared_ptr<KeyValueStore> create_kvstore() const = 0;
 
     // eviction control
+
+    // set the default and max alive duration for the data blocks, if std::nullopt is given, then the value is unset
+    virtual void set_default_alive_duration(std::optional<TimeUnit_t> default_alive_duration) = 0;
+
+    // set the max alive duration for the data blocks, if std::nullopt is given, then the value is unset
+    virtual void set_max_alive_duration(std::optional<TimeUnit_t> max_alive_duration) = 0;
+
+    // get the default and max alive duration for the data blocks
+    virtual std::optional<TimeUnit_t> get_default_alive_duration() const = 0;
+    virtual std::optional<TimeUnit_t> get_max_alive_duration() const = 0;
 
     // evict expired data blocks, if force is true, evict all expired data blocks
     virtual void _evict_expired_data_blocks(bool force = false) = 0;
