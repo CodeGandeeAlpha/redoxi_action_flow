@@ -91,7 +91,7 @@ int FrameMediator::to_cv_image_copy(cv::Mat &cv_image, std::optional<std::string
     } else {
         // no shared image, just return empty
         cv_image = cv::Mat();
-        return -1;
+        return 0;
     }
 
     // auto empty_return = [&]() {

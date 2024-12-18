@@ -9,8 +9,13 @@ namespace redoxi_works::shared_memory
 {
 
 VineyardShmClient::VineyardShmClient()
-    : m_expiration_cache(this)
 {
+    m_expiration_cache.set_on_evict_callback(
+        [this](const ObjectIdentifier &object_id, const ExpirationCache &cache) {
+            (void)cache;
+            delete_object(object_id, nullptr);
+            return 0;
+        });
     m_expiration_cache.start_auto_evict();
 }
 
@@ -282,9 +287,16 @@ int VineyardShmClient::get_data(DataBlock *output_data_block,
         return -1;
     }
 }
-
 int VineyardShmClient::delete_object(const ObjectIdentifier &identifier,
                                      const KeyValueStore *metadata)
+{
+    // remove it from cache
+    m_expiration_cache.remove_memory_block(identifier, false);
+    return _delete_object(identifier, metadata);
+}
+
+int VineyardShmClient::_delete_object(const ObjectIdentifier &identifier,
+                                      const KeyValueStore *metadata)
 {
     if (!m_client || !m_client->Connected()) {
         return -1;

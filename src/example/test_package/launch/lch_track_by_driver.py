@@ -167,8 +167,8 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
 
 # video_source -> detection_driver
 video_src_node_name = "video_source"
-# fn_video = r"/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
+fn_video = r"/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+# fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
 # fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.mp4"
 # fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/new-york.mp4"
 # fn_video = r"/soft/workspace/code/psf_ros2_ws/data/dancetrack/dancetrack-0039.mp4"
@@ -193,7 +193,7 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
         step_interval=StepIntervals.Medium,
-        video_start_time=20000000,
+        video_start_time=0,
         video_end_time=-1,
         frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
             drop_strategy=videoSrcCfg.DropStrategy.DontCare,

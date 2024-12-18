@@ -60,12 +60,9 @@ int main(int argc, char **argv)
 
         rdx_shm::ShmPutOptions put_options;
         // put_options.alive_duration = std::chrono::seconds(0.5);
-        put_options.on_expired = [](
-                                     const rdx_shm::ObjectIdentifier &oid,
-                                     rdx_shm::SharedMemoryClient *client,
-                                     const auto &time_now,
-                                     const rdx_shm::ShmPutOptions &opt) {
-            (void)client;
+        put_options.on_expired = [](const rdx_shm::ObjectIdentifier &oid,
+                                    const auto &time_now,
+                                    const rdx_shm::ShmPutOptions &opt) {
             spdlog::info("Object expired, object id = {}, options = {}, time now = {}",
                          oid.to_string(), opt.to_string(), time_now.time_since_epoch().count());
             return rdx_shm::ShmPutOptions::ExpiredAction::DontCare;

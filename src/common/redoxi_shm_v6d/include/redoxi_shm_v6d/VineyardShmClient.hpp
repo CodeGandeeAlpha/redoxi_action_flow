@@ -85,6 +85,10 @@ class VineyardShmClient : public SharedMemoryClient
     std::shared_ptr<VineyardTensor_u8> get_data(vineyard::ObjectID object_id);
 
   private:
+    // delete the object from vineyard, without considering the expiration cache
+    int _delete_object(const ObjectIdentifier &identifier,
+                       const KeyValueStore *metadata = nullptr);
+
     std::shared_ptr<vineyard::Client> m_client;
 
     // connection config, common to all shm clients

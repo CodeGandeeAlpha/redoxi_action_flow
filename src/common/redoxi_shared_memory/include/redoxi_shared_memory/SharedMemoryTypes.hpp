@@ -72,7 +72,6 @@ struct ShmPutOptions {
     //! @return The action to take for the expired block
     std::function<ExpiredAction(
         const ObjectIdentifier &object_id,
-        SharedMemoryClient *client,
         const TimePoint_t &time_now,
         const ShmPutOptions &put_options)>
         on_expired;

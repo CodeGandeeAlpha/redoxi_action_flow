@@ -77,7 +77,7 @@ option(BUILD_DETECTION_DRIVER_NODE "Build detection_driver_node target" ON)
 option(BUILD_MOT_TRACKER_NODE "Build mot_tracker_node target" ON)
 option(BUILD_MOT_TRACKER_DRIVER "Build mot_tracker_driver target" ON)
 option(BUILD_FRAME_RELAY_NODE "Build frame_relay_node target" ON)
-option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
+option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" ON)
 option(BUILD_TEST_SHM_TIMEOUT "Build test_shm_timeout target" ON)
 
 # Function to configure a target

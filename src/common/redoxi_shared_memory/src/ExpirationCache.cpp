@@ -83,8 +83,8 @@ struct ExpirationCache::Impl {
     std::mutex m_cache_mutex;
 };
 
-ExpirationCache::ExpirationCache(SharedMemoryClient *client)
-    : m_impl(std::make_shared<Impl>()), m_client(client)
+ExpirationCache::ExpirationCache()
+    : m_impl(std::make_shared<Impl>())
 {
     // register shutdown callback, on shutdown, stop the auto eviction thread and evict all expired memory blocks
     rclcpp::on_shutdown(std::function<void()>([this]() {
@@ -130,6 +130,11 @@ int ExpirationCache::stop_auto_evict()
     return 0;
 }
 
+void ExpirationCache::set_on_evict_callback(OnEvictCallback_t callback)
+{
+    m_on_evict_callback = callback;
+}
+
 int ExpirationCache::add_memory_block(
     const ObjectIdentifier &object_id, const ShmPutOptions &put_options)
 {
@@ -154,6 +159,59 @@ int ExpirationCache::add_memory_block(
     }
 
     return 0;
+}
+
+int ExpirationCache::remove_memory_block(const ObjectIdentifier &object_id, bool treat_it_as_expired)
+{
+    std::lock_guard<std::mutex> lock(m_impl->m_cache_mutex);
+
+    // look up the object id in the cache
+    auto &left_map = m_impl->m_cache.left;
+    auto it = left_map.find(object_id);
+    if (it == left_map.end()) {
+        // not found
+        return -1;
+    }
+
+    // got it, now remove it
+    auto &data_block_info = it->get_right();
+    RDX_INFO_DEV(nullptr, __func__, "Removing memory block from cache: {}", object_id.to_string());
+
+    if (treat_it_as_expired) {
+        // have callback? call it
+        ShmPutOptions::ExpiredAction action = ShmPutOptions::ExpiredAction::DontCare;
+        if (data_block_info.put_options.on_expired) {
+            RDX_INFO_DEV(nullptr, __func__, "Calling per-block expiration callback for block: {}", object_id.to_string());
+            action = data_block_info.put_options.on_expired(
+                object_id, std::chrono::system_clock::now(), data_block_info.put_options);
+        }
+
+        // user agreed to evict, do it
+        if (action != ShmPutOptions::ExpiredAction::Keep) {
+            // remove from cache
+            RDX_INFO_DEV(nullptr, __func__, "Removing expired block from cache: {}", object_id.to_string());
+            m_impl->m_cache.left.erase(it);
+
+            // call the callback
+            if (m_on_evict_callback) {
+                RDX_INFO_DEV(nullptr, __func__, "Calling universal eviction callback for block: {}", object_id.to_string());
+                int ret = m_on_evict_callback(object_id, *this);
+                if (ret != 0) {
+                    RDX_WARN_DEV(nullptr, __func__, "Universal eviction callback failed for block: {}, continue evicting",
+                                 object_id.to_string());
+                } else {
+                    RDX_INFO_DEV(nullptr, __func__, "Universal eviction callback succeeded for block: {}", object_id.to_string());
+                }
+            }
+        } else {
+            RDX_INFO_DEV(nullptr, __func__, "Keeping expired block: {} as requested", object_id.to_string());
+        }
+        return 0;
+    } else {
+        // not treated as expired, just remove it
+        m_impl->m_cache.left.erase(it);
+        return 0;
+    }
 }
 
 int64_t ExpirationCache::evict_expired_memory_blocks(bool force_evict_all)
@@ -185,17 +243,27 @@ int64_t ExpirationCache::evict_expired_memory_blocks(bool force_evict_all)
         ShmPutOptions::ExpiredAction action = ShmPutOptions::ExpiredAction::DontCare;
         if (data_block_info.put_options.on_expired) {
             RDX_INFO_DEV(nullptr, __func__, "Calling expiration callback for block: {}", object_id.to_string());
-            action = data_block_info.put_options.on_expired(object_id, m_client, time_now, data_block_info.put_options);
+            action = data_block_info.put_options.on_expired(object_id, time_now, data_block_info.put_options);
         }
 
         // delete the object from shm service
         if (action != ShmPutOptions::ExpiredAction::Keep) {
-            RDX_INFO_DEV(nullptr, __func__, "Deleting expired block from shared memory: {}", object_id.to_string());
-            m_client->delete_object(object_id);
-
             // remove from cache
             RDX_INFO_DEV(nullptr, __func__, "Removing expired block from cache: {}", object_id.to_string());
             right.erase(it);
+
+            // call the callback
+            if (m_on_evict_callback) {
+                RDX_INFO_DEV(nullptr, __func__, "Calling evict callback for block: {}", object_id.to_string());
+                int ret = m_on_evict_callback(object_id, *this);
+                if (ret != 0) {
+                    RDX_WARN_DEV(nullptr, __func__, "Evict callback failed for block: {}, continue evicting",
+                                 object_id.to_string());
+                } else {
+                    RDX_INFO_DEV(nullptr, __func__, "Evict callback succeeded for block: {}", object_id.to_string());
+                }
+            }
+
             num_evicted++;
         } else {
             RDX_INFO_DEV(nullptr, __func__, "Keeping expired block: {} as requested", object_id.to_string());

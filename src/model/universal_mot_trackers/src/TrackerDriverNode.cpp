@@ -26,6 +26,7 @@ int TrackerDriverNode::_on_process_input_request(CalleeTypes::RequestOutputReque
     // fill control code and task uid
     auto signal_code = RequestDataTrait_t::get_control_signal_code(*detector_source_data.get_goal());
     out_callee_request->set_control_signal_code(signal_code);
+    out_callee_request->set_source_task_metadata(RequestDataTrait_t::get_source_task_metadata(*detector_source_data.get_goal()));
 
     // get detections from source data, and put them into tracker source data
     const auto &det_msg = detector_source_data.get_goal()->detections;
