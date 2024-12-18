@@ -8,7 +8,6 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
-find_package(redoxi_extern_cpp REQUIRED)
 find_package(redoxi_common_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
@@ -55,7 +54,6 @@ ament_target_dependencies(
   PUBLIC
   rclcpp
   rclcpp_action
-  redoxi_extern_cpp
   redoxi_common_cpp
   cv_bridge
   rosidl_runtime_cpp)
@@ -83,7 +81,6 @@ endif()
 ament_export_dependencies(
   rclcpp
   rclcpp_action
-  redoxi_extern_cpp
   redoxi_common_cpp
   cv_bridge
   json_struct

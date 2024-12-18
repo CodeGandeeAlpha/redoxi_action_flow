@@ -15,7 +15,6 @@
   <depend>rclcpp</depend>
   <depend>rclcpp_action</depend>
   <depend>rosidl_runtime_cpp</depend>
-  <depend>redoxi_extern_cpp</depend>
   <depend>redoxi_common_cpp</depend>
   <depend>json_struct</depend>
   <depend>cv_bridge</depend>
