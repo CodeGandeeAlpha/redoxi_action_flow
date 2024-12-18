@@ -81,19 +81,6 @@ int FrameRelayNode::_start()
         RDX_INFO_DEV(this, __func__, false, "{}", "input port started");
     }
 
-    // create shm client
-    {
-        m_shm_client = shared_memory::SharedMemoryFactory::get_instance().get_default_client(this);
-        auto shm_client = m_shm_client.lock();
-        const auto &config = shm_client->get_shm_config();
-        if (!shm_client) {
-            RDX_INFO_DEV(this, __func__, false, "{}", "Failed to create shm client");
-        } else {
-            RDX_INFO_DEV(this, __func__, false, "Created shm client, service type = {}, region key = {}",
-                         config.service_type, config.region_key);
-        }
-    }
-
     // step thread and state will be handled by base class
     return 0;
 }
@@ -102,9 +89,6 @@ int FrameRelayNode::_stop()
 {
     m_input_port->stop();
     RDX_INFO_DEV(this, __func__, false, "{}", "input port stopped");
-
-    // delete shm client, disconnect from shm service
-    m_shm_client.reset();
 
     return 0;
 }
@@ -194,56 +178,10 @@ int FrameRelayNode::_parse_frame(cv::Mat *output,
     }
 
     auto msg_uuid = ActionDataTrait_t::get_uuid(*source_data.get_goal());
-
-    // parse from shm
-    auto &shm_token = source_data.get_goal()->frame_bundle.primary_frame.shm_token;
-    auto shm_client = m_shm_client.lock();
-    if (shm_token.object_size >= 0 && shm_client && shm_client->is_connected()) {
-        shared_memory::ObjectIdentifier oid;
-        if (shm_token.object_id != 0) {
-            oid.id = shm_token.object_id;
-        }
-        if (!shm_token.object_key.empty()) {
-            oid.key = shm_token.object_key;
-        }
-        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Getting data from shm with object id {}",
-                     boost::uuids::to_string(msg_uuid), oid.id.value_or(0));
-        auto datablock = shm_client->get_data(oid);
-        if (!datablock) {
-            RDX_INFO_DEV(this, __func__, false,
-                         "[msg_uuid={}] Failed to get data from shm", boost::uuids::to_string(msg_uuid));
-            return -1;
-        }
-
-        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Data from shm parsed to cv::Mat",
-                     boost::uuids::to_string(msg_uuid));
-        cv::Mat tmp;
-        datablock->get_as_cvmat(&tmp);
-
-        // IMPORTANT: copy the data to the output, because the datablock will be released after the function returns
-        tmp.copyTo(*output);
-
-        // after reading, delete the data from shm
-        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Deleting data from shm",
-                     boost::uuids::to_string(msg_uuid));
-        auto delete_ok = shm_client->delete_object(oid) == 0;
-        if (!delete_ok) {
-            RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Failed to delete data from shm",
-                         boost::uuids::to_string(msg_uuid));
-        }
-    } else {
-        // read raw image directly from the goal
-        RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Reading raw image directly from the goal",
-                     boost::uuids::to_string(msg_uuid));
-
-        image_utils::FrameMediator fm(&source_data.get_goal()->frame_bundle.primary_frame);
-        fm.to_cv_image_copy(*output);
-        // auto &raw_image = source_data.get_goal()->frame_bundle.primary_frame.raw_image;
-        // if (!raw_image.data.empty()) {
-        //     auto img_bridge = cv_bridge::toCvCopy(raw_image, raw_image.encoding);
-        //     *output = img_bridge->image;
-        // }
-    }
+    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] parsing frame",
+                 boost::uuids::to_string(msg_uuid));
+    image_utils::FrameMediator fm(&source_data.get_goal()->frame_bundle.primary_frame);
+    fm.to_cv_image_copy(*output);
 
     return 0;
 }
