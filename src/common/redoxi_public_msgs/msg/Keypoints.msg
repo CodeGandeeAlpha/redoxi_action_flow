@@ -3,8 +3,8 @@
 # bbox is relative to frame, in pixel unit
 unique_identifier_msgs/UUID x_uid
 Control x_control
-# same group id means the same object
-unique_identifier_msgs/UUID x_group_uid
+# same task uid means the same object
+redoxi_public_msgs/TaskMetadata x_task_metadata
 
 float32[] confidence
 geometry_msgs/Point[] keypoints_2

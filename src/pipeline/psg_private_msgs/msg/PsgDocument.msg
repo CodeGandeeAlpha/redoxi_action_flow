@@ -1,6 +1,6 @@
 unique_identifier_msgs/UUID x_uid
 redoxi_public_msgs/Control x_control
-unique_identifier_msgs/UUID x_group_uid
+redoxi_public_msgs/TaskMetadata x_task_metadata
 
 std_msgs/Header header
 Person[] persons

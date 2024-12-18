@@ -153,19 +153,6 @@ int PSGTracker::_start()
         RDX_INFO_DEV(this, __func__, false, "{}", "input port started");
     }
 
-    // create shm client
-    {
-        auto shm_config = shared_memory::SharedMemoryFactory::get_shm_config_from_node(this);
-        m_shm_client = shared_memory::SharedMemoryFactory::create_client_by_config(shm_config);
-        if (!m_shm_client) {
-            RDX_INFO_DEV(this, __func__, false, "Failed to create shm client, service name = {}, region key = {}",
-                         shm_config.service_name, shm_config.region_key);
-        } else {
-            RDX_INFO_DEV(this, __func__, false, "Created shm client, service name = {}, region key = {}",
-                         shm_config.service_name, shm_config.region_key);
-        }
-    }
-
     // step thread and state will be handled by base class
     return 0;
 }
@@ -294,7 +281,7 @@ std::vector<redoxi_public_msgs::msg::TrackTarget> PSGTracker::_track(const std::
     std::vector<redoxi_public_msgs::msg::Detection> detections;
     for (const auto &person : persons) {
         detections.push_back(person.true_body);
-        detections.back().x_group_uid = person.x_uid; // 方便后面把track_targets和persons关联起来
+        detections.back().x_task_metadata.source_task_uid = person.x_uid; // 方便后面把track_targets和persons关联起来
     }
 
     // // 保存frame和detections用以复现跟踪结果

@@ -9,8 +9,8 @@ redoxi_public_msgs/MultiDeviceFrame frame_bundle
 ---
 redoxi_public_msgs/ReturnResponse x_return
 redoxi_public_msgs/Keypoints[] keypoints
-# 0: keypoints[i] is matched to detections[i], no need to check x_group_uid
-# 1: matched by x_group_uid, keypoints[i].x_group_uid == detections[k].x_uid iff keypoints[i] is for detections[k]
+# 0: keypoints[i] is matched to detections[i], no need to check x_task_metadata.source_task_uid
+# 1: matched by x_task_metadata.source_task_uid, keypoints[i].x_task_metadata.source_task_uid == detections[k].x_uid iff keypoints[i] is for detections[k]
 bool is_matched_by_uid 0
 ---
 # string feedback_msg

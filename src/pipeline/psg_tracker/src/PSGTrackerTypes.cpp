@@ -238,7 +238,7 @@ void ROSTracker::_msg_dets_to_body_dets(const std::vector<redoxi_public_msgs::ms
 redoxi_public_msgs::msg::TrackTarget ROSTracker::_track_target_with_msg_det_to_msg(const redoxi_public_msgs::msg::Detection &detection, RedoxiTrack::TrackTargetPtr track_target)
 {
     redoxi_public_msgs::msg::TrackTarget track_target_msg;
-    track_target_msg.x_group_uid = detection.x_group_uid;
+    track_target_msg.x_task_metadata = detection.x_task_metadata;
     track_target_msg.frame_metadata = detection.frame_metadata;
     track_target_msg.true_detection = detection;
     track_target_msg.track_id = track_target->get_path_id();
@@ -252,7 +252,7 @@ redoxi_public_msgs::msg::TrackTarget ROSTracker::_track_target_with_msg_det_to_m
 
     track_target_msg.predicted_detection.bbox = track_target_msg.track_bbox;
     track_target_msg.predicted_detection.category = 0;
-    track_target_msg.predicted_detection.x_group_uid = track_target_msg.x_group_uid;
+    track_target_msg.predicted_detection.x_task_metadata = track_target_msg.x_task_metadata;
     track_target_msg.predicted_detection.frame_metadata = track_target_msg.frame_metadata;
     track_target_msg.predicted_detection.confidence = track_target_msg.confidence;
     return track_target_msg;
@@ -273,7 +273,7 @@ redoxi_public_msgs::msg::TrackTarget ROSTracker::_track_target_to_msg(RedoxiTrac
 
     track_target_msg.predicted_detection.bbox = track_target_msg.track_bbox;
     track_target_msg.predicted_detection.category = 0;
-    track_target_msg.predicted_detection.x_group_uid = track_target_msg.x_group_uid;
+    track_target_msg.predicted_detection.x_task_metadata = track_target_msg.x_task_metadata;
     track_target_msg.predicted_detection.frame_metadata = track_target_msg.frame_metadata;
     track_target_msg.predicted_detection.confidence = track_target_msg.confidence;
 

@@ -246,6 +246,9 @@ int PSGMasterNode::_create_document_request_handler(const RuntimeConfig_t &runti
             msg.frame_bundle.x_control.code = static_cast<int32_t>(control_signal_code);
             msg.frame_bundle.primary_frame.x_control.code = static_cast<int32_t>(control_signal_code);
             msg.x_control.code = static_cast<int32_t>(control_signal_code);
+            auto task_metadata = ActionDataTrait_t::get_source_task_metadata(*source_data->get_goal());
+            msg.x_task_metadata.source_task_info = task_metadata.source_task_info;
+            msg.x_task_metadata.source_task_uid = to_ros_uuid_msg(task_metadata.source_task_id);
             output_source_data.set_document(msg);
 
 
