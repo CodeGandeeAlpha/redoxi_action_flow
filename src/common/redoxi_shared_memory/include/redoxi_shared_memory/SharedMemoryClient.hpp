@@ -122,6 +122,15 @@ class SharedMemoryClient
      * @return A shared pointer to the key-value store.
      */
     virtual std::shared_ptr<KeyValueStore> create_kvstore() const = 0;
+
+    // eviction control
+
+    // evict expired data blocks, if force is true, evict all expired data blocks
+    virtual void _evict_expired_data_blocks(bool force = false) = 0;
+
+    // enable/disable auto eviction of expired data blocks
+    virtual void _set_auto_evict_enabled(bool enable) = 0;
+    virtual bool _get_auto_evict_enabled() const = 0;
 };
 
 } // namespace redoxi_works::shared_memory

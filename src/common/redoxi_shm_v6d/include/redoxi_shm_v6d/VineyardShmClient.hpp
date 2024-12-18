@@ -61,6 +61,10 @@ class VineyardShmClient : public SharedMemoryClient
     std::shared_ptr<DataBlock> create_datablock() const override;
     std::shared_ptr<KeyValueStore> create_kvstore() const override;
 
+    // eviction control
+    void _evict_expired_data_blocks(bool force = false) override;
+    void _set_auto_evict_enabled(bool enable) override;
+    bool _get_auto_evict_enabled() const override;
     // --- Vineyard specific methods ---
   public:
     //! Get the underlying vineyard client

@@ -43,6 +43,12 @@ class ExpirationCache
     // reset the expiration cache, evict all expired memory blocks
     void reset();
 
+    // check if the auto eviction is enabled
+    bool is_auto_evict_enabled() const
+    {
+        return m_auto_evict_running;
+    }
+
   private:
     struct Impl;
     std::shared_ptr<Impl> m_impl;

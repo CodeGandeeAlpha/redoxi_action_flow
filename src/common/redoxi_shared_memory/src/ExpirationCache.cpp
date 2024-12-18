@@ -4,6 +4,7 @@
 #include <boost/bimap/multiset_of.hpp>
 #include <boost/bimap/support/lambda.hpp>
 #include <redoxi_basic_cpp/logging/ros_logging.hpp>
+#include <mutex>
 
 namespace bimaps = boost::bimaps;
 
@@ -89,6 +90,9 @@ struct ExpirationCache::Impl {
     bimaps::bimap<bimaps::set_of<ObjectIdentifier>,
                   bimaps::multiset_of<DataBlockInfo>>
         m_cache;
+
+    // mutex for cache operations
+    std::mutex m_cache_mutex;
 };
 
 ExpirationCache::ExpirationCache(SharedMemoryClient *client)
@@ -141,6 +145,8 @@ int ExpirationCache::stop_auto_evict()
 int ExpirationCache::add_memory_block(
     const ObjectIdentifier &object_id, const ShmPutOptions &put_options)
 {
+    std::lock_guard<std::mutex> lock(m_impl->m_cache_mutex);
+
     RDX_INFO_DEV(nullptr, __func__, "Adding memory block to expiration cache: {}", object_id.to_string());
 
     // if alive_duration is not set, treat it as no expiration
@@ -164,6 +170,8 @@ int ExpirationCache::add_memory_block(
 
 int64_t ExpirationCache::evict_expired_memory_blocks(bool force_evict_all)
 {
+    std::lock_guard<std::mutex> lock(m_impl->m_cache_mutex);
+
     auto &right = m_impl->m_cache.right;
     auto time_now = std::chrono::system_clock::now();
     if (force_evict_all) {

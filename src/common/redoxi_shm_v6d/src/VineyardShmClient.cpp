@@ -328,6 +328,25 @@ std::shared_ptr<KeyValueStore> VineyardShmClient::create_kvstore() const
     return std::make_shared<VineyardParams>();
 }
 
+void VineyardShmClient::_evict_expired_data_blocks(bool force)
+{
+    m_expiration_cache.evict_expired_memory_blocks(force);
+}
+
+void VineyardShmClient::_set_auto_evict_enabled(bool enable)
+{
+    if (enable) {
+        m_expiration_cache.start_auto_evict();
+    } else {
+        m_expiration_cache.stop_auto_evict();
+    }
+}
+
+bool VineyardShmClient::_get_auto_evict_enabled() const
+{
+    return m_expiration_cache.is_auto_evict_enabled();
+}
+
 } // namespace redoxi_works::shared_memory
 
 #include <pluginlib/class_list_macros.hpp>
