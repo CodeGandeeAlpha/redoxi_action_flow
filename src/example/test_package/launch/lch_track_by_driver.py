@@ -188,7 +188,7 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
                     delivery_policy=videoSrcCfg.DeliveryPolicy(
                         drop_strategy=videoSrcCfg.DropStrategy.DontCare,
                     ),
-                    create_debug_pub=True,
+                    # create_debug_pub=True,
                 ),
             ],
             # data_topic_for_source_data="data_msg/source_data",
@@ -198,15 +198,15 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
         step_interval=StepIntervals.Medium,
         video_start_time=0,
-        video_end_time=1000000,
+        video_end_time=-1,
         frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
             drop_strategy=videoSrcCfg.DropStrategy.DropAsNeeded,
         ),
         frame_request_policy=videoSrcCfg.DeliveryPolicy(
             drop_strategy=videoSrcCfg.DropStrategy.DropAsNeeded,
         ),
-        output_image_size={"width": 1920, "height": 1080},
-        # output_image_size={"width": 1024, "height": -1},
+        # output_image_size={"width": 1920, "height": 1080},
+        output_image_size={"width": 1200, "height": -1},
     ),
 )
 
