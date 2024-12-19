@@ -69,6 +69,7 @@ psg_counter_node_json_params = psgCounterCfg.PSGCounterNodeConfig(
                 )
             ],
             data_topic_for_target_data="data_out/target_data",
+            data_topic_for_source_data="data_out/source_data",
         ),
     ),
     runtime_config=psgCounterCfg.PSGCounterRuntimeConfig(
@@ -125,6 +126,7 @@ psg_tracker_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeConfig(
                 )
             ],
             data_topic_for_target_data="data_out/target_data_pipeline",
+            data_topic_for_source_data="data_out/source_data_pipeline",
             visualization_topic_for_source_data="debug/source_data_visualization",
         ),
         callee_request_port_config=psgDriverBaseCfg.OutputPortConfig(
@@ -159,6 +161,7 @@ psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
                 )
             ],
             data_topic_for_target_data="data_out/target_data",
+            data_topic_for_source_data="data_out/source_data",
         ),
     ),
     runtime_config=psgInoutBaseCfg.InoutBaseRuntimeConfig(
@@ -225,6 +228,7 @@ psg_all_detector_cpp_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeCo
                 )
             ],
             data_topic_for_target_data="data_out/target_data_pipeline",
+            data_topic_for_source_data="data_out/source_data_pipeline",
             visualization_topic_for_source_data="debug/source_data_visualization",
         ),
         callee_request_port_config=psgDriverBaseCfg.OutputPortConfig(
