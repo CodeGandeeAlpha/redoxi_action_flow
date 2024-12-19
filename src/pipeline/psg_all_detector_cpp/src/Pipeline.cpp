@@ -363,9 +363,7 @@ int PSGAllDetectorCppNode::_create_frame_request_handler(const RuntimeConfig_t &
             // from input source data to output source data
             OutputSourceDataModel_t output_source_data;
             OutputSourceDataModel_t::FrameData_t frame_data;
-            image_utils::FrameMediator fm(&source_data->get_goal()->document.frame_bundle.primary_frame);
-            fm.to_cv_image_copy(frame_data.image);
-            frame_data.metadata = source_data->get_goal()->document.frame_bundle.primary_frame.metadata;
+            frame_data.from_frame_msg(source_data->get_goal()->document.frame_bundle.primary_frame);
             output_source_data.set_primary_frame(frame_data);
 
             auto goal_handle = source_data->get_goal_handle_future().get();
@@ -564,7 +562,8 @@ void PSGAllDetectorCppNode::_get_model_result()
         // create output source data
         OutputSourceDataPipeline_t output_pipeline_source_data;
         psg_private_msgs::msg::PsgDocument document;
-        output_model_result.source_data->get_primary_frame().to_frame_msg(document.frame_bundle.primary_frame);
+        output_model_result.source_data->get_primary_frame().to_frame_mediator().to_frame_msg(
+            document.frame_bundle.primary_frame);
         document.detections = result->detections;
 
         // 根据detections中的keypoints的头点，构建头的bbox

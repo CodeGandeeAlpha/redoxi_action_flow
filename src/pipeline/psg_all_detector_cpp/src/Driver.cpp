@@ -18,7 +18,7 @@ int PSGAllDetectorCppDriver::_on_process_callee_result(OutputTypes::OutputReques
     output_pipeline_source_data.auxiliary_data = std::string("detection");
 
     psg_private_msgs::msg::PsgDocument document;
-    callee_request.get_source_data().get_primary_frame().to_frame_msg(document.frame_bundle.primary_frame);
+    callee_request.get_source_data().get_primary_frame().to_frame_mediator().to_frame_msg(document.frame_bundle.primary_frame);
 
     document.detections = callee_result->detections;
 
@@ -66,9 +66,7 @@ int PSGAllDetectorCppDriver::_on_process_input_request(InputRequestHandler_t::Ou
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Creating request from source data", msg_uuid_str);
     CalleeTypes::RequestOutputSourceData_t output_source_data;
     CalleeTypes::RequestOutputSourceData_t::FrameData_t frame_data;
-    image_utils::FrameMediator fm(&source_data->get_goal()->document.frame_bundle.primary_frame);
-    fm.to_cv_image_copy(frame_data.image);
-    frame_data.metadata = source_data->get_goal()->document.frame_bundle.primary_frame.metadata;
+    frame_data.from_frame_msg(source_data->get_goal()->document.frame_bundle.primary_frame);
     output_source_data.set_primary_frame(frame_data);
 
     auto goal_handle = source_data->get_goal_handle_future().get();

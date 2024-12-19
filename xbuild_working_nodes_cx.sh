@@ -39,6 +39,7 @@ PackagesToBuild="redoxi_video_reader \
                  redoxi_common_nodes \
                  redoxi_common_py \
                  redoxi_shared_memory \
+                 redoxi_shm_v6d \
                  redoxi_inference \
                  redoxi_inference_onnx \
                  rosboard \
