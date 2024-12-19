@@ -49,6 +49,8 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
   public:
     using PSGDocument_t = psg_private_msgs::msg::PsgDocument;
     using VisualizationPublisher_t = image_ports::types::DeliverySourceData::VisualizationPublisher_t;
+    using DataPublisher_t = image_ports::types::DeliverySourceData::DataPublisher_t;
+
     DeliverySourceData()
     {
         static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>, "DeliverySourceData must satisfy DeliverySourceDataConcept");
@@ -433,6 +435,11 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
             }
         }
         return 0;
+    }
+
+    int to_publish_data(PubDataMsgType_t &msg) const override
+    {
+        return to_publish_visualization(msg);
     }
 
     // auxiliary data for easy extension without inheritance
