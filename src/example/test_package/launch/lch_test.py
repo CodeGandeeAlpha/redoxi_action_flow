@@ -57,7 +57,7 @@ tracker_node_params = motTrackersCfg.UniversalMotTrackersNodeConfig(
         input_port_config=motTrackersCfg.InputPortConfig(
             action_name="in/track_request",
         ),
-        publish_visualization_topic="vis/tracking",
+        # publish_visualization_topic="vis/tracking",
         # preferred_image_size={"width": 1920, "height": 1080},
     ),
     runtime_config=motTrackersCfg.UniversalMotTrackersRuntimeConfig(

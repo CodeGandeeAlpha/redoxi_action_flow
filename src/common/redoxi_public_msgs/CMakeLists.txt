@@ -34,6 +34,7 @@ rosidl_generate_interfaces(
   "msg/TrackObjectStatus.msg"
   "msg/MultiDeviceFrame.msg"
   "msg/FrameDeviceTag.msg"
+  "msg/TensorMetadata.msg"
   "action/ProcessBodyPoses.action"
   "action/ProcessDetections.action"
   "action/ProcessDetectionsByFrame.action"

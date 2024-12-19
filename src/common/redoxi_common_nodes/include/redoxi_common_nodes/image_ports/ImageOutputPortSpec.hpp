@@ -194,6 +194,7 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
 
     //! Visualization publisher type for image output port, override the default one in base class
     using VisualizationPublisher_t = DownstreamDebugPublisher;
+    using DataPublisher_t = DownstreamDebugPublisher; // also used for data publisher
 
     DeliverySourceData()
     {
@@ -260,8 +261,7 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
 
     int to_publish_data(PubDataMsgType_t &msg) const override
     {
-        to_publish_visualization(msg);
-        return 0;
+        return to_publish_visualization(msg);
     }
 
     virtual void from_frame_bundle(const FrameBundle_t &frame_bundle)

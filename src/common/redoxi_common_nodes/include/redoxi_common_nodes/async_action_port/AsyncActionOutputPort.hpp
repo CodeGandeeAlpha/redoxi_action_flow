@@ -757,6 +757,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
         } else if (request_precondition == DeliveryPrecondition::AnyDownstreamReady || request_precondition == DeliveryPrecondition::AllDownstreamsReady) {
             // test for precondition: any downstream ready or all downstreams ready
 
+            // FIXME: for no_drop strategy, we should continue to test precondition until it is satisfied
+            // currently you have to disable the precondition for no_drop strategy is work correctly
+
             // count the number of downstreams that are ready, apply precondition
             size_t num_downstream_ready = 0;
             for (auto &ds : m_downstreams) {

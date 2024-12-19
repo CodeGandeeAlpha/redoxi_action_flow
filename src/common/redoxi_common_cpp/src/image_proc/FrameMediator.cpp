@@ -1,5 +1,6 @@
 #include "redoxi_common_cpp/image_proc/FrameMediator.hpp"
 #include <redoxi_common_cpp/ros_utils/common.hpp>
+#include <redoxi_common_cpp/image_proc/utils.hpp>
 #include <redoxi_common_cpp/ros_utils/shm_utils.hpp>
 #include <redoxi_shared_memory/SharedMemoryFactory.hpp>
 #include <unordered_set>
@@ -358,6 +359,23 @@ int FrameMediator::to_frame_msg(redoxi_public_msgs::msg::Frame &frame_msg,
             }
             shm_token.region_key = shm_client->get_shm_config().region_key;
             shm_token.service_type = shm_client->get_shm_config().service_type;
+            if (_storage_options.shm_put_options.has_value() && _storage_options.shm_put_options->alive_duration.has_value()) {
+                shm_token.alive_duration_microsec = _storage_options.shm_put_options->alive_duration.value().count();
+            }
+
+            {
+                auto current_time = std::chrono::system_clock::now();
+
+                // seconds
+                shm_token.time_created.sec = std::chrono::duration_cast<std::chrono::seconds>(current_time.time_since_epoch()).count();
+                // nanoseconds
+                shm_token.time_created.nanosec = std::chrono::duration_cast<std::chrono::nanoseconds>(current_time.time_since_epoch()).count() % 1000000000;
+            }
+
+            // tensor metadata
+            shm_token.tensor_metadata.shape = {(int64_t)output_image.rows, (int64_t)output_image.cols, (int64_t)output_image.channels()};
+            shm_token.tensor_metadata.dtype = image_utils::cv_type_to_string(output_image.type());
+
             frame_msg.shm_token = shm_token;
             frame_msg.metadata = m_frame_metadata;
             make_metadata_compatible(&frame_msg.metadata, output_image);

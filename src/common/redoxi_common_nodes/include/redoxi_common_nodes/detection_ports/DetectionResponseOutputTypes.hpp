@@ -39,8 +39,7 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
 
     int to_publish_data(PubDataMsgType_t &msg) const override
     {
-        to_publish_visualization(msg);
-        return 0;
+        return to_publish_visualization(msg);
     }
 
     //! Convert the source data to a ROS message for publishing

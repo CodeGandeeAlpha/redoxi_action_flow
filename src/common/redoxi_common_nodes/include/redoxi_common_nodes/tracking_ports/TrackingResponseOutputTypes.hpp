@@ -26,6 +26,7 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
     using Detection_t = redoxi_public_msgs::msg::Detection;
     using FrameData_t = image_ports::types::FrameWithMetadata;
     using VisualizationPublisher_t = image_ports::types::DeliverySourceData::VisualizationPublisher_t;
+    using DataPublisher_t = image_ports::types::DeliverySourceData::DataPublisher_t;
 
   public:
     virtual ~DeliverySourceData() = default;
@@ -58,8 +59,7 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
 
     int to_publish_data(PubDataMsgType_t &msg) const override
     {
-        to_publish_visualization(msg);
-        return 0;
+        return to_publish_visualization(msg);
     }
 
     //! Get the frame image

@@ -32,6 +32,9 @@ namespace env
 {
 constexpr std::string_view ServiceType = "RDX_SHM_SERVICE_TYPE";
 constexpr std::string_view RegionKey = "RDX_SHM_REGION_KEY";
+
+// default alive duration for shared memory block, in seconds, can be float or int
+constexpr std::string_view ShmAliveDuration = "RDX_SHM_DEFAULT_ALIVE_DURATION_SEC";
 } // namespace env
 } // namespace redoxi_works::shared_memory::config_keys
 
@@ -40,7 +43,11 @@ namespace redoxi_works::shared_memory::config_values
 {
 namespace service_types
 {
-constexpr std::string_view Vineyard = "vineyard";
+// vineyard shared memory service (v6d), see https://github.com/v6d-io/v6d
+constexpr std::string_view Vineyard = "v6d";
+
+// boost shared memory service, see https://www.boost.org/doc/libs/1_87_0/doc/html/interprocess/managed_memory_segments.html
+constexpr std::string_view BoostShm = "boostshm";
 } // namespace service_types
 } // namespace redoxi_works::shared_memory::config_values
 

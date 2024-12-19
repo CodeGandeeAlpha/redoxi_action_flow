@@ -5,3 +5,4 @@
 #include <redoxi_common_cpp/ros_utils/RosTimeUnsetToken.hpp>
 #include <redoxi_common_cpp/ros_utils/SyncActionSender.hpp>
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
+#include <redoxi_common_cpp/ros_utils/shm_utils.hpp>

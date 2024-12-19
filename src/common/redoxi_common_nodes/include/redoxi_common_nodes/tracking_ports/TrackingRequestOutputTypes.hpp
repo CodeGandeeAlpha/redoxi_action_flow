@@ -16,6 +16,8 @@ namespace redoxi_works::tracking_ports::request_response::types
 //! Retry policy type implementing the RetryPolicyConcept
 using RetryPolicy = redoxi_works::output_port_types::DefaultRetryPolicy<TimeUnit>;
 
+// TODO: use the preferred way to define the source data type, that is, inherit from the base class
+// otherwise, empty image published may crash rosboard
 //! Source data type for tracking request output port
 //! It encapsulates the frame image and detections which will be sent to tracking nodes to perform tracking
 class DeliverySourceData

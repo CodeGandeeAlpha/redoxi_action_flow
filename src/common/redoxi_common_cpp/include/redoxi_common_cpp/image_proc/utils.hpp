@@ -77,4 +77,57 @@ inline std::string get_default_image_encoding(const cv::Mat &image)
     }
 }
 
+//! convert cv type to tensor dtype
+//! @note for unsupported types, return empty string
+template <int CvType>
+inline constexpr const char *cv_type_to_string()
+{
+    //! Get depth of cv type (e.g. CV_8U for CV_8UC3)
+    auto depth = CV_MAT_DEPTH(CvType);
+    switch (depth) {
+        case CV_8U:
+            return "uint8";
+        case CV_16U:
+            return "uint16";
+        case CV_8S:
+            return "int8";
+        case CV_16S:
+            return "int16";
+        case CV_32S:
+            return "int32";
+        case CV_32F:
+            return "float32";
+        case CV_64F:
+            return "float64";
+        default:
+            return "";
+    }
+}
+
+//! convert cv type to tensor dtype
+//! @note for unsupported types, return empty string
+inline const char *cv_type_to_string(int cvtype)
+{
+    //! Get depth of cv type (e.g. CV_8U for CV_8UC3)
+    auto depth = CV_MAT_DEPTH(cvtype);
+    switch (depth) {
+        case CV_8U:
+            return cv_type_to_string<CV_8U>();
+        case CV_16U:
+            return cv_type_to_string<CV_16U>();
+        case CV_8S:
+            return cv_type_to_string<CV_8S>();
+        case CV_16S:
+            return cv_type_to_string<CV_16S>();
+        case CV_32S:
+            return cv_type_to_string<CV_32S>();
+        case CV_32F:
+            return cv_type_to_string<CV_32F>();
+        case CV_64F:
+            return cv_type_to_string<CV_64F>();
+        default:
+            return "";
+    }
+}
+
 } // namespace redoxi_works::image_utils

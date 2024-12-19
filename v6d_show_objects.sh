@@ -1,7 +1,7 @@
 #!/bin/bash
 
 v6d_console="./tmp/vineyardctl"
-ipc_socket="/soft/data/vineyard.sock"
+ipc_socket="${RDX_SHM_REGION_KEY:-/soft/data/vineyard.sock}"
 
 # Default limit value
 limit=100

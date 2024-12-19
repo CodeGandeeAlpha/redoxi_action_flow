@@ -4,6 +4,7 @@ string SHM_SERVICE_TYPE_V6D="v6d"
 string SHM_SERVICE_TYPE_BOOST="boost"
 int64 INVALID_OBJECT_ID=0
 int64 INVALID_OBJECT_SIZE=-1
+int64 INVALID_ALIVE_DURATION_MICROSEC=-1
 
 # used to identify this message
 unique_identifier_msgs/UUID x_uid
@@ -25,3 +26,12 @@ string object_key
 
 # the id of the object in the shared memory region
 int64 object_id 0
+
+# the time when the object is written to the shared memory region
+builtin_interfaces/Time time_created
+
+# alive duration in microseconds, -1 means the object will not be deleted automatically
+int64 alive_duration_microsec -1
+
+# if the object is a tensor, the metadata of the tensor
+TensorMetadata tensor_metadata
