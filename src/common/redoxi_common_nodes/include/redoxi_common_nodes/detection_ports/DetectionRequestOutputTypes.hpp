@@ -49,8 +49,6 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         auto fm = vis_image.to_frame_mediator();
         auto canvas = fm.to_cv_image_copy();
         image_utils::draw_detections(&canvas, detections);
-
-        //! Convert drawn image to ROS message using cv_bridge
         std_msgs::msg::Header header;
         header.stamp = rclcpp::Clock().now();
         cv_bridge::CvImage cv_bridge_img(header, vis_image.get_encoding(), canvas);
@@ -122,10 +120,20 @@ class DeliveryRequest : public DeliveryRequestBase
         // set the visualization frame
         target_data.set_visualization_frame(source_data.get_primary_frame());
 
+        // {
+        //     const auto &raw_image = target_data.get_visualization_frame().get_data_as<image_ports::types::FrameWithMetadata::Frame_t>().raw_image;
+        //     RDX_INFO_DEV(nullptr, __func__, "visualization raw_image size={}, empty={}",
+        //                  raw_image.data.size(), target_data.get_visualization_frame().is_empty());
+        // }
+
         // convert primary frame to goal
         {
             const auto &frame_data = source_data.get_primary_frame();
             frame_data.to_frame_mediator().to_frame_msg(goal.frame_bundle.primary_frame);
+            // {
+            //     const auto &raw_image = goal.frame_bundle.primary_frame.raw_image;
+            //     RDX_INFO_DEV(nullptr, __func__, "primary_frame raw_image size={}", raw_image.data.size());
+            // }
         }
 
         // convert secondary frame to goal

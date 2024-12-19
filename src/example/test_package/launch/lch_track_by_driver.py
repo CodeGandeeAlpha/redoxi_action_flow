@@ -157,8 +157,11 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
                 detDriverCfg.DownstreamSpec(
                     name=det_node_name,
                     action_name=f"/{det_node_name}/{det_node_params.init_config.detection_request_config.input_port_config.action_name}",
+                    # create_debug_pub=True,
                 ),
             ],
+            visualization_topic_for_source_data="vis/callee/source_data",
+            visualization_topic_for_target_data="vis/callee/target_data",
         ),
     ),
     runtime_config=detDriverCfg.DetectionDriverRuntimeConfig(
@@ -185,7 +188,7 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
                     delivery_policy=videoSrcCfg.DeliveryPolicy(
                         drop_strategy=videoSrcCfg.DropStrategy.DontCare,
                     ),
-                    # create_debug_pub=True,
+                    create_debug_pub=True,
                 ),
             ],
             # data_topic_for_source_data="data_msg/source_data",
@@ -195,7 +198,7 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
         step_interval=StepIntervals.Medium,
         video_start_time=0,
-        video_end_time=-1,
+        video_end_time=1000000,
         frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
             drop_strategy=videoSrcCfg.DropStrategy.DropAsNeeded,
         ),

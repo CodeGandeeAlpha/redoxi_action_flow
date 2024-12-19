@@ -211,48 +211,59 @@ int FrameMediator::to_image_msg(sensor_msgs::msg::Image &image_msg,
     auto source_encoding = get_encoding();
     auto target_encoding = encoding.value_or(source_encoding);
 
+    RDX_DEBUG_DEV(nullptr, __func__,
+                  "Converting image with source_encoding={}, target_encoding={}",
+                  source_encoding, target_encoding);
+
     if (m_frame_msg) {
-        //! If we have a frame message, work with the raw image data
+        RDX_DEBUG_DEV(nullptr, __func__, "{}", "Processing frame message");
         const auto &raw_image = m_frame_msg->raw_image;
 
         if (raw_image.data.empty()) {
-            // empty, try to get it from shm
+            RDX_DEBUG_DEV(nullptr, __func__, "{}", "Raw image is empty, attempting to get from shared memory");
             cv::Mat shm_cv_image;
             auto ret = to_cv_image_shared(shm_cv_image);
             if (ret != 0) {
-                RDX_WARN_DEV(nullptr, __func__, "failed to get cv::Mat from shm, ret={}", ret);
+                RDX_WARN_DEV(nullptr, __func__, "Failed to get cv::Mat from shared memory, ret={}", ret);
                 return ret;
             }
 
-            // convert shm_cv_image to image msg
+            RDX_DEBUG_DEV(nullptr, __func__,
+                          "Converting shared memory image to ROS message, image size={}x{}",
+                          shm_cv_image.rows, shm_cv_image.cols);
             auto bridge_image = std::make_shared<cv_bridge::CvImage>(std_msgs::msg::Header(), source_encoding, shm_cv_image);
             auto converted_cv_img_ptr = cv_bridge::cvtColor(bridge_image, target_encoding);
             image_msg = *converted_cv_img_ptr->toImageMsg();
         } else {
-            // we have raw image, just use it
+            RDX_DEBUG_DEV(nullptr, __func__,
+                          "Using existing raw image data, size={}", raw_image.data.size());
             if (source_encoding == target_encoding) {
-                //! If encodings match, copy raw image directly
+                RDX_DEBUG_DEV(nullptr, __func__, "{}", "Encodings match, copying raw image directly");
                 image_msg = raw_image;
             } else {
-                //! Convert encoding using cv_bridge if needed
+                RDX_DEBUG_DEV(nullptr, __func__, "{}", "Converting encoding using cv_bridge");
                 auto cv_img_ptr = cv_bridge::toCvCopy(raw_image, target_encoding);
                 image_msg = *cv_img_ptr->toImageMsg();
             }
         }
     } else {
-        //! If we have a cv::Mat instead of frame message
+        RDX_DEBUG_DEV(nullptr, __func__,
+                      "Processing cv::Mat, size={}x{}", m_frame.rows, m_frame.cols);
         if (source_encoding == target_encoding) {
-            //! If encodings match, convert directly to ROS message
+            RDX_DEBUG_DEV(nullptr, __func__, "{}", "Encodings match, converting directly to ROS message");
             cv_bridge::CvImage cv_img(std_msgs::msg::Header(), source_encoding, m_frame);
             cv_img.toImageMsg(image_msg);
         } else {
-            //! Convert encoding using cv_bridge if needed
+            RDX_DEBUG_DEV(nullptr, __func__, "{}", "Converting encoding using cv_bridge");
             auto cv_img_ptr = std::make_shared<cv_bridge::CvImage>(
                 std_msgs::msg::Header(), source_encoding, m_frame);
             auto converted_cv_img_ptr = cv_bridge::cvtColor(cv_img_ptr, target_encoding);
             converted_cv_img_ptr->toImageMsg(image_msg);
         }
     }
+
+    RDX_DEBUG_DEV(nullptr, __func__,
+                  "Image conversion completed successfully, output size={}", image_msg.data.size());
     return 0;
 }
 

@@ -53,9 +53,11 @@ struct FrameWithMetadata {
         bool has_frame_msg = false;
         if (std::holds_alternative<Frame_t>(this->data)) {
             const auto &frame_data = std::get<Frame_t>(this->data);
-            has_frame_msg = !frame_data.raw_image.data.empty() || !shm_utils::ShmTokenTraits::is_valid(frame_data.shm_token);
+            auto has_raw_image = !frame_data.raw_image.data.empty();
+            auto has_shm_data = shm_utils::ShmTokenTraits::is_valid(frame_data.shm_token);
+            has_frame_msg = has_raw_image || has_shm_data;
         }
-        return has_cv_mat || has_frame_msg;
+        return !has_cv_mat && !has_frame_msg;
     }
 
     std::string get_encoding() const
@@ -87,6 +89,18 @@ struct FrameWithMetadata {
     {
         this->data = raw_data;
         return 0;
+    }
+
+    template <typename T>
+    T &get_data_as()
+    {
+        return std::get<T>(this->data);
+    }
+
+    template <typename T>
+    const T &get_data_as() const
+    {
+        return std::get<T>(this->data);
     }
 
     Metadata_t &get_metadata()

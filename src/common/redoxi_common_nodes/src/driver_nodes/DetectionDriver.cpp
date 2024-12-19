@@ -64,9 +64,13 @@ int DetectionDriver::_on_process_input_request(InputRequestHandler_t::OutputRequ
 
     // get signal code and show it
     // auto signal_code = InputTypes::ActionDataTrait_t::get_control_signal_code(*source_data->get_goal());
-    output_request->set_control_signal_code(signal_code);
-    RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Set control signal code to {}",
-                 msg_uuid_str, control_signal_code_to_string(signal_code));
+    // output_request->set_control_signal_code(signal_code);
+    // RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Set control signal code to {}",
+    //              msg_uuid_str, control_signal_code_to_string(signal_code));
+
+    // const auto &raw_image = output_request->get_source_data().get_primary_frame().get_data_as<image_ports::types::FrameWithMetadata::Frame_t>().raw_image;
+    // RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] sending raw image data size={}, encoding={}",
+    //              msg_uuid_str, raw_image.data.size(), raw_image.encoding);
 
     RDX_INFO_DEV(this, __func__, false, "[msg_uuid={}] Done, created request from source data", msg_uuid_str);
 
