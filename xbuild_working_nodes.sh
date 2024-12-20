@@ -47,7 +47,7 @@ fi
 NUM_JOBS=$(($(nproc) - 2))
 
 # Add memory check before building
-FREE_MEM_GB=$(free -g | awk '/^Mem:/{print $6}')
+FREE_MEM_GB=$(free -g | awk '/^Mem:/{print $7}')
 if [ $FREE_MEM_GB -lt 4 ]; then
     echo "Warning: Low memory available ($FREE_MEM_GB GB). Build might fail."
     NUM_JOBS=1

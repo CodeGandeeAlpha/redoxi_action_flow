@@ -201,9 +201,6 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
                 videoSrcCfg.DownstreamSpec(
                     name=det_driver_node_name,
                     action_name=f"/{det_driver_node_name}/{det_driver_node_params.init_config.input_port_config.action_name}",
-                    delivery_policy=videoSrcCfg.DeliveryPolicy(
-                        drop_strategy=videoSrcCfg.DropStrategy.DontCare,
-                    ),
                     # create_debug_pub=True,
                 ),
             ],
