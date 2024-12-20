@@ -3,6 +3,7 @@ from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
 from launch.actions import SetEnvironmentVariable
 from launch.actions import DeclareLaunchArgument
+import os
 import json
 
 import yolo8_series.configs as yolo
@@ -12,6 +13,16 @@ import redoxi_common_py.configs.detection_driver as detDriverCfg
 import redoxi_common_py.configs.frame_relay as frameRelayCfg
 import universal_mot_trackers.node_configs as motTrackersCfg
 import universal_mot_trackers.driver_configs as motTrackersDriverCfg
+
+# Get workspace root from COLCON_PREFIX_PATH
+import os
+
+workspace_root = os.getenv("COLCON_PREFIX_PATH", "")
+if workspace_root:
+    # Remove /install from the end if present
+    if workspace_root.endswith("/install"):
+        workspace_root = workspace_root[:-8]  # Remove last 8 characters ('/install')
+
 
 try:
     from attrs import asdict
@@ -107,15 +118,20 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
 # detection_driver <-> detector
 # fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx"
 # fn_model = r"/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8m-pose-dynbatch.onnx"
-# fn_model = r"/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx"
-fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s-pose.onnx"
+fn_model = f"{workspace_root}/tmp/models/yolov8n-pose-640.onnx"
+# fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s-pose.onnx"
 det_node_name = "detector"
 det_node_params = yolo.Yolo8ModelNodeConfig(
     init_config=yolo.Yolo8ModelInitConfig(
         model_configs=[
+            # {
+            #     "model_path": fn_model,
+            #     "device_type": "cuda",
+            #     "device_index": 0,
+            # },
             {
                 "model_path": fn_model,
-                "device_type": "cuda",
+                "device_type": "cpu",
                 "device_index": 0,
             },
         ],
@@ -171,11 +187,11 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
 
 # video_source -> detection_driver
 video_src_node_name = "video_source"
-# fn_video = r"/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.coded.mp4"
-# fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/crowded_0820.mp4"
-# fn_video = "/soft/workspace/code/psf_ros2_ws/.bigdata/new-york.mp4"
-# fn_video = r"/soft/workspace/code/psf_ros2_ws/data/dancetrack/dancetrack-0039.mp4"
+fn_video = f"{workspace_root}/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
+# fn_video = f"{workspace_root}/.bigdata/crowded_0820.coded.mp4"
+# fn_video = f"{workspace_root}/.bigdata/crowded_0820.mp4"
+# fn_video = f"{workspace_root}/.bigdata/new-york.mp4"
+# fn_video = f"{workspace_root}/data/dancetrack/dancetrack-0039.mp4"
 video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
         video_url=fn_video,
@@ -199,14 +215,15 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
         step_interval=StepIntervals.Medium,
         video_start_time=0,
         video_end_time=-1,
-        frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
-            drop_strategy=videoSrcCfg.DropStrategy.DropAsNeeded,
-        ),
-        frame_request_policy=videoSrcCfg.DeliveryPolicy(
-            drop_strategy=videoSrcCfg.DropStrategy.DropAsNeeded,
-        ),
+        # frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
+        #     precondition=videoSrcCfg.DeliveryPrecondition.DontCare,
+        #     drop_strategy=videoSrcCfg.DropStrategy.NoDrop,
+        # ),
+        # frame_request_policy=videoSrcCfg.DeliveryPolicy(
+        #     drop_strategy=videoSrcCfg.DropStrategy.NoDrop,
+        # ),
         # output_image_size={"width": 1920, "height": 1080},
-        output_image_size={"width": 1200, "height": -1},
+        output_image_size={"width": 1024, "height": -1},
     ),
 )
 
@@ -322,9 +339,7 @@ def generate_launch_description():
         SetEnvironmentVariable(
             "RCUTILS_CONSOLE_OUTPUT_FORMAT", "[{severity}][{time}]: {message}"
         ),
-        SetEnvironmentVariable(
-            "ROS_LOG_DIR", "/soft/workspace/code/psf_ros2_ws/tmp/roslog"
-        ),
+        SetEnvironmentVariable("ROS_LOG_DIR", f"{workspace_root}/tmp/roslog"),
         SetEnvironmentVariable("ROS_DOMAIN_ID", "0"),
     ]
 

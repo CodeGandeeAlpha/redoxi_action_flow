@@ -19,7 +19,11 @@ sudo apt-get install -y doxygen \
 
 # allow pip3 to break the system package
 sudo pip3 config --global set global.break-system-packages true
-sudo pip3 install libclang
+if [ ! -z "$http_proxy" ]; then
+    sudo pip3 install libclang --proxy="$http_proxy"
+else
+    sudo pip3 install libclang
+fi
 
 # Install libclang-dev package
 sudo apt-get update

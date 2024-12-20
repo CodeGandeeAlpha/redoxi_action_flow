@@ -31,8 +31,12 @@ if cmake --build build -j$(nproc); then
 
     # Install v6d python binding and etcd
     echo "Installing v6d python binding and etcd..."
-    sudo python3 setup.py bdist_wheel
-    sudo pip3 install dist/vineyard-*.whl
+    sudo -E python3 setup.py bdist_wheel
+    if [ -n "$http_proxy" ]; then
+        sudo -E pip3 --proxy "$http_proxy" install dist/vineyard-*.whl
+    else
+        sudo -E pip3 install dist/vineyard-*.whl
+    fi
 
     # Update ldconfig to include the newly installed libraries
     echo "Updating ldconfig..."

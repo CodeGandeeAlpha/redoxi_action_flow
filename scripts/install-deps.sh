@@ -13,4 +13,8 @@ apt-get install -y libtbb-dev xtensor-dev
 # apt-get install -y nuget tensorrt-libs
 
 # required by the ros2_web_bridge
-sudo pip3 install simplejpeg
+if [ ! -z "$http_proxy" ]; then
+    sudo pip3 install simplejpeg --proxy="$http_proxy"
+else
+    sudo pip3 install simplejpeg
+fi
