@@ -930,6 +930,11 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 return ActionAfterTimeout::WaitAgain;
             };
 
+        // FIXME: for no_drop and shared memory delivery, it will have problem,
+        // where the frame is still being sent when timeout is triggered.
+        // There is no easy solution, because even if the frame is sent, the shared memory can still timeout before the message reaches downstream
+        // currently a workaround is to set shared memory timeout to inf, and handle it in the last node.
+        // TODO: find a better solution, consider using builtin shared memory (in fastDDS or cycloneDDS)
         while (attempts < max_attempts || no_drop) {
             if (!rclcpp::ok()) {
                 // system is shutting down, get out
