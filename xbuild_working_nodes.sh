@@ -15,21 +15,24 @@ display_help() {
     echo "  $0 --verbose --debug"
 }
 
-PackagesToBuild="redoxi_common_nodes \
-                 redoxi_inference \
-                 redoxi_inference_onnx \
-                 redoxi_dnn_models \
-                 redoxi_shm_v6d \
-                 yolo8_series \
-                 test_package \
-                 universal_mot_trackers \
-                 test_hz_py \
-                 rosboard"
+# Get the absolute path of the directory containing this script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-# PackagesToBuild="redoxi_shared_memory \
+# PackagesToBuild="redoxi_common_nodes \
+#                  redoxi_inference \
+#                  redoxi_inference_onnx \
+#                  redoxi_dnn_models \
 #                  redoxi_shm_v6d \
-#                  redoxi_basic_cpp \
-#                  test_package"
+#                  yolo8_series \
+#                  test_package \
+#                  universal_mot_trackers \
+#                  test_hz_py \
+#                  rosboard"
+
+PackagesToBuild="redoxi_inference_rknn \
+                 redoxi_inference \
+                 redoxi_basic_cpp \
+                 test_package"
 
 # Check if --help flag is provided
 if [[ "$*" == *"--help"* ]]; then
@@ -90,6 +93,7 @@ colcon build --packages-up-to $PackagesToBuild \
     -DJSON_STRUCT_OPT_INSTALL=ON \
     -DJSON_STRUCT_OPT_BUILD_EXAMPLES=OFF \
     -DJSON_STRUCT_OPT_BUILD_TESTS=OFF \
+    -DRKNPU_ROOT=$SCRIPT_DIR/tmp/rknpu2 \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++
 
