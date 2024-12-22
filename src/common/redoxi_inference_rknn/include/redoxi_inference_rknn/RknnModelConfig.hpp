@@ -16,10 +16,12 @@ namespace cmkeys = redoxi_works::inference::common_config_keys;
 namespace cmdev = redoxi_works::inference::common_device_types;
 
 class RknnModelInference;
-struct RknnModelConfig : public redoxi_works::inference::defaults::DefaultKeyValueStore {
+struct RknnModelConfig : public defaults::DefaultKeyValueStore {
     friend class RknnModelInference;
 
   public:
+    using Ptr = std::shared_ptr<RknnModelConfig>;
+    using ConstPtr = std::shared_ptr<const RknnModelConfig>;
     inline static constexpr const char *DefaultDeviceType = cmdev::RKNPU;
 
     struct Keys {

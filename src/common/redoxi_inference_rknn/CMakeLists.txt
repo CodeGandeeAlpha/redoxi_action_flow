@@ -11,7 +11,13 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(redoxi_inference REQUIRED)
 find_package(redoxi_basic_cpp REQUIRED)
-add_library(redoxi_inference_rknn src/redoxi_inference_rknn.cpp)
+
+set(srcfiles src/redoxi_inference_rknn.cpp
+  src/RknnModelInference.cpp
+)
+
+
+add_library(redoxi_inference_rknn ${srcfiles})
 add_library(redoxi_inference_rknn::redoxi_inference_rknn ALIAS redoxi_inference_rknn)
 target_compile_features(redoxi_inference_rknn PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 target_include_directories(redoxi_inference_rknn PUBLIC

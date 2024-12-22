@@ -26,6 +26,7 @@ class RknnModelPortInfo : public ModelPortInfo
 
   protected:
     DataType_t m_dtype = DataType_t::RKNN_TENSOR_FLOAT16; // default to float16
+    rknn_tensor_attr m_rknn_attr;                         // the underlying rknn tensor attribute
     size_t m_index{0};                                    // index of the port in the model
 };
 } // namespace redoxi_works::inference::rknn

@@ -63,10 +63,6 @@ class OnnxModelInference : public RedoxiModelInference
     }
 
   private:
-    //! Initialize the port information
-    void _init_all_ports();
-
-  private:
     std::shared_ptr<Ort::Session> m_session;
     std::shared_ptr<Ort::Env> m_env;
     std::shared_ptr<OnnxModelConfig> m_config;

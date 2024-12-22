@@ -294,6 +294,13 @@ class InferenceInOutData
 class RedoxiModelInference
 {
   public:
+    using KeyValueStore_t = KeyValueStore;
+    using InitConfig_t = KeyValueStore;        // used in open()
+    using ModelMetadata_t = KeyValueStore;     // used in get_model_metadata()
+    using InferenceMetadata_t = KeyValueStore; // used in get_inference_metadata()
+    using InOutData_t = InferenceInOutData;    // used in do_inference()
+    using ModelPortInfo_t = ModelPortInfo;
+
     RedoxiModelInference() = default;
     virtual ~RedoxiModelInference() = default;
 
@@ -301,13 +308,13 @@ class RedoxiModelInference
     virtual KeyValueStore::Ptr create_init_params() = 0;
 
     // create an inference inout data object
-    virtual InferenceInOutData::Ptr create_inference_inout_data() = 0;
+    virtual InOutData_t::Ptr create_inference_inout_data() = 0;
 
     // get the information of all input ports, in original model definition
-    virtual ModelPortInfo::ConstPtrMap get_input_port_infos() const = 0;
+    virtual ModelPortInfo_t::ConstPtrMap get_input_port_infos() const = 0;
 
     // get the information of all output ports, in original model definition
-    virtual ModelPortInfo::ConstPtrMap get_output_port_infos() const = 0;
+    virtual ModelPortInfo_t::ConstPtrMap get_output_port_infos() const = 0;
 
     // initialize the model inference, load model and other resources
     virtual int open(KeyValueStore::Ptr params) = 0;
@@ -319,13 +326,13 @@ class RedoxiModelInference
     virtual int close() = 0;
 
     // get model metadata, related to the model itself
-    virtual KeyValueStore::ConstPtr get_model_metadata() const = 0;
+    virtual ModelMetadata_t::ConstPtr get_model_metadata() const = 0;
 
     // get inference metadata, related to the runtime environment
-    virtual KeyValueStore::ConstPtr get_inference_metadata() const = 0;
+    virtual InferenceMetadata_t::ConstPtr get_inference_metadata() const = 0;
 
     // inference
-    virtual int do_inference(InferenceInOutData::Ptr inout_data) = 0;
+    virtual int do_inference(InOutData_t::Ptr inout_data) = 0;
 };
 
 } // namespace redoxi_works::inference

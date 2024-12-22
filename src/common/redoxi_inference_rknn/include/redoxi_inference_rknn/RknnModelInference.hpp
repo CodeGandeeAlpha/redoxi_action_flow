@@ -1,6 +1,5 @@
 #pragma once
 
-#include <redoxi_inference/redoxi_inference.hpp>
 #include <redoxi_inference_rknn/RknnModelConfig.hpp>
 #include <redoxi_inference_rknn/RknnPortInfo.hpp>
 #include <redoxi_inference_rknn/RknnInferenceInOutData.hpp>
@@ -12,11 +11,10 @@ namespace redoxi_works::inference::rknn
 struct InferenceContextInitConfig {
     std::vector<int> use_npu_cores = {0, 1, 2}; // default enable all cores
     uint32_t init_flags = 0;                    // other flags for rknn_init
+    std::shared_ptr<rknn_init_extend> init_ext; // extended rknn api init information
 };
 
-//! ONNX model inference
-//! IMPORTANT: the current implementation assumes input and output shape do not change frequently
-//! otherwise the performance will be very slow because io binding will be recreated every time when the shape is changed
+//! Inference model using rk3588 npu
 class RknnModelInference : public RedoxiModelInference
 {
   public:
@@ -24,6 +22,7 @@ class RknnModelInference : public RedoxiModelInference
     // e.g. rknn_context, onnx session, etc.
     using InferenceContext_t = rknn_context;
     using RknnTensorType_t = rknn_tensor_type;
+    using InitConfig_t = RknnModelConfig;
 
     RknnModelInference();
     virtual ~RknnModelInference() = default;
@@ -71,10 +70,6 @@ class RknnModelInference : public RedoxiModelInference
     }
 
   private:
-    //! Initialize the port information
-    void _init_all_ports();
-
-  private:
     std::shared_ptr<RknnModelConfig> m_config;
     RknnModelPortInfo::PtrMap m_input_ports;
     RknnModelPortInfo::PtrMap m_output_ports;
@@ -116,6 +111,6 @@ class RknnModelInference : public RedoxiModelInference
      * @param dtype The ONNX tensor element data type.
      * @return A string representation of the data type.
      */
-    static std::string rknn_element_type_to_string(RknnTensorType_t dtype);
+    static std::string rknn_tensor_type_to_string(RknnTensorType_t dtype);
 };
 } // namespace redoxi_works::inference::rknn
