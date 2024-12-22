@@ -42,23 +42,18 @@ class RknnInferenceInOutData : public InferenceInOutData
     virtual bool remove_any_data(const std::string &key) override;
 
   protected:
-    // update the io binding for input ports
-    // return true if the io binding is updated, false otherwise
-    virtual bool _update_io_binding_input();
-
-    // update the io binding for output ports
-    // return true if the io binding is updated, false otherwise
-    virtual bool _update_io_binding_output();
-
     RknnModelInference *m_model_inference = nullptr;
 
     // port data indexed by port name
     std::map<std::string, RknnPortData::Ptr> m_input_ports;
     std::map<std::string, RknnPortData::Ptr> m_output_ports;
 
-    // flag to indicate if the port configuration has been changed
-    std::atomic_bool m_input_port_configuration_dirty{false};
-    std::atomic_bool m_output_port_configuration_dirty{false};
+    // flag to indicate if the input port configuration is dirty
+    // which calls for some update in the rknn inference cache
+    std::atomic<bool> m_input_port_configuration_dirty = false;
+    // flag to indicate if the output port configuration is dirty
+    // which calls for some update in the rknn inference cache
+    std::atomic<bool> m_output_port_configuration_dirty = false;
 
     // any data attached to the inference inout data, for custom usage without inheritance
     std::map<std::string, std::shared_ptr<std::any>> m_any_data;

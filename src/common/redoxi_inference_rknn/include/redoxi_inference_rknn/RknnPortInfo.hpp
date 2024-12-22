@@ -24,6 +24,11 @@ class RknnModelPortInfo : public ModelPortInfo
     RknnModelPortInfo() = default;
     virtual ~RknnModelPortInfo() = default;
 
+    size_t get_index() const
+    {
+        return m_index;
+    }
+
   protected:
     DataType_t m_dtype = DataType_t::RKNN_TENSOR_FLOAT16; // default to float16
     rknn_tensor_attr m_rknn_attr;                         // the underlying rknn tensor attribute

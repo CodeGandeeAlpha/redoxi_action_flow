@@ -14,6 +14,8 @@ find_package(redoxi_basic_cpp REQUIRED)
 
 set(srcfiles src/redoxi_inference_rknn.cpp
   src/RknnModelInference.cpp
+  src/RknnPortData.cpp
+  src/RknnInferenceInOutData.cpp
 )
 
 

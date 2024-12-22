@@ -8,10 +8,59 @@
 namespace redoxi_works::inference::rknn
 {
 
+/**
+ * @brief Configuration for initializing the RKNN inference context
+ */
 struct InferenceContextInitConfig {
-    std::vector<int> use_npu_cores = {0, 1, 2}; // default enable all cores
-    uint32_t init_flags = 0;                    // other flags for rknn_init
-    std::shared_ptr<rknn_init_extend> init_ext; // extended rknn api init information
+    //! NPU cores to use, default enables all cores (0,1,2)
+    std::vector<int> use_npu_cores = {0, 1, 2};
+
+    //! @name RKNN API Options
+    //! @{
+
+    //! Whether to collect performance stats during inference
+    bool rkopt_collect_performance_stats = false;
+
+    //! Whether to allow users to allocate memory themselves
+    bool rkopt_allocate_memory_outside = false;
+
+    //! Whether to share weights between different models (requires special model export handling)
+    bool rkopt_shared_weight = false;
+
+    //! Whether to only load model info without model data (can query ports but not run inference)
+    bool rkopt_load_model_info_only = false;
+
+    //! Whether to use GPU for NPU ops not supported by the NPU
+    bool rkopt_use_gpu_for_unsupported_npu_ops = false;
+
+    //! Whether to use SRAM for internal tensors instead of DDR
+    bool rkopt_internel_tensor_use_sram = false;
+
+    //! Whether to share SRAM between models (all must use SRAM for internal tensors)
+    bool rkopt_internal_tensor_share_sram = false;
+
+    //! Whether to manually flush input cache instead of auto flush
+    bool rkopt_manual_flush_input_cache = false;
+
+    //! Whether to manually flush output cache instead of auto flush
+    bool rkopt_manual_flush_output_cache = false;
+
+    //! Whether to allow device memory allocation without context
+    bool rkopt_allow_allocate_device_memory_without_context = false;
+    //! @}
+
+    //! Additional initialization flags for rknn_init
+    uint32_t _more_init_flags = 0;
+
+    /**
+     * @brief Extended RKNN API initialization info required for certain options:
+     * - rkopt_shared_weight (RKNN_FLAG_SHARE_WEIGHT_MEM): Need source model context
+     * - rkopt_allow_allocate_device_memory_without_context (RKNN_MEM_FLAG_ALLOC_NO_CONTEXT): Need model buffer
+     */
+    std::shared_ptr<rknn_init_extend> extended_init_info;
+
+    //! Convert the RKNN API options to initialization flags
+    uint32_t to_init_flags() const;
 };
 
 //! Inference model using rk3588 npu

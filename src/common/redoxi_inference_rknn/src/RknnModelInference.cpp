@@ -1,9 +1,50 @@
 #include <redoxi_inference_rknn/RknnModelInference.hpp>
 #include <redoxi_basic_cpp/logging/ros_logging.hpp>
 #include <redoxi_inference_rknn/rknn_utils.hpp>
+#include <filesystem>
+#include <algorithm>
+#include <numeric>
 
 namespace redoxi_works::inference::rknn
 {
+
+uint32_t InferenceContextInitConfig::to_init_flags() const
+{
+    uint32_t flags = 0;
+    if (rkopt_collect_performance_stats) {
+        flags |= RKNN_FLAG_COLLECT_PERF_MASK;
+    }
+    if (rkopt_allocate_memory_outside) {
+        flags |= RKNN_FLAG_MEM_ALLOC_OUTSIDE;
+    }
+    if (rkopt_shared_weight) {
+        flags |= RKNN_FLAG_SHARE_WEIGHT_MEM;
+    }
+    if (rkopt_load_model_info_only) {
+        flags |= RKNN_FLAG_COLLECT_MODEL_INFO_ONLY;
+    }
+    if (rkopt_use_gpu_for_unsupported_npu_ops) {
+        flags |= RKNN_FLAG_EXECUTE_FALLBACK_PRIOR_DEVICE_GPU;
+    }
+    if (rkopt_internel_tensor_use_sram) {
+        flags |= RKNN_FLAG_ENABLE_SRAM;
+    }
+    if (rkopt_internal_tensor_share_sram) {
+        flags |= RKNN_FLAG_SHARE_SRAM;
+    }
+    if (rkopt_manual_flush_input_cache) {
+        flags |= RKNN_FLAG_DISABLE_FLUSH_INPUT_MEM_CACHE;
+    }
+    if (rkopt_manual_flush_output_cache) {
+        flags |= RKNN_FLAG_DISABLE_FLUSH_OUTPUT_MEM_CACHE;
+    }
+    if (rkopt_allow_allocate_device_memory_without_context) {
+        flags |= RKNN_MEM_FLAG_ALLOC_NO_CONTEXT;
+    }
+    flags |= _more_init_flags;
+    return flags;
+}
+
 RknnModelInference::KeyValueStore_t::Ptr RknnModelInference::create_init_params()
 {
     return std::make_shared<RknnModelConfig>();
@@ -63,14 +104,106 @@ RknnModelInference::ModelPortInfo_t::PtrMap RknnModelInference::_get_output_port
 
 int RknnModelInference::do_inference(InferenceInOutData::Ptr inout_data)
 {
-    (void)inout_data;
-    throw std::runtime_error("Not implemented");
+    // auto _inout_data = std::dynamic_pointer_cast<RknnInferenceInOutData>(inout_data);
+    auto num_inputs = m_input_ports.size();
+
+    // create rknn input structures
+    std::vector<rknn_input> inputs(num_inputs);
+    size_t input_index = 0;
+    for (auto it = m_input_ports.begin(); it != m_input_ports.end(); ++it, ++input_index) {
+
+        // TODO: now only supports uint8 HWC images
+        inputs[input_index].type = RKNN_TENSOR_UINT8;
+        inputs[input_index].fmt = RKNN_TENSOR_NHWC;
+
+        auto port_info = it->second;
+        inputs[input_index].index = port_info->get_index();
+        auto port_data = inout_data->get_input_port_data(port_info->get_name());
+        uint8_t *data = nullptr;
+        auto ret = port_data->get_tensor_data(&data);
+        if (ret != 0) {
+            RDX_RAISE_ERROR("[f={}] Failed to get tensor data for port: {}", __func__, port_info->get_name());
+            return ret;
+        }
+        size_t data_size = std::accumulate(port_data->get_shape().begin(), port_data->get_shape().end(), 1, std::multiplies<int64_t>());
+
+        inputs[input_index].buf = data;
+        inputs[input_index].size = data_size;
+    }
+
+    // make sure we have a valid context
 }
 
 int RknnModelInference::open(KeyValueStore::Ptr params)
 {
-    (void)params;
-    throw std::runtime_error("Not implemented");
+    auto config = std::dynamic_pointer_cast<RknnModelConfig>(params);
+    if (config == nullptr) {
+        // wrong type of params
+        return -1;
+    }
+
+    auto model_path = config->model_path;
+
+    // check if the model path is valid
+    if (model_path.empty()) {
+        RDX_RAISE_ERROR("[f={}] Model path is empty", __func__);
+        return -1;
+    }
+    if (!std::filesystem::exists(model_path)) {
+        RDX_RAISE_ERROR("[f={}] Model path does not exist: {}", __func__, model_path);
+        return -1;
+    }
+
+    auto device_index = config->device_index;
+    auto core_mask = config->core_mask;
+    // create the environment and session
+    InferenceContextInitConfig infer_config;
+    m_context = create_inference_context(model_path, infer_config);
+
+    // set cores
+    {
+        int ret = 0;
+        if (device_index == std::numeric_limits<int64_t>::max()) {
+            ret = rknn_set_core_mask(*m_context, rknn_core_mask::RKNN_NPU_CORE_AUTO);
+        } else {
+            if (core_mask == 1 << 0) {
+                ret = rknn_set_core_mask(*m_context, rknn_core_mask::RKNN_NPU_CORE_0);
+            } else if (core_mask == 1 << 1) {
+                ret = rknn_set_core_mask(*m_context, rknn_core_mask::RKNN_NPU_CORE_1);
+            } else if (core_mask == 1 << 2) {
+                ret = rknn_set_core_mask(*m_context, rknn_core_mask::RKNN_NPU_CORE_2);
+            } else if (core_mask == ((1 << 1) | (1 << 2))) {
+                ret = rknn_set_core_mask(*m_context, rknn_core_mask::RKNN_NPU_CORE_0_1);
+            } else if (core_mask == ((1 << 1) | (1 << 2) | (1 << 3))) {
+                ret = rknn_set_core_mask(*m_context, rknn_core_mask::RKNN_NPU_CORE_0_1_2);
+            } else {
+                RDX_RAISE_ERROR("[f={}] Invalid core mask: {}", __func__, core_mask);
+                return -1;
+            }
+        }
+        HANDLE_RKNN_ERROR(ret);
+    }
+
+    // get all input and output port infos
+    m_input_ports = get_input_port_infos(*m_context);
+    RDX_INFO_DEV(nullptr, __func__, false, "Got {} input ports", m_input_ports.size());
+    {
+        for (const auto &[port_name, port_info] : m_input_ports) {
+            RDX_INFO_DEV(nullptr, __func__, false, "Input Port: {}", port_info->to_description());
+        }
+    }
+
+    m_output_ports = get_output_port_infos(*m_context);
+    RDX_INFO_DEV(nullptr, __func__, false, "Got {} output ports", m_output_ports.size());
+    {
+        for (const auto &[port_name, port_info] : m_output_ports) {
+            RDX_INFO_DEV(nullptr, __func__, false, "Output Port: {}", port_info->to_description());
+        }
+    }
+
+    RDX_INFO_DEV(nullptr, __func__, false, "{}", "Initialization completed");
+    m_config = config;
+    return 0;
 }
 
 bool RknnModelInference::is_open() const
@@ -100,7 +233,7 @@ std::shared_ptr<RknnModelInference::InferenceContext_t> RknnModelInference::crea
 
     // load model
     auto ret = rknn_init(ctx.get(), (void *)model_path.c_str(), 0,
-                         init_config.init_flags, init_config.init_ext.get());
+                         init_config.to_init_flags(), init_config.extended_init_info.get());
     HANDLE_RKNN_ERROR(ret);
     return ctx;
 }
