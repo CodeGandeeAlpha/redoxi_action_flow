@@ -9,7 +9,8 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
-
+find_package(redoxi_inference REQUIRED)
+find_package(redoxi_basic_cpp REQUIRED)
 add_library(redoxi_inference_rknn src/redoxi_inference_rknn.cpp)
 add_library(redoxi_inference_rknn::redoxi_inference_rknn ALIAS redoxi_inference_rknn)
 target_compile_features(redoxi_inference_rknn PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
@@ -21,6 +22,8 @@ ament_target_dependencies(
   redoxi_inference_rknn
   PUBLIC
   "rclcpp"
+  "redoxi_inference"
+  "redoxi_basic_cpp"
 )
 
 if(NOT DEFINED RKNPU_ROOT)
@@ -60,6 +63,8 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
+
+ament_export_dependencies(rclcpp redoxi_inference redoxi_basic_cpp)
 
 ament_export_include_directories(
   "include/${PROJECT_NAME}"
