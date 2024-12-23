@@ -73,7 +73,7 @@ class RknnModelInference : public RedoxiModelInference
     using RknnTensorType_t = rknn_tensor_type;
     using InitConfig_t = RknnModelConfig;
 
-    RknnModelInference();
+    RknnModelInference() = default;
     virtual ~RknnModelInference() = default;
 
     //! Create a key value store

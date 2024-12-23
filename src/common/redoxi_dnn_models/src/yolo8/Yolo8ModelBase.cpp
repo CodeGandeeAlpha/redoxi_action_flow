@@ -59,6 +59,7 @@ int Yolo8ModelBase::open(KeyValueStore::Ptr params)
     }
 
     // Create onnx model instance
+    // TODO: add rknn model
     auto model = m_impl->loader.createSharedInstance("redoxi_works::inference::onnx::OnnxModelInference");
     if (!model) {
         RDX_RAISE_ERROR("Failed to create onnx model instance");

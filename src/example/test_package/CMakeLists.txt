@@ -80,7 +80,7 @@ option(BUILD_MOT_TRACKER_DRIVER "Build mot_tracker_driver target" OFF)
 option(BUILD_FRAME_RELAY_NODE "Build frame_relay_node target" OFF)
 option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
 option(BUILD_TEST_SHM_TIMEOUT "Build test_shm_timeout target" OFF)
-option(BUILD_TEST_RKNN_INFER "Build test_rknn_infer target" OFF)
+option(BUILD_TEST_RKNN_INFER "Build test_rknn_infer target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
