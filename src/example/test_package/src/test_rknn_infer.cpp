@@ -20,6 +20,11 @@ int main(int argc, char **argv)
     init_params->set_string(common_keys::ModelPath, model_path.string());
     init_params->set_string(common_keys::DeviceType, common_device_types::RKNPU);
 
+    // open the model
+    spdlog::info("Opening the model");
+    auto ret = model.open(init_params);
+    spdlog::info("Model opened with return code: {}", ret);
+
     // create inference inout data
     // auto inference_inout_data = model.create_inference_inout_data();
 
