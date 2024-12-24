@@ -317,8 +317,16 @@ int UniversalMotTrackerNode::_create_tracker(const InitConfig_t &init_config)
             tracker_impl->m_tracker_param->set_preferred_image_size(image_size);
         }
 
+        auto deepsort_params = std::static_pointer_cast<RedoxiTrack::DeepSortTrackerParam>(tracker_impl->m_tracker_param);
+        deepsort_params->m_max_gating_distance = init_config.deep_sort_params.max_gating_distance;
+        deepsort_params->m_base_gating_threshold = init_config.deep_sort_params.base_gating_threshold;
+        deepsort_params->m_alpha_smooth_features = init_config.deep_sort_params.alpha_smooth_features;
+        deepsort_params->m_gating_dist_lambda = init_config.deep_sort_params.gating_dist_lambda;
+        deepsort_params->m_duplicate_iou_dist = init_config.deep_sort_params.duplicate_iou_dist;
+        deepsort_params->m_use_optical_before_track = init_config.deep_sort_params.use_optical_before_track;
+
         RDX_INFO_DEV(this, __func__, "{}", "Initializing DeepSORT tracker");
-        tracker_impl->m_tracker->init(*tracker_impl->m_tracker_param);
+        tracker_impl->m_tracker->init(*deepsort_params);
         tracker_impl->m_tracker_event_handler = event_handler;
         m_impl->m_tracker_impl = tracker_impl;
     } else if (init_config.tracker_type == types::TrackerType::BoTSort) {
@@ -330,8 +338,24 @@ int UniversalMotTrackerNode::_create_tracker(const InitConfig_t &init_config)
             tracker_impl->m_tracker_param->set_preferred_image_size(image_size);
         }
 
+        auto botsort_params = std::static_pointer_cast<RedoxiTrack::BotsortTrackerParam>(tracker_impl->m_tracker_param);
+        botsort_params->m_track_high_thresh = init_config.botsort_params.track_high_thresh;
+        botsort_params->m_track_low_thresh = init_config.botsort_params.track_low_thresh;
+        botsort_params->m_match_thresh = init_config.botsort_params.match_thresh;
+        botsort_params->m_aspect_ratio_thresh = init_config.botsort_params.aspect_ratio_thresh;
+        botsort_params->m_min_box_area = init_config.botsort_params.min_box_area;
+        botsort_params->m_proximity_thresh = init_config.botsort_params.proximity_thresh;
+        botsort_params->m_new_track_thresh = init_config.botsort_params.new_track_thresh;
+        botsort_params->m_max_time_lost = init_config.botsort_params.max_time_lost;
+        botsort_params->m_keep_track_buffer = init_config.botsort_params.keep_track_buffer;
+        botsort_params->m_use_optical_before_track = init_config.botsort_params.use_optical_before_track;
+        botsort_params->m_fuse_score = init_config.botsort_params.fuse_score;
+        botsort_params->m_use_reid_feature = init_config.botsort_params.use_reid_feature;
+        botsort_params->m_appearance_thresh = init_config.botsort_params.appearance_thresh;
+        botsort_params->m_alpha_smooth_features = init_config.botsort_params.alpha_smooth_features;
+
         RDX_INFO_DEV(this, __func__, "{}", "Initializing BoTSort tracker");
-        tracker_impl->m_tracker->init(*tracker_impl->m_tracker_param);
+        tracker_impl->m_tracker->init(*botsort_params);
         tracker_impl->m_tracker_event_handler = event_handler;
         m_impl->m_tracker_impl = tracker_impl;
     }

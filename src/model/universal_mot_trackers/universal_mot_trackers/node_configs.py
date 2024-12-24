@@ -47,6 +47,34 @@ __all__ = (
 
 
 @define(kw_only=True)
+class DeepSORTParams(commonTypes.JsonConvertible):
+    max_gating_distance: float = field(default=0.3)
+    base_gating_threshold: float = field(default=6.325e-3)
+    alpha_smooth_features: float = field(default=0.9)
+    gating_dist_lambda: float = field(default=0.98)
+    duplicate_iou_dist: float = field(default=0.15)
+    use_optical_before_track: bool = field(default=True)
+
+
+@define(kw_only=True)
+class BoTSORTParams(commonTypes.JsonConvertible):
+    track_high_thresh: float = field(default=0.6)
+    track_low_thresh: float = field(default=0.1)
+    new_track_thresh: float = field(default=0.7)
+    keep_track_buffer: int = field(default=30)
+    max_time_lost: int = field(default=30)
+    match_thresh: float = field(default=0.8)
+    aspect_ratio_thresh: float = field(default=1.6)
+    min_box_area: float = field(default=10.0)
+    proximity_thresh: float = field(default=0.5)
+    appearance_thresh: float = field(default=0.25)
+    alpha_smooth_features: float = field(default=0.9)
+    use_optical_before_track: bool = field(default=False)
+    fuse_score: bool = field(default=False)
+    use_reid_feature: bool = field(default=True)
+
+
+@define(kw_only=True)
 class UniversalMotTrackersInitConfig(nodeCfg.BaseRosNodeInitConfig):
     InputPortActionGoalType: ClassVar[str] = (
         "redoxi_public_msgs/action/ProcessTrackByDetection_Goal"
@@ -55,6 +83,10 @@ class UniversalMotTrackersInitConfig(nodeCfg.BaseRosNodeInitConfig):
     publish_visualization_topic: str | None = field(default=None)
     publish_probe_topic: str | None = field(default=None)
     preferred_image_size: ImageSize | None = field(default=None)
+    tracker_type: str = field(default="deepsort")
+    motion_prediction_type: str = field(default="mixed_ofkf")
+    deep_sort_params: DeepSORTParams | None = field(default=None)
+    botsort_params: BoTSORTParams | None = field(default=None)
 
 
 @define(kw_only=True)

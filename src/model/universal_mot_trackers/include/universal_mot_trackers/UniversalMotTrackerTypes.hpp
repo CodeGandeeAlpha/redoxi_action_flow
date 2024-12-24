@@ -25,6 +25,58 @@ struct MotionPredictionType {
     inline constexpr static std::string_view MixedOFKF = "mixed_ofkf"; // mixed optical flow and kalman filter
 };
 
+struct DeepSORTParams {
+    float max_gating_distance = 0.3;
+
+    float base_gating_threshold = 6.325 * 1e-3;
+
+    float alpha_smooth_features = 0.9;
+    float gating_dist_lambda = 0.98;
+    float duplicate_iou_dist = 0.15;
+    bool use_optical_before_track = true;
+
+    JS_OBJECT(
+        JS_MEMBER(max_gating_distance),
+        JS_MEMBER(base_gating_threshold),
+        JS_MEMBER(alpha_smooth_features),
+        JS_MEMBER(gating_dist_lambda),
+        JS_MEMBER(duplicate_iou_dist),
+        JS_MEMBER(use_optical_before_track));
+};
+
+struct BoTSORTParams {
+    float track_high_thresh = 0.6; // botsort nni 0.35  bytetrack0.5  botsort 0.6
+    float track_low_thresh = 0.1;
+    float new_track_thresh = 0.7; // botsort nni 0.5   bytetrack0.6  botsort 0.7
+    int keep_track_buffer = 30;
+    int max_time_lost = 30;
+    float match_thresh = 0.8; // botsort nni 0.6   bytetrack0.8  botsort 0.8
+    float aspect_ratio_thresh = 1.6;
+    float min_box_area = 10.0;
+    float proximity_thresh = 0.5;
+    float appearance_thresh = 0.25; // botsort nni 0.5   botsort 0.25
+    float alpha_smooth_features = 0.9;
+    bool use_optical_before_track = false;
+    bool fuse_score = false; // botsort/bytetrack false
+    bool use_reid_feature = true;
+
+    JS_OBJECT(
+        JS_MEMBER(track_high_thresh),
+        JS_MEMBER(track_low_thresh),
+        JS_MEMBER(new_track_thresh),
+        JS_MEMBER(keep_track_buffer),
+        JS_MEMBER(max_time_lost),
+        JS_MEMBER(match_thresh),
+        JS_MEMBER(aspect_ratio_thresh),
+        JS_MEMBER(min_box_area),
+        JS_MEMBER(proximity_thresh),
+        JS_MEMBER(appearance_thresh),
+        JS_MEMBER(alpha_smooth_features),
+        JS_MEMBER(use_optical_before_track),
+        JS_MEMBER(fuse_score),
+        JS_MEMBER(use_reid_feature));
+};
+
 /**
  * @brief The initialization configuration for the Universal MOT Tracker node
  */
@@ -44,12 +96,22 @@ class InitConfig : public common_nodes::OpenCloseNode::InitConfig_t
     std::string tracker_type = std::string(TrackerType::DeepSORT);
     std::string motion_prediction_type = std::string(MotionPredictionType::MixedOFKF);
 
+    // DeepSORT params
+    DeepSORTParams deep_sort_params;
+
+    // BoTSORT params
+    BoTSORTParams botsort_params;
+
     JS_OBJECT_WITH_SUPER(
         JS_SUPER(common_nodes::OpenCloseNode::InitConfig_t),
         JS_MEMBER(input_port_config),
         JS_MEMBER(publish_visualization_topic),
         JS_MEMBER(publish_probe_topic),
-        JS_MEMBER(preferred_image_size));
+        JS_MEMBER(preferred_image_size),
+        JS_MEMBER(tracker_type),
+        JS_MEMBER(motion_prediction_type),
+        JS_MEMBER(deep_sort_params),
+        JS_MEMBER(botsort_params));
 };
 
 /**
