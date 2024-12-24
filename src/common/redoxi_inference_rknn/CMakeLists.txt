@@ -16,6 +16,8 @@ set(srcfiles src/redoxi_inference_rknn.cpp
   src/RknnModelInference.cpp
   src/RknnPortData.cpp
   src/RknnInferenceInOutData.cpp
+  src/rknn_utils.cpp
+  src/RknnPortInfo.cpp
 )
 
 

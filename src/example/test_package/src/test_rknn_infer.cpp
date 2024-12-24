@@ -10,8 +10,8 @@ namespace common_keys = rdx::inference::common_config_keys;
 namespace common_device_types = rdx::inference::common_device_types;
 
 // fs::path model_path = "/data/code/psf_ros2_ws/tmp/models/rknn/mobilenet_v1.rknn";
-fs::path model_path = "/data/code/psf_ros2_ws/tmp/models/rknn/yolov8n-pose-ptq-bs1.rknn";
-// fs::path model_path = "/data/code/psf_ros2_ws/tmp/models/rknn/yolov8n-pose-fp-bs1.rknn";
+// fs::path model_path = "/data/code/psf_ros2_ws/tmp/models/rknn/yolov8n-pose-ptq-bs3.rknn";
+fs::path model_path = "/data/code/psf_ros2_ws/tmp/models/rknn/yolov8n-pose-fp-bs3.rknn";
 fs::path image_path = "/data/code/psf_ros2_ws/data/ori_img.jpg";
 
 int main(int argc, char **argv)

@@ -2,6 +2,7 @@
 
 #include <rknn_api.h>
 #include <redoxi_basic_cpp/logging/ros_logging.hpp>
+#include <string_view>
 
 namespace redoxi_works::inference::rknn
 {
@@ -39,4 +40,31 @@ namespace redoxi_works::inference::rknn
         }                                                                                                           \
     } while (0)
 
+inline constexpr std::string_view rknn_tensor_type_to_string(rknn_tensor_type dtype)
+{
+    switch (dtype) {
+        case RKNN_TENSOR_FLOAT32:
+            return "float32";
+        case RKNN_TENSOR_FLOAT16:
+            return "float16";
+        case RKNN_TENSOR_INT8:
+            return "int8";
+        case RKNN_TENSOR_UINT8:
+            return "uint8";
+        case RKNN_TENSOR_INT16:
+            return "int16";
+        case RKNN_TENSOR_UINT16:
+            return "uint16";
+        case RKNN_TENSOR_INT32:
+            return "int32";
+        case RKNN_TENSOR_UINT32:
+            return "uint32";
+        case RKNN_TENSOR_INT64:
+            return "int64";
+        case RKNN_TENSOR_BOOL:
+            return "bool";
+        default:
+            return "unknown";
+    }
+}
 } // namespace redoxi_works::inference::rknn

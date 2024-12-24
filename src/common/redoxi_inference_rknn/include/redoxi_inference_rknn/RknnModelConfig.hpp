@@ -5,9 +5,6 @@
 #include <redoxi_inference/default_impl.hpp>
 #include <rknn_api.h>
 #include <string>
-#include <sstream>
-#include <tuple>
-#include <any>
 
 namespace redoxi_works::inference::rknn
 {
@@ -32,6 +29,10 @@ struct RknnModelConfig : public defaults::DefaultKeyValueStore {
         inline static constexpr auto DeviceType = cmkeys::DeviceType;
         inline static constexpr auto DeviceIndex = cmkeys::DeviceIndex;
         inline static constexpr auto CoreMask = "core_mask";
+
+        // rknn context for duplication, so that the same model can be shared by multiple inference instances
+        // this is int64_t
+        inline static constexpr auto DuplicateContext = "duplicate_context";
     }; // namespace Keys
 
     RknnModelConfig()
@@ -61,6 +62,14 @@ struct RknnModelConfig : public defaults::DefaultKeyValueStore {
                       "- (1<<1)|(1<<2) means core 1 and 2\n"
                       "etc."},
                      &core_mask);
+
+        RDX_INFO_DEV(nullptr, __func__, "Registering key {}", Keys::DuplicateContext);
+        register_key({Keys::DuplicateContext, "int64",
+                      "The existing rknn context for duplication.\n"
+                      "This allows the same model to be shared by multiple inference instances.\n"
+                      "see rknn_dup_context() in rknn_api.h for more details.\n"
+                      "When this is set, the model path will be ignored."},
+                     &duplicate_context);
     }
 
   protected:
@@ -68,6 +77,7 @@ struct RknnModelConfig : public defaults::DefaultKeyValueStore {
     std::string device_type{DefaultDeviceType};
     int64_t device_index = DeviceIndexUseAnyCore; // default to allow to use any core, let rknn api do scheduling
     int64_t core_mask = 0;
+    int64_t duplicate_context = 0;
 };
 
 } // namespace redoxi_works::inference::rknn
