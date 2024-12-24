@@ -93,7 +93,7 @@ colcon build --packages-up-to $PackagesToBuild \
     -DJSON_STRUCT_OPT_INSTALL=ON \
     -DJSON_STRUCT_OPT_BUILD_EXAMPLES=OFF \
     -DJSON_STRUCT_OPT_BUILD_TESTS=OFF \
-    -DRKNPU_ROOT=$SCRIPT_DIR/tmp/rknpu2 \
+    -DRKNPU_ROOT=$SCRIPT_DIR/tmp/rknpu-2.2 \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++
 

@@ -14,20 +14,22 @@ find_package(ament_cmake REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(TBB REQUIRED)
 find_package(xtensor REQUIRED)
+find_package(OpenCV REQUIRED)
 
 # Set dependencies
-set(DEPENDENCIES
-    psg_private_msgs
-    redoxi_video_reader
-    redoxi_samples_lib
-    redoxi_samples_nodes
-    redoxi_shared_memory
-    redoxi_inference
-    redoxi_inference_rknn
-    redoxi_dnn_models
-    yolo8_series
-    pluginlib
-    universal_mot_trackers)
+# set(DEPENDENCIES
+#     psg_private_msgs
+#     redoxi_video_reader
+#     redoxi_samples_lib
+#     redoxi_samples_nodes
+#     redoxi_shared_memory
+#     redoxi_inference
+#     redoxi_dnn_models
+#     yolo8_series
+#     pluginlib
+#     universal_mot_trackers
+#     redoxi_inference_rknn)
+set(DEPENDENCIES redoxi_inference_rknn cv_bridge)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb xtensor)
 
@@ -60,7 +62,7 @@ option(BUILD_TEST_V2_JSON_EXAMPLES "Build test_v2_json_examples target" OFF)
 option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2
        "Build test_simple_action_generator_v2 target" OFF)
 option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target"
-       ON)
+       OFF)
 option(BUILD_ONNX_HELLO_WORLD "Build onnx_hello_world target" OFF)
 option(BUILD_ONNX_INFERENCE_API "Build onnx_inference_api target" OFF)
 option(BUILD_ONNX_YOLO8POSE "Build onnx_yolo8pose target" OFF)
@@ -81,6 +83,7 @@ option(BUILD_FRAME_RELAY_NODE "Build frame_relay_node target" OFF)
 option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
 option(BUILD_TEST_SHM_TIMEOUT "Build test_shm_timeout target" OFF)
 option(BUILD_TEST_RKNN_INFER "Build test_rknn_infer target" ON)
+option(BUILD_TEST_RKNN_OFFICIAL_INFER "Build test_rknn_official_infer target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -109,6 +112,10 @@ function(configure_target target_name)
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_TEST_RKNN_OFFICIAL_INFER)
+  configure_target(test_rknn_official_infer)
+endif()
 
 if(BUILD_TEST_RKNN_INFER)
   configure_target(test_rknn_infer)

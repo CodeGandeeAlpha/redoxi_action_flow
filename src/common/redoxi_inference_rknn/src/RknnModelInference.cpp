@@ -52,7 +52,9 @@ RknnModelInference::KeyValueStore_t::Ptr RknnModelInference::create_init_params(
 
 RknnModelInference::InOutData_t::Ptr RknnModelInference::create_inference_inout_data()
 {
-    return std::make_shared<RknnInferenceInOutData>();
+    auto output = std::make_shared<RknnInferenceInOutData>();
+    output->init(this);
+    return output;
 }
 
 RknnModelInference::KeyValueStore_t::ConstPtr RknnModelInference::get_model_metadata() const
@@ -105,7 +107,7 @@ RknnModelInference::ModelPortInfo_t::PtrMap RknnModelInference::_get_output_port
 int RknnModelInference::do_inference(InferenceInOutData::Ptr inout_data)
 {
     // make sure we have a valid context
-    if (m_context == nullptr) {
+    if (m_context == nullptr || *m_context == 0) {
         RDX_RAISE_ERROR("[f={}()] RKNN Model is not initialized (no context)", __func__);
         return -1;
     }
@@ -127,7 +129,8 @@ int RknnModelInference::do_inference(InferenceInOutData::Ptr inout_data)
         auto port_info = it->second;
         inp.index = port_info->get_index();
         auto port_data = inout_data->get_input_port_data(port_info->get_name());
-        auto num_elements = std::accumulate(port_data->get_shape().begin(), port_data->get_shape().end(), 1, std::multiplies<int64_t>());
+        auto shape = port_data->get_shape();
+        auto num_elements = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<int64_t>());
 
         // negative num_elements is not allowed
         if (num_elements < 0) {
@@ -138,6 +141,8 @@ int RknnModelInference::do_inference(InferenceInOutData::Ptr inout_data)
         if (port_data->get_dtype_str() == "uint8") {
             // uint8 case, you do not need to process the image in this case
             // assuming the image is in (N)HWC format
+            RDX_INFO_DEV(nullptr, __func__, false, "Setting input[{}] type={}",
+                         input_index, port_data->get_dtype_str());
             inp.type = RKNN_TENSOR_UINT8;
             inp.fmt = RKNN_TENSOR_NHWC;
             uint8_t *data = nullptr;
@@ -152,6 +157,8 @@ int RknnModelInference::do_inference(InferenceInOutData::Ptr inout_data)
         } else if (port_data->get_dtype_str() == "float32") {
             // float32 case, you need to process the image in this case by scaling the image to [0, 1]
             // assuming the image is in (N)HWC format
+            RDX_INFO_DEV(nullptr, __func__, false, "Setting input[{}] type={}",
+                         input_index, port_data->get_dtype_str());
             inp.type = RKNN_TENSOR_FLOAT32;
             inp.fmt = RKNN_TENSOR_NCHW;
             float *data = nullptr;
@@ -172,7 +179,17 @@ int RknnModelInference::do_inference(InferenceInOutData::Ptr inout_data)
     // set input into context
     RDX_INFO_DEV(nullptr, __func__, false, "Setting {} inputs into context", inputs.size());
     {
+        // rknn_input_output_num io_num;
+        // rknn_query(*m_context, RKNN_QUERY_IN_OUT_NUM, &io_num, sizeof(io_num));
+        // RDX_INFO_DEV(nullptr, __func__, false, "io_num: n_input={}, n_output={}", io_num.n_input, io_num.n_output);
         auto ret = rknn_inputs_set(*m_context, inputs.size(), inputs.data());
+        // rknn_input ii[1];
+        // ii[0].index = 0;
+        // ii[0].type = RKNN_TENSOR_FLOAT32;
+        // ii[0].fmt = RKNN_TENSOR_NCHW;
+        // ii[0].buf = nullptr;
+        // ii[0].size = 0;
+        // auto ret = rknn_inputs_set(*m_context, 1, ii);
         HANDLE_RKNN_ERROR(ret);
     }
 
@@ -207,15 +224,16 @@ int RknnModelInference::do_inference(InferenceInOutData::Ptr inout_data)
                      port_index, port_name, outputs[port_index].size);
 
         auto port_data = inout_data->get_output_port_data(port_name);
+        auto shape = port_data->get_shape();
         {
             // sanity check
-            auto num_expected_output_elements = std::accumulate(port_info->get_shape().begin(), port_info->get_shape().end(), 1, std::multiplies<int64_t>());
+            auto num_expected_output_elements = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<int64_t>());
             if (outputs[port_index].size != num_expected_output_elements * sizeof(float)) {
                 RDX_RAISE_ERROR("[f={}()] Output size mismatch for port: {}", __func__, port_name);
                 return -1;
             }
         }
-        port_data->set_tensor_data((float *)outputs[port_index].buf, port_info->get_shape());
+        port_data->set_tensor_data((float *)outputs[port_index].buf, shape);
     }
 
     // release the outputs
@@ -252,9 +270,11 @@ int RknnModelInference::open(KeyValueStore::Ptr params)
     // set cores
     {
         int ret = 0;
-        if (device_index == std::numeric_limits<int64_t>::max()) {
+        if (device_index == RknnModelConfig::DeviceIndexUseAnyCore) {
             ret = rknn_set_core_mask(*m_context, rknn_core_mask::RKNN_NPU_CORE_AUTO);
-        } else {
+        } else if (device_index == RknnModelConfig::DeviceIndexUseAllCores) {
+            ret = rknn_set_core_mask(*m_context, rknn_core_mask::RKNN_NPU_CORE_ALL);
+        } else if (device_index == RknnModelConfig::DeviceIndexUseCoreMask) {
             if (core_mask == 1 << 0) {
                 ret = rknn_set_core_mask(*m_context, rknn_core_mask::RKNN_NPU_CORE_0);
             } else if (core_mask == 1 << 1) {
@@ -292,8 +312,9 @@ int RknnModelInference::open(KeyValueStore::Ptr params)
 
     // we do not allow dynamic input shapes (-1 in dimensions)
     for (const auto &port : m_input_ports) {
-        if (std::find(port.second->get_shape().begin(), port.second->get_shape().end(), -1) != port.second->get_shape().end()) {
-            RDX_RAISE_ERROR("[f={}()] Dynamic input shape is not allowed", __func__);
+        auto shape = port.second->get_shape();
+        if (std::find(shape.begin(), shape.end(), -1) != shape.end()) {
+            RDX_RAISE_ERROR("[f={}()] Dynamic input shape is not allowed for port: {}", __func__, port.first);
             return -1;
         }
     }
@@ -329,8 +350,10 @@ std::shared_ptr<RknnModelInference::InferenceContext_t> RknnModelInference::crea
         });
 
     // load model
+    auto init_flags = init_config.to_init_flags();
+    RDX_INFO_DEV(nullptr, __func__, "opening model with init_flags={}", init_flags);
     auto ret = rknn_init(ctx.get(), (void *)model_path.c_str(), 0,
-                         init_config.to_init_flags(), init_config.extended_init_info.get());
+                         init_flags, init_config.extended_init_info.get());
     HANDLE_RKNN_ERROR(ret);
     return ctx;
 }
@@ -343,18 +366,30 @@ RknnModelPortInfo::PtrMap RknnModelInference::get_input_port_infos(
     rknn_query(context, RKNN_QUERY_IN_OUT_NUM, &io_num, sizeof(io_num));
 
     std::vector<rknn_tensor_attr> input_attrs(io_num.n_input);
+    RDX_INFO_DEV(nullptr, __func__, false, "found {} inputs", io_num.n_input);
     for (uint32_t i = 0; i < io_num.n_input; i++) {
-        rknn_query(context, RKNN_QUERY_INPUT_ATTR, &input_attrs[i], sizeof(rknn_tensor_attr));
         auto &attr = input_attrs[i];
+        memset(&attr, 0, sizeof(rknn_tensor_attr));
+        attr.index = i;
+
+        rknn_query(context, RKNN_QUERY_INPUT_ATTR, &input_attrs[i], sizeof(rknn_tensor_attr));
+
         auto port_info = std::make_shared<RknnModelPortInfo>();
 
         port_info->m_name = attr.name;
-        port_info->m_dtype = attr.type;
-        port_info->m_dtype_str = rknn_tensor_type_to_string(attr.type);
+        // port_info->m_dtype = attr.type;
+        // port_info->m_dtype_str = rknn_tensor_type_to_string(attr.type);
+        port_info->intrinsic_dtype = attr.type;
+        port_info->intrinsic_dtype_str = rknn_tensor_type_to_string(attr.type);
+
+        // rknn will convert the type to appropriate type, so the input type on user side can be whatever
+        port_info->m_dtype = RknnModelPortInfo::DataType_t::RKNN_TENSOR_UINT8;
+        port_info->m_dtype_str = "uint8";
+
         port_info->m_shape = std::vector<int64_t>(attr.dims, attr.dims + attr.n_dims);
         port_info->m_is_input = true;
         port_info->m_index = attr.index;
-        port_info->m_rknn_attr = attr;
+        port_info->rknn_attr = attr;
         input_ports.insert(std::make_pair(port_info->m_name, port_info));
     }
     return input_ports;
@@ -368,18 +403,32 @@ RknnModelPortInfo::PtrMap RknnModelInference::get_output_port_infos(
     rknn_query(context, RKNN_QUERY_IN_OUT_NUM, &io_num, sizeof(io_num));
 
     std::vector<rknn_tensor_attr> output_attrs(io_num.n_output);
+    RDX_INFO_DEV(nullptr, __func__, false, "found {} outputs", io_num.n_output);
     for (uint32_t i = 0; i < io_num.n_output; i++) {
-        rknn_query(context, RKNN_QUERY_OUTPUT_ATTR, &output_attrs[i], sizeof(rknn_tensor_attr));
+        // RDX_INFO_DEV(nullptr, __func__, false, "reading meta info for output[{}]", i);
         auto &attr = output_attrs[i];
+        memset(&attr, 0, sizeof(rknn_tensor_attr));
+        attr.index = i;
+
+        rknn_query(context, RKNN_QUERY_OUTPUT_ATTR, &attr, sizeof(rknn_tensor_attr));
         auto port_info = std::make_shared<RknnModelPortInfo>();
 
         port_info->m_name = attr.name;
-        port_info->m_dtype = attr.type;
-        port_info->m_dtype_str = rknn_tensor_type_to_string(attr.type);
+        port_info->intrinsic_dtype = attr.type;
+        port_info->intrinsic_dtype_str = rknn_tensor_type_to_string(attr.type);
+
+        // for output, rknn always returns float32
+        port_info->m_dtype = RknnModelPortInfo::DataType_t::RKNN_TENSOR_FLOAT32;
+        port_info->m_dtype_str = "float32";
+
         port_info->m_shape = std::vector<int64_t>(attr.dims, attr.dims + attr.n_dims);
         port_info->m_is_input = false;
         port_info->m_index = attr.index;
-        port_info->m_rknn_attr = attr;
+        port_info->rknn_attr = attr;
+
+        RDX_INFO_DEV(nullptr, __func__, false, "output[{}] name={}, shape={}, size={}", i,
+                     port_info->m_name, fmt::join(port_info->m_shape, ","), port_info->rknn_attr.size);
+
         output_ports.insert(std::make_pair(port_info->m_name, port_info));
     }
     return output_ports;

@@ -21,7 +21,13 @@ class RknnModelPortInfo : public ModelPortInfo
     using ConstPtrMap = std::map<std::string, ConstPtr>;
 
   public:
-    RknnModelPortInfo() = default;
+    RknnModelPortInfo()
+    {
+        // default to float32
+        m_dtype = DataType_t::RKNN_TENSOR_FLOAT32;
+        m_dtype_str = "float32";
+    }
+
     virtual ~RknnModelPortInfo() = default;
 
     size_t get_index() const
@@ -29,9 +35,13 @@ class RknnModelPortInfo : public ModelPortInfo
         return m_index;
     }
 
+  public:
+    rknn_tensor_attr rknn_attr;      // the underlying rknn tensor attribute
+    DataType_t intrinsic_dtype;      // the intrinsic rknn data type of the port
+    std::string intrinsic_dtype_str; // the intrinsic data type of the port represented as string
+
   protected:
-    DataType_t m_dtype = DataType_t::RKNN_TENSOR_FLOAT16; // default to float16
-    rknn_tensor_attr m_rknn_attr;                         // the underlying rknn tensor attribute
-    size_t m_index{0};                                    // index of the port in the model
+    DataType_t m_dtype;
+    size_t m_index{0}; // index of the port in the model
 };
 } // namespace redoxi_works::inference::rknn

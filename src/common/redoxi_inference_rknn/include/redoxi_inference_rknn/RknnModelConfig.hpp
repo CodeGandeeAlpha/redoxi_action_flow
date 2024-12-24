@@ -23,6 +23,9 @@ struct RknnModelConfig : public defaults::DefaultKeyValueStore {
     using Ptr = std::shared_ptr<RknnModelConfig>;
     using ConstPtr = std::shared_ptr<const RknnModelConfig>;
     inline static constexpr const char *DefaultDeviceType = cmdev::RKNPU;
+    inline static constexpr auto DeviceIndexUseAnyCore = -1;
+    inline static constexpr auto DeviceIndexUseAllCores = -2;
+    inline static constexpr auto DeviceIndexUseCoreMask = -3; // use core mask, explicitly choose which core to use
 
     struct Keys {
         inline static constexpr auto ModelPath = cmkeys::ModelPath;
@@ -42,10 +45,10 @@ struct RknnModelConfig : public defaults::DefaultKeyValueStore {
 
         register_key({Keys::DeviceIndex, "int64",
                       "The npu core index to use.\n"
-                      "- 0,1,2 means core 0,1,2\n"
-                      "- std::numeric_limits<int64_t>::max() means all cores\n"
-                      "- -1 means unspecified, leave it for core mask\n"
-                      "To use core mask, set core_mask property"},
+                      "- 0,1,2: Use specific core 0,1,2\n"
+                      "- -1 (DeviceIndexUseAnyCore): [default] Let RKNN API automatically choose core\n"
+                      "- -2 (DeviceIndexUseAllCores): Use all available cores\n"
+                      "- -3 (DeviceIndexUseCoreMask): Use core mask specified in core_mask property"},
                      &device_index);
 
         RDX_INFO_DEV(nullptr, __func__, "Registering key {}", Keys::CoreMask);
@@ -63,7 +66,7 @@ struct RknnModelConfig : public defaults::DefaultKeyValueStore {
   protected:
     std::string model_path;
     std::string device_type{DefaultDeviceType};
-    int64_t device_index = -1; // -1 means all cores
+    int64_t device_index = DeviceIndexUseAnyCore; // default to allow to use any core, let rknn api do scheduling
     int64_t core_mask = 0;
 };
 
