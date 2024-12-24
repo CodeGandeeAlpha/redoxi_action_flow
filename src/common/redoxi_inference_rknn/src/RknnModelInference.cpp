@@ -467,3 +467,24 @@ RknnModelPortInfo::PtrMap RknnModelInference::get_output_port_infos(
 
 
 } // namespace redoxi_works::inference::rknn
+
+#include <pluginlib/class_list_macros.hpp>
+PLUGINLIB_EXPORT_CLASS(
+    redoxi_works::inference::rknn::RknnModelInference,
+    redoxi_works::inference::RedoxiModelInference)
+
+PLUGINLIB_EXPORT_CLASS(
+    redoxi_works::inference::rknn::RknnModelConfig,
+    redoxi_works::inference::KeyValueStore)
+
+PLUGINLIB_EXPORT_CLASS(
+    redoxi_works::inference::rknn::RknnPortData,
+    redoxi_works::inference::ModelPortData)
+
+PLUGINLIB_EXPORT_CLASS(
+    redoxi_works::inference::rknn::RknnModelPortInfo,
+    redoxi_works::inference::ModelPortInfo)
+
+PLUGINLIB_EXPORT_CLASS(
+    redoxi_works::inference::rknn::RknnInferenceInOutData,
+    redoxi_works::inference::InferenceInOutData)

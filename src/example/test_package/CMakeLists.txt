@@ -29,7 +29,7 @@ find_package(OpenCV REQUIRED)
 #     pluginlib
 #     universal_mot_trackers
 #     redoxi_inference_rknn)
-set(DEPENDENCIES redoxi_inference_rknn cv_bridge)
+set(DEPENDENCIES redoxi_inference redoxi_inference_rknn cv_bridge)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb xtensor)
 
@@ -84,6 +84,7 @@ option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
 option(BUILD_TEST_SHM_TIMEOUT "Build test_shm_timeout target" OFF)
 option(BUILD_TEST_RKNN_INFER "Build test_rknn_infer target" ON)
 option(BUILD_TEST_RKNN_OFFICIAL_INFER "Build test_rknn_official_infer target" ON)
+option(BUILD_TEST_RKNN_PLUGIN "Build test_rknn_plugin target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -112,6 +113,10 @@ function(configure_target target_name)
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_TEST_RKNN_PLUGIN)
+  configure_target(test_rknn_plugin)
+endif()
 
 if(BUILD_TEST_RKNN_OFFICIAL_INFER)
   configure_target(test_rknn_official_infer)
