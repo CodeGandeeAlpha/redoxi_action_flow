@@ -4,6 +4,9 @@ from redoxi_common_py.configs.base_node import *
 import redoxi_common_py.configs.async_ports as portCfg
 from redoxi_common_py.configs.async_ports import *
 
+import redoxi_common_py.common_types as commonTypes
+from redoxi_common_py.common_types import *
+
 try:
     from attrs import define, field, asdict
     import attrs.validators as av
