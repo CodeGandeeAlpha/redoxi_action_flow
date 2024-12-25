@@ -110,6 +110,28 @@ class MeanAverageTime:
 class YOLOv8Pose:
     """YOLOv8 object detection model class for handling inference and visualization."""
 
+    Skeleton: list[tuple[int, int]] = [
+        [15, 13],
+        [13, 11],
+        [16, 14],
+        [14, 12],
+        [11, 12],
+        [5, 11],
+        [6, 12],
+        [5, 6],
+        [5, 7],
+        [6, 8],
+        [7, 9],
+        [8, 10],
+        [1, 2],
+        [0, 1],
+        [0, 2],
+        [1, 3],
+        [2, 4],
+        [3, 5],
+        [4, 6],
+    ]
+
     def __init__(
         self,
         rknn_model,
@@ -155,27 +177,7 @@ class YOLOv8Pose:
         self.preprocess_time = MeanAverageTime()
         self.postprocess_time = MeanAverageTime()
         self.inference_time = MeanAverageTime()
-        self.skeleton = [
-            [15, 13],
-            [13, 11],
-            [16, 14],
-            [14, 12],
-            [11, 12],
-            [5, 11],
-            [6, 12],
-            [5, 6],
-            [5, 7],
-            [6, 8],
-            [7, 9],
-            [8, 10],
-            [1, 2],
-            [0, 1],
-            [0, 2],
-            [1, 3],
-            [2, 4],
-            [3, 5],
-            [4, 6],
-        ]
+        self.skeleton = YOLOv8Pose.Skeleton
 
     @staticmethod
     def decode_detections(
@@ -517,6 +519,53 @@ class YOLOv8Pose:
             cv2.LINE_AA,
         )
 
+    @staticmethod
+    def draw_detections_static(
+        img, box, score, class_id, color_by_id: np.ndarray, label_name_by_id: list[str]
+    ):
+        x1, y1, w, h = box
+        color = color_by_id[class_id]
+        cv2.rectangle(img, (int(x1), int(y1)), (int(x1 + w), int(y1 + h)), color, 2)
+        label = f"{label_name_by_id[class_id]}: {score:.2f}"
+        (label_width, label_height), _ = cv2.getTextSize(
+            label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1
+        )
+        label_x = x1
+        label_y = y1 - 10 if y1 - 10 > label_height else y1 + 10
+        cv2.rectangle(
+            img,
+            (int(label_x), int(label_y - label_height)),
+            (int(label_x + label_width), int(label_y + label_height)),
+            color,
+            cv2.FILLED,
+        )
+        cv2.putText(
+            img,
+            label,
+            (int(label_x), int(label_y)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 0, 0),
+            1,
+            cv2.LINE_AA,
+        )
+
+    @staticmethod
+    def draw_kpts_static(img, kpts, score_thres=0.3):
+        skeleton = YOLOv8Pose.Skeleton
+        for kpt in kpts:
+            if kpt[2] > score_thres:
+                cv2.circle(img, (int(kpt[0]), int(kpt[1])), 3, (0, 0, 255), -1)
+        for edge in skeleton:
+            if kpts[edge[0]][2] > score_thres and kpts[edge[1]][2] > score_thres:
+                cv2.line(
+                    img,
+                    (int(kpts[edge[0]][0]), int(kpts[edge[0]][1])),
+                    (int(kpts[edge[1]][0]), int(kpts[edge[1]][1])),
+                    (0, 255, 0),
+                    2,
+                )
+
 
 def run_pose_detection(
     rknn_model: str,
@@ -629,33 +678,49 @@ def run_pose_detection_once(
         print(f"Output image saved to {fn_output}")
 
 
-# if __name__ == "__main__":
-#     fn_image = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/pose.jpg"
-#     img = iio.imread(fn_image)
-
-#     fn_det0 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/det0.npy"
-#     fn_det1 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/det1.npy"
-#     fn_det2 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/det2.npy"
-#     fn_kpt0 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/kpt0.npy"
-#     fn_kpt1 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/kpt1.npy"
-#     fn_kpt2 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/kpt2.npy"
-
-#     det0: np.ndarray = np.load(fn_det0)
-#     det1: np.ndarray = np.load(fn_det1)
-#     det2: np.ndarray = np.load(fn_det2)
-#     kpt0: np.ndarray = np.load(fn_kpt0)
-#     kpt1: np.ndarray = np.load(fn_kpt1)
-#     kpt2: np.ndarray = np.load(fn_kpt2)
-
-
 if __name__ == "__main__":
+    fn_image = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/resized_image.jpg"
     rknn_model = r"/data/code/psf_ros2_ws/tmp/models/rknn/yolov8s-pose-ptq-bs1.rknn"
-    fn_image = r"/data/code/psf_ros2_ws/data/ori_img.jpg"
-    output_dir = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose"
+    model = YOLOv8Pose(rknn_model, (640, 640), 0.3, 0.5)
+    model.dw = 0
+    model.dh = 0
+    model.ratio = (1.0, 1.0)
+    img: np.ndarray = iio.imread(fn_image)
 
-    # read image
-    img = iio.imread(fn_image)
-    conf_thres = 0.3
-    iou_thres = 0.5
-    model = YOLOv8Pose(rknn_model, (640, 640), conf_thres, iou_thres)
-    run_pose_detection_once(model, img, output_dir=output_dir)
+    fn_det0 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/det0.npy"
+    fn_det1 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/det1.npy"
+    fn_det2 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/det2.npy"
+    fn_kpt0 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/kpt0.npy"
+    fn_kpt1 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/kpt1.npy"
+    fn_kpt2 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/kpt2.npy"
+
+    det0: np.ndarray = np.load(fn_det0)
+    det1: np.ndarray = np.load(fn_det1)
+    det2: np.ndarray = np.load(fn_det2)
+    kpt0: np.ndarray = np.load(fn_kpt0)
+    kpt1: np.ndarray = np.load(fn_kpt1)
+    kpt2: np.ndarray = np.load(fn_kpt2)
+
+    raw_outputs = [det0, det1, det2, kpt0, kpt1, kpt2]
+    dets = YOLOv8Pose.decode_detections(raw_outputs[:3])
+    kpts = YOLOv8Pose.decode_poses(raw_outputs[3:])
+    det_results, kpts_results = model.postprocess(dets, kpts)
+
+    canvas = img.copy()
+    for (score, class_id, box), kpts in zip(det_results, kpts_results):
+        model.draw_detections(canvas, box, score, class_id)
+        model.draw_kpts(canvas, kpts)
+    iio.imwrite(r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/pose_static.jpg", canvas)
+
+
+# if __name__ == "__main__":
+#     rknn_model = r"/data/code/psf_ros2_ws/tmp/models/rknn/yolov8s-pose-ptq-bs1.rknn"
+#     fn_image = r"/data/code/psf_ros2_ws/data/ori_img.jpg"
+#     output_dir = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose"
+
+#     # read image
+#     img = iio.imread(fn_image)
+#     conf_thres = 0.3
+#     iou_thres = 0.5
+#     model = YOLOv8Pose(rknn_model, (640, 640), conf_thres, iou_thres)
+#     run_pose_detection_once(model, img, output_dir=output_dir)
