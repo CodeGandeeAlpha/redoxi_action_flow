@@ -19,6 +19,46 @@ def np_sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
+def make_anchors_single_scale(
+    feature_height: int, feature_width: int, stride: int, grid_cell_offset=0.5
+):
+    """Generate anchors from features for a single feature map.
+
+    Parameters
+    ---------------
+    feature_height: int
+        Height of the feature map
+    feature_width: int
+        Width of the feature map
+    stride: int
+        Stride of the feature map
+    grid_cell_offset: float, optional
+        Offset added to grid coordinates, by default 0.5
+
+    Returns
+    ---------------
+    tuple[np.ndarray, np.ndarray]
+        A tuple containing:
+        - anchor_points: Array of shape (H*W, 2) containing (x,y) coordinates of anchor points
+        - stride_tensor: Array of shape (H*W, 1) containing stride values for each anchor point
+    """
+
+    # 创建网格坐标
+    sx = np.arange(feature_width, dtype=np.float32) + grid_cell_offset  # shift x
+    sy = np.arange(feature_height, dtype=np.float32) + grid_cell_offset  # shift y
+    # 使用 numpy 的 meshgrid 创建网格
+    sy, sx = np.meshgrid(sy, sx, indexing="ij")
+    # 堆叠并重塑坐标
+    anchor_points = np.stack((sx, sy), -1).reshape(-1, 2)
+    # 创建对应的 stride tensor
+    stride_tensor = np.full(
+        (feature_height * feature_width, 1), stride, dtype=np.float32
+    )
+
+    # 连接所有 anchor points 和 stride tensors
+    return anchor_points, stride_tensor
+
+
 def make_anchors(feats, strides, grid_cell_offset=0.5):
     """Generate anchors from features."""
     anchor_points, stride_tensor = [], []
@@ -139,6 +179,47 @@ class YOLOv8Pose:
             [3, 5],
             [4, 6],
         ]
+
+    @staticmethod
+    def decode_detections(
+        x, reg_max=16, nc=1, no=65, stride=np.array([8, 16, 32]), proj=None
+    ):
+        """Decode raw model outputs into detection boxes.
+
+        Args:
+            x: List of model output tensors
+            reg_max: DFL regression max value (default: 16)
+            nc: Number of classes (default: 1)
+            no: Number of outputs (default: 65)
+            stride: Model strides (default: [8,16,32])
+            proj: Optional projection vector (default: None)
+
+        Returns:
+            Decoded detection boxes
+        """
+
+        if proj is None:
+            proj = np.arange(reg_max)
+
+        anchors, strides = (x.transpose() for x in make_anchors(x, stride, 0.5))
+
+        shape = x[0].shape
+        x_cat = np.concatenate([xi.reshape(shape[0], no, -1) for xi in x], axis=2)
+        box = x_cat[:, : reg_max * 4, :]
+        cls = x_cat[:, reg_max * 4 : reg_max * 4 + nc, :]
+
+        box = np.transpose(box, (0, 2, 1))
+        b, a, c = box.shape
+        box = box.reshape(b, a, 4, c // 4)
+        box = np.exp(box) / np.sum(np.exp(box), axis=3, keepdims=True)  # softmax
+
+        box = np.matmul(box, proj)
+        box = np.transpose(box, (0, 2, 1))
+        dbox = dist2bbox(box, np.expand_dims(anchors, 0), xywh=True, dim=1) * strides
+
+        y = np.concatenate((dbox, np_sigmoid(cls)), axis=1)
+
+        return y
 
     def letterbox(self, img, new_shape=(640, 640), color=(114, 114, 114)):
         # Resize and pad image to new shape
@@ -307,6 +388,16 @@ class YOLOv8Pose:
 
         return y
 
+    # def det_decode(self, x):
+    #     return self.decode_detections(
+    #         x,
+    #         reg_max=self.reg_max,
+    #         nc=self.nc,
+    #         no=self.no,
+    #         stride=self.stride,
+    #         proj=self.proj,
+    #     )
+
     def kpts_decode(self, bs, kpts):
         nk = self.kpt_shape[0] * self.kpt_shape[1]
         ndim = self.kpt_shape[1]
@@ -397,19 +488,27 @@ class YOLOv8Pose:
         )
 
 
-if __name__ == "__main__":
-    # rknn_model = r"/data/code/psf_ros2_ws/tmp/models/rknn/yolov8s-pose-fp-bs1.rknn"
-    rknn_model = r"/data/code/psf_ros2_ws/tmp/models/rknn/yolov8s-pose-ptq-bs1.rknn"
-    # rknn_model = r"/data/code/psf_ros2_ws/tmp/models/rknn/yolov8n-pose-ptq-bs1.rknn"
-    fn_image = r"/data/code/psf_ros2_ws/data/ori_img.jpg"
-    output_dir = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose"
+def run_pose_detection(
+    rknn_model: str,
+    image: np.ndarray,
+    num_iterations: int = 30,
+    conf_thres: float = 0.3,
+    iou_thres: float = 0.5,
+    output_dir: str | None = None,
+):
+    """Run pose detection on input image using multiple YOLOv8 detectors in parallel.
 
-    # read image
-    img = iio.imread(fn_image)
-
-    # load model
-    conf_thres = 0.3
-    iou_thres = 0.5
+    Args:
+        image: Input image as numpy array in BGR format
+        conf_thres: Confidence threshold for detection filtering (default: 0.3)
+        iou_thres: IoU threshold for NMS (default: 0.5)
+        output_dir: Optional directory to save visualization results (default: None)
+        num_iterations: Number of iterations to run detection (default: 30)
+    Returns:
+        Tuple containing:
+            - List of detections, each containing (confidence score, class id, bounding box)
+            - List of keypoints for each detection
+    """
     import asyncio
 
     # Create 3 detectors
@@ -417,7 +516,6 @@ if __name__ == "__main__":
     detector2 = YOLOv8Pose(rknn_model, (640, 640), conf_thres, iou_thres)
     detector3 = YOLOv8Pose(rknn_model, (640, 640), conf_thres, iou_thres)
     detector_list: list[YOLOv8Pose] = [detector1, detector2, detector3]
-    num_iterations = 30
 
     async def detect_task(detector, img):
         return detector.detect(img)
@@ -450,8 +548,9 @@ if __name__ == "__main__":
         detector1.draw_detections(canvas, box, score, class_id)
         detector1.draw_kpts(canvas, kpts)
 
-    _, filename = os.path.split(fn_image)
-    iio.imwrite(os.path.join(output_dir, f"{filename}-pose.jpg"), canvas)
+    if output_dir:
+        filename = os.path.splitext(os.path.basename(fn_image))[0]
+        iio.imwrite(os.path.join(output_dir, f"pose.jpg"), canvas)
 
     total_time_per_detector = [
         d.inference_time.get() * num_iterations for d in detector_list
@@ -460,7 +559,73 @@ if __name__ == "__main__":
     print(
         f"Total average time: {np.sum(total_time_per_detector) / (num_iterations * len(detector_list))}"
     )
-    # print(f"Preprocess time: {detector1.preprocess_time.get()}")
-    # print(f"Inference time: {detector1.inference_time.get()}")
-    # print(f"Postprocess time: {detector1.postprocess_time.get()}")
     print(f"Model: {rknn_model}")
+
+    return det_results, kpts_results, canvas
+
+
+def run_pose_detection_once(
+    model: YOLOv8Pose,
+    image: np.ndarray,
+    conf_thres: float = 0.3,
+    iou_thres: float = 0.5,
+    output_dir: str | None = None,
+):
+    """Run pose detection on input image using multiple YOLOv8 detectors in parallel.
+
+    Args:
+        image: Input image as numpy array in BGR format
+        conf_thres: Confidence threshold for detection filtering (default: 0.3)
+        iou_thres: IoU threshold for NMS (default: 0.5)
+        output_dir: Optional directory to save visualization results (default: None)
+    Returns:
+        Tuple containing:
+            - List of detections, each containing (confidence score, class id, bounding box)
+            - List of keypoints for each detection
+    """
+    import asyncio
+
+    # Create 3 detectors
+    det_results, kpts_results = model.detect(img)
+
+    canvas = img.copy()
+    for (score, class_id, box), kpts in zip(det_results, kpts_results):
+        model.draw_detections(canvas, box, score, class_id)
+        model.draw_kpts(canvas, kpts)
+
+    if output_dir:
+        fn_output = os.path.join(output_dir, f"pose.jpg")
+        iio.imwrite(fn_output, canvas)
+        print(f"Output image saved to {fn_output}")
+
+
+# if __name__ == "__main__":
+#     fn_image = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/pose.jpg"
+#     img = iio.imread(fn_image)
+
+#     fn_det0 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/det0.npy"
+#     fn_det1 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/det1.npy"
+#     fn_det2 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/det2.npy"
+#     fn_kpt0 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/kpt0.npy"
+#     fn_kpt1 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/kpt1.npy"
+#     fn_kpt2 = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose/kpt2.npy"
+
+#     det0: np.ndarray = np.load(fn_det0)
+#     det1: np.ndarray = np.load(fn_det1)
+#     det2: np.ndarray = np.load(fn_det2)
+#     kpt0: np.ndarray = np.load(fn_kpt0)
+#     kpt1: np.ndarray = np.load(fn_kpt1)
+#     kpt2: np.ndarray = np.load(fn_kpt2)
+
+
+if __name__ == "__main__":
+    rknn_model = r"/data/code/psf_ros2_ws/tmp/models/rknn/yolov8s-pose-ptq-bs1.rknn"
+    fn_image = r"/data/code/psf_ros2_ws/data/ori_img.jpg"
+    output_dir = r"/data/code/psf_ros2_ws/tmp/output/rknn-pose"
+
+    # read image
+    img = iio.imread(fn_image)
+    conf_thres = 0.3
+    iou_thres = 0.5
+    model = YOLOv8Pose(rknn_model, (640, 640), conf_thres, iou_thres)
+    run_pose_detection_once(model, img, output_dir=output_dir)
