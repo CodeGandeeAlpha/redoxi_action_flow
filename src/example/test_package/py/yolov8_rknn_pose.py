@@ -66,17 +66,14 @@ def make_anchors(feats, strides, grid_cell_offset=0.5):
 
     for i, stride in enumerate(strides):
         _, _, h, w = feats[i].shape
-        # 创建网格坐标
-        sx = np.arange(w, dtype=np.float32) + grid_cell_offset  # shift x
-        sy = np.arange(h, dtype=np.float32) + grid_cell_offset  # shift y
-        # 使用 numpy 的 meshgrid 创建网格
-        sy, sx = np.meshgrid(sy, sx, indexing="ij")
-        # 堆叠并重塑坐标
-        anchor_points.append(np.stack((sx, sy), -1).reshape(-1, 2))
-        # 创建对应的 stride tensor
-        stride_tensor.append(np.full((h * w, 1), stride, dtype=np.float32))
+        # Generate anchors for this feature map using make_anchors_single_scale
+        anchors, strides_tensor = make_anchors_single_scale(
+            h, w, stride, grid_cell_offset
+        )
+        anchor_points.append(anchors)
+        stride_tensor.append(strides_tensor)
 
-    # 连接所有 anchor points 和 stride tensors
+    # Concatenate all anchor points and stride tensors
     return np.concatenate(anchor_points), np.concatenate(stride_tensor)
 
 
@@ -221,6 +218,34 @@ class YOLOv8Pose:
 
         return y
 
+    @staticmethod
+    def decode_poses(x, num_keypoints=17, stride=np.array([8, 16, 32])):
+        """Decode raw model outputs into pose keypoints.
+
+        Args:
+            x: List of model output tensors
+            num_keypoints: Number of keypoints (default: 17)
+            stride: Model strides (default: [8,16,32])
+
+        Returns:
+            Decoded pose keypoints
+        """
+        kpt_shape = (num_keypoints, 3)
+        nk = kpt_shape[0] * kpt_shape[1]
+        ndim = kpt_shape[1]
+
+        batch_size = x[0].shape[0]
+        kpt = np.concatenate([k.reshape(batch_size, nk, -1) for k in x], axis=-1)
+
+        y = kpt.reshape(batch_size, *kpt_shape, -1)
+        anchors, strides = (x.transpose() for x in make_anchors(x, stride, 0.5))
+        a = (y[:, :, :2] * 2.0 + (anchors - 0.5)) * strides
+
+        if ndim == 3:
+            # 连接坐标和置信度分数
+            a = np.concatenate((a, np_sigmoid(y[:, :, 2:3])), axis=2)
+        return a
+
     def letterbox(self, img, new_shape=(640, 640), color=(114, 114, 114)):
         # Resize and pad image to new shape
         shape = img.shape[:2]  # current shape [height, width]
@@ -362,54 +387,59 @@ class YOLOv8Pose:
             output_kpts.append(poses[i])
         return output_boxes, output_kpts
 
-    def det_decode(self, x):
-        if self.proj is None:
-            self.proj = np.arange(self.reg_max)
-        self.anchors, self.strides = (
-            x.transpose() for x in make_anchors(x, self.stride, 0.5)
-        )
-        shape = x[0].shape
-        x_cat = np.concatenate([xi.reshape(shape[0], self.no, -1) for xi in x], axis=2)
-        box = x_cat[:, : self.reg_max * 4, :]
-        cls = x_cat[:, self.reg_max * 4 : self.reg_max * 4 + self.nc, :]
-        box = np.transpose(box, (0, 2, 1))
-        b, a, c = box.shape
-        box = box.reshape(b, a, 4, c // 4)
-        box = np.exp(box) / np.sum(np.exp(box), axis=3, keepdims=True)  # softmax
-
-        box = np.matmul(box, self.proj)
-        box = np.transpose(box, (0, 2, 1))
-        dbox = (
-            dist2bbox(box, np.expand_dims(self.anchors, 0), xywh=True, dim=1)
-            * self.strides
-        )
-
-        y = np.concatenate((dbox, np_sigmoid(cls)), axis=1)
-
-        return y
-
     # def det_decode(self, x):
-    #     return self.decode_detections(
-    #         x,
-    #         reg_max=self.reg_max,
-    #         nc=self.nc,
-    #         no=self.no,
-    #         stride=self.stride,
-    #         proj=self.proj,
+    #     if self.proj is None:
+    #         self.proj = np.arange(self.reg_max)
+    #     self.anchors, self.strides = (
+    #         x.transpose() for x in make_anchors(x, self.stride, 0.5)
+    #     )
+    #     shape = x[0].shape
+    #     x_cat = np.concatenate([xi.reshape(shape[0], self.no, -1) for xi in x], axis=2)
+    #     box = x_cat[:, : self.reg_max * 4, :]
+    #     cls = x_cat[:, self.reg_max * 4 : self.reg_max * 4 + self.nc, :]
+    #     box = np.transpose(box, (0, 2, 1))
+    #     b, a, c = box.shape
+    #     box = box.reshape(b, a, 4, c // 4)
+    #     box = np.exp(box) / np.sum(np.exp(box), axis=3, keepdims=True)  # softmax
+
+    #     box = np.matmul(box, self.proj)
+    #     box = np.transpose(box, (0, 2, 1))
+    #     dbox = (
+    #         dist2bbox(box, np.expand_dims(self.anchors, 0), xywh=True, dim=1)
+    #         * self.strides
     #     )
 
-    def kpts_decode(self, bs, kpts):
-        nk = self.kpt_shape[0] * self.kpt_shape[1]
-        ndim = self.kpt_shape[1]
-        kpt = np.concatenate([k.reshape(bs, nk, -1) for k in kpts], axis=-1)
+    #     y = np.concatenate((dbox, np_sigmoid(cls)), axis=1)
 
-        y = kpt.reshape(bs, *self.kpt_shape, -1)
-        a = (y[:, :, :2] * 2.0 + (self.anchors - 0.5)) * self.strides
+    #     return y
 
-        if ndim == 3:
-            # 连接坐标和置信度分数
-            a = np.concatenate((a, np_sigmoid(y[:, :, 2:3])), axis=2)
-        return a
+    def det_decode(self, x):
+        return self.decode_detections(
+            x,
+            reg_max=self.reg_max,
+            nc=self.nc,
+            no=self.no,
+            stride=self.stride,
+            proj=self.proj,
+        )
+
+    # def kpts_decode(self, bs, kpts):
+    #     nk = self.kpt_shape[0] * self.kpt_shape[1]
+    #     ndim = self.kpt_shape[1]
+    #     kpt = np.concatenate([k.reshape(bs, nk, -1) for k in kpts], axis=-1)
+
+    #     y = kpt.reshape(bs, *self.kpt_shape, -1)
+    #     a = (y[:, :, :2] * 2.0 + (self.anchors - 0.5)) * self.strides
+
+    #     if ndim == 3:
+    #         # 连接坐标和置信度分数
+    #         a = np.concatenate((a, np_sigmoid(y[:, :, 2:3])), axis=2)
+    #     return a
+
+    def kpts_decode(self, kpts):
+        return self.decode_poses(
+            kpts, num_keypoints=self.kpt_shape[0], stride=self.stride
+        )
 
     def detect(self, image: np.ndarray):
         """
@@ -438,7 +468,7 @@ class YOLOv8Pose:
 
         postprocess_start = time.time()
         dets = self.det_decode(raw_outputs[:3])
-        kpts = self.kpts_decode(1, raw_outputs[3:])
+        kpts = self.kpts_decode(raw_outputs[3:])
         det_results = self.postprocess(dets, kpts)  # output image
         postprocess_end = time.time()
         self.postprocess_time.update(postprocess_end - postprocess_start)
