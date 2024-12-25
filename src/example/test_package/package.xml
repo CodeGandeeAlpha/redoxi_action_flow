@@ -15,12 +15,13 @@
   <depend>redoxi_shared_memory</depend>
   <depend>redoxi_inference</depend>
   <depend>redoxi_dnn_models</depend> -->
-  <depend>redoxi_inference_rknn</depend>
-  <depend>cv_bridge</depend>
   <!-- <depend>yolo8_series</depend>
   <depend>universal_mot_trackers</depend>
   <depend>psg_private_msgs</depend> -->
   <depend>pluginlib</depend>
+
+  <depend>redoxi_inference_rknn</depend>
+  <depend>cv_bridge</depend>
 
   <depend>redoxi_common_py</depend>
 
