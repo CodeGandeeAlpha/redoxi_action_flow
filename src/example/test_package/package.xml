@@ -19,6 +19,7 @@
   <depend>universal_mot_trackers</depend>
   <depend>psg_private_msgs</depend> -->
   <depend>pluginlib</depend>
+  <depend>yolo8_series</depend>
 
   <depend>redoxi_inference_rknn</depend>
   <depend>cv_bridge</depend>

@@ -29,7 +29,11 @@ find_package(OpenCV REQUIRED)
 #     pluginlib
 #     universal_mot_trackers
 #     redoxi_inference_rknn)
-set(DEPENDENCIES redoxi_inference redoxi_inference_rknn cv_bridge)
+set(DEPENDENCIES 
+    redoxi_inference 
+    redoxi_inference_rknn 
+    cv_bridge
+    yolo8_series)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb xtensor)
 
@@ -72,9 +76,9 @@ option(BUILD_TEST_FRAME_PROXY "Build test_frame_proxy target" OFF)
 option(BUILD_TEST_JSON_STRUCT "Build test_json_struct target" OFF)
 option(BUILD_VIDEO_FROM_URL_NODE "Build video_from_url_node target" OFF)
 option(BUILD_YOLO_BODY_POSE_DETECTION_NODE
-       "Build yolo_body_pose_detection_node target" OFF)
+       "Build yolo_body_pose_detection_node target" ON)
 option(BUILD_YOLO_OBJECT_DETECTION_NODE
-       "Build yolo_object_detection_node target" OFF)
+       "Build yolo_object_detection_node target" ON)
 option(BUILD_DETECTION_RELAY_NODE "Build detection_relay_node target" OFF)
 option(BUILD_DETECTION_DRIVER_NODE "Build detection_driver_node target" OFF)
 option(BUILD_MOT_TRACKER_NODE "Build mot_tracker_node target" OFF)
