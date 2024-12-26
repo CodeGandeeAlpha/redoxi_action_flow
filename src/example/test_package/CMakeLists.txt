@@ -89,6 +89,7 @@ option(BUILD_TEST_SHM_TIMEOUT "Build test_shm_timeout target" OFF)
 option(BUILD_TEST_RKNN_INFER "Build test_rknn_infer target" ON)
 option(BUILD_TEST_RKNN_OFFICIAL_INFER "Build test_rknn_official_infer target" ON)
 option(BUILD_TEST_RKNN_PLUGIN "Build test_rknn_plugin target" ON)
+option(BUILD_TEST_RKNN_YOLO8_POSE "Build test_rknn_yolo8_pose target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -117,6 +118,10 @@ function(configure_target target_name)
       ${ALL_TEST_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
+
+if(BUILD_TEST_RKNN_YOLO8_POSE)
+  configure_target(test_rknn_yolo8_pose)
+endif()
 
 if(BUILD_TEST_RKNN_PLUGIN)
   configure_target(test_rknn_plugin)

@@ -32,6 +32,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PackagesToBuild="redoxi_inference_rknn \
                  redoxi_inference \
                  redoxi_basic_cpp \
+                 redoxi_inference_onnx \
                  test_package"
 
 # Check if --help flag is provided

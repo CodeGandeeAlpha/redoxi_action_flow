@@ -4,14 +4,14 @@
 #include <redoxi_dnn_models/yolo8/Yolo8ModelBaseImpl.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <sensor_msgs/image_encodings.hpp>
-
+#include <filesystem>
 #define ENABLE_DEBUG_OUTPUT
 #ifdef ENABLE_DEBUG_OUTPUT
 #    include <xtensor/xnpy.hpp>
 #endif
 
 
-// namespace fs = std::filesystem;
+namespace fs = std::filesystem;
 namespace redoxi_works::inference::yolo8
 {
 
@@ -58,13 +58,6 @@ int Yolo8ModelBase::open(KeyValueStore::Ptr params)
                         typeid(params.get()).name());
     }
 
-    // Create onnx model instance
-    // TODO: add rknn model
-    auto model = m_impl->loader.createSharedInstance("redoxi_works::inference::onnx::OnnxModelInference");
-    if (!model) {
-        RDX_RAISE_ERROR("Failed to create onnx model instance");
-    }
-
     // Get model parameters
     std::string model_path, device_type;
     int64_t device_index;
@@ -73,6 +66,39 @@ int Yolo8ModelBase::open(KeyValueStore::Ptr params)
     _params->get_int(&device_index, common_config_keys::DeviceIndex);
     RDX_INFO_DEV(nullptr, __func__, "Opening model from {}, device type {}, device index {}",
                  model_path, device_type, device_index);
+
+    // check if the model file exists
+    if (!fs::exists(model_path)) {
+        RDX_RAISE_ERROR("[f={}()] Model file does not exist: {}", __func__, model_path);
+        return -1;
+    }
+
+    // Create onnx model instance
+    // TODO: add rknn model
+    std::shared_ptr<RedoxiModelInference> model;
+    if (device_type == common_device_types::RKNPU) {
+        // rknn model, where the model itself should be .rknn file
+        model = m_impl->loader.createSharedInstance("redoxi_works::inference::rknn::RknnModelInference");
+
+        // check if the model file has .rknn extension
+        if (fs::path(model_path).extension() != ".rknn") {
+            RDX_RAISE_ERROR("[f={}()] Invalid model file extension for RKNPU device, expected .rknn: {}", __func__, model_path);
+            return -1;
+        }
+    } else {
+        // default to onnx
+        model = m_impl->loader.createSharedInstance("redoxi_works::inference::onnx::OnnxModelInference");
+
+        // check if the model file has .onnx extension
+        if (fs::path(model_path).extension() != ".onnx") {
+            RDX_RAISE_ERROR("[f={}()] Invalid model file extension for ONNX device, expected .onnx: {}", __func__, model_path);
+            return -1;
+        }
+    }
+
+    if (!model) {
+        RDX_RAISE_ERROR("Failed to create model instance");
+    }
 
     // transfer the parameters to the inner model
     auto inner_params = model->create_init_params();

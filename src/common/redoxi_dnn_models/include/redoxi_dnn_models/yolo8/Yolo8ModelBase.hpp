@@ -69,9 +69,9 @@ class Yolo8ModelBase : public RedoxiModelInference
     std::shared_ptr<InitConfig_t> m_init_params;
 
     // model-specific parameters, tied to ultralytics yolov8 architecture
-    int64_t m_num_classes{-1};                // number of classes, different for each model
-    int64_t m_dfl_reg_max{16};                // number of distribution focal loss (DFL) regression channels
-    std::vector<int64_t> m_stride{8, 16, 32}; // stride of the model
+    // int64_t m_num_classes{-1};                // number of classes, different for each model
+    // int64_t m_dfl_reg_max{16};                // number of distribution focal loss (DFL) regression channels
+    // std::vector<int64_t> m_stride{8, 16, 32}; // stride of the model
 };
 
 } // namespace redoxi_works::inference::yolo8

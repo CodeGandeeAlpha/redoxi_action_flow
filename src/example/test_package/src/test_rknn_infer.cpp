@@ -15,7 +15,7 @@ namespace common_keys = rdx::inference::common_config_keys;
 namespace common_device_types = rdx::inference::common_device_types;
 
 // fs::path model_path = "/data/code/psf_ros2_ws/tmp/models/rknn/mobilenet_v1.rknn";
-fs::path model_path = "/data/code/psf_ros2_ws/tmp/models/rknn/yolov8n-pose-ptq-bs1.rknn";
+fs::path model_path = "/data/code/psf_ros2_ws/tmp/models/rknn/yolov8s-pose-pthq.rknn";
 // fs::path model_path = "/data/code/psf_ros2_ws/tmp/models/rknn/yolov8n-pose-fp-bs1.rknn";
 fs::path image_path = "/data/code/psf_ros2_ws/data/ori_img.jpg";
 
@@ -99,7 +99,19 @@ int main(int argc, char **argv)
     cv::imwrite("/data/code/psf_ros2_ws/tmp/output/rknn-pose/resized_image.jpg", resized_image);
 
     spdlog::info("Setting input data");
-    input_data->set_tensor_data(resized_image.data, input_shape);
+    {
+        std::vector<cv::Mat> split_channels;
+        std::vector<size_t> shape_chw = {(size_t)resized_image.channels(), (size_t)resized_image.rows, (size_t)resized_image.cols};
+        cv::split(resized_image, split_channels);
+        xt::xarray<uint8_t> input_tensor(shape_chw);
+        for (int i = 0; i < resized_image.channels(); i++) {
+            auto a = xt::adapt((uint8_t *)split_channels[i].data,
+                               (size_t)split_channels[i].total(),
+                               xt::no_ownership(), shape_chw);
+            xt::view(input_tensor, i, xt::all(), xt::all()) = a;
+        }
+        input_data->set_tensor_data(input_tensor.data(), input_shape);
+    }
 
     // run inference
     spdlog::info("Running inference");

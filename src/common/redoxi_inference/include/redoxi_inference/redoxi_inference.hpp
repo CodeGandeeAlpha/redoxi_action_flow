@@ -48,6 +48,11 @@ struct DeviceInfo {
     int device_index = 0;
 };
 
+enum class TensorFormat {
+    NHWC = 0,
+    NCHW
+};
+
 //! Check if a specific shape is compatible with a general shape.
 //! Specific shape set fixed dimensions for dynamic dimensions in the general shape, but not the other way around
 //! - if general_shape[k]>0, then specific_shape[k]==general_shape[k]
@@ -210,10 +215,10 @@ class ModelPortData
     virtual ModelPortInfo::ConstPtr get_port_info() const = 0;
 
     //! Set data by tensor, for float type. Data will be copied into the tensor
-    virtual int set_tensor_data(const float *data, std::vector<int64_t> shape) = 0;
+    virtual int set_tensor_data(const float *data, std::vector<int64_t> shape, TensorFormat fmt) = 0;
 
     //! Set data by tensor, for uint8_t type. Data will be copied into the tensor
-    virtual int set_tensor_data(const uint8_t *data, std::vector<int64_t> shape) = 0;
+    virtual int set_tensor_data(const uint8_t *data, std::vector<int64_t> shape, TensorFormat fmt) = 0;
 
     //! Get the shape of the tensor, you need this to interpret the data you get from get_as_tensor()
     //! @return The shape of the tensor
@@ -224,21 +229,21 @@ class ModelPortData
     virtual std::string get_dtype_str() const = 0;
 
     //! Get the raw data pointer of the tensor, then you can interpret the data by its shape
-    virtual int get_tensor_data(const float **output_tensor) const = 0;
+    virtual int get_tensor_data(const float **output_tensor, TensorFormat *fmt) const = 0;
 
     //! Get the raw data pointer of the tensor, then you can interpret the data by its shape
     //! you can also modify the data by this pointer
     //! @return 0 if success, -1 if failed
-    virtual int get_tensor_data(float **output_tensor) = 0;
+    virtual int get_tensor_data(float **output_tensor, TensorFormat *fmt) = 0;
 
     //! Get the raw data pointer of the tensor, then you can interpret the data by its shape
     //! @return 0 if success, -1 if failed
-    virtual int get_tensor_data(const uint8_t **output_tensor) const = 0;
+    virtual int get_tensor_data(const uint8_t **output_tensor, TensorFormat *fmt) const = 0;
 
     //! Get the raw data pointer of the tensor, then you can interpret the data by its shape
     //! you can also modify the data by this pointer
     //! @return 0 if success, -1 if failed
-    virtual int get_tensor_data(uint8_t **output_tensor) = 0;
+    virtual int get_tensor_data(uint8_t **output_tensor, TensorFormat *fmt) = 0;
 
     //! Check if the tensor data is set
     virtual bool has_tensor_data() const = 0;

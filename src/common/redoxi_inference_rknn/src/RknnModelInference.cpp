@@ -145,6 +145,7 @@ int RknnModelInference::do_inference(InferenceInOutData::Ptr inout_data)
                          input_index, port_data->get_dtype_str());
             inp.type = RKNN_TENSOR_UINT8;
             inp.fmt = RKNN_TENSOR_NHWC;
+            // inp.fmt = RKNN_TENSOR_NCHW;
             uint8_t *data = nullptr;
             auto ret = port_data->get_tensor_data(&data);
             if (ret != 0) {
