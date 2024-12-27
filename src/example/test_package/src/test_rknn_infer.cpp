@@ -87,7 +87,9 @@ int main(int argc, char **argv)
     RDX_INFO_DEV(nullptr, __func__, false, "input_port_name: {}", input_port_name);
     auto input_data = inout_data->get_input_port_data(input_port_name);
     auto input_shape = input_data->get_shape();
-    spdlog::info("Input shape: {}", fmt::join(input_shape, ","));
+    auto input_tensor_format = input_data->get_port_info()->get_tensor_format();
+    spdlog::info("Input shape: {}, tensor format: {}", fmt::join(input_shape, ","),
+                 rdx::inference::tensor_format_to_string(input_tensor_format));
 
     // generate a random image
     cv::Mat image = cv::imread(image_path, cv::IMREAD_COLOR);
@@ -99,16 +101,17 @@ int main(int argc, char **argv)
     cv::imwrite("/data/code/psf_ros2_ws/tmp/output/rknn-pose/resized_image.jpg", resized_image);
 
     spdlog::info("Setting input data");
+    std::vector<cv::Mat> split_channels;
+    cv::split(resized_image, split_channels);
     {
-        std::vector<cv::Mat> split_channels;
-        std::vector<size_t> shape_chw = {(size_t)resized_image.channels(), (size_t)resized_image.rows, (size_t)resized_image.cols};
-        cv::split(resized_image, split_channels);
-        xt::xarray<uint8_t> input_tensor(shape_chw);
-        for (int i = 0; i < resized_image.channels(); i++) {
+        std::vector<size_t> shape_nhwc = {1, (size_t)resized_image.channels(), (size_t)resized_image.rows, (size_t)resized_image.cols};
+        xt::xarray<uint8_t> input_tensor(shape_nhwc);
+        for (size_t i = 0; i < input_tensor.shape(1); i++) {
+            std::vector<size_t> shape_hwc = {(size_t)resized_image.rows, (size_t)resized_image.cols};
             auto a = xt::adapt((uint8_t *)split_channels[i].data,
                                (size_t)split_channels[i].total(),
-                               xt::no_ownership(), shape_chw);
-            xt::view(input_tensor, i, xt::all(), xt::all()) = a;
+                               xt::no_ownership(), shape_hwc);
+            xt::view(input_tensor, 0, i, xt::all(), xt::all()) = a;
         }
         input_data->set_tensor_data(input_tensor.data(), input_shape);
     }

@@ -11,7 +11,8 @@ ModelPortInfo::ConstPtr RknnPortData::get_port_info() const
     return m_port_info;
 }
 
-int RknnPortData::set_tensor_data(const float *data, std::vector<int64_t> shape, std::optional<TensorFormat> format)
+int RknnPortData::set_tensor_data(const float *data, std::vector<int64_t> shape,
+                                  std::optional<TensorFormat> format)
 {
     //! Check dtype compatibility first
     if (m_port_info->get_dtype_str() != "float32") {

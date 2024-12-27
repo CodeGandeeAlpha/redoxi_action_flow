@@ -20,7 +20,7 @@
   <depend>psg_private_msgs</depend>
   <depend>pluginlib</depend>
 
-  <!-- <depend>redoxi_inference_rknn</depend> -->
+  <depend>redoxi_inference_rknn</depend>
   <!-- <depend>cv_bridge</depend> -->
 
   <depend>redoxi_common_py</depend>

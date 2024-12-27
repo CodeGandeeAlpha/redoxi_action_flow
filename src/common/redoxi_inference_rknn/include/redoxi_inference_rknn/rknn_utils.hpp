@@ -2,6 +2,7 @@
 
 #include <rknn_api.h>
 #include <redoxi_basic_cpp/logging/ros_logging.hpp>
+#include <redoxi_inference/redoxi_inference.hpp>
 #include <string_view>
 
 namespace redoxi_works::inference::rknn
@@ -65,6 +66,30 @@ inline constexpr std::string_view rknn_tensor_type_to_string(rknn_tensor_type dt
             return "bool";
         default:
             return "unknown";
+    }
+}
+
+inline constexpr TensorFormat rknn_format_to_tensor_format(rknn_tensor_format format)
+{
+    switch (format) {
+        case RKNN_TENSOR_NHWC:
+            return TensorFormat::NHWC;
+        case RKNN_TENSOR_NCHW:
+            return TensorFormat::NCHW;
+        default:
+            return TensorFormat::UNKNOWN;
+    }
+}
+
+inline constexpr rknn_tensor_format tensor_format_to_rknn_format(TensorFormat format)
+{
+    switch (format) {
+        case TensorFormat::NHWC:
+            return RKNN_TENSOR_NHWC;
+        case TensorFormat::NCHW:
+            return RKNN_TENSOR_NCHW;
+        default:
+            return RKNN_TENSOR_UNDEFINED;
     }
 }
 } // namespace redoxi_works::inference::rknn

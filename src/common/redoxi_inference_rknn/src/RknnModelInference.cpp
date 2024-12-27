@@ -144,8 +144,10 @@ int RknnModelInference::do_inference(InferenceInOutData::Ptr inout_data)
             RDX_INFO_DEV(nullptr, __func__, false, "Setting input[{}] type={}",
                          input_index, port_data->get_dtype_str());
             inp.type = RKNN_TENSOR_UINT8;
-            inp.fmt = RKNN_TENSOR_NHWC;
-            // inp.fmt = RKNN_TENSOR_NCHW;
+
+            auto tensor_format = port_data->get_port_info()->get_tensor_format();
+            inp.fmt = tensor_format_to_rknn_format(tensor_format);
+
             uint8_t *data = nullptr;
             auto ret = port_data->get_tensor_data(&data);
             if (ret != 0) {
@@ -161,7 +163,9 @@ int RknnModelInference::do_inference(InferenceInOutData::Ptr inout_data)
             RDX_INFO_DEV(nullptr, __func__, false, "Setting input[{}] type={}",
                          input_index, port_data->get_dtype_str());
             inp.type = RKNN_TENSOR_FLOAT32;
-            inp.fmt = RKNN_TENSOR_NCHW;
+
+            auto tensor_format = port_data->get_port_info()->get_tensor_format();
+            inp.fmt = tensor_format_to_rknn_format(tensor_format);
             float *data = nullptr;
             auto ret = port_data->get_tensor_data(&data);
             if (ret != 0) {
@@ -413,6 +417,7 @@ RknnModelPortInfo::PtrMap RknnModelInference::get_input_port_infos(
         port_info->m_is_input = true;
         port_info->m_index = attr.index;
         port_info->context = &context;
+        port_info->m_tensor_format = rknn_format_to_tensor_format(attr.fmt);
 
         {
             // handle dynamic input range, you need to query for them explicitly

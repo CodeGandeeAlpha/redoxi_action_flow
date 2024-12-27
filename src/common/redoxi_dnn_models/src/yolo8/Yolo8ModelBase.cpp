@@ -209,7 +209,20 @@ int Yolo8ModelBase::set_input_images(InferenceInOutData::Ptr model_inout_data,
     yolo8::Yolo8Preprocessor preprocessor;
     yolo8::Yolo8PreprocessorConfig config;
     auto [expected_shape, expected_tensor_format] = get_model_input_shape();
-    auto [expected_batch_size, expected_num_channels, expected_height, expected_width] = expected_shape;
+    int64_t expected_batch_size = 0, expected_num_channels = 0, expected_height = 0, expected_width = 0;
+    if (expected_tensor_format == inference::TensorFormat::NCHW) {
+        expected_batch_size = expected_shape[0];
+        expected_num_channels = expected_shape[1];
+        expected_height = expected_shape[2];
+        expected_width = expected_shape[3];
+    } else if (expected_tensor_format == inference::TensorFormat::NHWC) {
+        expected_batch_size = expected_shape[0];
+        expected_height = expected_shape[1];
+        expected_width = expected_shape[2];
+        expected_num_channels = expected_shape[3];
+    } else {
+        RDX_RAISE_ERROR("[f={}] Unsupported tensor format: {}", __func__, tensor_format_to_string(expected_tensor_format));
+    }
     config.model_input_image_size = cv::Size(expected_width, expected_height);
     preprocessor.init(config);
 
