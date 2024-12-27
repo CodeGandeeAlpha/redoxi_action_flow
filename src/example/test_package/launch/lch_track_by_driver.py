@@ -47,7 +47,7 @@ class StepIntervals:
 
 class InputCacheSize:
     Small = 1
-    Medium = 2
+    Medium = 1
     Large = 4
 
 
@@ -105,8 +105,8 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
             #     ),
             # ],
             data_topic_for_source_data="data_msg/source_data",  # source data msg is image, transmission is reliable, better smoothness in visualization
-            visualization_topic_for_source_data="vis_msg/source_data",  # source visualization msg is image, but transmission is unreliable, may drop frames
-            data_topic_for_target_data="data_msg/target_data",  # target data msg is tracking result, transmission is reliable, can be used for data processing
+            # visualization_topic_for_source_data="vis_msg/source_data",  # source visualization msg is image, but transmission is unreliable, may drop frames
+            # data_topic_for_target_data="data_msg/target_data",  # target data msg is tracking result, transmission is reliable, can be used for data processing
             visualization_topic_for_target_data="vis_msg/target_data",  # target visualization msg is image, but transmission is unreliable, may drop frames
         ),
         callee_request_port_config=motTrackersDriverCfg.OutputPortConfig(
@@ -130,7 +130,7 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
 # fn_model = f"{workspace_root}/tmp/models/yolov8n-pose-640.onnx"
 # fn_model = f"{workspace_root}/tmp/models/yolov8s-pose.onnx"
 # fn_model = (
-#     f"{workspace_root}/tmp/models/rknn/pose/small/yolov8s-pose-288x512-bs1-pthq.rknn"
+#     f"{workspace_root}/tmp/models/rknn/pose/small/yolov8s-pose-224x384-bs1-pthq.rknn"
 # )
 fn_model = f"/data/code/psf_ros2_ws/tmp/models/rknn/pose/nano/yolov8n-pose-352x640-bs1-pthq.rknn"
 det_node_name = "detector"
@@ -150,7 +150,7 @@ det_node_params = yolo.Yolo8ModelNodeConfig(
             # {
             #     "model_path": fn_model,
             #     "device_type": "rknpu",
-            #     "device_index": 1,
+            #     "device_index": -2,
             # },
         ],
         detection_request_config=yolo.DetectionRequestConfig(

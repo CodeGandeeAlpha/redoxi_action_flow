@@ -5,11 +5,11 @@ version = 1
 
 [[segment.mempool]]
 size = 32
-count = 10000
+count = 30000
 
 [[segment.mempool]]
 size = 64
-count = 50000
+count = 30000
 
 [[segment.mempool]]
 size = 128
@@ -21,15 +21,15 @@ count = 12500
 
 [[segment.mempool]]
 size = 512
-count = 62500
+count = 30000
 
 [[segment.mempool]]
 size = 1024
-count = 31250
+count = 20000
 
 [[segment.mempool]]
 size = 2048
-count = 15625
+count = 7000
 
 [[segment.mempool]]
 size = 4096
@@ -69,11 +69,11 @@ count = 300
 
 [[segment.mempool]]
 size = 2097152
-count = 150
+count = 70
 
 [[segment.mempool]]
 size = 4194304
-count = 70
+count = 30
 
 [[segment.mempool]]
 size = 8388608
