@@ -25,6 +25,8 @@ struct InferenceContextInitConfig {
     bool rkopt_allocate_memory_outside = false;
 
     //! Whether to share weights between different models (requires special model export handling)
+    //! This is for variable length input ports, NOT for reusing the same model context for different threads
+    //! For weight reusing in multi-threaded inference, rknn_dup_context() is needed
     bool rkopt_shared_weight = false;
 
     //! Whether to only load model info without model data (can query ports but not run inference)
@@ -72,6 +74,12 @@ class RknnModelInference : public RedoxiModelInference
     using InferenceContext_t = rknn_context;
     using RknnTensorType_t = rknn_tensor_type;
     using InitConfig_t = RknnModelConfig;
+
+    // default tensor type for input port, rknn will be responsible for converting to float32
+    static constexpr RknnTensorType_t DefaultInputTensorType = RknnTensorType_t::RKNN_TENSOR_UINT8;
+
+    // default tensor type for output port, rknn will be responsible for converting to float32
+    static constexpr RknnTensorType_t DefaultOutputTensorType = RknnTensorType_t::RKNN_TENSOR_FLOAT32;
 
     RknnModelInference() = default;
     virtual ~RknnModelInference() = default;
@@ -137,6 +145,15 @@ class RknnModelInference : public RedoxiModelInference
         const InferenceContextInitConfig &init_config);
 
     /**
+     * @brief Create an inference context by duplicating an existing context
+     *
+     * @param duplicate_context The existing rknn context to duplicate
+     * @return A shared pointer to the created inference context
+     */
+    static std::shared_ptr<InferenceContext_t> create_inference_context(
+        InferenceContext_t &duplicate_context);
+
+    /**
      * @brief Get information about the input ports of the ONNX model.
      *
      * @param session A shared pointer to the Ort::Session.
@@ -153,13 +170,5 @@ class RknnModelInference : public RedoxiModelInference
      */
     static RknnModelPortInfo::PtrMap get_output_port_infos(
         const InferenceContext_t &context);
-
-    /**
-     * @brief Convert an ONNX tensor element data type to its string representation.
-     *
-     * @param dtype The ONNX tensor element data type.
-     * @return A string representation of the data type.
-     */
-    static std::string rknn_tensor_type_to_string(RknnTensorType_t dtype);
 };
 } // namespace redoxi_works::inference::rknn

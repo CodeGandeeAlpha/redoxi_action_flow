@@ -1,4 +1,5 @@
 #include <redoxi_inference_rknn/RknnPortData.hpp>
+#include <redoxi_basic_cpp/logging/ros_logging.hpp>
 #include <numeric>
 #include <algorithm>
 
@@ -10,10 +11,19 @@ ModelPortInfo::ConstPtr RknnPortData::get_port_info() const
     return m_port_info;
 }
 
-int RknnPortData::set_tensor_data(const float *data, std::vector<int64_t> shape)
+int RknnPortData::set_tensor_data(const float *data, std::vector<int64_t> shape,
+                                  std::optional<TensorFormat> format)
 {
     //! Check dtype compatibility first
     if (m_port_info->get_dtype_str() != "float32") {
+        return -1;
+    }
+
+    // check if the format is compatible with the port info
+    if (format.has_value() && format.value() != m_port_info->get_tensor_format()) {
+        RDX_RAISE_ERROR("[f={}] Tensor format mismatch: {} vs {}",
+                        __func__, tensor_format_to_string(format.value()),
+                        tensor_format_to_string(m_port_info->get_tensor_format()));
         return -1;
     }
 
@@ -30,18 +40,22 @@ int RknnPortData::set_tensor_data(const float *data, std::vector<int64_t> shape)
     } else {
         auto &tensor_data_f32 = std::get<MappedTensorData_f32>(m_tensor_data);
         tensor_data_f32.data->assign(data, data + num_elements);
-        if (!tensor_data_f32.data->empty()) {
-            RDX_INFO_DEV(nullptr, __func__, false, "Port name={}, first element: {}",
-                         m_port_info->get_name(), tensor_data_f32.data->front());
-        }
         return 0;
     }
 }
 
-int RknnPortData::set_tensor_data(const uint8_t *data, std::vector<int64_t> shape)
+int RknnPortData::set_tensor_data(const uint8_t *data, std::vector<int64_t> shape, std::optional<TensorFormat> format)
 {
     //! Check dtype compatibility first
     if (m_port_info->get_dtype_str() != "uint8") {
+        return -1;
+    }
+
+    //! Check if the format is compatible with the port info
+    if (format.has_value() && format.value() != m_port_info->get_tensor_format()) {
+        RDX_RAISE_ERROR("[f={}] Tensor format mismatch: {} vs {}",
+                        __func__, tensor_format_to_string(format.value()),
+                        tensor_format_to_string(m_port_info->get_tensor_format()));
         return -1;
     }
 

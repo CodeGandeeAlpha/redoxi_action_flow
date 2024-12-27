@@ -8,6 +8,7 @@
 #include <map>
 #include <sstream>
 #include <any>
+#include <optional>
 
 
 namespace redoxi_works::inference
@@ -47,6 +48,24 @@ struct DeviceInfo {
     // if you have multiple devices of the same type, you can specify which one to use
     int device_index = 0;
 };
+
+enum class TensorFormat {
+    NCHW = 0, // nchw for 4d, chw for 3d, hw for 2d
+    NHWC = 1, // nhwc for 4d, hwc for 3d, hw for 2d
+    UNKNOWN = 1000
+};
+
+inline constexpr const char *tensor_format_to_string(TensorFormat format)
+{
+    switch (format) {
+        case TensorFormat::NCHW:
+            return "nchw";
+        case TensorFormat::NHWC:
+            return "nhwc";
+        default:
+            return "unknown";
+    }
+}
 
 //! Check if a specific shape is compatible with a general shape.
 //! Specific shape set fixed dimensions for dynamic dimensions in the general shape, but not the other way around
@@ -158,6 +177,13 @@ class ModelPortInfo
         return m_shape;
     }
 
+    //! Get the expected tensor format
+    //! @return The expected tensor format
+    virtual TensorFormat get_tensor_format() const
+    {
+        return m_tensor_format;
+    }
+
     //! Get if the port is an input port
     //! @return True if the port is an input port, false if it is an output port
     virtual bool is_input() const
@@ -178,6 +204,7 @@ class ModelPortInfo
             }
         }
         ss << "), dtype=" << m_dtype_str;
+        ss << ", format=" << (m_tensor_format == TensorFormat::NCHW ? "NCHW" : "NHWC");
         return ss.str();
     }
 
@@ -194,6 +221,9 @@ class ModelPortInfo
     std::string m_dtype_str;
     std::vector<int64_t> m_shape;
     bool m_is_input{false};
+
+    // expected tensor format
+    TensorFormat m_tensor_format{TensorFormat::NCHW};
 };
 
 class ModelPortData
@@ -205,42 +235,82 @@ class ModelPortData
     ModelPortData() = default;
     virtual ~ModelPortData() = default;
 
-    // get information of the port, note that there may be dynamic shape for the data
-    // so you need to use get_shape() to get the actual shape of the data
+    /**
+     * @brief Get information of the port
+     * @note There may be dynamic shape for the data so you need to use get_shape() to get the actual shape
+     * @note This is the same as what you get from the inout data
+     * @return Port information
+     */
     virtual ModelPortInfo::ConstPtr get_port_info() const = 0;
 
-    //! Set data by tensor, for float type. Data will be copied into the tensor
-    virtual int set_tensor_data(const float *data, std::vector<int64_t> shape) = 0;
+    /**
+     * @brief Set data by tensor, for float type. Data will be copied into the tensor
+     * @param data Input data pointer
+     * @param shape Shape of the input tensor
+     * @param fmt Optional tensor format. If not specified, assumes same as port's preferred format.
+     *           If specified, will be converted to port's preferred format
+     * @return 0 if success, -1 if failed
+     */
+    virtual int set_tensor_data(const float *data, std::vector<int64_t> shape,
+                                std::optional<TensorFormat> fmt = std::nullopt) = 0;
 
-    //! Set data by tensor, for uint8_t type. Data will be copied into the tensor
-    virtual int set_tensor_data(const uint8_t *data, std::vector<int64_t> shape) = 0;
+    /**
+     * @brief Set data by tensor, for uint8_t type. Data will be copied into the tensor
+     * @param data Input data pointer
+     * @param shape Shape of the input tensor
+     * @param fmt Optional tensor format. If not specified, assumes same as port's preferred format.
+     *           If specified, will be converted to port's preferred format
+     * @return 0 if success, -1 if failed
+     */
+    virtual int set_tensor_data(const uint8_t *data, std::vector<int64_t> shape,
+                                std::optional<TensorFormat> fmt = std::nullopt) = 0;
 
-    //! Get the shape of the tensor, you need this to interpret the data you get from get_as_tensor()
-    //! @return The shape of the tensor
+    /**
+     * @brief Get the shape of the actual tensor data, may be different from the port shape,
+     *        when the port accepts dynamic shape.
+     * @return The shape of the tensor
+     */
     virtual std::vector<int64_t> get_shape() const = 0;
 
-    //! Get the data type of the tensor, you need this to interpret the data you get from get_tensor_data()
-    //! @return The data type of the tensor
+    /**
+     * @brief Get the data type of the actual tensor data, it may be different from the port data type,
+     *        when the port expects something that has no c++ native corresponding type.
+     * @return The data type of the tensor
+     */
     virtual std::string get_dtype_str() const = 0;
 
-    //! Get the raw data pointer of the tensor, then you can interpret the data by its shape
+    /**
+     * @brief Get the raw data pointer of the tensor
+     * @param output_tensor Output pointer to receive the tensor data
+     * @return 0 if success, -1 if failed
+     */
     virtual int get_tensor_data(const float **output_tensor) const = 0;
 
-    //! Get the raw data pointer of the tensor, then you can interpret the data by its shape
-    //! you can also modify the data by this pointer
-    //! @return 0 if success, -1 if failed
+    /**
+     * @brief Get the raw data pointer of the tensor that can be modified
+     * @param output_tensor Output pointer to receive the tensor data
+     * @return 0 if success, -1 if failed
+     */
     virtual int get_tensor_data(float **output_tensor) = 0;
 
-    //! Get the raw data pointer of the tensor, then you can interpret the data by its shape
-    //! @return 0 if success, -1 if failed
+    /**
+     * @brief Get the raw data pointer of the tensor
+     * @param output_tensor Output pointer to receive the tensor data
+     * @return 0 if success, -1 if failed
+     */
     virtual int get_tensor_data(const uint8_t **output_tensor) const = 0;
 
-    //! Get the raw data pointer of the tensor, then you can interpret the data by its shape
-    //! you can also modify the data by this pointer
-    //! @return 0 if success, -1 if failed
+    /**
+     * @brief Get the raw data pointer of the tensor that can be modified
+     * @param output_tensor Output pointer to receive the tensor data
+     * @return 0 if success, -1 if failed
+     */
     virtual int get_tensor_data(uint8_t **output_tensor) = 0;
 
-    //! Check if the tensor data is set
+    /**
+     * @brief Check if the tensor data is set
+     * @return True if tensor data is set, false otherwise
+     */
     virtual bool has_tensor_data() const = 0;
 };
 

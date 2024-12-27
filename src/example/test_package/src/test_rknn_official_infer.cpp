@@ -117,7 +117,7 @@ int main(int argc, char **argv)
     // const char *model_path = "/data/code/psf_ros2_ws/tmp/models/rknn/mobilenet_v1.rknn";
     // const char *model_path = "/data/code/psf_ros2_ws/tmp/models/rknn/yolov8s-ptq-bs1.rknn";
     // const char *model_path = "/data/code/psf_ros2_ws/tmp/rknpu-2.2/examples/rknn_yolov5_demo/model/RK3588/yolov5s-640-640.rknn";
-    const char *model_path = "/data/code/psf_ros2_ws/tmp/models/rknn/yolov8s.onnx";
+    const char *model_path = "/data/code/psf_ros2_ws/tmp/models/yolov8s-fp-bs1.rknn";
     const char *img_path = "/data/code/psf_ros2_ws/data/ori_img.jpg";
 
     // if (argc != 3) {

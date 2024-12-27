@@ -47,9 +47,10 @@ class Yolo8ModelBase : public RedoxiModelInference
         InferenceInOutData::Ptr model_inout_data,
         const OutputConfig_t &config) const = 0;
 
-    // get the shape of the model input in NCHW format
-    virtual std::array<int64_t, 4> get_model_input_shape_nchw() const;
     virtual std::string get_model_input_dtype() const;
+
+    // get the shape and format of the model input
+    virtual std::tuple<std::array<int64_t, 4>, inference::TensorFormat> get_model_input_shape() const;
 
     // get the shape of the model output in (batch_size, num_values, num_boxes)
     virtual std::array<int64_t, 3> get_model_output_shape() const;
@@ -67,6 +68,11 @@ class Yolo8ModelBase : public RedoxiModelInference
     ModelPortInfo::ConstPtr m_model_output_info;
 
     std::shared_ptr<InitConfig_t> m_init_params;
+
+    // model-specific parameters, tied to ultralytics yolov8 architecture
+    // int64_t m_num_classes{-1};                // number of classes, different for each model
+    // int64_t m_dfl_reg_max{16};                // number of distribution focal loss (DFL) regression channels
+    // std::vector<int64_t> m_stride{8, 16, 32}; // stride of the model
 };
 
 } // namespace redoxi_works::inference::yolo8

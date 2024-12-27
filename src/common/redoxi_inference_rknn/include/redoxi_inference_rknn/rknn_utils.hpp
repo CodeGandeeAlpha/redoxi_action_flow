@@ -2,6 +2,8 @@
 
 #include <rknn_api.h>
 #include <redoxi_basic_cpp/logging/ros_logging.hpp>
+#include <redoxi_inference/redoxi_inference.hpp>
+#include <string_view>
 
 namespace redoxi_works::inference::rknn
 {
@@ -39,4 +41,55 @@ namespace redoxi_works::inference::rknn
         }                                                                                                           \
     } while (0)
 
+inline constexpr std::string_view rknn_tensor_type_to_string(rknn_tensor_type dtype)
+{
+    switch (dtype) {
+        case RKNN_TENSOR_FLOAT32:
+            return "float32";
+        case RKNN_TENSOR_FLOAT16:
+            return "float16";
+        case RKNN_TENSOR_INT8:
+            return "int8";
+        case RKNN_TENSOR_UINT8:
+            return "uint8";
+        case RKNN_TENSOR_INT16:
+            return "int16";
+        case RKNN_TENSOR_UINT16:
+            return "uint16";
+        case RKNN_TENSOR_INT32:
+            return "int32";
+        case RKNN_TENSOR_UINT32:
+            return "uint32";
+        case RKNN_TENSOR_INT64:
+            return "int64";
+        case RKNN_TENSOR_BOOL:
+            return "bool";
+        default:
+            return "unknown";
+    }
+}
+
+inline constexpr TensorFormat rknn_format_to_tensor_format(rknn_tensor_format format)
+{
+    switch (format) {
+        case RKNN_TENSOR_NHWC:
+            return TensorFormat::NHWC;
+        case RKNN_TENSOR_NCHW:
+            return TensorFormat::NCHW;
+        default:
+            return TensorFormat::UNKNOWN;
+    }
+}
+
+inline constexpr rknn_tensor_format tensor_format_to_rknn_format(TensorFormat format)
+{
+    switch (format) {
+        case TensorFormat::NHWC:
+            return RKNN_TENSOR_NHWC;
+        case TensorFormat::NCHW:
+            return RKNN_TENSOR_NCHW;
+        default:
+            return RKNN_TENSOR_UNDEFINED;
+    }
+}
 } // namespace redoxi_works::inference::rknn

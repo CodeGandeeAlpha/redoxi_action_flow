@@ -11,11 +11,15 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(redoxi_inference REQUIRED)
 find_package(redoxi_basic_cpp REQUIRED)
+find_package(pluginlib REQUIRED)
+pluginlib_export_plugin_description_file(redoxi_inference plugins.xml)
 
 set(srcfiles src/redoxi_inference_rknn.cpp
   src/RknnModelInference.cpp
   src/RknnPortData.cpp
   src/RknnInferenceInOutData.cpp
+  src/rknn_utils.cpp
+  src/RknnPortInfo.cpp
 )
 
 
@@ -32,6 +36,7 @@ ament_target_dependencies(
   "rclcpp"
   "redoxi_inference"
   "redoxi_basic_cpp"
+  "pluginlib"
 )
 
 if(NOT DEFINED RKNPU_ROOT)
@@ -72,7 +77,7 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_export_dependencies(rclcpp redoxi_inference redoxi_basic_cpp)
+ament_export_dependencies(rclcpp redoxi_inference redoxi_basic_cpp pluginlib)
 
 ament_export_include_directories(
   "include/${PROJECT_NAME}"

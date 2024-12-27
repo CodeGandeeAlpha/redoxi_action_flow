@@ -81,8 +81,8 @@ class RknnPortData : public ModelPortData
 
   public:
     virtual ModelPortInfo::ConstPtr get_port_info() const override;
-    virtual int set_tensor_data(const float *data, std::vector<int64_t> shape) override;
-    virtual int set_tensor_data(const uint8_t *data, std::vector<int64_t> shape) override;
+    virtual int set_tensor_data(const float *data, std::vector<int64_t> shape, std::optional<TensorFormat> format = std::nullopt) override;
+    virtual int set_tensor_data(const uint8_t *data, std::vector<int64_t> shape, std::optional<TensorFormat> format = std::nullopt) override;
     virtual int get_tensor_data(const float **output_tensor) const override;
     virtual int get_tensor_data(float **output_tensor) override;
     virtual int get_tensor_data(const uint8_t **output_tensor) const override;

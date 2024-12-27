@@ -45,6 +45,12 @@ class StepIntervals:
     VeryFast = 1000
 
 
+class InputCacheSize:
+    Small = 1
+    Medium = 2
+    Large = 4
+
+
 # the graph structure is:
 # video_source -> detection_driver -> tracker_driver -> frame_relay
 #                       |                   |
@@ -56,6 +62,7 @@ frame_relay_node_params = frameRelayCfg.FrameRelayNodeConfig(
     init_config=frameRelayCfg.FrameRelayNodeInitConfig(
         input_port_config=frameRelayCfg.InputPortConfig(
             action_name="in/frame",
+            buffer_capacity=InputCacheSize.Medium,
         ),
         publish_topic="out/relayed_frame",
     ),
@@ -67,6 +74,7 @@ tracker_node_params = motTrackersCfg.UniversalMotTrackersNodeConfig(
     init_config=motTrackersCfg.UniversalMotTrackersInitConfig(
         input_port_config=motTrackersCfg.InputPortConfig(
             action_name="in/track_request",
+            buffer_capacity=InputCacheSize.Medium,
         ),
         # publish_visualization_topic="vis/tracking",
         # preferred_image_size={"width": 1920, "height": 1080},
@@ -86,6 +94,7 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
     init_config=motTrackersDriverCfg.TrackerDriverInitConfig(
         input_port_config=motTrackersDriverCfg.InputPortConfig(
             action_name="in/detections",
+            buffer_capacity=InputCacheSize.Medium,
         ),
         output_port_config=motTrackersDriverCfg.OutputPortConfig(
             # downstream_specs=[
@@ -119,32 +128,42 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
 # fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx"
 # fn_model = r"/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8m-pose-dynbatch.onnx"
 # fn_model = f"{workspace_root}/tmp/models/yolov8n-pose-640.onnx"
-fn_model = f"{workspace_root}/tmp/models/yolov8s-pose.onnx"
+# fn_model = f"{workspace_root}/tmp/models/yolov8s-pose.onnx"
+# fn_model = (
+#     f"{workspace_root}/tmp/models/rknn/pose/small/yolov8s-pose-288x512-bs1-pthq.rknn"
+# )
+fn_model = f"/data/code/psf_ros2_ws/tmp/models/rknn/pose/nano/yolov8n-pose-352x640-bs1-pthq.rknn"
 det_node_name = "detector"
 det_node_params = yolo.Yolo8ModelNodeConfig(
     init_config=yolo.Yolo8ModelInitConfig(
         model_configs=[
+            # {
+            #     "model_path": fn_model,
+            #     "device_type": "cuda",
+            #     "device_index": 0,
+            # },
             {
                 "model_path": fn_model,
-                "device_type": "cuda",
-                "device_index": 0,
+                "device_type": "rknpu",
+                "device_index": -2,
             },
             # {
             #     "model_path": fn_model,
-            #     "device_type": "cpu",
-            #     "device_index": 0,
+            #     "device_type": "rknpu",
+            #     "device_index": 1,
             # },
         ],
         detection_request_config=yolo.DetectionRequestConfig(
             input_port_config=yolo.InputPortConfig(
                 action_name="in/detection_request",
+                buffer_capacity=InputCacheSize.Medium,
             ),
         ),
     ),
     runtime_config=yolo.Yolo8ModelRuntimeConfig(
         model_output_config=yolo.ModelPostprocessConfig(
-            conf_threshold=0.3,
-            iou_threshold=0.5,
+            conf_threshold=0.2,
+            iou_threshold=0.6,
             selected_class_ids=[0],  # 0=person (ultralytics convention)
         )
     ),
@@ -158,6 +177,7 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
     init_config=detDriverCfg.DetectionDriverInitConfig(
         input_port_config=detDriverCfg.InputPortConfig(
             action_name="in/frame",
+            buffer_capacity=InputCacheSize.Medium,
         ),
         output_port_config=detDriverCfg.OutputPortConfig(
             downstream_specs=[
@@ -201,7 +221,7 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
                 videoSrcCfg.DownstreamSpec(
                     name=det_driver_node_name,
                     action_name=f"/{det_driver_node_name}/{det_driver_node_params.init_config.input_port_config.action_name}",
-                    # create_debug_pub=True,
+                    create_debug_pub=True,
                 ),
             ],
             # data_topic_for_source_data="data_msg/source_data",
@@ -217,10 +237,16 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
             drop_strategy=videoSrcCfg.DropStrategy.DropAsNeeded,
         ),
         frame_request_policy=videoSrcCfg.DeliveryPolicy(
+            precondition=videoSrcCfg.DeliveryPrecondition.DontCare,
             drop_strategy=videoSrcCfg.DropStrategy.DropAsNeeded,
+            retry_policy=videoSrcCfg.RetryPolicy(
+                number_of_retry=0,
+                wait_time_between_retry=1000,
+                wait_time_retry_response=1000,
+            ),
         ),
-        output_image_size={"width": 1920, "height": 1080},
-        # output_image_size={"width": 1200, "height": -1},
+        # output_image_size={"width": 1920, "height": 1080},
+        output_image_size={"width": 1024, "height": -1},
     ),
 )
 
