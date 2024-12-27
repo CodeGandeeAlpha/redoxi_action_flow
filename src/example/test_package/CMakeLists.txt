@@ -17,23 +17,22 @@ find_package(xtensor REQUIRED)
 find_package(OpenCV REQUIRED)
 
 # Set dependencies
-# set(DEPENDENCIES
-#     psg_private_msgs
-#     redoxi_video_reader
-#     redoxi_samples_lib
-#     redoxi_samples_nodes
-#     redoxi_shared_memory
-#     redoxi_inference
-#     redoxi_dnn_models
-#     yolo8_series
-#     pluginlib
-#     universal_mot_trackers
-#     redoxi_inference_rknn)
-set(DEPENDENCIES 
-    redoxi_inference 
-    redoxi_inference_rknn 
-    cv_bridge
-    yolo8_series)
+set(DEPENDENCIES
+    psg_private_msgs
+    redoxi_video_reader
+    redoxi_samples_lib
+    redoxi_samples_nodes
+    redoxi_shared_memory
+    redoxi_inference
+    redoxi_dnn_models
+    yolo8_series
+    pluginlib
+    universal_mot_trackers)
+# set(DEPENDENCIES 
+#     redoxi_inference 
+#     # redoxi_inference_rknn 
+#     cv_bridge
+#     yolo8_series)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb xtensor)
 
@@ -74,22 +73,26 @@ option(BUILD_ONNX_YOLO8DET "Build onnx_yolo8det target" OFF)
 option(BUILD_TEST_DRIVER_NODE "Build test_driver_node target" OFF)
 option(BUILD_TEST_FRAME_PROXY "Build test_frame_proxy target" OFF)
 option(BUILD_TEST_JSON_STRUCT "Build test_json_struct target" OFF)
-option(BUILD_VIDEO_FROM_URL_NODE "Build video_from_url_node target" OFF)
+
+# Video tests
+option(BUILD_VIDEO_FROM_URL_NODE "Build video_from_url_node target" ON)
 option(BUILD_YOLO_BODY_POSE_DETECTION_NODE
        "Build yolo_body_pose_detection_node target" ON)
 option(BUILD_YOLO_OBJECT_DETECTION_NODE
        "Build yolo_object_detection_node target" ON)
-option(BUILD_DETECTION_RELAY_NODE "Build detection_relay_node target" OFF)
-option(BUILD_DETECTION_DRIVER_NODE "Build detection_driver_node target" OFF)
-option(BUILD_MOT_TRACKER_NODE "Build mot_tracker_node target" OFF)
-option(BUILD_MOT_TRACKER_DRIVER "Build mot_tracker_driver target" OFF)
-option(BUILD_FRAME_RELAY_NODE "Build frame_relay_node target" OFF)
+option(BUILD_DETECTION_RELAY_NODE "Build detection_relay_node target" ON)
+option(BUILD_DETECTION_DRIVER_NODE "Build detection_driver_node target" ON)
+option(BUILD_MOT_TRACKER_NODE "Build mot_tracker_node target" ON)
+option(BUILD_MOT_TRACKER_DRIVER "Build mot_tracker_driver target" ON)
+option(BUILD_FRAME_RELAY_NODE "Build frame_relay_node target" ON)
 option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
 option(BUILD_TEST_SHM_TIMEOUT "Build test_shm_timeout target" OFF)
-option(BUILD_TEST_RKNN_INFER "Build test_rknn_infer target" ON)
-option(BUILD_TEST_RKNN_OFFICIAL_INFER "Build test_rknn_official_infer target" ON)
-option(BUILD_TEST_RKNN_PLUGIN "Build test_rknn_plugin target" ON)
-option(BUILD_TEST_RKNN_YOLO8_POSE "Build test_rknn_yolo8_pose target" ON)
+
+# RKNN tests
+option(BUILD_TEST_RKNN_INFER "Build test_rknn_infer target" OFF)
+option(BUILD_TEST_RKNN_OFFICIAL_INFER "Build test_rknn_official_infer target" OFF)
+option(BUILD_TEST_RKNN_PLUGIN "Build test_rknn_plugin target" OFF)
+option(BUILD_TEST_RKNN_YOLO8_POSE "Build test_rknn_yolo8_pose target" OFF)
 
 # Function to configure a target
 function(configure_target target_name)

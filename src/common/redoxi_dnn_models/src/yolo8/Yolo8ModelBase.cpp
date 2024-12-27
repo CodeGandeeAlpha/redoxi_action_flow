@@ -74,7 +74,6 @@ int Yolo8ModelBase::open(KeyValueStore::Ptr params)
     }
 
     // Create onnx model instance
-    // TODO: add rknn model
     std::shared_ptr<RedoxiModelInference> model;
     if (device_type == common_device_types::RKNPU) {
         // rknn model, where the model itself should be .rknn file
@@ -118,9 +117,9 @@ int Yolo8ModelBase::open(KeyValueStore::Ptr params)
     }
     m_model_input_info = input_ports.begin()->second;
 
-    //! check input shape is 4D (NCHW)
+    //! check input shape is 4D (NCHW or NHWC)
     if (m_model_input_info->get_shape().size() != 4) {
-        RDX_RAISE_ERROR("Invalid input tensor shape: expected 4 dimensions (NCHW), got {}",
+        RDX_RAISE_ERROR("Invalid input tensor shape: expected 4 dimensions (NCHW or NHWC), got {}",
                         m_model_input_info->get_shape().size());
     }
 
@@ -145,10 +144,14 @@ int Yolo8ModelBase::open(KeyValueStore::Ptr params)
 
     // set the model pointer
     RDX_INFO_DEV(nullptr, __func__, "{}", "Model opened successfully");
-    RDX_INFO_DEV(nullptr, __func__, "Model input dtype: {}, input size (N,C,H,W): ({},{},{},{}), output dtype: {}",
+    RDX_INFO_DEV(nullptr, __func__, "Model input: dtype: {}, shape: ({},{},{},{}), tensor format: {}",
                  m_model_input_info->get_dtype_str(), m_model_input_info->get_shape()[0],
                  m_model_input_info->get_shape()[1], m_model_input_info->get_shape()[2],
-                 m_model_input_info->get_shape()[3], m_model_output_info->get_dtype_str());
+                 m_model_input_info->get_shape()[3], tensor_format_to_string(m_model_input_info->get_tensor_format()));
+    RDX_INFO_DEV(nullptr, __func__, "Model output: dtype: {}, shape: ({},{},{}), tensor format: {}",
+                 m_model_output_info->get_dtype_str(), m_model_output_info->get_shape()[0],
+                 m_model_output_info->get_shape()[1], m_model_output_info->get_shape()[2],
+                 tensor_format_to_string(m_model_output_info->get_tensor_format()));
     m_model = model;
     m_init_params = _params;
 
@@ -205,7 +208,8 @@ int Yolo8ModelBase::set_input_images(InferenceInOutData::Ptr model_inout_data,
 
     yolo8::Yolo8Preprocessor preprocessor;
     yolo8::Yolo8PreprocessorConfig config;
-    auto [expected_batch_size, expected_num_channels, expected_height, expected_width] = get_model_input_shape_nchw();
+    auto [expected_shape, expected_tensor_format] = get_model_input_shape();
+    auto [expected_batch_size, expected_num_channels, expected_height, expected_width] = expected_shape;
     config.model_input_image_size = cv::Size(expected_width, expected_height);
     preprocessor.init(config);
 
@@ -215,20 +219,42 @@ int Yolo8ModelBase::set_input_images(InferenceInOutData::Ptr model_inout_data,
     }
     int64_t batch_size = (int64_t)images.size();
 
-    // create a 4d tensor to hold all images
-    auto input_dtype = get_model_input_dtype();
-    if (input_dtype != "float32") {
-        RDX_RAISE_ERROR("Unsupported model input dtype: {}", input_dtype);
-    }
+    auto port_name = m_model_input_info->get_name();
+    auto port_tensor_format = expected_tensor_format;
+    auto port_dtype = m_model_input_info->get_dtype_str();
+    auto port_data = model_inout_data->get_input_port_data(port_name);
+
+    // saves the preprocess info for each image
+    yolo8::ImagePreprocessInfo::List preprocess_info(batch_size);
 
     // for each image, do preprocess
-    std::vector<float> tensor_data(batch_size * expected_num_channels * expected_height * expected_width, 0.0f);
-    yolo8::ImagePreprocessInfo::List preprocess_info(batch_size);
-    preprocessor.preprocess(tensor_data.data(), &preprocess_info, images, image_format);
+    if (port_dtype == "float32") {
+        std::vector<float> tensor_data(batch_size * expected_num_channels * expected_height * expected_width, 0.0f);
+        preprocessor.preprocess(tensor_data.data(), port_tensor_format, &preprocess_info, images, image_format);
 
-    // copy the tensor to the model input
-    auto port_data = model_inout_data->get_input_port_data(m_model_input_info->get_name());
-    port_data->set_tensor_data(tensor_data.data(), {batch_size, expected_num_channels, expected_height, expected_width});
+        // copy the tensor to the model input
+        if (port_tensor_format == inference::TensorFormat::NCHW) {
+            port_data->set_tensor_data(tensor_data.data(), {batch_size, expected_num_channels, expected_height, expected_width});
+        } else if (port_tensor_format == inference::TensorFormat::NHWC) {
+            port_data->set_tensor_data(tensor_data.data(), {batch_size, expected_height, expected_width, expected_num_channels});
+        } else {
+            RDX_RAISE_ERROR("[f={}()] Unsupported tensor format: {}", __func__, tensor_format_to_string(port_tensor_format));
+        }
+    } else if (port_dtype == "uint8") {
+        std::vector<uint8_t> tensor_data(batch_size * expected_num_channels * expected_height * expected_width, 0);
+        preprocessor.preprocess(tensor_data.data(), port_tensor_format, &preprocess_info, images, image_format);
+
+        // copy the tensor to the model input
+        if (port_tensor_format == inference::TensorFormat::NCHW) {
+            port_data->set_tensor_data(tensor_data.data(), {batch_size, expected_num_channels, expected_height, expected_width});
+        } else if (port_tensor_format == inference::TensorFormat::NHWC) {
+            port_data->set_tensor_data(tensor_data.data(), {batch_size, expected_height, expected_width, expected_num_channels});
+        } else {
+            RDX_RAISE_ERROR("[f={}()] Unsupported tensor format: {}", __func__, tensor_format_to_string(port_tensor_format));
+        }
+    } else {
+        RDX_RAISE_ERROR("[f={}()] Unsupported model input dtype: {}", __func__, port_dtype);
+    }
 
     // attach the preprocess info to the model input
     auto any_data = std::make_shared<std::any>(preprocess_info);
@@ -237,12 +263,15 @@ int Yolo8ModelBase::set_input_images(InferenceInOutData::Ptr model_inout_data,
     return 0;
 }
 
-std::array<int64_t, 4> Yolo8ModelBase::get_model_input_shape_nchw() const
+std::tuple<std::array<int64_t, 4>, inference::TensorFormat> Yolo8ModelBase::get_model_input_shape() const
 {
     std::array<int64_t, 4> shape{0, 0, 0, 0};
     auto shape_vec = m_model_input_info->get_shape();
+    if (shape_vec.size() != 4) {
+        RDX_RAISE_ERROR("[f={}()] Invalid input tensor shape: expected 4 dimensions, got {}", __func__, shape_vec.size());
+    }
     std::copy(shape_vec.begin(), shape_vec.end(), shape.begin());
-    return shape;
+    return std::make_tuple(shape, m_model_input_info->get_tensor_format());
 }
 
 std::string Yolo8ModelBase::get_model_input_dtype() const
