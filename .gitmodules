@@ -27,3 +27,7 @@
 	path = src/extern/PassengerFlow
 	url = git@codeup.aliyun.com:61adcb80e05da4a409ab67b8/intellif/PassengerFlow.git
 	branch = master
+[submodule "src/extern/dynamic_message_introspection"]
+	path = src/extern/dynamic_message_introspection
+	url = https://github.com/osrf/dynamic_message_introspection.git
+	branch = main
