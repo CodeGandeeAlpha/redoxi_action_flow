@@ -30,11 +30,17 @@ struct PSGDocumentSinkInitConfig : public common_nodes::StartStopNode::InitConfi
     std::string debug_topic_document_accepted = "debug_port/document_accepted";
     std::string debug_topic_document_rejected = "debug_port/document_rejected";
 
+    //! save document for test
+    std::string save_middle_result_dir_path = "";
+    bool enable_save_middle_result = false;
+
     JS_OBJECT_WITH_SUPER(JS_SUPER(common_nodes::StartStopNode::InitConfig_t),
                          JS_MEMBER(input_port_config),
                          JS_MEMBER(publish_topic),
                          JS_MEMBER(debug_topic_document_accepted),
-                         JS_MEMBER(debug_topic_document_rejected));
+                         JS_MEMBER(debug_topic_document_rejected),
+                         JS_MEMBER(save_middle_result_dir_path),
+                         JS_MEMBER(enable_save_middle_result));
 };
 
 struct PSGDocumentSinkRuntimeConfig : public common_nodes::StartStopNode::RuntimeConfig_t {
@@ -72,14 +78,37 @@ class PSGDocumentSink : public common_nodes::StartStopNode
     int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config) override;
 
   protected:
+    void _save_event_count(std::shared_ptr<InitConfig_t> init_config);
+    void _save_event_data(std::shared_ptr<InitConfig_t> init_config,
+                          const psg_private_msgs::msg::PsgDocument &raw_document);
+    void _save_person_every_frame(std::shared_ptr<InitConfig_t> init_config,
+                                  const psg_private_msgs::msg::PsgDocument &raw_document);
+    void _save_trajectory_every_person(std::shared_ptr<InitConfig_t> init_config,
+                                       const psg_private_msgs::msg::PsgDocument &raw_document);
+
+  protected:
     std::shared_ptr<InputPort_t> m_input_port;
-    std::shared_ptr<InitConfig_t> m_init_config;
 
     // publishers
     StampedDocumentPub m_pub_relayed_document;
     StampedImagePub m_pub_relayed_image;
     StampedImagePub m_pub_debug_document_accepted;
     StampedImagePub m_pub_debug_document_rejected;
+
+    // 中间结果相关
+    std::map<std::string, std::map<std::string, int>> m_event_count;
+
+    std::map<int, std::string> m_EventTyp2String = {
+        {0, "None"},
+        {1, "Disappear"},
+        {2, "DoorIn"},
+        {3, "DoorOut"},
+        {4, "DoorIgnore"},
+        {5, "DoorSpeedOut"},
+        {6, "DoorSpeedIn"},
+        {7, "PassingIn"},
+        {8, "PassingOut"},
+        {9, "PassingIgnore"}};
 };
 
 } // namespace redoxi_works

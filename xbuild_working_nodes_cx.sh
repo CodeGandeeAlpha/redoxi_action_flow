@@ -38,8 +38,8 @@ display_help() {
 PackagesToBuild="redoxi_shm_v6d \
                  redoxi_inference_onnx \
                  rosboard \
+                 dynmsg \
                  test_cx"
-
 
 # Check if --help flag is provided
 if [[ "$*" == *"--help"* ]]; then
@@ -98,5 +98,6 @@ colcon build --packages-up-to $PackagesToBuild \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
     -DJSON_STRUCT_OPT_BUILD_EXAMPLES=OFF \
     -DJSON_STRUCT_OPT_BUILD_TESTS=OFF \
-    -DJSON_STRUCT_OPT_INSTALL=ON
+    -DJSON_STRUCT_OPT_INSTALL=ON \
+    -DBUILD_TESTING=OFF
 source install/setup.bash

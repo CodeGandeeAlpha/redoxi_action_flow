@@ -21,6 +21,10 @@ log_level_arg = DeclareLaunchArgument(
     description="Logging level",
 )
 
+# graph of pipeline
+# video_source -> psg_master_node -> psg_all_detector_cpp_driver -> psg_person_generator -> psg_tracker_driver -> psg_counter -> document_sink
+#                                                 |                                                  |
+#                                     yolo_body_pose_detection_node                           psg_tracker_node
 
 class StepIntervals:
     VerySlow = 3000000
@@ -32,7 +36,8 @@ class StepIntervals:
 
 fn_video = (
     # "/3d/chengxiao/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-    "/3d/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.6.30-2023-06-18-15-00-02.mp4"
+    # "/3d/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.6.30-2023-06-18-15-00-02.mp4"
+    "/3d/chengxiao/data/passengerflow/50_wanda_30s/20.22.6.30-2023-06-18-15-00-02_27908_28658.mp4"
 )
 
 # 文档接收节点配置
@@ -44,6 +49,8 @@ document_sink_node_json_params = psgDocSinkCfg.PSGDocumentSinkNodeConfig(
             action_name="in/action",
         ),
         publish_topic="out/relayed_document",
+        save_middle_result_dir_path="/3d/chengxiao/code/psf_ros2_ws/tmp/test_psg_document_sink",
+        enable_save_middle_result=True,
     ),
     runtime_config=psgDocSinkCfg.PSGDocumentSinkNodeRuntimeConfig(
         enable_debug_topics=True,
@@ -288,7 +295,7 @@ video_src_node_name = "video_source"
 video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
         video_url=fn_video,
-        auto_replay=True,
+        auto_replay=False,
         primary_output_spec=videoSrcCfg.OutputPortConfig(
             downstream_specs=[
                 videoSrcCfg.DownstreamSpec(
@@ -302,7 +309,7 @@ video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
         step_interval=StepIntervals.Fast,
-        output_image_size=videoSrcCfg.ImageSize(width=1024, height=-1),
+        output_image_size=videoSrcCfg.ImageSize(width=1920, height=1080),
         output_image_encoding="bgr8",
         frame_request_policy=videoSrcCfg.DeliveryPolicy(
             drop_strategy="drop_as_needed",

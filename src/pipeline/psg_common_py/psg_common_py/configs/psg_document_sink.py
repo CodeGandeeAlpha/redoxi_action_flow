@@ -51,6 +51,8 @@ class PSGDocumentSinkNodeInitConfig(baseNodeCfg.BaseRosNodeInitConfig):
     publish_topic: str | None = field(default=None)
     debug_topic_frame_accepted: str | None = field(default=None)
     debug_topic_frame_rejected: str | None = field(default=None)
+    save_middle_result_dir_path: str | None = field(default=None)
+    enable_save_middle_result: bool = field(default=False)
 
 
 @define(kw_only=True)

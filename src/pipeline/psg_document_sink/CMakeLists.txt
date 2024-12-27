@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(psg_master_node REQUIRED)
+find_package(dynmsg REQUIRED)
 
 add_library(psg_document_sink src/psg_document_sink.cpp)
 add_library(psg_document_sink::psg_document_sink ALIAS psg_document_sink)
@@ -25,6 +26,7 @@ target_compile_definitions(psg_document_sink PRIVATE "PSG_DOCUMENT_SINK_BUILDING
 ament_target_dependencies(
   psg_document_sink PUBLIC
   psg_master_node
+  dynmsg
   "rclcpp"
 )
 
@@ -66,6 +68,7 @@ ament_export_targets(
 ament_export_dependencies(
   rclcpp
   psg_master_node
+  dynmsg
 )
 
 ament_package()

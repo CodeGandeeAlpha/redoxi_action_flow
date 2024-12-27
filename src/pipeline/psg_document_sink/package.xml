@@ -11,6 +11,7 @@
 
   <depend>rclcpp</depend>
   <depend>psg_master_node</depend>
+  <depend>dynmsg</depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
