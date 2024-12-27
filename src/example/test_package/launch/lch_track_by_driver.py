@@ -128,25 +128,25 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
 # fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx"
 # fn_model = r"/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8m-pose-dynbatch.onnx"
 # fn_model = f"{workspace_root}/tmp/models/yolov8n-pose-640.onnx"
-# fn_model = f"{workspace_root}/tmp/models/yolov8s-pose.onnx"
+fn_model = f"{workspace_root}/tmp/models/yolov8s-pose.onnx"
 # fn_model = (
 #     f"{workspace_root}/tmp/models/rknn/pose/small/yolov8s-pose-224x384-bs1-pthq.rknn"
 # )
-fn_model = f"/data/code/psf_ros2_ws/tmp/models/rknn/pose/nano/yolov8n-pose-352x640-bs1-pthq.rknn"
+# fn_model = f"/data/code/psf_ros2_ws/tmp/models/rknn/pose/nano/yolov8n-pose-352x640-bs1-pthq.rknn"
 det_node_name = "detector"
 det_node_params = yolo.Yolo8ModelNodeConfig(
     init_config=yolo.Yolo8ModelInitConfig(
         model_configs=[
-            # {
-            #     "model_path": fn_model,
-            #     "device_type": "cuda",
-            #     "device_index": 0,
-            # },
             {
                 "model_path": fn_model,
-                "device_type": "rknpu",
-                "device_index": -2,
+                "device_type": "cpu",
+                "device_index": 0,
             },
+            # {
+            #     "model_path": fn_model,
+            #     "device_type": "rknpu",
+            #     "device_index": -2,
+            # },
             # {
             #     "model_path": fn_model,
             #     "device_type": "rknpu",
@@ -208,10 +208,10 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
 # video_source -> detection_driver
 video_src_node_name = "video_source"
 # fn_video = f"{workspace_root}/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-fn_video = f"{workspace_root}/.bigdata/crowded_0820.coded.mp4"
+# fn_video = f"{workspace_root}/.bigdata/crowded_0820.coded.mp4"
 # fn_video = f"{workspace_root}/.bigdata/crowded_0820.mp4"
 # fn_video = f"{workspace_root}/.bigdata/new-york.mp4"
-# fn_video = f"{workspace_root}/data/dancetrack/dancetrack-0039.mp4"
+fn_video = f"{workspace_root}/data/dancetrack/dancetrack-0039.mp4"
 video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
         video_url=fn_video,

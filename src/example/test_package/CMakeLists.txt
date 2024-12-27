@@ -27,8 +27,7 @@ set(DEPENDENCIES
     redoxi_dnn_models
     yolo8_series
     pluginlib
-    universal_mot_trackers
-    redoxi_inference_rknn)
+    universal_mot_trackers)
 # set(DEPENDENCIES 
 #     redoxi_inference 
 #     # redoxi_inference_rknn 
@@ -90,10 +89,10 @@ option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
 option(BUILD_TEST_SHM_TIMEOUT "Build test_shm_timeout target" OFF)
 
 # RKNN tests
-option(BUILD_TEST_RKNN_INFER "Build test_rknn_infer target" ON)
-option(BUILD_TEST_RKNN_OFFICIAL_INFER "Build test_rknn_official_infer target" ON)
-option(BUILD_TEST_RKNN_PLUGIN "Build test_rknn_plugin target" ON)
-option(BUILD_TEST_RKNN_YOLO8_POSE "Build test_rknn_yolo8_pose target" ON)
+option(BUILD_TEST_RKNN_INFER "Build test_rknn_infer target" OFF)
+option(BUILD_TEST_RKNN_OFFICIAL_INFER "Build test_rknn_official_infer target" OFF)
+option(BUILD_TEST_RKNN_PLUGIN "Build test_rknn_plugin target" OFF)
+option(BUILD_TEST_RKNN_YOLO8_POSE "Build test_rknn_yolo8_pose target" OFF)
 
 # Function to configure a target
 function(configure_target target_name)

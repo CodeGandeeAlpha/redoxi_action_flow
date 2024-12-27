@@ -3,7 +3,7 @@
 #include <redoxi_common_cpp/common_concepts.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
-
+#include <string>
 namespace redoxi_works
 {
 
@@ -26,6 +26,10 @@ concept DeliverySourceDataConcept = requires(T t)
     typename T::PubDataMsgType_t;
     requires RosMessageConcept<typename T::PubDataMsgType_t>;
 
+    //! The source data can be converted to this type for state probing, and transmitted reliably
+    typename T::PubProbeMsgType_t;
+    requires RosMessageConcept<typename T::PubProbeMsgType_t>;
+
     //! Convert to visualization message
     {
         std::declval<const T &>().to_publish_visualization(std::declval<typename T::PubVisualizationMsgType_t &>())
@@ -34,6 +38,14 @@ concept DeliverySourceDataConcept = requires(T t)
     //! Convert to data message for unreliable data transmission
     {
         std::declval<const T &>().to_publish_data(std::declval<typename T::PubDataMsgType_t &>())
+        } -> std::same_as<int>;
+
+    //! Convert to probe message for reliable state probing, function signature is:
+    //! @param probe_msg the probe message to be published
+    //! @param context the context of the probe message, such as the task name, the action name, etc.
+    //! @return 0 if success, -1 if failed
+    {
+        std::declval<const T &>().to_publish_probe(std::declval<typename T::PubProbeMsgType_t &>(), std::declval<const std::string &>())
         } -> std::same_as<int>;
 
     //! Must have method to get UUID
@@ -62,9 +74,14 @@ concept DeliveryTargetDataConcept = requires(T t)
     typename T::PubDataMsgType_t;
     requires RosMessageConcept<typename T::PubDataMsgType_t>;
 
+    //! Must have publish message type for reliable state probing
+    typename T::PubProbeMsgType_t;
+    requires RosMessageConcept<typename T::PubProbeMsgType_t>;
+
     //! Must have action data trait
     typename T::ActionDataTrait_t;
     requires ActionDataTraitConcept<typename T::ActionDataTrait_t>;
+
 
     //! Must be copyable
     requires std::copyable<T>;
@@ -108,6 +125,14 @@ concept DeliveryTargetDataConcept = requires(T t)
     //! Must have method to convert to unreliable data transmission message
     {
         std::declval<const T &>().to_publish_data(std::declval<typename T::PubDataMsgType_t &>())
+        } -> std::same_as<int>;
+
+    //! Must have method to convert to probe message
+    //! @param probe_msg the probe message to be published
+    //! @param context the context of the probe message, such as the task name, the action name, etc.
+    //! @return 0 if success, -1 if failed
+    {
+        std::declval<const T &>().to_publish_probe(std::declval<typename T::PubProbeMsgType_t &>(), std::declval<const std::string &>())
         } -> std::same_as<int>;
 
     //! Get/set task metadata
@@ -382,11 +407,23 @@ concept InitConfigConcept = requires(T t)
     requires RosPublisherConcept<typename T::SourceDataPublisher_t>;
     requires std::same_as<typename T::SourcePubDataMsgType_t, typename T::SourceDataPublisher_t::MessageType_t>;
 
+    //! Must have source probe publisher, for publishing probe messages to the source data
+    typename T::SourceProbePublisher_t;
+    typename T::SourcePubProbeMsgType_t;
+    requires RosPublisherConcept<typename T::SourceProbePublisher_t>;
+    requires std::same_as<typename T::SourcePubProbeMsgType_t, typename T::SourceProbePublisher_t::MessageType_t>;
+
     //! Must have target data publisher, for publishing data outside
     typename T::TargetDataPublisher_t;
     typename T::TargetPubDataMsgType_t;
     requires RosPublisherConcept<typename T::TargetDataPublisher_t>;
     requires std::same_as<typename T::TargetPubDataMsgType_t, typename T::TargetDataPublisher_t::MessageType_t>;
+
+    //! Must have target probe publisher, for publishing probe messages to the target data
+    typename T::TargetProbePublisher_t;
+    typename T::TargetPubProbeMsgType_t;
+    requires RosPublisherConcept<typename T::TargetProbePublisher_t>;
+    requires std::same_as<typename T::TargetPubProbeMsgType_t, typename T::TargetProbePublisher_t::MessageType_t>;
 
     //! Must have both const and non-const methods to get downstream specs
     {
@@ -422,6 +459,11 @@ concept InitConfigConcept = requires(T t)
         std::declval<const T &>().get_visualization_topic_for_source_data()
         } -> std::same_as<std::optional<std::string>>;
 
+    //! Must have method to get source probe topic
+    {
+        std::declval<const T &>().get_probe_topic_for_source_data()
+        } -> std::same_as<std::optional<std::string>>;
+
     //! Must have method to get target data publish topic
     {
         std::declval<const T &>().get_data_topic_for_target_data()
@@ -430,6 +472,11 @@ concept InitConfigConcept = requires(T t)
     //! Must have method to get target visualization topic
     {
         std::declval<const T &>().get_visualization_topic_for_target_data()
+        } -> std::same_as<std::optional<std::string>>;
+
+    //! Must have method to get target probe topic
+    {
+        std::declval<const T &>().get_probe_topic_for_target_data()
         } -> std::same_as<std::optional<std::string>>;
 };
 

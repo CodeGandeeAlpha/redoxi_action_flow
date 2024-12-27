@@ -1,7 +1,7 @@
 #pragma once
 
 #include <optional>
-#include <typeinfo>
+#include <chrono>
 #include <sensor_msgs/msg/image.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
@@ -26,6 +26,8 @@ using _SampleAction = redoxi_public_msgs::action::ProcessFrame;
 using _SampleVisMsgType = sensor_msgs::msg::Image;
 //! Sample data message type, used to test whether the concepts are working
 using _SampleDataMsgType = std_msgs::msg::String;
+//! Sample probe message type, used to test whether the concepts are working
+using _SampleProbeMsgType = std_msgs::msg::String;
 //! Sample time unit type, used to test whether the concepts are working
 using _TimeUnit = std::chrono::milliseconds;
 
@@ -38,16 +40,28 @@ using _SampleTargetVisPublisher = NoneRosPublisher<_SampleVisMsgType>;
 static_assert(RosPublisherConcept<_SampleTargetVisPublisher>,
               "_SampleTargetVisPublisher must satisfy RosPublisherConcept");
 
+using _SampleSourceProbePublisher = NoneRosPublisher<_SampleProbeMsgType>;
+static_assert(RosPublisherConcept<_SampleSourceProbePublisher>,
+              "_SampleSourceProbePublisher must satisfy RosPublisherConcept");
+
+using _SampleTargetProbePublisher = NoneRosPublisher<_SampleProbeMsgType>;
+static_assert(RosPublisherConcept<_SampleTargetProbePublisher>,
+              "_SampleTargetProbePublisher must satisfy RosPublisherConcept");
+
 //! In a rush? Just implement this class
 template <RosMessageConcept VisualizationMsgType,
-          RosMessageConcept DataMsgType>
+          RosMessageConcept DataMsgType,
+          RosMessageConcept ProbeMsgType = std_msgs::msg::String>
 class DefaultDeliverySourceData
 {
   public:
     using PubVisualizationMsgType_t = VisualizationMsgType;
     using PubDataMsgType_t = DataMsgType;
+    using PubProbeMsgType_t = ProbeMsgType;
+
     using VisualizationPublisher_t = SimpleRosPublisher<PubVisualizationMsgType_t>;
     using DataPublisher_t = SimpleRosPublisher<PubDataMsgType_t>;
+    using ProbePublisher_t = SimpleRosPublisher<PubProbeMsgType_t>;
 
     virtual ~DefaultDeliverySourceData() = default;
 
@@ -64,6 +78,23 @@ class DefaultDeliverySourceData
     {
         static_assert(RosPublisherConcept<DataPublisher_t>,
                       "DataPublisher_t must satisfy RosPublisherConcept");
+        return 0;
+    }
+
+    //! Convert to probe message for reliable state probing. If the probe message is string, default implementation is to
+    //! publish the current time, the context, and the UUID of the source data
+    //! @param msg the probe message to be published
+    //! @param context the context of the probe message, such as the task name, the action name, etc.
+    //! @return 0 if success, -1 if failed
+    virtual int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const
+    {
+        if constexpr (std::is_same_v<PubProbeMsgType_t, std_msgs::msg::String>) {
+            auto uuid = get_uuid();
+            auto current_time = std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+            msg.data = "[" + std::to_string(current_time) + "][" + context + "]: " + UUIDTrait::to_string(uuid);
+        }
+
         return 0;
     }
 
@@ -236,7 +267,8 @@ static_assert(RetryPolicyConcept<_SampleRetryPolicy>,
 template <RosActionConcept ActionType,
           ActionDataTraitConcept ActionDataTrait,
           RosMessageConcept PubVisualizationMsgType,
-          RosMessageConcept PubDataMsgType = typename ActionType::Goal>
+          RosMessageConcept PubDataMsgType = typename ActionType::Goal,
+          RosMessageConcept PubProbeMsgType = std_msgs::msg::String>
 class DefaultTargetData
 {
   public:
@@ -247,12 +279,15 @@ class DefaultTargetData
 
     using PubVisualizationMsgType_t = PubVisualizationMsgType;
     using PubDataMsgType_t = PubDataMsgType;
-
+    using PubProbeMsgType_t = PubProbeMsgType;
     //! Visualization publisher type, you can override this in derived class with "using" clause
     using VisualizationPublisher_t = SimpleRosPublisher<PubVisualizationMsgType>;
 
     //! Data publisher type, you can override this in derived class with "using" clause
     using DataPublisher_t = SimpleRosPublisher<PubDataMsgType>;
+
+    //! Probe publisher type, you can override this in derived class with "using" clause
+    using ProbePublisher_t = SimpleRosPublisher<PubProbeMsgType>;
 
     virtual ~DefaultTargetData() = default;
     DefaultTargetData(const Goal_t &goal = Goal_t())
@@ -308,6 +343,22 @@ class DefaultTargetData
     {
         if constexpr (std::is_same_v<PubDataMsgType_t, Goal_t>) {
             msg = m_goal;
+        }
+        return 0;
+    }
+
+    //! Convert to probe message for reliable state probing. If the probe message is string, default implementation is to
+    //! publish the current time, the context, and the UUID of the source data
+    //! @param msg the probe message to be published
+    //! @param context the context of the probe message, such as the task name, the action name, etc.
+    //! @return 0 if success, -1 if failed
+    virtual int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const
+    {
+        if constexpr (std::is_same_v<PubProbeMsgType_t, std_msgs::msg::String>) {
+            auto uuid = ActionDataTrait_t::get_uuid(m_goal);
+            auto current_time = std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+            msg.data = "[" + std::to_string(current_time) + "][" + context + "]: " + UUIDTrait::to_string(uuid);
         }
         return 0;
     }
@@ -896,17 +947,43 @@ static_assert(DownstreamSpecConcept<_SampleDownstreamSpec>,
 
 //! Implementation of InitConfigConcept
 template <DownstreamSpecConcept TDownstreamSpec,
-          RosPublisherConcept TSourceDataPublisher,
-          RosPublisherConcept TTargetDataPublisher>
+          DeliverySourceDataConcept TSourceData,
+          DeliveryTargetDataConcept TTargetData>
+requires requires{
+    // source data should have publishers defined
+    typename TSourceData::VisualizationPublisher_t;
+    requires RosPublisherConcept<typename TSourceData::VisualizationPublisher_t>;
+
+    typename TSourceData::DataPublisher_t;
+    requires RosPublisherConcept<typename TSourceData::DataPublisher_t>;
+
+    typename TSourceData::ProbePublisher_t;
+    requires RosPublisherConcept<typename TSourceData::ProbePublisher_t>;
+
+    // target data should have publishers defined
+    typename TTargetData::VisualizationPublisher_t;
+    requires RosPublisherConcept<typename TTargetData::VisualizationPublisher_t>;
+
+    typename TTargetData::DataPublisher_t;
+    requires RosPublisherConcept<typename TTargetData::DataPublisher_t>;
+
+    typename TTargetData::ProbePublisher_t;
+    requires RosPublisherConcept<typename TTargetData::ProbePublisher_t>;
+}
 class DefaultInitConfig
 {
   public:
     //! Type aliases
     using DownstreamSpec_t = TDownstreamSpec;
-    using SourceDataPublisher_t = TSourceDataPublisher;
-    using TargetDataPublisher_t = TTargetDataPublisher;
+    using SourceDataPublisher_t = typename TSourceData::DataPublisher_t;
+    using TargetDataPublisher_t = typename TTargetData::DataPublisher_t;
     using SourcePubDataMsgType_t = typename SourceDataPublisher_t::MessageType_t;
     using TargetPubDataMsgType_t = typename TargetDataPublisher_t::MessageType_t;
+
+    using SourceProbePublisher_t = typename TSourceData::ProbePublisher_t;
+    using TargetProbePublisher_t = typename TTargetData::ProbePublisher_t;
+    using SourcePubProbeMsgType_t = typename SourceProbePublisher_t::MessageType_t;
+    using TargetPubProbeMsgType_t = typename TargetProbePublisher_t::MessageType_t;
 
     virtual ~DefaultInitConfig() = default;
 
@@ -1012,12 +1089,38 @@ class DefaultInitConfig
         this->visualization_topic_for_target_data = topic;
     }
 
+    //! Get probe topic for source data
+    virtual std::optional<std::string> get_probe_topic_for_source_data() const
+    {
+        return this->probe_topic_for_source_data;
+    }
+
+    //! Set probe topic for source data
+    virtual void set_probe_topic_for_source_data(const std::optional<std::string> &topic)
+    {
+        this->probe_topic_for_source_data = topic;
+    }
+
+    //! Get probe topic for target data
+    virtual std::optional<std::string> get_probe_topic_for_target_data() const
+    {
+        return this->probe_topic_for_target_data;
+    }
+
+    //! Set probe topic for target data
+    virtual void set_probe_topic_for_target_data(const std::optional<std::string> &topic)
+    {
+        this->probe_topic_for_target_data = topic;
+    }
+
   protected: // no m_ prefix so that you can use json serialization easier
     std::vector<DownstreamSpec_t> downstream_specs;
     std::optional<std::string> data_topic_for_source_data;
     std::optional<std::string> data_topic_for_target_data;
     std::optional<std::string> visualization_topic_for_source_data;
     std::optional<std::string> visualization_topic_for_target_data;
+    std::optional<std::string> probe_topic_for_source_data;
+    std::optional<std::string> probe_topic_for_target_data;
 
     int num_buffer_requests{1};
     bool preserve_request_order{true};
@@ -1033,10 +1136,12 @@ class DefaultInitConfig
               JS_MEMBER(data_topic_for_source_data),
               JS_MEMBER(data_topic_for_target_data),
               JS_MEMBER(visualization_topic_for_source_data),
-              JS_MEMBER(visualization_topic_for_target_data));
+              JS_MEMBER(visualization_topic_for_target_data),
+              JS_MEMBER(probe_topic_for_source_data),
+              JS_MEMBER(probe_topic_for_target_data));
 };
 using _SampleInitConfig = DefaultInitConfig<_SampleDownstreamSpec,
-                                            _SampleSourceDataPublisher, _SampleTargetDataPublisher>;
+                                            _SampleSourceData, _SampleTargetData>;
 static_assert(InitConfigConcept<_SampleInitConfig>,
               "_SampleInitConfig must satisfy InitConfigConcept");
 
@@ -1219,6 +1324,15 @@ concept AsyncActionOutputPortSpecConcept = requires(T t)
     requires RosPublisherConcept<typename T::SourceDataPublisher_t>;
     requires std::same_as<typename T::SourceDataPublisher_t::MessageType_t, typename T::SourcePubDataMsgType_t>;
 
+    //! Source probe message type
+    typename T::SourcePubProbeMsgType_t;
+    requires RosMessageConcept<typename T::SourcePubProbeMsgType_t>;
+
+    //! Source probe publisher type
+    typename T::SourceProbePublisher_t;
+    requires RosPublisherConcept<typename T::SourceProbePublisher_t>;
+    requires std::same_as<typename T::SourceProbePublisher_t::MessageType_t, typename T::SourcePubProbeMsgType_t>;
+
     //! Target data type
     typename T::DeliveryTargetData_t;
     requires DeliveryTargetDataConcept<typename T::DeliveryTargetData_t>;
@@ -1241,6 +1355,15 @@ concept AsyncActionOutputPortSpecConcept = requires(T t)
     typename T::TargetDataPublisher_t;
     requires RosPublisherConcept<typename T::TargetDataPublisher_t>;
     requires std::same_as<typename T::TargetDataPublisher_t::MessageType_t, typename T::TargetPubDataMsgType_t>;
+
+    //! Target probe message type
+    typename T::TargetPubProbeMsgType_t;
+    requires RosMessageConcept<typename T::TargetPubProbeMsgType_t>;
+
+    //! Target probe publisher type
+    typename T::TargetProbePublisher_t;
+    requires RosPublisherConcept<typename T::TargetProbePublisher_t>;
+    requires std::same_as<typename T::TargetProbePublisher_t::MessageType_t, typename T::TargetPubProbeMsgType_t>;
 
     //! Stamp type
     typename T::DeliveryStamp_t;
@@ -1322,6 +1445,17 @@ struct _SampleAsyncActionOutputPortSpec {
     using SourcePubDataMsgType_t = typename SourceDataPublisher_t::MessageType_t;
     //! Target publish data message type
     using TargetPubDataMsgType_t = typename TargetDataPublisher_t::MessageType_t;
+
+
+    //! Source probe message type
+    using SourcePubProbeMsgType_t = _SampleProbeMsgType;
+    //! Target probe message type
+    using TargetPubProbeMsgType_t = _SampleProbeMsgType;
+
+    //! Source probe publisher type
+    using SourceProbePublisher_t = _SampleSourceProbePublisher;
+    //! Target probe publisher type
+    using TargetProbePublisher_t = _SampleTargetProbePublisher;
 
     //! Delivery policy type
     using DeliveryPolicy_t = _SampleDeliveryPolicy;
