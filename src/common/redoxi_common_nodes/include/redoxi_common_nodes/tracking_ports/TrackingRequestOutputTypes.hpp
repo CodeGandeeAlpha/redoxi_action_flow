@@ -20,37 +20,23 @@ using RetryPolicy = redoxi_works::output_port_types::DefaultRetryPolicy<TimeUnit
 // otherwise, empty image published may crash rosboard
 //! Source data type for tracking request output port
 //! It encapsulates the frame image and detections which will be sent to tracking nodes to perform tracking
-class DeliverySourceData
+class DeliverySourceData : public output_port_types::SimpleImageSourceData
 {
   public:
     using Detection_t = redoxi_public_msgs::msg::Detection;
     using FrameData_t = image_ports::types::FrameWithMetadata;
-    using PubVisualizationMsgType_t = sensor_msgs::msg::Image;
-    using PubDataMsgType_t = TrackingRequestActionType::Goal;
+    using VisualizationPublisher_t = image_ports::types::DeliverySourceData::VisualizationPublisher_t;
 
   public:
     virtual ~DeliverySourceData() = default;
 
-    // get/set uuid
-    UUIDType get_uuid() const
+    int to_publish_data(PubDataMsgType_t &msg) const override
     {
-        return this->uid;
-    }
-
-    void set_uuid(const UUIDType &uid)
-    {
-        this->uid = uid;
-    }
-
-    virtual int to_publish_data(PubDataMsgType_t &msg) const
-    {
-        msg.detections = detections;
-        frame_data.to_frame_mediator().to_frame_msg(msg.frame_bundle.primary_frame);
-        return 0;
+        return to_publish_visualization(msg);
     }
 
     // to publish message
-    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
+    int to_publish_visualization(PubVisualizationMsgType_t &msg) const override
     {
         if (frame_data.is_empty()) {
             return -1;
@@ -104,7 +90,6 @@ class DeliverySourceData
     }
 
   protected:
-    UUIDType uid;
     FrameData_t frame_data;              // the frame data
     std::vector<Detection_t> detections; // the detections
     std::any auxiliary_data;             // any auxiliary data
@@ -115,13 +100,14 @@ static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>,
 //! Delivery target data type for detection request output port
 using DeliveryTargetDataBase = output_port_types::DefaultTargetData<TrackingRequestActionType,
                                                                     TrackingRequestActionDataTrait,
-                                                                    DeliverySourceData::PubVisualizationMsgType_t>;
+                                                                    sensor_msgs::msg::Image>;
 
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
   public:
     using FrameData_t = DeliverySourceData::FrameData_t;
     using Detection_t = DeliverySourceData::Detection_t;
+    using VisualizationPublisher_t = image_ports::types::DeliveryTargetData::VisualizationPublisher_t;
 
     DeliveryTargetData()
     {
@@ -207,8 +193,8 @@ using DownstreamSpec = Downstream::DownstreamSpec_t;
 
 //! Init config type for detection request output port
 using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
-                                                        NoneRosPublisher<DeliverySourceData::PubDataMsgType_t>,
-                                                        SimpleRosPublisher<DeliveryTargetData::PubDataMsgType_t>>;
+                                                        DeliverySourceData,
+                                                        DeliveryTargetData>;
 
 //! Detection request output port spec
 struct TrackingRequestOutputPortSpec {
@@ -241,10 +227,16 @@ struct TrackingRequestOutputPortSpec {
     using SourceVisualizationPublisher_t = DownstreamSpec::SourceVisualizationPublisher_t;
 
     //! Source publish data message type
-    using SourcePubDataMsgType_t = typename DeliverySourceData::PubDataMsgType_t;
+    using SourcePubDataMsgType_t = DeliverySourceData::PubDataMsgType_t;
 
     //! Source data publisher type
-    using SourceDataPublisher_t = InitConfig::SourceDataPublisher_t;
+    using SourceDataPublisher_t = DeliverySourceData::DataPublisher_t;
+
+    //! Source data probe message type
+    using SourcePubProbeMsgType_t = DeliverySourceData::PubProbeMsgType_t;
+
+    //! Source data probe publisher type
+    using SourceProbePublisher_t = DeliverySourceData::ProbePublisher_t;
 
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
@@ -253,13 +245,19 @@ struct TrackingRequestOutputPortSpec {
     using TargetPubVisualizationMsgType_t = DeliveryTargetData::PubVisualizationMsgType_t;
 
     //! Target data publisher type
-    using TargetVisualizationPublisher_t = DownstreamSpec::TargetVisualizationPublisher_t;
+    using TargetVisualizationPublisher_t = DeliveryTargetData::VisualizationPublisher_t;
 
     //! Target publish data message type
-    using TargetPubDataMsgType_t = typename DeliveryTargetData::PubDataMsgType_t;
+    using TargetPubDataMsgType_t = DeliveryTargetData::PubDataMsgType_t;
 
     //! Target data publisher type
-    using TargetDataPublisher_t = InitConfig::TargetDataPublisher_t;
+    using TargetDataPublisher_t = DeliveryTargetData::DataPublisher_t;
+
+    //! Target data probe message type
+    using TargetPubProbeMsgType_t = DeliveryTargetData::PubProbeMsgType_t;
+
+    //! Target data probe publisher type
+    using TargetProbePublisher_t = DeliveryTargetData::ProbePublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;

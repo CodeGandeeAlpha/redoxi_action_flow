@@ -47,7 +47,7 @@ class StepIntervals:
 
 class InputCacheSize:
     Small = 1
-    Medium = 1
+    Medium = 2
     Large = 4
 
 
@@ -108,6 +108,7 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
             # visualization_topic_for_source_data="vis_msg/source_data",  # source visualization msg is image, but transmission is unreliable, may drop frames
             # data_topic_for_target_data="data_msg/target_data",  # target data msg is tracking result, transmission is reliable, can be used for data processing
             visualization_topic_for_target_data="vis_msg/target_data",  # target visualization msg is image, but transmission is unreliable, may drop frames
+            probe_topic_for_target_data="probe/target_data",
         ),
         callee_request_port_config=motTrackersDriverCfg.OutputPortConfig(
             downstream_specs=[
@@ -139,7 +140,7 @@ det_node_params = yolo.Yolo8ModelNodeConfig(
         model_configs=[
             {
                 "model_path": fn_model,
-                "device_type": "cpu",
+                "device_type": "cuda",
                 "device_index": 0,
             },
             # {
@@ -187,6 +188,7 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
                     # create_debug_pub=True,
                 ),
             ],
+            probe_topic_for_target_data="probe/target_data",
         ),
         callee_request_port_config=detDriverCfg.OutputPortConfig(
             downstream_specs=[
