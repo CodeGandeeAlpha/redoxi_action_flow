@@ -207,8 +207,8 @@ using DownstreamSpec = Downstream::DownstreamSpec_t;
 
 //! Init config type for detection request output port
 using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
-                                                        DeliverySourceData::DataPublisher_t,
-                                                        DeliveryTargetData::DataPublisher_t>;
+                                                        DeliverySourceData,
+                                                        DeliveryTargetData>;
 
 //! Detection request output port spec
 struct TrackingResponseOutputPortSpec {
@@ -242,6 +242,10 @@ struct TrackingResponseOutputPortSpec {
     using SourcePubDataMsgType_t = DeliverySourceData_t::PubDataMsgType_t;
     using SourceDataPublisher_t = DeliverySourceData_t::DataPublisher_t;
 
+    //! Source data probe message type and publisher type
+    using SourcePubProbeMsgType_t = DeliverySourceData_t::PubProbeMsgType_t;
+    using SourceProbePublisher_t = DeliverySourceData_t::ProbePublisher_t;
+
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
 
@@ -252,6 +256,10 @@ struct TrackingResponseOutputPortSpec {
     //! Target data data publisher and message type
     using TargetPubDataMsgType_t = DeliveryTargetData_t::PubDataMsgType_t;
     using TargetDataPublisher_t = DeliveryTargetData_t::DataPublisher_t;
+
+    //! Target data probe message type and publisher type
+    using TargetPubProbeMsgType_t = DeliveryTargetData_t::PubProbeMsgType_t;
+    using TargetProbePublisher_t = DeliveryTargetData_t::ProbePublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;

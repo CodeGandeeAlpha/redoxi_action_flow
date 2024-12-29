@@ -184,8 +184,8 @@ static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
 
 //! Init config type for detection output port
 using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
-                                                        DeliverySourceData::DataPublisher_t,
-                                                        DeliveryTargetData::DataPublisher_t>;
+                                                        DeliverySourceData,
+                                                        DeliveryTargetData>;
 
 //! Downstream type for detection output port
 // using Downstream = output_port_types::DefaultDownstream<DownstreamSpec>;
@@ -226,6 +226,12 @@ struct DetectionResponseOutputPortSpec {
     //! Source data publisher type
     using SourceDataPublisher_t = DeliverySourceData_t::DataPublisher_t;
 
+    //! Source data probe message type
+    using SourcePubProbeMsgType_t = DeliverySourceData_t::PubProbeMsgType_t;
+
+    //! Source data probe publisher type
+    using SourceProbePublisher_t = DeliverySourceData_t::ProbePublisher_t;
+
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
 
@@ -240,6 +246,12 @@ struct DetectionResponseOutputPortSpec {
 
     //! Target data publisher type
     using TargetDataPublisher_t = DeliveryTargetData_t::DataPublisher_t;
+
+    //! Target data probe message type
+    using TargetPubProbeMsgType_t = DeliveryTargetData_t::PubProbeMsgType_t;
+
+    //! Target data probe publisher type
+    using TargetProbePublisher_t = DeliveryTargetData_t::ProbePublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;

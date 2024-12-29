@@ -14,15 +14,18 @@ find_package(rclcpp_action REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(json_struct REQUIRED)
 find_package(rosidl_runtime_cpp REQUIRED)
+
 # uncomment the following section in order to fill in further dependencies
 # manually. find_package(<dependency> REQUIRED)
 
-set(cpp_required_to_find Boost)
+set(cpp_required_to_find Boost nlohmann_json)
 foreach(pkg ${cpp_required_to_find})
   find_package(${pkg} REQUIRED)
 endforeach()
 
-set(cpp_required_to_link Boost::boost json_struct::json_struct)
+set(cpp_required_to_link 
+    Boost::boost json_struct::json_struct 
+    nlohmann_json::nlohmann_json)
 
 set(srcfiles
     src/redoxi_common_nodes.cpp

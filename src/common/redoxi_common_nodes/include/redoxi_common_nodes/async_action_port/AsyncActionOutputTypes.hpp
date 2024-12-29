@@ -7,7 +7,9 @@
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <rosidl_runtime_cpp/traits.hpp>
 #include <json_struct/json_struct.h>
+#include <nlohmann/json.hpp>
 
+#include <redoxi_basic_cpp/logging/utils.hpp>
 #include <redoxi_common_nodes/async_action_port/output_port_concepts.hpp>
 #include <redoxi_public_msgs/action/process_frame.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
@@ -89,10 +91,11 @@ class DefaultDeliverySourceData
     virtual int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const
     {
         if constexpr (std::is_same_v<PubProbeMsgType_t, std_msgs::msg::String>) {
-            auto uuid = get_uuid();
-            auto current_time = std::chrono::duration_cast<std::chrono::microseconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count();
-            msg.data = "[" + std::to_string(current_time) + "][" + context + "]: " + UUIDTrait::to_string(uuid);
+            auto jsdata = m_probe_json;
+            jsdata["uuid"] = UUIDTrait::to_string(get_uuid());
+            jsdata["context"] = context;
+            jsdata["timestamp"] = logging::get_timestamp();
+            msg.data = jsdata.dump();
         }
 
         return 0;
@@ -112,6 +115,20 @@ class DefaultDeliverySourceData
 
   protected:
     UUIDType m_uuid{0};
+
+  protected:
+    // if you did not override to_publish_probe, you can use this to set the probe message
+    nlohmann::json &_get_probe_json()
+    {
+        return m_probe_json;
+    }
+    const nlohmann::json &_get_probe_json() const
+    {
+        return m_probe_json;
+    }
+
+  private:
+    nlohmann::json m_probe_json;
 };
 using _SampleSourceData = DefaultDeliverySourceData<_SampleVisMsgType, _SampleDataMsgType>;
 static_assert(DeliverySourceDataConcept<_SampleSourceData>,
@@ -355,10 +372,11 @@ class DefaultTargetData
     virtual int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const
     {
         if constexpr (std::is_same_v<PubProbeMsgType_t, std_msgs::msg::String>) {
-            auto uuid = ActionDataTrait_t::get_uuid(m_goal);
-            auto current_time = std::chrono::duration_cast<std::chrono::microseconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count();
-            msg.data = "[" + std::to_string(current_time) + "][" + context + "]: " + UUIDTrait::to_string(uuid);
+            auto jsdata = _get_probe_json();
+            jsdata["uuid"] = UUIDTrait::to_string(get_source_data_uuid());
+            jsdata["context"] = context;
+            jsdata["timestamp"] = logging::get_timestamp();
+            msg.data = jsdata.dump();
         }
         return 0;
     }
@@ -376,6 +394,20 @@ class DefaultTargetData
 
   protected:
     Goal_t m_goal;
+
+  protected:
+    // if you did not override to_publish_probe, you can use this to set the probe message
+    nlohmann::json &_get_probe_json()
+    {
+        return m_probe_json;
+    }
+    const nlohmann::json &_get_probe_json() const
+    {
+        return m_probe_json;
+    }
+
+  private:
+    nlohmann::json m_probe_json;
 };
 using _SampleTargetData = DefaultTargetData<_SampleAction, _SampleActionDataTrait, _SampleVisMsgType>;
 static_assert(DeliveryTargetDataConcept<_SampleTargetData>,
@@ -949,7 +981,8 @@ static_assert(DownstreamSpecConcept<_SampleDownstreamSpec>,
 template <DownstreamSpecConcept TDownstreamSpec,
           DeliverySourceDataConcept TSourceData,
           DeliveryTargetDataConcept TTargetData>
-requires requires{
+requires requires
+{
     // source data should have publishers defined
     typename TSourceData::VisualizationPublisher_t;
     requires RosPublisherConcept<typename TSourceData::VisualizationPublisher_t>;

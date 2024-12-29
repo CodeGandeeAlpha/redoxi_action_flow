@@ -460,6 +460,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
             return -1;
         }
 
+        // initialize source data publisher
         auto qos_source_data = DefaultParams::DataPublisherQoS;
         auto data_topic_for_source_data = init_config.get_data_topic_for_source_data();
         if (data_topic_for_source_data.has_value()) {
@@ -468,6 +469,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
             m_data_pub_source_data->init(inner_pub);
         }
 
+        // initialize source visualization publisher
         auto qos_source_visualization = DefaultParams::DebugPublisherQoS;
         auto visualization_topic_for_source_data = init_config.get_visualization_topic_for_source_data();
         if (visualization_topic_for_source_data.has_value()) {
@@ -476,6 +478,16 @@ class AsyncActionOutputPort : public IStartStopProtocol
             m_vis_pub_source_data->init(inner_pub);
         }
 
+        // initialize source probe publisher
+        auto qos_source_probe = DefaultParams::ProbePublisherQoS;
+        auto probe_topic_for_source_data = init_config.get_probe_topic_for_source_data();
+        if (probe_topic_for_source_data.has_value()) {
+            m_probe_pub_source_data = std::make_shared<SourceProbePublisher_t>();
+            auto inner_pub = parent_node->create_publisher<typename SourceProbePublisher_t::MessageType_t>(probe_topic_for_source_data.value(), qos_source_probe);
+            m_probe_pub_source_data->init(inner_pub);
+        }
+
+        // initialize target data publisher
         auto qos_target_data = DefaultParams::DataPublisherQoS;
         auto data_topic_for_target_data = init_config.get_data_topic_for_target_data();
         if (data_topic_for_target_data.has_value()) {
@@ -484,12 +496,22 @@ class AsyncActionOutputPort : public IStartStopProtocol
             m_data_pub_target_data->init(inner_pub);
         }
 
+        // initialize target visualization publisher
         auto qos_target_visualization = DefaultParams::DebugPublisherQoS;
         auto visualization_topic_for_target_data = init_config.get_visualization_topic_for_target_data();
         if (visualization_topic_for_target_data.has_value()) {
             m_vis_pub_target_data = std::make_shared<TargetVisualizationPublisher_t>();
             auto inner_pub = parent_node->create_publisher<typename TargetVisualizationPublisher_t::MessageType_t>(visualization_topic_for_target_data.value(), qos_target_visualization);
             m_vis_pub_target_data->init(inner_pub);
+        }
+
+        // initialize target probe publisher
+        auto qos_target_probe = DefaultParams::ProbePublisherQoS;
+        auto probe_topic_for_target_data = init_config.get_probe_topic_for_target_data();
+        if (probe_topic_for_target_data.has_value()) {
+            m_probe_pub_target_data = std::make_shared<TargetProbePublisher_t>();
+            auto inner_pub = parent_node->create_publisher<typename TargetProbePublisher_t::MessageType_t>(probe_topic_for_target_data.value(), qos_target_probe);
+            m_probe_pub_target_data->init(inner_pub);
         }
 
         return 0;
@@ -713,6 +735,23 @@ class AsyncActionOutputPort : public IStartStopProtocol
     virtual int _publish_probe_message(const SourceData_t *source_data,
                                        const TargetData_t *target_data)
     {
+        if (source_data != nullptr) {
+            auto pub = m_probe_pub_source_data;
+            if (pub != nullptr) {
+                typename SourceData_t::PubProbeMsgType_t source_pub_msg;
+                source_data->to_publish_probe(source_pub_msg, "output port sending");
+                pub->publish(source_pub_msg);
+            }
+        }
+        if (target_data != nullptr) {
+            auto pub = m_probe_pub_target_data;
+            if (pub != nullptr) {
+                typename TargetData_t::PubProbeMsgType_t target_pub_msg;
+                target_data->to_publish_probe(target_pub_msg, "output port sending");
+                pub->publish(target_pub_msg);
+            }
+        }
+        return 0;
     }
 
     virtual int _create_target_data(TargetData_t &target_data, const DeliveryRequest_t &request)
@@ -836,6 +875,14 @@ class AsyncActionOutputPort : public IStartStopProtocol
             auto ret = _publish_visualization_message(&task.get_request().get_source_data(), &target_data);
             if (ret != 0) {
                 RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Failed to publish visualization message");
+            }
+        }
+
+        // publish probe message
+        {
+            auto ret = _publish_probe_message(&task.get_request().get_source_data(), &target_data);
+            if (ret != 0) {
+                RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Failed to publish probe message");
             }
         }
 
@@ -1130,6 +1177,10 @@ class AsyncActionOutputPort : public IStartStopProtocol
     std::shared_ptr<SourceVisualizationPublisher_t> m_vis_pub_source_data;
     std::shared_ptr<TargetVisualizationPublisher_t> m_vis_pub_target_data;
 
+    // probe publishers
+    std::shared_ptr<SourceProbePublisher_t> m_probe_pub_source_data;
+    std::shared_ptr<TargetProbePublisher_t> m_probe_pub_target_data;
+
   protected:
     // callback functions
 
@@ -1193,8 +1244,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
 //! Concept to enforce a type to be convertible to AsyncActionOutputPort
 template <typename T>
-concept AsyncActionOutputPortConcept = requires(T a) {
-    { std::is_base_of_v<AsyncActionOutputPort<typename T::MasterSpec_t>, T> };
+concept AsyncActionOutputPortConcept = requires(T a)
+{
+    {std::is_base_of_v<AsyncActionOutputPort<typename T::MasterSpec_t>, T>};
 };
 
 

@@ -173,8 +173,8 @@ using DownstreamSpec = typename Downstream::DownstreamSpec_t;
 
 //! Init config type for detection request output port
 using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
-                                                        SimpleRosPublisher<typename DeliverySourceData::PubDataMsgType_t>,
-                                                        SimpleRosPublisher<typename DeliveryTargetData::PubDataMsgType_t>>;
+                                                        DeliverySourceData,
+                                                        DeliveryTargetData>;
 
 //! Detection request output port spec
 struct DetectionRequestOutputPortSpec {
@@ -212,6 +212,12 @@ struct DetectionRequestOutputPortSpec {
     //! Source data publisher type
     using SourceDataPublisher_t = typename InitConfig::SourceDataPublisher_t;
 
+    //! Source data probe message type
+    using SourcePubProbeMsgType_t = DeliverySourceData_t::PubProbeMsgType_t;
+
+    //! Source data probe publisher type
+    using SourceProbePublisher_t = DeliverySourceData_t::ProbePublisher_t;
+
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
 
@@ -226,6 +232,12 @@ struct DetectionRequestOutputPortSpec {
 
     //! Target data publisher type
     using TargetDataPublisher_t = typename InitConfig::TargetDataPublisher_t;
+
+    //! Target data probe message type
+    using TargetPubProbeMsgType_t = DeliveryTargetData_t::PubProbeMsgType_t;
+
+    //! Target data probe publisher type
+    using TargetProbePublisher_t = DeliveryTargetData_t::ProbePublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;
