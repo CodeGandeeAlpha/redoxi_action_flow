@@ -41,7 +41,7 @@ class BaseRosNodeRuntimeConfig
 {
   public:
     using TimeUnit_t = DefaultTimeUnit_t;
-    inline static constexpr TimeUnit_t DefaultStepInterval = TimeUnit_t{std::chrono::milliseconds(5)};
+    inline static constexpr TimeUnit_t DefaultStepInterval = TimeUnit_t{std::chrono::milliseconds(2)};
 
   public:
     virtual ~BaseRosNodeRuntimeConfig() = default;

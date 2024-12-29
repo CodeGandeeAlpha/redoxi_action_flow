@@ -91,10 +91,7 @@ class DefaultDeliverySourceData
     virtual int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const
     {
         if constexpr (std::is_same_v<PubProbeMsgType_t, std_msgs::msg::String>) {
-            auto jsdata = m_probe_json;
-            jsdata["uuid"] = UUIDTrait::to_string(get_uuid());
-            jsdata["context"] = context;
-            jsdata["timestamp"] = logging::get_timestamp();
+            nlohmann::json jsdata = _get_default_probe_json(context);
             msg.data = jsdata.dump();
         }
 
@@ -114,22 +111,19 @@ class DefaultDeliverySourceData
     }
 
   protected:
-    UUIDType m_uuid{0};
+    nlohmann::json _get_default_probe_json(const std::string &context) const
+    {
+        nlohmann::json jsdata;
+        jsdata["uuid"] = UUIDTrait::to_string(get_uuid());
+        jsdata["context"] = context;
+        jsdata["timestamp"] = logging::get_timestamp();
+        return jsdata;
+    }
 
   protected:
-    // if you did not override to_publish_probe, you can use this to set the probe message
-    nlohmann::json &_get_probe_json()
-    {
-        return m_probe_json;
-    }
-    const nlohmann::json &_get_probe_json() const
-    {
-        return m_probe_json;
-    }
-
-  private:
-    nlohmann::json m_probe_json;
+    UUIDType m_uuid{0};
 };
+
 using _SampleSourceData = DefaultDeliverySourceData<_SampleVisMsgType, _SampleDataMsgType>;
 static_assert(DeliverySourceDataConcept<_SampleSourceData>,
               "_SampleSourceData must satisfy DeliverySourceDataConcept");
@@ -286,7 +280,7 @@ template <RosActionConcept ActionType,
           RosMessageConcept PubVisualizationMsgType,
           RosMessageConcept PubDataMsgType = typename ActionType::Goal,
           RosMessageConcept PubProbeMsgType = std_msgs::msg::String>
-class DefaultTargetData
+class DefaultDeliveryTargetData
 {
   public:
     //! The ROS message type that this target data wraps
@@ -306,8 +300,8 @@ class DefaultTargetData
     //! Probe publisher type, you can override this in derived class with "using" clause
     using ProbePublisher_t = SimpleRosPublisher<PubProbeMsgType>;
 
-    virtual ~DefaultTargetData() = default;
-    DefaultTargetData(const Goal_t &goal = Goal_t())
+    virtual ~DefaultDeliveryTargetData() = default;
+    DefaultDeliveryTargetData(const Goal_t &goal = Goal_t())
     {
         m_goal = goal;
     }
@@ -372,10 +366,7 @@ class DefaultTargetData
     virtual int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const
     {
         if constexpr (std::is_same_v<PubProbeMsgType_t, std_msgs::msg::String>) {
-            auto jsdata = _get_probe_json();
-            jsdata["uuid"] = UUIDTrait::to_string(get_source_data_uuid());
-            jsdata["context"] = context;
-            jsdata["timestamp"] = logging::get_timestamp();
+            nlohmann::json jsdata = _get_default_probe_json(context);
             msg.data = jsdata.dump();
         }
         return 0;
@@ -393,31 +384,28 @@ class DefaultTargetData
     }
 
   protected:
-    Goal_t m_goal;
+    nlohmann::json _get_default_probe_json(const std::string &context) const
+    {
+        nlohmann::json jsdata;
+        jsdata["uuid"] = UUIDTrait::to_string(get_source_data_uuid());
+        jsdata["context"] = context;
+        jsdata["timestamp"] = logging::get_timestamp();
+        jsdata["signal_code"] = control_signal_code_to_string(get_control_signal_code());
+        return jsdata;
+    }
 
   protected:
-    // if you did not override to_publish_probe, you can use this to set the probe message
-    nlohmann::json &_get_probe_json()
-    {
-        return m_probe_json;
-    }
-    const nlohmann::json &_get_probe_json() const
-    {
-        return m_probe_json;
-    }
-
-  private:
-    nlohmann::json m_probe_json;
+    Goal_t m_goal;
 };
-using _SampleTargetData = DefaultTargetData<_SampleAction, _SampleActionDataTrait, _SampleVisMsgType>;
+using _SampleTargetData = DefaultDeliveryTargetData<_SampleAction, _SampleActionDataTrait, _SampleVisMsgType>;
 static_assert(DeliveryTargetDataConcept<_SampleTargetData>,
               "_SampleTargetData must satisfy DeliveryTargetDataConcept");
 
 //! Default implementation of target data publisher, using action goal as the message type
 //! Note that you will not be able to see this kind of message in rviz because it does not have a .msg file
 template <RosActionConcept TargetActionType>
-using DefaultTargetDataPublisher = SimpleRosPublisher<typename TargetActionType::Goal>;
-using _SampleTargetDataPublisher = DefaultTargetDataPublisher<_SampleAction>;
+using DefaultDeliveryTargetDataPublisher = SimpleRosPublisher<typename TargetActionType::Goal>;
+using _SampleTargetDataPublisher = DefaultDeliveryTargetDataPublisher<_SampleAction>;
 static_assert(RosPublisherConcept<_SampleTargetDataPublisher>,
               "_SampleTargetDataPublisher must satisfy RosPublisherConcept");
 

@@ -273,6 +273,14 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
         return 0;
     }
 
+    int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const override
+    {
+        nlohmann::json jsdata = _get_default_probe_json(context);
+        jsdata["frame_number"] = m_primary_frame.get_metadata().frame_num;
+        msg.data = jsdata.dump();
+        return 0;
+    }
+
     int to_publish_data(PubDataMsgType_t &msg) const override
     {
         return to_publish_visualization(msg);
@@ -300,9 +308,9 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
 
 //! Delivery target data type for image output port
 using DeliveryTargetDataBase =
-    output_port_types::DefaultTargetData<DeliveryActionType,
-                                         RedoxiActionDataTrait<DeliveryActionType>,
-                                         DeliverySourceData::PubVisualizationMsgType_t>;
+    output_port_types::DefaultDeliveryTargetData<DeliveryActionType,
+                                                 RedoxiActionDataTrait<DeliveryActionType>,
+                                                 DeliverySourceData::PubVisualizationMsgType_t>;
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
   public:
@@ -324,6 +332,14 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         image_utils::FrameMediator fm(&this->m_goal.frame_bundle.primary_frame);
         auto ret = fm.to_image_msg(msg);
         return ret;
+    }
+
+    int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const override
+    {
+        nlohmann::json jsdata = _get_default_probe_json(context);
+        jsdata["frame_number"] = image_utils::FrameMediator(&this->m_goal.frame_bundle.primary_frame).get_frame_number();
+        msg.data = jsdata.dump();
+        return 0;
     }
 
     // auxiliary data for easy extension without inheritance

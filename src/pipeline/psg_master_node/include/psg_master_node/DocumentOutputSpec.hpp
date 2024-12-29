@@ -453,9 +453,9 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
 
 //! Delivery target data type for image output port
 using DeliveryTargetDataBase =
-    output_port_types::DefaultTargetData<DeliveryActionType,
-                                         RedoxiActionDataTrait<DeliveryActionType>,
-                                         sensor_msgs::msg::Image>;
+    output_port_types::DefaultDeliveryTargetData<DeliveryActionType,
+                                                 RedoxiActionDataTrait<DeliveryActionType>,
+                                                 sensor_msgs::msg::Image>;
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
   public:

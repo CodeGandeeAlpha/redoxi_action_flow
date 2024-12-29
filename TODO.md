@@ -1,7 +1,8 @@
 ## Roadmap
 
 ### IMPORTANT
-- in output port, "fallback_delivery_precondition" actually controls the precondition, not the downstream.precondition
+- when using shared memory, shm data may be dropped in the middle of the pipeline (timeout dropping), nodes need to handle this (got an image but cannot read it).
+- in output port, "fallback_delivery_precondition" actually controls the precondition, not the downstream.
 
 ### core functions
 - [] support shared memory in all nodes

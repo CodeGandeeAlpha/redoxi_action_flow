@@ -98,9 +98,9 @@ static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>,
               "DeliverySourceData must satisfy DeliverySourceDataConcept");
 
 //! Delivery target data type for detection request output port
-using DeliveryTargetDataBase = output_port_types::DefaultTargetData<TrackingRequestActionType,
-                                                                    TrackingRequestActionDataTrait,
-                                                                    sensor_msgs::msg::Image>;
+using DeliveryTargetDataBase = output_port_types::DefaultDeliveryTargetData<TrackingRequestActionType,
+                                                                            TrackingRequestActionDataTrait,
+                                                                            sensor_msgs::msg::Image>;
 
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
@@ -120,12 +120,20 @@ class DeliveryTargetData : public DeliveryTargetDataBase
     {
     }
 
-    virtual int to_publish_visualization(PubVisualizationMsgType_t &msg) const
+    int to_publish_visualization(PubVisualizationMsgType_t &msg) const override
     {
         DeliverySourceData tmp;
         tmp.set_primary_frame(frame_data);
         tmp.set_detections(m_goal.detections);
         tmp.to_publish_visualization(msg);
+        return 0;
+    }
+
+    int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const override
+    {
+        nlohmann::json jsdata = _get_default_probe_json(context);
+        jsdata["frame_number"] = image_utils::FrameMediator(&m_goal.frame_bundle.primary_frame).get_frame_number();
+        msg.data = jsdata.dump();
         return 0;
     }
 

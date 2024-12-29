@@ -62,6 +62,14 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
         return to_publish_visualization(msg);
     }
 
+    int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const override
+    {
+        nlohmann::json jsdata = _get_default_probe_json(context);
+        jsdata["frame_number"] = frame_data.get_metadata().frame_num;
+        msg.data = jsdata.dump();
+        return 0;
+    }
+
     //! Get the frame image
     virtual const FrameData_t &get_primary_frame() const
     {
@@ -107,9 +115,9 @@ static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>,
               "DeliverySourceData must satisfy DeliverySourceDataConcept");
 
 //! Delivery target data type for detection request output port
-using DeliveryTargetDataBase = output_port_types::DefaultTargetData<TrackingResponseActionType,
-                                                                    TrackingResponseActionDataTrait,
-                                                                    DeliverySourceData::PubVisualizationMsgType_t>;
+using DeliveryTargetDataBase = output_port_types::DefaultDeliveryTargetData<TrackingResponseActionType,
+                                                                            TrackingResponseActionDataTrait,
+                                                                            DeliverySourceData::PubVisualizationMsgType_t>;
 
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
@@ -136,6 +144,14 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         tmp.set_track_targets(m_goal.track_targets);
         // RDX_INFO_DEV(nullptr, __func__, true, "[track_targets={}]", m_goal.track_targets.size());
         tmp.to_publish_visualization(msg);
+        return 0;
+    }
+
+    int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const override
+    {
+        nlohmann::json jsdata = _get_default_probe_json(context);
+        jsdata["frame_number"] = image_utils::FrameMediator(&this->m_goal.frame_bundle.primary_frame).get_frame_number();
+        msg.data = jsdata.dump();
         return 0;
     }
 

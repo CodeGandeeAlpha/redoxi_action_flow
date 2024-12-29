@@ -88,9 +88,9 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
 };
 
 //! Delivery target data type for detection output port
-using DeliveryTargetDataBase = output_port_types::DefaultTargetData<DetectionResponseActionType,
-                                                                    DetectionResponseActionDataTrait,
-                                                                    DeliverySourceData::PubVisualizationMsgType_t>;
+using DeliveryTargetDataBase = output_port_types::DefaultDeliveryTargetData<DetectionResponseActionType,
+                                                                            DetectionResponseActionDataTrait,
+                                                                            DeliverySourceData::PubVisualizationMsgType_t>;
 
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
@@ -114,6 +114,14 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         tmp.detections = this->m_goal.detections;
         tmp.frame_data = this->frame_data;
         return tmp.to_publish_visualization(msg);
+    }
+
+    int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const override
+    {
+        nlohmann::json jsdata = _get_default_probe_json(context);
+        jsdata["frame_number"] = m_goal.frame_bundle.primary_frame.metadata.frame_num;
+        msg.data = jsdata.dump();
+        return 0;
     }
 
     // auxiliary data for easy extension without inheritance
