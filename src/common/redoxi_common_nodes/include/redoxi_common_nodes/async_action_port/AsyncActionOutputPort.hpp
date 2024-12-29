@@ -59,6 +59,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
     using TargetDataPublisher_t = typename TSpec::TargetDataPublisher_t;
     using SourceVisualizationPublisher_t = typename TSpec::SourceVisualizationPublisher_t;
     using TargetVisualizationPublisher_t = typename TSpec::TargetVisualizationPublisher_t;
+    using SourceProbePublisher_t = typename TSpec::SourceProbePublisher_t;
+    using TargetProbePublisher_t = typename TSpec::TargetProbePublisher_t;
 
     // synchronous action sender
     using SyncActionSender_t = SyncActionSender<ActionType_t, TimeUnit_t>;
@@ -708,6 +710,11 @@ class AsyncActionOutputPort : public IStartStopProtocol
         return 0;
     }
 
+    virtual int _publish_probe_message(const SourceData_t *source_data,
+                                       const TargetData_t *target_data)
+    {
+    }
+
     virtual int _create_target_data(TargetData_t &target_data, const DeliveryRequest_t &request)
     {
         request.to_target_data(target_data);
@@ -1186,9 +1193,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
 //! Concept to enforce a type to be convertible to AsyncActionOutputPort
 template <typename T>
-concept AsyncActionOutputPortConcept = requires(T a)
-{
-    {std::is_base_of_v<AsyncActionOutputPort<typename T::MasterSpec_t>, T>};
+concept AsyncActionOutputPortConcept = requires(T a) {
+    { std::is_base_of_v<AsyncActionOutputPort<typename T::MasterSpec_t>, T> };
 };
 
 
