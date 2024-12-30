@@ -4,33 +4,37 @@
 - when using shared memory, shm data may be dropped in the middle of the pipeline (timeout dropping), nodes need to handle this (got an image but cannot read it).
 - in output port, "fallback_delivery_precondition" actually controls the precondition, not the downstream.
 
+### known bugs
+- [] probe message uuid is always 0, not initialized by source data?
+
+### performance optimization
+- [] group multiple nodes into a single process
+    - [] use ros2 lifecycle nodes to do external initialization
+- [] for nodes within a single process, transmit device memory directly (rk3588, cuda, etc.)
+- [] use boost shared memory to transfer frames
+
 ### core functions
-- [] support shared memory in all nodes
-- [] implement python action input/output port
+- [] python action input/output port
+- [] batched processing in port handlers
+
+### video source node
+- [] support filelist as input, automatic switch between files
+- [] support frame skipping
+- [] accept piped video from ffmpeg
+- [] accept rtsp stream
+- [] accept usb camera
+- [] subscribe to a topic, and convert it to action
+- [] collect and transmit IMU sensor data and camera pose data (like ios arframe)
+- [] command line controllable video source node, set file, play, pause, stop, etc.
 
 ### platform
-- [] support rk3588
+- [] Nvidia Orin
+- [x] support rk3588
 
-### nodes
-- [] general object detection node
-- [] general object tracking node
-- [] command line controllable video source node, set file, play, pause, stop, etc.
-- [] publish-to-action node, which accepts published messages and convert them into actions, driving the video pipeline
-- [] object snapshot node
-- [] head detection node
-- [] rtm pose node
-- [] tracking node
-- [] video reader by file
-- [] video reader by usb camera
-- [] multi stream video reader, like RGBD, stereo, etc.
-
-### tests
-- [] object detection node, including calling action (return by action result) and streaming action (send to downstream)
- 
-
-
-## Assumptions
-[] action messages arrive in order
+### other nodes
+- [] SPEC human pose node
+- [x] general object detection node
+- [x] general object tracking node
 
 ## Issues
 [] Out-of-order reception: if node A sends (x1,x2,x3) to node B, and we are set to deliver all messages until success, then when node B receives out of order (x3,x1,x2), node A will be deadlocked, because it fails to deliver x1 and x2 and will keep retrying. The solution is to make use of the ABORTED state of the goal handle. Node B can accepts x1 if buffer allows, but because it finds x1 is out of order, it will abort it, and node A will be aware of that through result_callback.

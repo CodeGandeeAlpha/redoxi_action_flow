@@ -16,7 +16,6 @@ int DetectionDriver::_on_process_callee_result(OutputTypes::OutputRequest_t *out
     OutputTypes::OutputSourceData_t output_source_data;
     output_source_data.detections = callee_result->detections;
     output_source_data.frame_data = callee_request.get_source_data().get_primary_frame();
-    output_source_data.uid = callee_request.get_source_data().get_uuid();
     output_request->set_source_data(output_source_data);
     return 0;
 }

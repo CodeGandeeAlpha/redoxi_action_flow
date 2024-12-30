@@ -118,6 +118,7 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
                     action_name=f"/{tracker_node_name}/{tracker_node_params.init_config.input_port_config.action_name}",
                 ),
             ],
+            probe_topic_for_source_data="callee/probe/source_data",
             probe_topic_for_target_data="callee/probe/target_data",
         ),
     ),
@@ -193,6 +194,7 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
             # visualization_topic_for_source_data="output/vis/source_data",
             # visualization_topic_for_target_data="output/vis/target_data",
             probe_topic_for_target_data="output/probe/target_data",
+            probe_topic_for_source_data="output/probe/source_data",
         ),
         callee_request_port_config=detDriverCfg.OutputPortConfig(
             downstream_specs=[
@@ -205,6 +207,7 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
             # visualization_topic_for_source_data="vis/callee/source_data",
             # visualization_topic_for_target_data="callee/vis/target_data",
             probe_topic_for_target_data="callee/probe/target_data",
+            probe_topic_for_source_data="callee/probe/source_data",
         ),
     ),
     runtime_config=detDriverCfg.DetectionDriverRuntimeConfig(
@@ -215,10 +218,10 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
 # video_source -> detection_driver
 video_src_node_name = "video_source"
 # fn_video = f"{workspace_root}/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-# fn_video = f"{workspace_root}/.bigdata/crowded_0820.coded.mp4"
+fn_video = f"{workspace_root}/.bigdata/crowded_0820.coded.mp4"
 # fn_video = f"{workspace_root}/.bigdata/crowded_0820.mp4"
 # fn_video = f"{workspace_root}/.bigdata/new-york.mp4"
-fn_video = f"{workspace_root}/data/dancetrack/dancetrack-0039.mp4"
+# fn_video = f"{workspace_root}/data/dancetrack/dancetrack-0039.mp4"
 video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
         video_url=fn_video,

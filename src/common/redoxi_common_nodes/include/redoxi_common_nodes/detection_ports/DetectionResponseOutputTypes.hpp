@@ -28,15 +28,6 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
     using FrameData_t = image_ports::types::FrameWithMetadata;
     using VisualizationPublisher_t = image_ports::types::DeliverySourceData::VisualizationPublisher_t;
 
-    DeliverySourceData()
-    {
-        static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>,
-                      "DeliverySourceData must satisfy DeliverySourceDataConcept");
-        uid = boost::uuids::random_generator()();
-    }
-
-    virtual ~DeliverySourceData() = default;
-
     int to_publish_data(PubDataMsgType_t &msg) const override
     {
         return to_publish_visualization(msg);
@@ -80,12 +71,13 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
 
     // auxiliary data for easy extension without inheritance
     std::any auxiliary_data;
-    boost::uuids::uuid uid;
     std::vector<redoxi_public_msgs::msg::Detection> detections;
 
     // the image is for publish only
     std::optional<FrameData_t> frame_data;
 };
+static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>,
+              "DeliverySourceData must satisfy DeliverySourceDataConcept");
 
 //! Delivery target data type for detection output port
 using DeliveryTargetDataBase = output_port_types::DefaultDeliveryTargetData<DetectionResponseActionType,

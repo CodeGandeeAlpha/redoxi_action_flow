@@ -6,8 +6,14 @@ Control x_control
 # same task uid means the same object
 redoxi_public_msgs/TaskMetadata x_task_metadata
 
+# 2d keypoints in image coordinate
 float32[] confidence
 geometry_msgs/Point[] keypoints_2
+
+# 3d keypoints in world coordinate or camera coordinate
+float32[] confidence_3
+geometry_msgs/Point[] keypoints_3
+
 # nx2 array representing edges between keypoints, (u1,v1,u2,v2,...)
 # u1,v1 are indices of keypoints, u2,v2 are indices of keypoints
 int64[] keypoint_edges

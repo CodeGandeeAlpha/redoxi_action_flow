@@ -210,13 +210,6 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
     using VisualizationPublisher_t = DownstreamDebugPublisher;
     using DataPublisher_t = DownstreamDebugPublisher; // also used for data publisher
 
-    DeliverySourceData()
-    {
-        static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>, "DeliverySourceData must satisfy DeliverySourceDataConcept");
-        m_uuid = boost::uuids::random_generator()();
-    }
-    virtual ~DeliverySourceData() = default;
-
     //! Get the image
     virtual const FrameData_t &get_primary_frame() const
     {
@@ -304,6 +297,8 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
     FrameWithMetadata m_primary_frame;
     std::vector<FrameWithMetadata> m_secondary_frames;
 };
+static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>,
+              "DeliverySourceData must satisfy DeliverySourceDataConcept");
 
 
 //! Delivery target data type for image output port

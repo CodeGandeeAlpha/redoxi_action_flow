@@ -50,7 +50,18 @@ using _SampleTargetProbePublisher = NoneRosPublisher<_SampleProbeMsgType>;
 static_assert(RosPublisherConcept<_SampleTargetProbePublisher>,
               "_SampleTargetProbePublisher must satisfy RosPublisherConcept");
 
-//! In a rush? Just implement this class
+/*!
+ * @brief Base class for delivery source data that provides default implementations
+ *
+ * This class provides a default implementation for delivery source data with:
+ * - Automatic UUID generation on construction
+ * - Virtual methods for converting to visualization, data and probe messages
+ * - Default probe message implementation that includes UUID, context and timestamp
+ *
+ * @tparam VisualizationMsgType ROS message type for visualization messages
+ * @tparam DataMsgType ROS message type for data messages
+ * @tparam ProbeMsgType ROS message type for probe messages, defaults to std_msgs::msg::String
+ */
 template <RosMessageConcept VisualizationMsgType,
           RosMessageConcept DataMsgType,
           RosMessageConcept ProbeMsgType = std_msgs::msg::String>
@@ -66,6 +77,10 @@ class DefaultDeliverySourceData
     using ProbePublisher_t = SimpleRosPublisher<PubProbeMsgType_t>;
 
     virtual ~DefaultDeliverySourceData() = default;
+    DefaultDeliverySourceData()
+    {
+        m_uuid = UUIDTrait::generate();
+    }
 
     //! Convert to visualization message
     virtual int to_publish_visualization(PubVisualizationMsgType_t &) const

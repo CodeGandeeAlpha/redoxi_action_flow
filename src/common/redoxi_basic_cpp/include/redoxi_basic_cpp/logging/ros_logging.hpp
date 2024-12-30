@@ -14,11 +14,11 @@
 //! importance is an integer value, the higher the value, the more important the log message is
 //! importance below the threshold will be ignored
 #ifndef REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_INFO
-#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_INFO 3
+#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_INFO 0
 #endif
 
 #ifndef REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_DEBUG
-#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_DEBUG 3
+#    define REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_DEBUG 0
 #endif
 
 #ifndef REDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_WARN

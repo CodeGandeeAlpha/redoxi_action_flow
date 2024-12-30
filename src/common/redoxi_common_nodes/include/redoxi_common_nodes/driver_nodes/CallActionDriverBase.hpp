@@ -184,6 +184,8 @@ class CallActionDriverBase : public OpenCloseNode
         out_callee_request->set_source_task_metadata(task_metadata);
         out_callee_request->set_control_signal_code(signal_code);
 
+        // TODO: request uuid?
+
         // call class member function
         auto ret_member = _on_process_input_request(out_callee_request,
                                                     out_callee_enqueue_policy,
@@ -220,11 +222,7 @@ class CallActionDriverBase : public OpenCloseNode
                                         const typename CalleeTypes::RequestOutputRequest_t &callee_request,
                                         const typename CalleeTypes::Downstream_t &downstream)
     {
-        // pass along task metadata and signal code
-        // auto task_metadata = callee_request.get_source_task_metadata();
-        // auto signal_code = callee_request.get_control_signal_code();
-        // out_downstream_request->set_source_task_metadata(task_metadata);
-        // out_downstream_request->set_control_signal_code(signal_code);
+        // pass along meta data from callee request
         out_downstream_request->copy_meta_info_from(callee_request);
 
         // call class member function

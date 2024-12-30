@@ -29,8 +29,6 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
     using DataPublisher_t = image_ports::types::DeliverySourceData::DataPublisher_t;
 
   public:
-    virtual ~DeliverySourceData() = default;
-
     // to publish message
     int to_publish_visualization(PubVisualizationMsgType_t &msg) const override
     {
