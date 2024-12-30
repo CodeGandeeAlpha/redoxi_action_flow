@@ -13,6 +13,7 @@ find_package(rcpputils REQUIRED)
 find_package(json_struct REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
 find_package(Boost REQUIRED)
 find_package(fmt REQUIRED)
 # uncomment the following section in order to fill in
@@ -41,6 +42,7 @@ ament_target_dependencies(redoxi_basic_cpp
   rcpputils
   rcutils
   rclcpp_action
+  rclcpp_lifecycle
 )
 
 install(
@@ -74,6 +76,7 @@ ament_export_dependencies(
   rcutils
   Boost
   rclcpp_action
+  rclcpp_lifecycle
   fmt
 )
 

@@ -6,6 +6,7 @@
 #include <atomic>
 
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp_lifecycle/lifecycle_node.hpp>
 #include <rcpputils/asserts.hpp>
 #include <rcutils/logging_macros.h>
 #include <fmt/format.h>
@@ -187,6 +188,8 @@ concept NodeOrLoggerConcept = requires(T t)
     requires std::is_same_v<std::remove_cvref_t<T>, rclcpp::Logger> ||
         std::is_convertible_v < std::remove_cvref_t<T>,
     const rclcpp::Node * > ||
+        std::is_convertible_v<std::remove_cvref_t<T>,
+                              const rclcpp_lifecycle::LifecycleNode *> ||
         std::is_null_pointer_v<std::remove_cvref_t<T>>;
 };
 

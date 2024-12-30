@@ -29,6 +29,8 @@ builtin_interfaces::msg::Time ros2_time_msg_from_sec(double sec)
     return time_msg;
 }
 
+//! declare some default parameters for the node, some are looked up by json string
+//! return 0 if success, otherwise return error code
 int declare_default_parameters_for_node(rclcpp::Node *node)
 {
     //! Declare and get the param_as_json_string parameter
@@ -78,4 +80,57 @@ int declare_default_parameters_for_node(rclcpp::Node *node)
 
     return 0;
 }
+
+//! declare some default parameters for the node, some are looked up by json string
+//! return 0 if success, otherwise return error code
+int declare_default_parameters_for_node(rclcpp_lifecycle::LifecycleNode *node)
+{
+    //! Declare and get the param_as_json_string parameter
+    node->declare_parameter(RosParams::ParamAsJsonString::MainKey, "");
+    std::string param_as_json_string = node->get_parameter(RosParams::ParamAsJsonString::MainKey).as_string();
+
+    RDX_INFO_DEV(node, __func__, false, "param_as_json_string: {}", param_as_json_string);
+
+    //! Parse the JSON string
+    nlohmann::json json_params;
+    try {
+        if (!param_as_json_string.empty()) {
+            RDX_INFO_DEV(node, __func__, false, "json parameter string is not empty, parsing: {}", param_as_json_string);
+            json_params = nlohmann::json::parse(param_as_json_string);
+        }
+    } catch (const nlohmann::json::parse_error &e) {
+        RDX_INFO_DEV(node, __func__, false, "[{}] Failed to parse param_as_json_string: {}", node->get_name(), e.what());
+        return -1;
+    }
+
+    if (json_params.empty()) {
+        RDX_INFO_DEV(node, __func__, false, "[{}] No json parameters to parse, exiting", node->get_name());
+        return 0;
+    }
+
+    // get the declare_params
+    {
+        auto pkey = RosParams::ParamAsJsonString::DeclareParams;
+        if (json_params.contains(pkey) && json_params[pkey].is_object()) {
+            for (const auto &[param_name, param_value] : json_params[pkey].items()) {
+                if (param_value.is_string()) {
+                    node->declare_parameter(param_name, param_value.get<std::string>());
+                } else if (param_value.is_number_integer()) {
+                    node->declare_parameter(param_name, param_value.get<int64_t>());
+                } else if (param_value.is_number_float()) {
+                    node->declare_parameter(param_name, param_value.get<double>());
+                } else if (param_value.is_boolean()) {
+                    node->declare_parameter(param_name, param_value.get<bool>());
+                } else {
+                    RCLCPP_WARN(node->get_logger(), "Unsupported parameter type for %s", param_name.c_str());
+                }
+            }
+        } else {
+            RCLCPP_WARN(node->get_logger(), "No parameters to declare or invalid format in %s", pkey.c_str());
+        }
+    }
+
+    return 0;
+}
+
 } // namespace redoxi_works

@@ -75,11 +75,6 @@ std::shared_future<int> OpenCloseNode::_async_start()
 
 int OpenCloseNode::open()
 {
-    //! If already in OPENED state, just return
-    if (get_status() == NodeStatusCode::OPENED) {
-        RDX_INFO_DEV(this, __func__, true, "{}", "Node already in OPENED state, skipping");
-        return 0;
-    }
     //! Check if node is in CLOSED state
     if (get_status() != NodeStatusCode::CLOSED) {
         RDX_RAISE_ERROR("[f={}] Cannot open node when not in CLOSED state", __func__);
@@ -92,7 +87,7 @@ int OpenCloseNode::open()
         RDX_RAISE_ERROR("[f={}] Failed to open node", __func__);
     }
 
-    set_status(NodeStatusCode::OPENED);
+    set_status(NodeStatusCode::STOPPED);
     return _on_opened();
 }
 
@@ -104,9 +99,9 @@ int OpenCloseNode::close()
         return 0;
     }
 
-    //! Check if node is in OPENED or STOPPED state
-    if (get_status() != NodeStatusCode::OPENED && get_status() != NodeStatusCode::STOPPED) {
-        RDX_RAISE_ERROR("[f={}] Cannot close node when not in OPENED or STOPPED state", __func__);
+    //! Check if node is in STOPPED state
+    if (get_status() != NodeStatusCode::STOPPED) {
+        RDX_RAISE_ERROR("[f={}] Cannot close node when not in STOPPED state", __func__);
     }
 
     //! Call implementation
@@ -126,9 +121,9 @@ int OpenCloseNode::start()
         RDX_INFO_DEV(this, __func__, true, "{}", "Node already in STARTED state, skipping");
         return 0;
     }
-    //! Check if node is in OPENED state
-    if (get_status() != NodeStatusCode::OPENED) {
-        RDX_RAISE_ERROR("[f={}] Cannot start node when not in OPENED state", __func__);
+    //! Check if node is in STOPPED state
+    if (get_status() != NodeStatusCode::STOPPED) {
+        RDX_RAISE_ERROR("[f={}] Cannot start node when not in STOPPED state", __func__);
     }
 
     //! Call implementation

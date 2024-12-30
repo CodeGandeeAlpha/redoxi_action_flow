@@ -19,6 +19,8 @@ find_package(TBB REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rcpputils REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
+find_package(lifecycle_msgs REQUIRED)
 find_package(redoxi_public_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(json_struct REQUIRED)
@@ -55,7 +57,9 @@ ament_target_dependencies(
   rclcpp_action
   cv_bridge
   redoxi_basic_cpp
-  redoxi_shared_memory)
+  redoxi_shared_memory
+  rclcpp_lifecycle
+  lifecycle_msgs)
 
 # Causes the visibility macros to use dllexport rather than dllimport, which is
 # appropriate when building the dll but not consuming it.
@@ -98,6 +102,8 @@ ament_export_dependencies(
   OpenCV
   json_struct
   redoxi_basic_cpp
-  redoxi_shared_memory)
+  redoxi_shared_memory
+  rclcpp_lifecycle
+  lifecycle_msgs)
 
 ament_package()

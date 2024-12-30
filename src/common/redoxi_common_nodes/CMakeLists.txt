@@ -14,7 +14,8 @@ find_package(rclcpp_action REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(json_struct REQUIRED)
 find_package(rosidl_runtime_cpp REQUIRED)
-
+find_package(rclcpp_lifecycle REQUIRED)
+find_package(lifecycle_msgs REQUIRED)
 # uncomment the following section in order to fill in further dependencies
 # manually. find_package(<dependency> REQUIRED)
 
@@ -34,6 +35,9 @@ set(srcfiles
     src/base_nodes/v1/BaseRosNode.cpp
     src/base_nodes/v1/StartStopNode.cpp
     src/base_nodes/v1/OpenCloseNode.cpp
+    src/base_nodes/v2/BaseRosNode.cpp
+    src/base_nodes/v2/StartStopNode.cpp
+    src/base_nodes/v2/OpenCloseNode.cpp
     src/driver_nodes/DetectionDriver.cpp)
 
 add_library(redoxi_common_nodes ${srcfiles})
@@ -59,7 +63,9 @@ ament_target_dependencies(
   rclcpp_action
   redoxi_common_cpp
   cv_bridge
-  rosidl_runtime_cpp)
+  rosidl_runtime_cpp
+  rclcpp_lifecycle
+  lifecycle_msgs)
 
 install(DIRECTORY include/ DESTINATION include)
 install(
@@ -88,6 +94,8 @@ ament_export_dependencies(
   cv_bridge
   json_struct
   rosidl_runtime_cpp
+  rclcpp_lifecycle
+  lifecycle_msgs
   ${cpp_required_to_find})
 
 ament_export_include_directories(include)
