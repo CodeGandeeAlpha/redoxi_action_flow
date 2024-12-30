@@ -1,7 +1,7 @@
-#include <redoxi_common_nodes/base_nodes/OpenCloseNode.hpp>
+#include <redoxi_common_nodes/base_nodes/v1/OpenCloseNode.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 
-namespace redoxi_works::common_nodes
+namespace redoxi_works::common_nodes::v1
 {
 OpenCloseNode::OpenCloseNode(const std::string &name, const rclcpp::NodeOptions &options)
     : BaseRosNode(name, options)
@@ -172,4 +172,4 @@ int OpenCloseNode::stop()
     set_status(NodeStatusCode::STOPPED);
     return _on_stopped();
 }
-} // namespace redoxi_works::common_nodes
+} // namespace redoxi_works::common_nodes::v1
