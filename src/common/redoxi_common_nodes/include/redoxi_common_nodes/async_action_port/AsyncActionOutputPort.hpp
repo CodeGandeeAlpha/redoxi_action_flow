@@ -235,7 +235,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         // create data publishers
         {
-            auto ret = _create_data_publishers(*init_config, m_parent_node);
+            auto ret = 0;
+            if (m_parent_node) {
+                ret = _create_data_publishers(*init_config, m_parent_node);
+            } else {
+                ret = _create_data_publishers(*init_config, m_parent_lifecycle_node);
+            }
             if (ret != 0) {
                 RDX_RAISE_ERROR("[{}] failed to create data publishers", __func__);
             }
@@ -441,7 +446,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
         for (auto &it : m_init_config->get_downstream_specs()) {
             Downstream_t ds;
             RDX_INFO_DEV(m_node_logger, __func__, PRINT_THREAD_ID, "Connecting to downstream with action name: {}", it.get_action_name());
-            auto ret = ds.init_by_spec(it, m_parent_node);
+            int ret = 0;
+            if (m_parent_node) {
+                ret = ds.init_by_spec(it, m_parent_node);
+            } else {
+                ret = ds.init_by_spec(it, m_parent_lifecycle_node);
+            }
             if (ret != 0) {
                 RDX_RAISE_ERROR("[{}] failed to initialize downstream", __func__);
             }
@@ -459,7 +469,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
     //! Create data publishers
     //! @return 0 if success, otherwise return error code
-    virtual int _create_data_publishers(const InitConfig_t &init_config, rclcpp::Node *parent_node)
+    template <RosNodeConcept NodeType>
+    int _create_data_publishers(const InitConfig_t &init_config, NodeType *parent_node)
     {
         if (!parent_node) {
             return -1;
@@ -470,7 +481,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         auto data_topic_for_source_data = init_config.get_data_topic_for_source_data();
         if (data_topic_for_source_data.has_value()) {
             m_data_pub_source_data = std::make_shared<SourceDataPublisher_t>();
-            auto inner_pub = parent_node->create_publisher<typename SourceDataPublisher_t::MessageType_t>(data_topic_for_source_data.value(), qos_source_data);
+            auto inner_pub = parent_node->template create_publisher<typename SourceDataPublisher_t::MessageType_t>(data_topic_for_source_data.value(), qos_source_data);
             m_data_pub_source_data->init(inner_pub);
         }
 
@@ -479,7 +490,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         auto visualization_topic_for_source_data = init_config.get_visualization_topic_for_source_data();
         if (visualization_topic_for_source_data.has_value()) {
             m_vis_pub_source_data = std::make_shared<SourceVisualizationPublisher_t>();
-            auto inner_pub = parent_node->create_publisher<typename SourceVisualizationPublisher_t::MessageType_t>(visualization_topic_for_source_data.value(), qos_source_visualization);
+            auto inner_pub = parent_node->template create_publisher<typename SourceVisualizationPublisher_t::MessageType_t>(visualization_topic_for_source_data.value(), qos_source_visualization);
             m_vis_pub_source_data->init(inner_pub);
         }
 
@@ -488,7 +499,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         auto probe_topic_for_source_data = init_config.get_probe_topic_for_source_data();
         if (probe_topic_for_source_data.has_value()) {
             m_probe_pub_source_data = std::make_shared<SourceProbePublisher_t>();
-            auto inner_pub = parent_node->create_publisher<typename SourceProbePublisher_t::MessageType_t>(probe_topic_for_source_data.value(), qos_source_probe);
+            auto inner_pub = parent_node->template create_publisher<typename SourceProbePublisher_t::MessageType_t>(probe_topic_for_source_data.value(), qos_source_probe);
             m_probe_pub_source_data->init(inner_pub);
         }
 
@@ -497,7 +508,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         auto data_topic_for_target_data = init_config.get_data_topic_for_target_data();
         if (data_topic_for_target_data.has_value()) {
             m_data_pub_target_data = std::make_shared<TargetDataPublisher_t>();
-            auto inner_pub = parent_node->create_publisher<typename TargetDataPublisher_t::MessageType_t>(data_topic_for_target_data.value(), qos_target_data);
+            auto inner_pub = parent_node->template create_publisher<typename TargetDataPublisher_t::MessageType_t>(data_topic_for_target_data.value(), qos_target_data);
             m_data_pub_target_data->init(inner_pub);
         }
 
@@ -506,7 +517,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         auto visualization_topic_for_target_data = init_config.get_visualization_topic_for_target_data();
         if (visualization_topic_for_target_data.has_value()) {
             m_vis_pub_target_data = std::make_shared<TargetVisualizationPublisher_t>();
-            auto inner_pub = parent_node->create_publisher<typename TargetVisualizationPublisher_t::MessageType_t>(visualization_topic_for_target_data.value(), qos_target_visualization);
+            auto inner_pub = parent_node->template create_publisher<typename TargetVisualizationPublisher_t::MessageType_t>(visualization_topic_for_target_data.value(), qos_target_visualization);
             m_vis_pub_target_data->init(inner_pub);
         }
 
@@ -515,7 +526,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         auto probe_topic_for_target_data = init_config.get_probe_topic_for_target_data();
         if (probe_topic_for_target_data.has_value()) {
             m_probe_pub_target_data = std::make_shared<TargetProbePublisher_t>();
-            auto inner_pub = parent_node->create_publisher<typename TargetProbePublisher_t::MessageType_t>(probe_topic_for_target_data.value(), qos_target_probe);
+            auto inner_pub = parent_node->template create_publisher<typename TargetProbePublisher_t::MessageType_t>(probe_topic_for_target_data.value(), qos_target_probe);
             m_probe_pub_target_data->init(inner_pub);
         }
 

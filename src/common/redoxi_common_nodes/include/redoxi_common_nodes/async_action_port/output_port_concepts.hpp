@@ -544,11 +544,16 @@ concept DownstreamConcept = requires(T t)
         std::declval<T &>().set_action_client(std::declval<typename T::ActionClient_t::SharedPtr>())
         } -> std::same_as<void>;
 
-    //! Must have initialization method
+    //! Must have initialization method, for normal node and lifecycle node
     {
         std::declval<T &>().init_by_spec(
             std::declval<const typename T::DownstreamSpec_t &>(),
             std::declval<rclcpp::Node *>())
+        } -> std::same_as<int>;
+    {
+        std::declval<T &>().init_by_spec(
+            std::declval<const typename T::DownstreamSpec_t &>(),
+            std::declval<rclcpp_lifecycle::LifecycleNode *>())
         } -> std::same_as<int>;
 
     //! Get source data debug publishers

@@ -61,11 +61,6 @@ option(BUILD_TEST_VIDEO_SINK "Build test_video_sink target" OFF)
 option(BUILD_TEST_SIMPLE_ACTION_GENERATOR
        "Build test_simple_action_generator target" OFF)
 option(BUILD_TEST_UUID_CONVERSION "Build test_uuid_conversion target" OFF)
-option(BUILD_TEST_V2_JSON_EXAMPLES "Build test_v2_json_examples target" OFF)
-option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2
-       "Build test_simple_action_generator_v2 target" OFF)
-option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target"
-       OFF)
 option(BUILD_ONNX_HELLO_WORLD "Build onnx_hello_world target" OFF)
 option(BUILD_ONNX_INFERENCE_API "Build onnx_inference_api target" OFF)
 option(BUILD_ONNX_YOLO8POSE "Build onnx_yolo8pose target" OFF)
@@ -197,24 +192,12 @@ if(BUILD_TEST_V6D_PLUGIN)
   configure_target(test_v6d_plugin)
 endif()
 
-if(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE)
-  configure_target(v2_random_video_source)
-endif()
-
 if(BUILD_FRAME_RELAY_NODE)
   configure_target(frame_relay_node)
 endif()
 
 if(BUILD_TEST_UUID_CONVERSION)
   configure_target(test_uuid_conversion)
-endif()
-
-if(BUILD_TEST_V2_JSON_EXAMPLES)
-  configure_target(v2_json_examples)
-endif()
-
-if(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2)
-  configure_target(v2_simple_action)
 endif()
 
 if(BUILD_TEST_SIMPLE_ACTION_GENERATOR)

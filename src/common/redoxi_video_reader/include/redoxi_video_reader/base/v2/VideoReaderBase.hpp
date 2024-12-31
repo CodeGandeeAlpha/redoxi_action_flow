@@ -85,8 +85,8 @@ class RedoxiVideoReaderBase : public common_nodes::v2::OpenCloseNode
     int _stop() override;
     int _close() override;
     void _step() override;
-    int _update_init_config(std::shared_ptr<BaseInitConfig_t> config) override;
-    int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config) override;
+    int _update_init_config(std::shared_ptr<RootInitConfig_t> config) override;
+    int _update_runtime_config(std::shared_ptr<RootRuntimeConfig_t> config) override;
 
   protected: // video reader specific
     /**

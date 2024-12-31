@@ -37,37 +37,17 @@ std::shared_future<void> BaseRosNode::_async_stop_step_thread()
     return future;
 }
 
-int BaseRosNode::set_runtime_config(std::shared_ptr<BaseRosNodeRuntimeConfig> runtime_config)
-{
-    // state must be inactive or unconfigured
-    {
-        auto state = get_current_state();
-        if (state.id() == lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE ||
-            state.id() == lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED) {
-            RDX_RAISE_ERROR("[f={}] Node cannot be updated in state {}", __func__, state.id());
-        }
-    }
-
-    // update runtime config
-    {
-        auto ret = _update_runtime_config(runtime_config);
-        if (ret != 0) {
-            RDX_INFO_DEV(this, __func__, false, "{}", "failed to update runtime config");
-            return ret;
-        }
-        m_runtime_config = runtime_config;
-    }
-
-    return 0;
-}
-
 int BaseRosNode::init()
 {
-    if (m_is_already_init) {
-        RDX_RAISE_ERROR("[f={}] Node cannot be initialized more than once", __func__);
-        return -1;
-    }
+    auto init_config = _load_init_config();
+    auto runtime_config = _load_runtime_config();
 
+    return init(init_config, runtime_config);
+}
+
+int BaseRosNode::init(std::shared_ptr<RootInitConfig_t> init_config,
+                      std::shared_ptr<RootRuntimeConfig_t> runtime_config)
+{
     // state must be unconfigured
     {
         auto state = get_current_state();
@@ -76,9 +56,13 @@ int BaseRosNode::init()
         }
     }
 
-    // update init config
+    // init() can only be called once
+    if (m_is_already_init) {
+        RDX_RAISE_ERROR("[f={}] Node cannot be initialized more than once", __func__);
+        return -1;
+    }
+
     {
-        auto init_config = _load_init_config();
         auto ret = _update_init_config(init_config);
         if (ret != 0) {
             RDX_RAISE_ERROR("[f={}] Failed to update init config", __func__);
@@ -86,9 +70,7 @@ int BaseRosNode::init()
         m_init_config = init_config;
     }
 
-    // update runtime config
     {
-        auto runtime_config = _load_runtime_config();
         auto ret = _update_runtime_config(runtime_config);
         if (ret != 0) {
             RDX_RAISE_ERROR("[f={}] Failed to update runtime config", __func__);
@@ -96,8 +78,8 @@ int BaseRosNode::init()
         m_runtime_config = runtime_config;
     }
 
+    // flag as initialized
     m_is_already_init = true;
-
     return 0;
 }
 

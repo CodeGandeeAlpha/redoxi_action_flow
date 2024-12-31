@@ -114,7 +114,7 @@ int64_t RedoxiVideoReaderBase::get_last_read_frame_number() const
     return m_last_read_frame_number;
 }
 
-int RedoxiVideoReaderBase::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
+int RedoxiVideoReaderBase::_update_init_config(std::shared_ptr<RootInitConfig_t> config)
 {
     auto init_config = std::dynamic_pointer_cast<InitConfig_t>(config);
 
@@ -166,7 +166,7 @@ int RedoxiVideoReaderBase::_on_delivery_task_finish(TargetData_t &target_data,
     return 0;
 }
 
-int RedoxiVideoReaderBase::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config)
+int RedoxiVideoReaderBase::_update_runtime_config(std::shared_ptr<RootRuntimeConfig_t> config)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(config);
 

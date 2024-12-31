@@ -37,24 +37,11 @@ std::shared_future<void> BaseRosNode::_async_stop_step_thread()
     return future;
 }
 
-int BaseRosNode::set_runtime_config(std::shared_ptr<BaseRosNodeRuntimeConfig> runtime_config)
+int BaseRosNode::init()
 {
-    //! Check state is CLOSED or STOPPED
-    if (m_status != NodeStatusCode::CLOSED && m_status != NodeStatusCode::STOPPED) {
-        RDX_RAISE_ERROR("[f={}] Node cannot be updated in state {}", __func__, m_status);
-    }
-
-    // update runtime config
-    {
-        auto ret = _update_runtime_config(runtime_config);
-        if (ret != 0) {
-            RDX_INFO_DEV(this, __func__, false, "{}", "failed to update runtime config");
-            return ret;
-        }
-        m_runtime_config = runtime_config;
-    }
-
-    return 0;
+    auto init_config = _load_init_config();
+    auto runtime_config = _load_runtime_config();
+    return init(init_config, runtime_config);
 }
 
 int BaseRosNode::init(std::shared_ptr<BaseRosNodeInitConfig> init_config,

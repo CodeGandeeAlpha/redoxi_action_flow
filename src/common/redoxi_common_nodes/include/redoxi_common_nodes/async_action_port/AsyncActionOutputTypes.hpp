@@ -1267,12 +1267,42 @@ class DefaultDownstream
     //! Initialize downstream from spec
     virtual int init_by_spec(const DownstreamSpec_t &spec, rclcpp::Node *node)
     {
+        return _init_by_spec(spec, node);
+    }
+
+    virtual int init_by_spec(const DownstreamSpec_t &spec, rclcpp_lifecycle::LifecycleNode *node)
+    {
+        return _init_by_spec(spec, node);
+    }
+
+  protected:
+    DownstreamSpec_t m_downstream_spec;
+    typename ActionClient_t::SharedPtr m_action_client;
+
+    std::shared_ptr<SourceVisualizationPublisher_t> m_debug_pub_source_data_sending;
+    std::shared_ptr<SourceVisualizationPublisher_t> m_debug_pub_source_data_succeeded;
+    std::shared_ptr<SourceVisualizationPublisher_t> m_debug_pub_source_data_failed;
+    std::shared_ptr<TargetVisualizationPublisher_t> m_debug_pub_target_data_sending;
+    std::shared_ptr<TargetVisualizationPublisher_t> m_debug_pub_target_data_succeeded;
+    std::shared_ptr<TargetVisualizationPublisher_t> m_debug_pub_target_data_failed;
+
+    rclcpp::Node *m_node{nullptr};
+    rclcpp_lifecycle::LifecycleNode *m_lifecycle_node{nullptr};
+
+  private:
+    template <RosNodeConcept NodeType>
+    int _init_by_spec(const DownstreamSpec_t &spec, NodeType *node)
+    {
         if (node == nullptr) {
             RDX_RAISE_ERROR("[{}()]: Node is nullptr when initializing downstream with spec '{}'", __func__, spec.get_name());
         }
 
         m_downstream_spec = spec;
-        m_node = node;
+        if constexpr (std::is_base_of_v<rclcpp_lifecycle::LifecycleNode, NodeType>) {
+            m_lifecycle_node = node;
+        } else {
+            m_node = node;
+        }
 
         // create action client
         RDX_INFO_DEV(node, __func__, "Creating action client for action '{}'", spec.get_action_name());
@@ -1290,18 +1320,6 @@ class DefaultDownstream
 
         return 0;
     }
-
-  protected:
-    DownstreamSpec_t m_downstream_spec;
-    typename ActionClient_t::SharedPtr m_action_client;
-
-    std::shared_ptr<SourceVisualizationPublisher_t> m_debug_pub_source_data_sending;
-    std::shared_ptr<SourceVisualizationPublisher_t> m_debug_pub_source_data_succeeded;
-    std::shared_ptr<SourceVisualizationPublisher_t> m_debug_pub_source_data_failed;
-    std::shared_ptr<TargetVisualizationPublisher_t> m_debug_pub_target_data_sending;
-    std::shared_ptr<TargetVisualizationPublisher_t> m_debug_pub_target_data_succeeded;
-    std::shared_ptr<TargetVisualizationPublisher_t> m_debug_pub_target_data_failed;
-    rclcpp::Node *m_node{nullptr};
 };
 using _SampleDownstream = DefaultDownstream<_SampleDownstreamSpec>;
 static_assert(DownstreamConcept<_SampleDownstream>,

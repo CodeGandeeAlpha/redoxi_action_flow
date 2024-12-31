@@ -72,20 +72,33 @@ class BaseRosNode : public rclcpp::Node
     using InitConfig_t = BaseRosNodeInitConfig;
     using RuntimeConfig_t = BaseRosNodeRuntimeConfig;
 
+    // do not change these names in subclass, otherwise you cannot find out the type of the bottom level config
+    using RootInitConfig_t = BaseRosNodeInitConfig;
+    using RootRuntimeConfig_t = BaseRosNodeRuntimeConfig;
+
   public:
     BaseRosNode(const std::string &node_name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
     virtual ~BaseRosNode() noexcept;
 
   public:
-    //! Initialize the node, default state transition: BEFORE_INIT -> CLOSED
-    //! @return 0 if success, otherwise error code.
-    //! @note This function is intended to be called only once.
-    int init(std::shared_ptr<BaseRosNodeInitConfig> init_config,
-             std::shared_ptr<BaseRosNodeRuntimeConfig> runtime_config);
+    /**
+     * @brief Initialize the node with automatically loaded config (using _load_init_config() and _load_runtime_config())
+     * @details Must be called once in UNCONFIGURED state
+     * @return 0 if success, otherwise error code
+     * @note This function is intended to be called only once
+     */
+    int init();
 
-    //! Update runtime config, only applicable when the node is CLOSED or STOPPED
-    //! @return 0 if success, otherwise error code.
-    int set_runtime_config(std::shared_ptr<BaseRosNodeRuntimeConfig> runtime_config);
+    /**
+     * @brief Initialize the node with external config
+     * @details Must be called once in UNCONFIGURED state
+     * @param init_config Initial configuration
+     * @param runtime_config Runtime configuration
+     * @return 0 if success, otherwise error code
+     * @note This function is intended to be called only once
+     */
+    int init(std::shared_ptr<RootInitConfig_t> init_config,
+             std::shared_ptr<RootRuntimeConfig_t> runtime_config);
 
     //! Get json parameters parsed from ros parameters
     const nlohmann::json &get_json_parameters() const
@@ -106,18 +119,44 @@ class BaseRosNode : public rclcpp::Node
     }
 
     //! Get init config
-    std::shared_ptr<BaseRosNodeInitConfig> get_init_config() const
+    std::shared_ptr<const RootInitConfig_t> get_init_config() const
     {
         return m_init_config;
     }
 
     //! Get runtime config
-    std::shared_ptr<BaseRosNodeRuntimeConfig> get_runtime_config() const
+    std::shared_ptr<const RootRuntimeConfig_t> get_runtime_config() const
+    {
+        return m_runtime_config;
+    }
+
+    //! Get init config
+    std::shared_ptr<RootInitConfig_t> get_init_config()
+    {
+        return m_init_config;
+    }
+
+    //! Get runtime config
+    std::shared_ptr<RootRuntimeConfig_t> get_runtime_config()
     {
         return m_runtime_config;
     }
 
   protected:
+    //! Create init config, intended to be overridden by subclass
+    virtual std::shared_ptr<RootInitConfig_t> _load_init_config() const
+    {
+        // to be compatible with v2, will be called by init() without given configs
+        throw std::runtime_error("Not implemented");
+    }
+
+    //! Create runtime config, intended to be overridden by subclass
+    virtual std::shared_ptr<RootRuntimeConfig_t> _load_runtime_config() const
+    {
+        // to be compatible with v2, will be called by init() without given configs
+        throw std::runtime_error("Not implemented");
+    }
+
     //! Step function to be called periodically, intended to be overridden by subclass
     virtual void _step() = 0;
 
@@ -135,11 +174,11 @@ class BaseRosNode : public rclcpp::Node
 
     //! Update init config, intended to be overridden by subclass. After this, m_init_config will be updated.
     //! @return 0 if success, otherwise error code
-    virtual int _update_init_config(std::shared_ptr<BaseRosNodeInitConfig> init_config) = 0;
+    virtual int _update_init_config(std::shared_ptr<RootInitConfig_t> init_config) = 0;
 
     //! Update runtime config, intended to be overridden by subclass. After this, m_runtime_config will be updated.
     //! @return 0 if success, otherwise error code.
-    virtual int _update_runtime_config(std::shared_ptr<BaseRosNodeRuntimeConfig> runtime_config) = 0;
+    virtual int _update_runtime_config(std::shared_ptr<RootRuntimeConfig_t> runtime_config) = 0;
 
     //! State transition after init, intended to be overridden by subclass.
     //! @return Node status after init.
@@ -167,10 +206,10 @@ class BaseRosNode : public rclcpp::Node
     std::atomic<bool> m_step_running{false};
 
     //! Init config
-    std::shared_ptr<BaseRosNodeInitConfig> m_init_config;
+    std::shared_ptr<RootInitConfig_t> m_init_config;
 
     //! Runtime config
-    std::shared_ptr<BaseRosNodeRuntimeConfig> m_runtime_config;
+    std::shared_ptr<RootRuntimeConfig_t> m_runtime_config;
 
     //! Task group for executing async tasks not in the calling thread
     tbb::task_group m_async_task_group;

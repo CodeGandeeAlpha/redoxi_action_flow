@@ -434,7 +434,19 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
     using DownstreamBase_t = output_port_types::DefaultDownstream<DownstreamSpecWithImagePub<ActionType, DeliveryPolicyType>>;
     using typename DownstreamBase_t::DownstreamSpec_t;
 
-    virtual int init_by_spec(const DownstreamSpec_t &spec, rclcpp::Node *node)
+    int init_by_spec(const DownstreamSpec_t &spec, rclcpp::Node *node) override
+    {
+        return _init_by_spec(spec, node);
+    }
+
+    int init_by_spec(const DownstreamSpec_t &spec, rclcpp_lifecycle::LifecycleNode *node) override
+    {
+        return _init_by_spec(spec, node);
+    }
+
+  private:
+    template <RosNodeConcept NodeType>
+    int _init_by_spec(const DownstreamSpec_t &spec, NodeType *node)
     {
         auto ret = DownstreamBase_t::init_by_spec(spec, node);
         if (ret != 0) {
@@ -449,7 +461,7 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
             auto topic = spec.get_vis_topic_source_data_failed();
             if (topic.has_value() && spec.get_use_debug_publish()) {
                 this->m_debug_pub_source_data_failed = std::make_shared<DownstreamDebugPublisher>();
-                auto pub = node->create_publisher<SourceVisMsgType>(topic.value(), qos_source);
+                auto pub = node->template create_publisher<SourceVisMsgType>(topic.value(), qos_source);
                 this->m_debug_pub_source_data_failed->init(pub);
             }
         }
@@ -458,7 +470,7 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
             auto topic = spec.get_vis_topic_source_data_sending();
             if (topic.has_value() && spec.get_use_debug_publish()) {
                 this->m_debug_pub_source_data_sending = std::make_shared<DownstreamDebugPublisher>();
-                auto pub = node->create_publisher<SourceVisMsgType>(topic.value(), qos_source);
+                auto pub = node->template create_publisher<SourceVisMsgType>(topic.value(), qos_source);
                 this->m_debug_pub_source_data_sending->init(pub);
             }
         }
@@ -467,7 +479,7 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
             auto topic = spec.get_vis_topic_source_data_succeeded();
             if (topic.has_value() && spec.get_use_debug_publish()) {
                 this->m_debug_pub_source_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
-                auto pub = node->create_publisher<SourceVisMsgType>(topic.value(), qos_source);
+                auto pub = node->template create_publisher<SourceVisMsgType>(topic.value(), qos_source);
                 this->m_debug_pub_source_data_succeeded->init(pub);
             }
         }
@@ -476,7 +488,7 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
             auto topic = spec.get_vis_topic_target_data_sending();
             if (topic.has_value() && spec.get_use_debug_publish()) {
                 this->m_debug_pub_target_data_sending = std::make_shared<DownstreamDebugPublisher>();
-                auto pub = node->create_publisher<TargetVisMsgType>(topic.value(), qos_target);
+                auto pub = node->template create_publisher<TargetVisMsgType>(topic.value(), qos_target);
                 this->m_debug_pub_target_data_sending->init(pub);
             }
         }
@@ -485,7 +497,7 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
             auto topic = spec.get_vis_topic_target_data_succeeded();
             if (topic.has_value() && spec.get_use_debug_publish()) {
                 this->m_debug_pub_target_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
-                auto pub = node->create_publisher<TargetVisMsgType>(topic.value(), qos_target);
+                auto pub = node->template create_publisher<TargetVisMsgType>(topic.value(), qos_target);
                 this->m_debug_pub_target_data_succeeded->init(pub);
             }
         }
@@ -494,7 +506,7 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
             auto topic = spec.get_vis_topic_target_data_failed();
             if (topic.has_value() && spec.get_use_debug_publish()) {
                 this->m_debug_pub_target_data_failed = std::make_shared<DownstreamDebugPublisher>();
-                auto pub = node->create_publisher<TargetVisMsgType>(topic.value(), qos_target);
+                auto pub = node->template create_publisher<TargetVisMsgType>(topic.value(), qos_target);
                 this->m_debug_pub_target_data_failed->init(pub);
             }
         }

@@ -3,6 +3,7 @@
 // basic concepts
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
+#include <rclcpp_lifecycle/lifecycle_node.hpp>
 #include <redoxi_basic_cpp/concepts/basic_concepts.hpp>
 
 namespace redoxi_works
@@ -86,6 +87,13 @@ concept RosPublisherConcept = requires(T pub)
     {
         pub.init(std::declval<std::shared_ptr<typename T::Publisher_t>>())
         } -> std::same_as<void>;
+};
+
+//! Concept to check if a type is a ROS node, which is either the normal Node or the LifecycleNode
+template <typename T>
+concept RosNodeConcept = requires(T node)
+{
+    requires std::is_base_of_v<rclcpp::Node, T> || std::is_base_of_v<rclcpp_lifecycle::LifecycleNode, T>;
 };
 
 //! None publisher type, used as dummy publisher for when no publisher is available
