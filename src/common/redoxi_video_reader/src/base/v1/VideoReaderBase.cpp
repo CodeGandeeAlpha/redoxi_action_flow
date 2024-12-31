@@ -10,7 +10,7 @@
 #include <redoxi_video_reader/base/v1/VideoReaderBase.hpp>
 #define PRINT_THREAD_ID_IN_LOG (true)
 
-namespace redoxi_works::video_reader::v1
+namespace redoxi_works::video_readers::v1
 {
 
 struct RedoxiVideoReaderImpl {
@@ -388,4 +388,4 @@ void RedoxiVideoReaderBase::_step()
     }
 }
 
-} // namespace redoxi_works::video_reader::v1
+} // namespace redoxi_works::video_readers::v1

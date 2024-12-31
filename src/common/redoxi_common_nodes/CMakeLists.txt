@@ -50,6 +50,7 @@ target_include_directories(
          $<INSTALL_INTERFACE:include>)
 
 target_link_libraries(redoxi_common_nodes PUBLIC ${cpp_required_to_link})
+target_precompile_headers(redoxi_common_nodes PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}/_pch.hpp)
 
 # Causes the visibility macros to use dllexport rather than dllimport, which is
 # appropriate when building the dll but not consuming it.

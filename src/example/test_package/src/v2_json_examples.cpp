@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <redoxi_video_reader/base/VideoReaderBaseTypes.hpp>
 #include <redoxi_video_reader/base/VideoReaderBase.hpp>
 #include <spdlog/spdlog.h>

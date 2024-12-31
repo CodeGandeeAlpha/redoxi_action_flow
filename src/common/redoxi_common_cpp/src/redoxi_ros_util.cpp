@@ -1,3 +1,5 @@
+#include <redoxi_common_cpp/_pch.hpp>
+
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>
 #include <nlohmann/json.hpp>
 #include <chrono>

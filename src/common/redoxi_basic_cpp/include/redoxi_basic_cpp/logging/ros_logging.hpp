@@ -212,8 +212,11 @@ void RDX_LOG_GENERIC_(NodeOrLogger node_or_logger, const char *func_name, _Stric
             return rclcpp::get_logger(DefaultRDXLoggerName);
         } else if constexpr (std::is_same_v<NodeOrLogger, rclcpp::Logger>) {
             return node_or_logger;
-        } else if constexpr (std::is_convertible_v<NodeOrLogger, const rclcpp::Node *>) {
-            return node_or_logger->get_logger();
+        } else if constexpr (std::is_convertible_v<NodeOrLogger, const rclcpp::Node *> || std::is_convertible_v<NodeOrLogger, const rclcpp_lifecycle::LifecycleNode *>) {
+            if (node_or_logger)
+                return node_or_logger->get_logger();
+            else
+                return rclcpp::get_logger(DefaultRDXLoggerName);
         } else {
             return rclcpp::get_logger(DefaultRDXLoggerName);
         }

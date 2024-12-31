@@ -1,3 +1,5 @@
+#include <redoxi_common_cpp/_pch.hpp>
+
 #include "redoxi_common_cpp/ros_utils/StampedImagePub.hpp"
 #include <redoxi_common_cpp/image_proc/ImageStamper.hpp>
 #include <redoxi_common_cpp/image_proc/FrameMediator.hpp>

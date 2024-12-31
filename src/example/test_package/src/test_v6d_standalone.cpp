@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include "redoxi_common_cpp/redoxi_v6d.hpp"
 #include <opencv2/opencv.hpp>
 #include <vineyard/client/client.h>

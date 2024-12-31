@@ -3,6 +3,7 @@
 #include <future>
 
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp_lifecycle/lifecycle_node.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 
 // just for example
@@ -62,10 +63,6 @@ template <typename ActionType,
 class SyncActionSender
 {
   public:
-    SyncActionSender(rclcpp::Node *node)
-        : m_node(node)
-    {
-    }
     using ActionType_t = ActionType;
     using ActionClient_t = rclcpp_action::Client<ActionType_t>;
     using GoalHandle_t = rclcpp_action::ClientGoalHandle<ActionType_t>;
@@ -129,55 +126,54 @@ class SyncActionSender
     typename ActionClient_t::SendGoalOptions get_logging_callbacks(const Goal_t &goal)
     {
         static typename ActionClient_t::SendGoalOptions opt;
-        auto node = m_node;
         auto msg_uuid = ActionDataTrait::get_uuid(goal);
         auto is_ping = ActionDataTrait::get_control_signal_code(goal) == ControlSignalCode::Ping;
         opt.goal_response_callback =
-            [node, msg_uuid, is_ping](auto goal_handle) {
+            [msg_uuid, is_ping](auto goal_handle) {
                 bool accepted = goal_handle != nullptr;
                 if (accepted) {
                     auto goal_uuid = to_boost_uuid(goal_handle->get_goal_id());
                     if (is_ping) {
-                        RDX_INFO_DEV(node, __func__, "[msg_uuid={}][goal_uuid={}][PING] goal ACCEPTED",
+                        RDX_INFO_DEV(nullptr, __func__, "[msg_uuid={}][goal_uuid={}][PING] goal ACCEPTED",
                                      boost::uuids::to_string(msg_uuid),
                                      boost::uuids::to_string(goal_uuid));
                     } else {
-                        RDX_INFO_DEV(node, __func__, "[msg_uuid={}][goal_uuid={}] goal ACCEPTED",
+                        RDX_INFO_DEV(nullptr, __func__, "[msg_uuid={}][goal_uuid={}] goal ACCEPTED",
                                      boost::uuids::to_string(msg_uuid),
                                      boost::uuids::to_string(goal_uuid));
                     }
                 } else {
                     if (is_ping) {
-                        RDX_INFO_DEV(node, __func__, "[msg_uuid={}][PING] goal REJECTED",
+                        RDX_INFO_DEV(nullptr, __func__, "[msg_uuid={}][PING] goal REJECTED",
                                      boost::uuids::to_string(msg_uuid));
                     } else {
-                        RDX_INFO_DEV(node, __func__, "[msg_uuid={}] goal REJECTED",
+                        RDX_INFO_DEV(nullptr, __func__, "[msg_uuid={}] goal REJECTED",
                                      boost::uuids::to_string(msg_uuid));
                     }
                 }
             };
         opt.feedback_callback =
-            [node, msg_uuid, is_ping](auto goal_handle, const auto) {
+            [msg_uuid, is_ping](auto goal_handle, const auto) {
                 auto goal_uuid = to_boost_uuid(goal_handle->get_goal_id());
                 if (is_ping) {
-                    RDX_INFO_DEV(node, __func__, "[msg_uuid={}][goal_uuid={}][PING] got feedback",
+                    RDX_INFO_DEV(nullptr, __func__, "[msg_uuid={}][goal_uuid={}][PING] got feedback",
                                  boost::uuids::to_string(msg_uuid),
                                  boost::uuids::to_string(goal_uuid));
                 } else {
-                    RDX_INFO_DEV(node, __func__, "[msg_uuid={}][goal_uuid={}] got feedback",
+                    RDX_INFO_DEV(nullptr, __func__, "[msg_uuid={}][goal_uuid={}] got feedback",
                                  boost::uuids::to_string(msg_uuid),
                                  boost::uuids::to_string(goal_uuid));
                 }
             };
         opt.result_callback =
-            [node, msg_uuid, is_ping](const auto &result) {
+            [msg_uuid, is_ping](const auto &result) {
                 auto goal_uuid = to_boost_uuid(result.goal_id);
                 if (is_ping) {
-                    RDX_INFO_DEV(node, __func__, "[msg_uuid={}][goal_uuid={}][PING] got result",
+                    RDX_INFO_DEV(nullptr, __func__, "[msg_uuid={}][goal_uuid={}][PING] got result",
                                  boost::uuids::to_string(msg_uuid),
                                  boost::uuids::to_string(goal_uuid));
                 } else {
-                    RDX_INFO_DEV(node, __func__, "[msg_uuid={}][goal_uuid={}] got result",
+                    RDX_INFO_DEV(nullptr, __func__, "[msg_uuid={}][goal_uuid={}] got result",
                                  boost::uuids::to_string(msg_uuid),
                                  boost::uuids::to_string(goal_uuid));
                 }
@@ -256,12 +252,12 @@ class SyncActionSender
             //! or the user decides to abort
             while (true && rclcpp::ok()) {
                 // wait once
-                RDX_LOG_DEBUG(m_node, __func__, "{}start waiting for goal response for {} {}",
+                RDX_LOG_DEBUG(nullptr, __func__, "{}start waiting for goal response for {} {}",
                               msg_uuid_str, timeout.count(), _get_time_unit_name<TimeUnit_t>());
                 auto status = goal_handle_future.wait_for(timeout);
                 if (status == std::future_status::timeout) {
                     //! Timeout occurred, ask the user what to do
-                    RDX_LOG_DEBUG(m_node, __func__, "{}wait for goal response timeout", msg_uuid_str);
+                    RDX_LOG_DEBUG(nullptr, __func__, "{}wait for goal response timeout", msg_uuid_str);
                     result.response_code = ActionDownstreamResponse::TIMEOUT;
 
                     //! Check for a timeout callback and execute it if available, if yes, call it
@@ -273,16 +269,16 @@ class SyncActionSender
                     //! Handle action after timeout if necessary
                     switch (action_after_timeout) {
                         case ActionAfterTimeout::WaitAgain:
-                            RDX_LOG_DEBUG(m_node, __func__, "{}wait again as requested by user", msg_uuid_str);
+                            RDX_LOG_DEBUG(nullptr, __func__, "{}wait again as requested by user", msg_uuid_str);
                             continue; // Retry waiting
                         case ActionAfterTimeout::TreatAsRejected:
                             // Got definite response, exit the loop and function
-                            RDX_LOG_DEBUG(m_node, __func__, "{}treat as rejected as requested by user", msg_uuid_str);
+                            RDX_LOG_DEBUG(nullptr, __func__, "{}treat as rejected as requested by user", msg_uuid_str);
                             result.response_code = ActionDownstreamResponse::REJECTED;
                             return result;
                         case ActionAfterTimeout::NoAction:
                             // No more waiting, exit the loop, let the user handle the indefinite result
-                            RDX_LOG_DEBUG(m_node, __func__, "{}no action taken, let the user handle the waiting later", msg_uuid_str);
+                            RDX_LOG_DEBUG(nullptr, __func__, "{}no action taken, let the user handle the waiting later", msg_uuid_str);
                             result.response_code = ActionDownstreamResponse::TIMEOUT;
                             return result;
                     }
@@ -290,12 +286,12 @@ class SyncActionSender
                     //! Goal response received within timeout
                     auto goal_handle = goal_handle_future.get();
                     if (goal_handle) {
-                        RDX_LOG_DEBUG(m_node, __func__, "{}goal response received", msg_uuid_str);
+                        RDX_LOG_DEBUG(nullptr, __func__, "{}goal response received", msg_uuid_str);
                         result.response_code = ActionDownstreamResponse::ACCEPTED;
                         result.goal_handle = goal_handle;
                         return result;
                     } else {
-                        RDX_LOG_DEBUG(m_node, __func__, "{}goal rejected", msg_uuid_str);
+                        RDX_LOG_DEBUG(nullptr, __func__, "{}goal rejected", msg_uuid_str);
                         result.response_code = ActionDownstreamResponse::REJECTED;
                         return result;
                     }
@@ -303,27 +299,28 @@ class SyncActionSender
             }
         } else {
             //! Negative timeout specified, wait indefinitely until goal response is received
-            RDX_LOG_DEBUG(m_node, __func__, "{}start indefinite waiting for goal response", msg_uuid_str);
+            RDX_LOG_DEBUG(nullptr, __func__, "{}start indefinite waiting for goal response", msg_uuid_str);
 
             auto goal_handle = goal_handle_future.get();
             if (goal_handle) {
-                RDX_LOG_DEBUG(m_node, __func__, "{}goal accepted", msg_uuid_str);
+                RDX_LOG_DEBUG(nullptr, __func__, "{}goal accepted", msg_uuid_str);
                 result.response_code = ActionDownstreamResponse::ACCEPTED;
                 result.goal_handle = goal_handle;
                 return result;
             } else {
-                RDX_LOG_DEBUG(m_node, __func__, "{}goal rejected", msg_uuid_str);
+                RDX_LOG_DEBUG(nullptr, __func__, "{}goal rejected", msg_uuid_str);
                 result.response_code = ActionDownstreamResponse::REJECTED;
                 return result;
             }
         }
 
-        RDX_LOG_DEBUG(m_node, __func__, "{}async sender done, returning result", msg_uuid_str);
+        RDX_LOG_DEBUG(nullptr, __func__, "{}async sender done, returning result", msg_uuid_str);
         return result;
     }
 
-  private:
-    rclcpp::Node *m_node = nullptr;
+    //   private:
+    //     rclcpp::Node *m_node = nullptr;
+    //     rclcpp_lifecycle::LifecycleNode *m_lifecycle_node = nullptr;
 };
 
 } // namespace redoxi_works

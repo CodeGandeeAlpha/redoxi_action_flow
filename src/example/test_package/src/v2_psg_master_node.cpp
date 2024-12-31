@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <psg_master_node/MasterNode.hpp>
 
 namespace rdx = redoxi_works;

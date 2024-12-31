@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 // Copyright (c) 2021 by Rockchip Electronics Co., Ltd. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

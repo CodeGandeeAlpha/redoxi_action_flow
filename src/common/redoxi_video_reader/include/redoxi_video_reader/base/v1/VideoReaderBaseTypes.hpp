@@ -9,7 +9,7 @@
 #include <sensor_msgs/image_encodings.hpp>
 #include <json_struct/json_struct.h>
 
-namespace redoxi_works::video_reader::base::v1
+namespace redoxi_works::video_readers::base::v1
 {
 class RedoxiVideoReaderBase;
 
@@ -108,4 +108,4 @@ class RuntimeConfig : public common_nodes::OpenCloseNode::RuntimeConfig_t
                          JS_MEMBER(frame_enqueue_policy));
 };
 
-} // namespace redoxi_works::video_reader::base::v1
+} // namespace redoxi_works::video_readers::base::v1

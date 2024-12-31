@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <psg_document_sink/AsyncDocumentInputPort.hpp>
 #include <psg_document_sink/psg_document_sink.hpp>
 

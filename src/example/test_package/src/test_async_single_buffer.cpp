@@ -1,4 +1,4 @@
-//! Test the SingleBufferExecNode in both synchronous and asynchronous modes
+#include <test_package/_pch.hpp>
 
 #include <tbb/flow_graph.h>
 #include <redoxi_common_cpp/async_processor/SingleBufferExecNode.hpp>

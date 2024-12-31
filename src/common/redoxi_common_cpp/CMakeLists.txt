@@ -47,6 +47,7 @@ target_include_directories(
          $<INSTALL_INTERFACE:include> ${required_includes})
 
 target_link_libraries(redoxi_common_cpp PUBLIC ${required_dependencies})
+target_precompile_headers(redoxi_common_cpp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}/_pch.hpp)
 
 ament_target_dependencies(
   redoxi_common_cpp

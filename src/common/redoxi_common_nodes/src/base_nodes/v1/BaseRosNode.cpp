@@ -1,3 +1,5 @@
+#include <redoxi_common_nodes/_pch.hpp>
+
 #include <chrono>
 #include <thread>
 #include <redoxi_common_nodes/base_nodes/v1/BaseRosNode.hpp>

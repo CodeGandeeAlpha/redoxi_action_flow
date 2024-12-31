@@ -1,3 +1,5 @@
+#include <redoxi_common_nodes/_pch.hpp>
+
 #include <redoxi_common_nodes/base_nodes/v2/StartStopNode.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 

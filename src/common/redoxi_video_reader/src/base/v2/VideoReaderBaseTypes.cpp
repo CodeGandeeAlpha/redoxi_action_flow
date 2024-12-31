@@ -3,7 +3,7 @@
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <json_struct/json_struct.h>
 
-namespace redoxi_works::video_reader::base::v2
+namespace redoxi_works::video_readers::base::v2
 {
 // void InitConfig::from_node(const RedoxiVideoReaderBase *node)
 // {
@@ -17,4 +17,4 @@ namespace redoxi_works::video_reader::base::v2
 //     RuntimeConfig::parse_from_node_parameters(this, node);
 // }
 
-} // namespace redoxi_works::video_reader::base::v2
+} // namespace redoxi_works::video_readers::base::v2

@@ -1,3 +1,4 @@
+#include <redoxi_common_cpp/_pch.hpp>
 #include <redoxi_common_cpp/image_proc/ImageStamper.hpp>
 
 namespace redoxi_works

@@ -1,3 +1,5 @@
+#include <redoxi_common_nodes/_pch.hpp>
+
 #include <redoxi_common_nodes/driver_nodes/DetectionDriver.hpp>
 #include <redoxi_common_cpp/ros_utils/shm_utils.hpp>
 

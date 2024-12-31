@@ -1,7 +1,7 @@
-#include <redoxi_video_reader/VideoSourceFromUrl.hpp>
+#include <redoxi_video_reader/v2/VideoSourceFromUrl.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 
-namespace redoxi_works::video_readers
+namespace redoxi_works::video_readers::v2
 {
 VideoSourceFromUrl::VideoSourceFromUrl(const std::string &name, const rclcpp::NodeOptions &options)
     : RedoxiVideoReaderBase(name, options)
@@ -182,4 +182,4 @@ VideoSourceFromUrl::ReadFrameResult VideoSourceFromUrl::_read_frame(SourceData_t
 
     return ReadFrameResult::OK;
 }
-} // namespace redoxi_works::video_readers
+} // namespace redoxi_works::video_readers::v2

@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <tbb/tbb.h>
 #include <chrono>
 #include <thread>

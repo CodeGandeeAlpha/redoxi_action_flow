@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <redoxi_video_reader/VideoSourceFromUrl.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <spdlog/spdlog.h>

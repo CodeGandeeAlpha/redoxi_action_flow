@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <redoxi_common_nodes/driver_nodes/DetectionDriver.hpp>
 #include <json_struct/json_struct.h>
 #include <spdlog/spdlog.h>

@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <pluginlib/class_loader.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <redoxi_shared_memory/SharedMemoryClient.hpp>

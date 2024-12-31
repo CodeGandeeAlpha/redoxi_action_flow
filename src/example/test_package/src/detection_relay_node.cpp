@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <redoxi_samples_nodes/sinks/DetectionRelayNode.hpp>
 #include <json_struct/json_struct.h>
 #include <spdlog/spdlog.h>

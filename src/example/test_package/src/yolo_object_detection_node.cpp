@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 // #include <yolo8_body_pose_detector/Yolo8BodyPoseDetectorNode.hpp>
 #include <yolo8_series/detection/Yolo8ObjectDetNode.hpp>
 #include <spdlog/spdlog.h>

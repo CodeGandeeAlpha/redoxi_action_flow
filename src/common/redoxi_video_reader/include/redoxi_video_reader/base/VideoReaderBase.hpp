@@ -4,6 +4,6 @@
 namespace redoxi_works
 {
 
-using RedoxiVideoReaderBase = video_reader::v1::RedoxiVideoReaderBase;
+using RedoxiVideoReaderBase = video_readers::v1::RedoxiVideoReaderBase;
 
 } // namespace redoxi_works

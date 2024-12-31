@@ -105,6 +105,9 @@ function(configure_target target_name)
     ${target_name} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                           $<INSTALL_INTERFACE:include>)
 
+  target_precompile_headers(
+    ${target_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}/_pch.hpp)
+
   # global directories defined using macro
   target_compile_definitions(
     ${target_name}

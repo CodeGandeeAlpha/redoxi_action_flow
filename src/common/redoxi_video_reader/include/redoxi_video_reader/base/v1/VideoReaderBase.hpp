@@ -11,7 +11,7 @@
 #include <redoxi_common_nodes/base_nodes/OpenCloseNode.hpp>
 #include <redoxi_video_reader/base/v1/VideoReaderBaseTypes.hpp>
 
-namespace redoxi_works::video_reader::v1
+namespace redoxi_works::video_readers::v1
 {
 
 struct RedoxiVideoReaderImpl;
@@ -42,10 +42,10 @@ class RedoxiVideoReaderBase : public common_nodes::OpenCloseNode
     //! Import all names from RedoxiVideoReaderInternalTypes
     //! @note: this is to allow subclass to override the type definitions
     // using OutputPortSpec = video_reader_base::OutputPortSpec;
-    using OutputPort_t = video_reader::base::v1::OutputPortType;
+    using OutputPort_t = base::v1::OutputPortType;
 
-    using InitConfig_t = video_reader::base::v1::InitConfig;
-    using RuntimeConfig_t = video_reader::base::v1::RuntimeConfig;
+    using InitConfig_t = base::v1::InitConfig;
+    using RuntimeConfig_t = base::v1::RuntimeConfig;
 
     using Downstream_t = OutputPort_t::Downstream_t;
     using DownstreamSpec_t = Downstream_t::DownstreamSpec_t;
@@ -193,4 +193,4 @@ class RedoxiVideoReaderBase : public common_nodes::OpenCloseNode
     std::atomic<int64_t> m_last_read_frame_number{-1};
 };
 
-} // namespace redoxi_works::video_reader::v1
+} // namespace redoxi_works::video_readers::v1

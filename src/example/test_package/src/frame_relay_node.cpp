@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <redoxi_common_nodes/async_action_port/AsyncActionInputPort.hpp>
 #include <redoxi_samples_nodes/sinks/FrameRelayNode.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>

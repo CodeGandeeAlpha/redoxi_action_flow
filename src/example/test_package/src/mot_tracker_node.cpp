@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <universal_mot_trackers/UniversalMotTrackerNode.hpp>
 #include <spdlog/spdlog.h>
 #include <filesystem>

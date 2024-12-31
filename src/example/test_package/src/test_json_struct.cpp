@@ -2,6 +2,7 @@
 // #define JS_STL_SET
 // #define JS_STL_UNORDERED_MAP
 // #define JS_STL_UNORDERED_SET
+#include <test_package/_pch.hpp>
 
 #include <json_struct/json_struct.h>
 #include <spdlog/spdlog.h>

@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include "geometry_msgs/msg/pose.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "redoxi_public_msgs/msg/frame.hpp"

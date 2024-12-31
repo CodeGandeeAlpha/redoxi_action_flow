@@ -11,7 +11,7 @@
 #include <redoxi_common_nodes/base_nodes/v2/OpenCloseNode.hpp>
 #include <redoxi_video_reader/base/v2/VideoReaderBaseTypes.hpp>
 
-namespace redoxi_works::video_reader::v2
+namespace redoxi_works::video_readers::v2
 {
 
 struct RedoxiVideoReaderImpl;
@@ -191,4 +191,4 @@ class RedoxiVideoReaderBase : public common_nodes::v2::OpenCloseNode
     std::atomic<int64_t> m_last_read_frame_number{-1};
 };
 
-} // namespace redoxi_works::video_reader::v2
+} // namespace redoxi_works::video_readers::v2
