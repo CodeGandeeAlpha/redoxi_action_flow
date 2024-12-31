@@ -48,17 +48,17 @@ int BaseRosNode::init()
 int BaseRosNode::init(std::shared_ptr<RootInitConfig_t> init_config,
                       std::shared_ptr<RootRuntimeConfig_t> runtime_config)
 {
-    // state must be unconfigured
+    // must be in configuring state
     {
         auto state = get_current_state();
-        if (state.id() != lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED) {
-            RDX_RAISE_ERROR("[f={}] Node cannot be initialized in state {}", __func__, state.id());
+        if (state.id() != lifecycle_msgs::msg::State::TRANSITION_STATE_CONFIGURING) {
+            RDX_RAISE_ERROR("[f={}()] Node cannot be initialized in state {}", __func__, state.id());
         }
     }
 
     // init() can only be called once
     if (m_is_already_init) {
-        RDX_RAISE_ERROR("[f={}] Node cannot be initialized more than once", __func__);
+        RDX_RAISE_ERROR("[f={}()] Node cannot be initialized more than once", __func__);
         return -1;
     }
 

@@ -9,8 +9,79 @@ namespace rdx = redoxi_works;
 // const char *fn_video = "/soft/workspace/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4";
 
 void print_jsons();
+int v1_style(int argc, char **argv);
+int v2_style(int argc, char **argv);
+int lifecycle_style(int argc, char **argv);
 
 int main(int argc, char **argv)
+{
+    return lifecycle_style(argc, argv);
+}
+
+int lifecycle_style(int argc, char **argv)
+{
+    // print_jsons();
+    // return 0;
+    //! Initialize ROS
+    spdlog::info("Initializing ROS...");
+    rclcpp::init(argc, argv);
+
+    //! Create node with default options
+    spdlog::info("Creating video source node...");
+    auto node = std::make_shared<rdx_video::VideoSourceFromUrl>("video_source_from_url");
+
+    spdlog::info("configure(): Initializing node with launch options...");
+    node->configure();
+
+    //! Start the node
+    spdlog::info("activate(): Starting node...");
+    node->activate();
+
+    //! Spin until shutdown
+    spdlog::info("Node started successfully. Spinning until shutdown...");
+    rclcpp::spin(node->get_node_base_interface());
+
+    //! Cleanup
+    // node->deactivate();
+    // node->cleanup();
+    spdlog::info("Shutting down...");
+    rclcpp::shutdown();
+    return 0;
+}
+
+int v2_style(int argc, char **argv)
+{
+    // print_jsons();
+    // return 0;
+    //! Initialize ROS
+    spdlog::info("Initializing ROS...");
+    rclcpp::init(argc, argv);
+
+    //! Create node with default options
+    spdlog::info("Creating video source node...");
+    auto node = std::make_shared<rdx_video::VideoSourceFromUrl>("video_source_from_url");
+
+    spdlog::info("Initializing node with launch options...");
+    node->init();
+
+    //! Start the node
+    spdlog::info("Starting node...");
+    node->open();
+    node->start();
+
+    //! Spin until shutdown
+    spdlog::info("Node started successfully. Spinning until shutdown...");
+    rclcpp::spin(node->get_node_base_interface());
+
+    //! Cleanup
+    node->stop();
+    node->close();
+    spdlog::info("Shutting down...");
+    rclcpp::shutdown();
+    return 0;
+}
+
+int v1_style(int argc, char **argv)
 {
     // print_jsons();
     // return 0;
