@@ -30,6 +30,9 @@ class StartStopNode : public BaseRosNode,
     // _stop(), ACTIVE -> INACTIVE
     RosLifecycleCallbackReturn_t on_deactivate(const RosLifecycleState_t &state) final;
 
+    // shutdown(), ACTIVE -> UNCONFIGURED
+    RosLifecycleCallbackReturn_t on_shutdown(const RosLifecycleState_t &state) final;
+
   protected:
     //! async stop the node, after which you can start it again
     //! @note This function is intended to be called in the step thread
@@ -57,10 +60,12 @@ class StartStopNode : public BaseRosNode,
 
   protected:
     //! subclass should implement this function, with state transition handled by base class
+    //! If called in started state, it should do nothing and return 0
     //! @return 0 if success, otherwise error code
     virtual int _start() = 0;
 
     //! subclass should implement this function, with state transition handled by base class
+    //! If called in stopped state, it should do nothing and return 0
     //! @return 0 if success, otherwise error code
     virtual int _stop() = 0;
 

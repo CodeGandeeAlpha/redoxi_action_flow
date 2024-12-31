@@ -27,7 +27,7 @@ class UniversalMotTrackerNode : public common_nodes::OpenCloseNode
     using InputSourceData_t = typename InputPort_t::SourceData_t;
     using InputPortHandler_t = port_handlers::PullProcessReplyHandler<typename InputPort_t::MasterSpec_t>;
 
-  public:
+  protected:
     void _step() override;
     int _open() override;
     int _close() override;
@@ -35,6 +35,8 @@ class UniversalMotTrackerNode : public common_nodes::OpenCloseNode
     int _stop() override;
     int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config) override;
     int _update_init_config(std::shared_ptr<BaseInitConfig_t> config) override;
+
+    DEFAULT_CONFIG_LOADER_IMPL(InitConfig_t, RuntimeConfig_t);
 
   protected:
     struct Impl;

@@ -1,3 +1,5 @@
+#include <redoxi_samples_nodes/_pch.hpp>
+
 #include <redoxi_samples_nodes/sinks/FrameRelayNode.hpp>
 #include <redoxi_shared_memory/SharedMemoryClient.hpp>
 #include <redoxi_shared_memory/SharedMemoryFactory.hpp>

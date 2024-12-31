@@ -46,6 +46,9 @@ class OpenCloseNode : public BaseRosNode,
     // _close(), INACTIVE -> UNCONFIGURED
     RosLifecycleCallbackReturn_t on_cleanup(const RosLifecycleState_t &state) final;
 
+    // _shutdown(), ANYTHING -> FINALIZED
+    RosLifecycleCallbackReturn_t on_shutdown(const RosLifecycleState_t &state) final;
+
   protected:
     //! async close the node, after which you can open it again
     //! @note This function is intended to be called in the step thread
@@ -97,18 +100,22 @@ class OpenCloseNode : public BaseRosNode,
 
   protected:
     //! subclass should implement this function, with state transition handled by base class
+    //! If called in opened state, it should do nothing and return 0
     //! @return 0 if success, otherwise error code
     virtual int _open() = 0;
 
     //! subclass should implement this function, with state transition handled by base class
+    //! If called in closed state, it should do nothing and return 0
     //! @return 0 if success, otherwise error code
     virtual int _close() = 0;
 
     //! subclass should implement this function, with state transition handled by base class
+    //! If called in closed state, it should do nothing and return 0
     //! @return 0 if success, otherwise error code
     virtual int _start() = 0;
 
     //! subclass should implement this function, with state transition handled by base class
+    //! If called in started state, it should do nothing and return 0
     //! @return 0 if success, otherwise error code
     virtual int _stop() = 0;
 

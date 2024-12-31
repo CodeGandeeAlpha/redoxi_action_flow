@@ -40,7 +40,7 @@ log_level_arg = DeclareLaunchArgument(
 class StepIntervals:
     VerySlow = 3000000
     Slow = 200000
-    Medium = 1000000 / 50
+    Medium = 1000000 / 25
     Fast = 5000
     VeryFast = 1000
 
@@ -242,7 +242,7 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
         step_interval=StepIntervals.Medium,
         video_start_time=0,
-        video_end_time=-1,
+        video_end_time=1000000,
         frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
             precondition=videoSrcCfg.DeliveryPrecondition.DontCare,
             drop_strategy=videoSrcCfg.DropStrategy.DropAsNeeded,

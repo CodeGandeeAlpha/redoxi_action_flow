@@ -72,6 +72,8 @@ class Yolo8BaseNode : public redoxi_works::common_nodes::StartStopNode
     int _update_init_config(std::shared_ptr<BaseInitConfig_t> init_config) override;
     int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config) override;
 
+    DEFAULT_CONFIG_LOADER_IMPL(InitConfig_t, RuntimeConfig_t);
+
   protected:
     // from this class
     virtual int _extract_image(cv::Mat *output, const std::shared_ptr<typename ByDetectionRequest::InputSourceData_t> &source_data);
@@ -407,7 +409,7 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
     process_handler->init(
         m_detection_request_input_port.get(),
         &m_impl->inference_resource_pool,
-        handler_config, this);
+        handler_config);
 
     typename Impl::PullProcessReplyHandler_t::OnProcessInputDataCallback_t process_func =
         [this, enable_visualization, enable_performance_probe](typename Impl::PullProcessReplyHandler_t::InputActionResult_t *output_action_result,

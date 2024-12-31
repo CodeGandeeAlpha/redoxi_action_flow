@@ -47,11 +47,6 @@ int BaseRosNode::init()
 int BaseRosNode::init(std::shared_ptr<BaseRosNodeInitConfig> init_config,
                       std::shared_ptr<BaseRosNodeRuntimeConfig> runtime_config)
 {
-    //! Check state is BEFORE_INIT
-    if (m_status != NodeStatusCode::BEFORE_INIT) {
-        RDX_RAISE_ERROR("[f={}] Node cannot be initialized in state {}", __func__, m_status);
-    }
-
     // update init config
     {
         auto ret = _update_init_config(init_config);

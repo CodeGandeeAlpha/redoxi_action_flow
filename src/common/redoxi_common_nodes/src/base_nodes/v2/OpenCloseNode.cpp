@@ -63,6 +63,25 @@ OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_cleanup(const RosL
     return RosLifecycleCallbackReturn_t::SUCCESS;
 }
 
+OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_shutdown(const RosLifecycleState_t &)
+{
+    //! Stop step thread
+    _stop_step_thread();
+
+    // Call stop and close
+    auto ret = _stop();
+    if (ret != 0) {
+        RDX_RAISE_ERROR("[f={}] Failed to stop node", __func__);
+    }
+
+    ret = _close();
+    if (ret != 0) {
+        RDX_RAISE_ERROR("[f={}] Failed to close node", __func__);
+    }
+
+    return RosLifecycleCallbackReturn_t::SUCCESS;
+}
+
 std::shared_future<int> OpenCloseNode::_async_close()
 {
     auto promise = std::make_shared<std::promise<int>>();

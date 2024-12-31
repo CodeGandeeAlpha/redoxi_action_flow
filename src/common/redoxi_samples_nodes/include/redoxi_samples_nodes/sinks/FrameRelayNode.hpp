@@ -77,6 +77,8 @@ class FrameRelayNode : public common_nodes::StartStopNode
     int _update_init_config(std::shared_ptr<BaseInitConfig_t> init_config) override;
     int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config) override;
 
+    DEFAULT_CONFIG_LOADER_IMPL(InitConfig_t, RuntimeConfig_t);
+
   protected:
     virtual int _parse_frame(cv::Mat *output, const SourceData_t &source_data);
 

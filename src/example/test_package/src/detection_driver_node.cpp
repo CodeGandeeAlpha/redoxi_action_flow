@@ -48,7 +48,7 @@ int main(int argc, char **argv)
     node->start();
 
     //! Spin until shutdown
-    rclcpp::spin(node);
+    rclcpp::spin(node->get_node_base_interface());
 
     //! Stop node and shutdown
     node->stop();

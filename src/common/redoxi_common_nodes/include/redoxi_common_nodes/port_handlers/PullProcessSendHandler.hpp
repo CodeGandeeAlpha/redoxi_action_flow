@@ -50,21 +50,18 @@ class PullProcessSendHandler
   public:
     PullProcessSendHandler() = default;
     virtual ~PullProcessSendHandler() = default;
-
-    virtual void init(
+    void init(
         InputPort_t *input_port,
         OutputPort_t *output_port,
         ResourceTokenQueue_t *resource_token_queue,
         std::shared_ptr<PullProcessSendHandlerConfig> config,
-        std::optional<OutputDeliveryPolicy_t> output_enqueue_policy = std::nullopt,
-        rclcpp::Node *node = nullptr)
+        std::optional<OutputDeliveryPolicy_t> output_enqueue_policy = std::nullopt)
     {
         m_resource_token_queue = resource_token_queue;
         m_input_port = input_port;
         m_output_port = output_port;
         m_output_enqueue_policy = output_enqueue_policy;
         m_config = config;
-        m_node = node;
     }
 
     // get data from input port, process it, and send to output port
@@ -276,8 +273,8 @@ class PullProcessSendHandler
     using OnReleaseResourceTokenCallback_t = std::function<int(ResourceToken_t &resource_token)>;
     OnReleaseResourceTokenCallback_t on_release_resource_token;
 
+
   private:
-    rclcpp::Node *m_node = nullptr;
     ResourceTokenQueue_t *m_resource_token_queue = nullptr;
     InputPort_t *m_input_port = nullptr;
     OutputPort_t *m_output_port = nullptr;

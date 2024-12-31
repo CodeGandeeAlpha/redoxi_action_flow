@@ -48,6 +48,20 @@ StartStopNode::RosLifecycleCallbackReturn_t StartStopNode::on_deactivate(const R
     return RosLifecycleCallbackReturn_t::SUCCESS;
 }
 
+StartStopNode::RosLifecycleCallbackReturn_t StartStopNode::on_shutdown(const RosLifecycleState_t &state)
+{
+    // perform stop and cleanup
+    _stop_step_thread();
+
+    // perform deactivate and cleanup
+    auto ret = _stop();
+    if (ret != 0) {
+        RDX_RAISE_ERROR("[f={}] Failed to stop node", __func__);
+    }
+
+    return RosLifecycleCallbackReturn_t::SUCCESS;
+}
+
 std::shared_future<int> StartStopNode::_async_stop()
 {
     auto promise = std::make_shared<std::promise<int>>();
@@ -84,6 +98,11 @@ std::shared_future<int> StartStopNode::_async_start()
 
 int StartStopNode::start()
 {
+    // if in unconfigured state, we need to configure first
+    if (get_current_state().id() == RosPrimaryState_t::PRIMARY_STATE_UNCONFIGURED) {
+        configure();
+    }
+
     // must be in inactive state
     if (get_current_state().id() != RosPrimaryState_t::PRIMARY_STATE_INACTIVE) {
         RDX_RAISE_ERROR("[f={}] Cannot start node when not in inactive state", __func__);
@@ -101,6 +120,10 @@ int StartStopNode::stop()
     }
 
     LifecycleNode::deactivate();
+
+    // clean up the node back to unconfigured state
+    // LifecycleNode::cleanup();
+
     return _on_stopped();
 }
 

@@ -1,3 +1,4 @@
+#include <redoxi_dnn_models/_pch.hpp>
 #include <pluginlib/class_loader.hpp>
 
 #include <redoxi_dnn_models/yolo8/Yolo8PoseModel.hpp>

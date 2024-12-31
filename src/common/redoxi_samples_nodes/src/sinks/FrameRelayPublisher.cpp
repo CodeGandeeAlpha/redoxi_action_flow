@@ -1,3 +1,5 @@
+#include <redoxi_samples_nodes/_pch.hpp>
+
 #include <redoxi_samples_nodes/sinks/FrameRelayPublisher.hpp>
 #include <redoxi_common_cpp/async_processor/SingleBufferExecNode.hpp>
 #include <redoxi_common_cpp/redoxi_ros_util.hpp>

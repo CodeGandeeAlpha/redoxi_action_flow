@@ -43,11 +43,10 @@ class PullProcessReplyHandler
     PullProcessReplyHandler() = default;
     virtual ~PullProcessReplyHandler() = default;
 
-    virtual void init(
+    void init(
         InputPort_t *input_port,
         ResourceTokenQueue_t *resource_token_queue,
-        std::shared_ptr<PullProcessSendHandlerConfig> config,
-        rclcpp::Node *node = nullptr)
+        std::shared_ptr<PullProcessSendHandlerConfig> config)
     {
         RDX_INFO_DEV(nullptr, __func__, true,
                      "Initializing pull process reply handler, input port = {}, self={}",
@@ -59,7 +58,6 @@ class PullProcessReplyHandler
         m_resource_token_queue = resource_token_queue;
         m_input_port = input_port;
         m_config = config;
-        m_node = node;
 
         RDX_INFO_DEV(nullptr, __func__, true,
                      "Pull process reply handler initialized, m_input_port = {}, self={}",
@@ -218,6 +216,7 @@ class PullProcessReplyHandler
 
   private:
     rclcpp::Node *m_node = nullptr;
+    rclcpp_lifecycle::LifecycleNode *m_lifecycle_node = nullptr;
     ResourceTokenQueue_t *m_resource_token_queue = nullptr;
     InputPort_t *m_input_port = nullptr;
     std::shared_ptr<PullProcessSendHandlerConfig> m_config = nullptr;

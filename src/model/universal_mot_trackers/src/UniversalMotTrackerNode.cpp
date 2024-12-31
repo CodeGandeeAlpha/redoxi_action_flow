@@ -280,7 +280,7 @@ int UniversalMotTrackerNode::_create_input_port_handler(
 
     // create input port handler
     m_input_port_handler = std::make_shared<InputPortHandler_t>();
-    m_input_port_handler->init(m_input_port.get(), nullptr, handler_config, this);
+    m_input_port_handler->init(m_input_port.get(), nullptr, handler_config);
 
     // add callback
     m_input_port_handler->on_process_input_data = std::bind(&UniversalMotTrackerNode::_handle_input_data,

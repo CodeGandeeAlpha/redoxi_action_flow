@@ -38,6 +38,7 @@ target_include_directories(
 target_compile_definitions(redoxi_samples_nodes
                            PRIVATE "REDOXI_SAMPLES_NODES_BUILDING_LIBRARY")
 target_link_libraries(redoxi_samples_nodes PRIVATE Boost::boost Boost::timer)
+target_precompile_headers(redoxi_samples_nodes PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}/_pch.hpp)
 
 ament_target_dependencies(
   redoxi_samples_nodes

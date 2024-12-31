@@ -52,8 +52,6 @@ class VideoSourceFromUrl : public RedoxiVideoReaderBase
     VideoSourceFromUrl(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
     virtual ~VideoSourceFromUrl() noexcept;
 
-    DEFAULT_CONFIG_LOADER_IMPL(InitConfig_t, RuntimeConfig_t);
-
     // get the video url
     std::string get_video_url() const;
 
@@ -76,6 +74,8 @@ class VideoSourceFromUrl : public RedoxiVideoReaderBase
     int _on_closed() override;
     ReadFrameResult _read_frame(SourceData_t &source_data, std::atomic<int64_t> &frame_number) override;
     int _on_before_request_enqueue(DeliveryRequest_t &request, DeliveryPolicy_t &enqueue_policy) override;
+
+    DEFAULT_CONFIG_LOADER_IMPL(InitConfig_t, RuntimeConfig_t);
 
   protected:
     std::shared_ptr<cv::VideoCapture> m_video_capture;

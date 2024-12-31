@@ -116,6 +116,8 @@ class CallActionDriverBase : public OpenCloseNode
     int _update_init_config(std::shared_ptr<BaseInitConfig_t> init_config) override;
     int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config) override;
 
+    DEFAULT_CONFIG_LOADER_IMPL(InitConfig_t, RuntimeConfig_t);
+
     /**
      * @brief After the request is received from the input port, process it
      * @details This is the data-processing callback of the input port handler
@@ -453,8 +455,7 @@ int CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
             m_callee_port.get(),
             nullptr,
             handler_config,
-            config->callee_request_enqueue_policy,
-            this);
+            config->callee_request_enqueue_policy);
 
         m_input_request_handler->on_process_input_data =
             std::bind(&CallActionDriverBase::_internal_process_input_request, this,

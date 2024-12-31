@@ -60,7 +60,7 @@ int main(int argc, char **argv)
 
     //! Keep the node running
     spdlog::info("Spinning node");
-    rclcpp::spin(frame_relay_node);
+    rclcpp::spin(frame_relay_node->get_node_base_interface());
 
     //! Stop the node before shutdown
     spdlog::info("Stopping node");

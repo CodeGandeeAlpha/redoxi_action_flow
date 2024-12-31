@@ -40,7 +40,7 @@ int main(int argc, char **argv)
 
     spdlog::info("Spinning node...");
     //! Spin node
-    rclcpp::spin(node);
+    rclcpp::spin(node->get_node_base_interface());
 
     spdlog::info("Stopping node...");
     node->stop();

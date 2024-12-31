@@ -1,3 +1,5 @@
+#include <redoxi_samples_nodes/_pch.hpp>
+
 #include <redoxi_samples_nodes/sinks/DetectionRelayNode.hpp>
 #include <redoxi_dnn_models/message_conversion.hpp>
 #include <redoxi_dnn_models/visualizations.hpp>
@@ -101,7 +103,7 @@ int DetectionRelayNode::_create_port_handler(
     auto port_handler_config = std::make_shared<PortHandler_t::InitConfig_t>();
     port_handler_config->block_input_reading = runtime_config->enable_blocking_mode;
     port_handler_config->block_resource_acquisition = runtime_config->enable_blocking_mode;
-    m_port_handler->init(m_input_port.get(), nullptr, port_handler_config, this);
+    m_port_handler->init(m_input_port.get(), nullptr, port_handler_config);
 
     m_port_handler->on_process_input_data =
         [this, runtime_config](InputPort_t::ActionResult_t *output_action_result,

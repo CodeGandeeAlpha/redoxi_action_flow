@@ -1,3 +1,5 @@
+#include <redoxi_dnn_models/_pch.hpp>
+
 #include <redoxi_dnn_models/yolo8/Yolo8ModelBase.hpp>
 #include <redoxi_dnn_models/yolo8/Yolo8Preprocessor.hpp>
 #include <redoxi_dnn_models/yolo8/Yolo8Postprocessor.hpp>
