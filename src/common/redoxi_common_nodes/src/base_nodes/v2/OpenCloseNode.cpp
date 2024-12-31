@@ -5,10 +5,10 @@
 
 namespace redoxi_works::common_nodes::v2
 {
-OpenCloseNode::OpenCloseNode(const std::string &name, const rclcpp::NodeOptions &options)
-    : BaseRosNode(name, options)
-{
-}
+// OpenCloseNode::OpenCloseNode(const std::string &name, const rclcpp::NodeOptions &options)
+//     : BaseRosNode(name, options)
+// {
+// }
 
 OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_configure(const RosLifecycleState_t &)
 {

@@ -12,7 +12,8 @@ class StartStopNode : public BaseRosNode,
                       public IStartStopProtocol
 {
   public:
-    StartStopNode(const std::string &node_name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+    using BaseRosNode::BaseRosNode;
+    virtual ~StartStopNode() noexcept = default;
 
   public:
     int start() final;

@@ -13,10 +13,8 @@ class OpenCloseNode : public BaseRosNode,
                       public IOpenCloseProtocol
 {
   public:
-    OpenCloseNode(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
-    virtual ~OpenCloseNode() noexcept
-    {
-    }
+    using BaseRosNode::BaseRosNode;
+    virtual ~OpenCloseNode() noexcept = default;
 
   public:
     //! open the node, if you want to update init_config, do it before calling this function

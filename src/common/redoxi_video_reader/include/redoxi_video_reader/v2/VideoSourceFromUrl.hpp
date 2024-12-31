@@ -49,8 +49,8 @@ class VideoSourceFromUrl : public RedoxiVideoReaderBase
     using RuntimeConfig_t = video_source_from_url_types::RuntimeConfig;
 
   public:
-    VideoSourceFromUrl(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
-    virtual ~VideoSourceFromUrl() noexcept;
+    using RedoxiVideoReaderBase::RedoxiVideoReaderBase;
+    virtual ~VideoSourceFromUrl() noexcept = default;
 
     // get the video url
     std::string get_video_url() const;

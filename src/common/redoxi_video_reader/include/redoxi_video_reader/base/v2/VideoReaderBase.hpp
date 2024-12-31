@@ -67,8 +67,9 @@ class RedoxiVideoReaderBase : public common_nodes::v2::OpenCloseNode
     using BaseRuntimeConfig_t = BaseNode_t::RuntimeConfig_t;
 
   public:
+    using BaseNode_t::BaseNode_t;
     //! Constructor with node options and name
-    explicit RedoxiVideoReaderBase(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+    // explicit RedoxiVideoReaderBase(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
 
     //! Destructor
     virtual ~RedoxiVideoReaderBase() noexcept;

@@ -3,14 +3,6 @@
 
 namespace redoxi_works::video_readers::v2
 {
-VideoSourceFromUrl::VideoSourceFromUrl(const std::string &name, const rclcpp::NodeOptions &options)
-    : RedoxiVideoReaderBase(name, options)
-{
-}
-
-VideoSourceFromUrl::~VideoSourceFromUrl() noexcept
-{
-}
 
 int VideoSourceFromUrl::_open()
 {
@@ -183,3 +175,6 @@ VideoSourceFromUrl::ReadFrameResult VideoSourceFromUrl::_read_frame(SourceData_t
     return ReadFrameResult::OK;
 }
 } // namespace redoxi_works::video_readers::v2
+
+#include <rclcpp_components/register_node_macro.hpp>
+RCLCPP_COMPONENTS_REGISTER_NODE(redoxi_works::video_readers::v2::VideoSourceFromUrl)

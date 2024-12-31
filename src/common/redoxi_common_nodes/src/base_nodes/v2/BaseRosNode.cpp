@@ -21,6 +21,11 @@ BaseRosNode::BaseRosNode(const std::string &node_name, const rclcpp::NodeOptions
     m_json_parameters = RDX_GET_JSON_PARAM_FROM_LIFECYCLE_NODE(node);
 }
 
+BaseRosNode::BaseRosNode(const rclcpp::NodeOptions &options)
+    : BaseRosNode("BaseRosNode", options)
+{
+}
+
 std::shared_future<void> BaseRosNode::_async_stop_step_thread()
 {
     // make sure the step thread cannot proceed anymore

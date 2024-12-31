@@ -9,6 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
 find_package(redoxi_common_cpp REQUIRED)
 find_package(redoxi_public_msgs REQUIRED)
 find_package(redoxi_common_nodes REQUIRED)
@@ -58,11 +59,15 @@ ament_target_dependencies(
   "cv_bridge"
   "redoxi_common_nodes"
   "redoxi_shared_memory"
+  "rclcpp_components"
 )
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
 target_compile_definitions(redoxi_video_reader PRIVATE "REDOXI_VIDEO_READER_BUILDING_LIBRARY")
+rclcpp_components_register_nodes(redoxi_video_reader
+  "redoxi_works::video_readers::v2::VideoSourceFromUrl"
+)
 
 install(
   DIRECTORY include/
@@ -112,6 +117,7 @@ ament_export_dependencies(
   Boost
   redoxi_common_nodes
   redoxi_shared_memory
+  rclcpp_components
 )
 
 

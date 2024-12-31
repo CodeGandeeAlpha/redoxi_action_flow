@@ -19,10 +19,10 @@ struct RedoxiVideoReaderImpl {
     tbb::task_group m_tasks;
 };
 
-RedoxiVideoReaderBase::RedoxiVideoReaderBase(const std::string &name, const rclcpp::NodeOptions &options)
-    : BaseNode_t(name, options)
-{
-}
+// RedoxiVideoReaderBase::RedoxiVideoReaderBase(const std::string &name, const rclcpp::NodeOptions &options)
+//     : BaseNode_t(name, options)
+// {
+// }
 
 RedoxiVideoReaderBase::~RedoxiVideoReaderBase() noexcept
 {

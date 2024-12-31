@@ -6,10 +6,10 @@
 namespace redoxi_works::common_nodes::v2
 {
 
-StartStopNode::StartStopNode(const std::string &node_name, const rclcpp::NodeOptions &options)
-    : BaseRosNode(node_name, options)
-{
-}
+// StartStopNode::StartStopNode(const std::string &node_name, const rclcpp::NodeOptions &options)
+//     : BaseRosNode(node_name, options)
+// {
+// }
 
 StartStopNode::RosLifecycleCallbackReturn_t StartStopNode::on_configure(const RosLifecycleState_t &)
 {
