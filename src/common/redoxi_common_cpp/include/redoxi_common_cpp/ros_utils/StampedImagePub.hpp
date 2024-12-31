@@ -25,6 +25,7 @@ class StampedImagePub
 
     //! Constructor that creates publisher during construction
     StampedImagePub(rclcpp::Node *node, const std::string &topic_name, std::optional<rclcpp::QoS> qos = std::nullopt);
+    StampedImagePub(rclcpp_lifecycle::LifecycleNode *node, const std::string &topic_name, std::optional<rclcpp::QoS> qos = std::nullopt);
 
     //! Check if the publisher is valid
     bool valid() const
@@ -34,6 +35,10 @@ class StampedImagePub
 
     //! Initialize the publisher
     int init(rclcpp::Node *node,
+             const std::string &topic_name,
+             std::optional<rclcpp::QoS> qos = std::nullopt);
+
+    int init(rclcpp_lifecycle::LifecycleNode *node,
              const std::string &topic_name,
              std::optional<rclcpp::QoS> qos = std::nullopt);
 
@@ -71,6 +76,7 @@ class StampedImagePub
   private:
     Publisher_t::SharedPtr m_pub;
     rclcpp::Node *m_node = nullptr;
+    rclcpp_lifecycle::LifecycleNode *m_lifecycle_node = nullptr;
 };
 static_assert(RosPublisherConcept<StampedImagePub>,
               "StampedImagePub must satisfy RosPublisherConcept");

@@ -26,8 +26,10 @@ find_package(Boost REQUIRED)
 
 
 set(source_files
-  src/VideoReaderBase.cpp
-  src/VideoReaderBaseTypes.cpp
+  src/base/v1/VideoReaderBase.cpp
+  src/base/v1/VideoReaderBaseTypes.cpp
+  src/base/v2/VideoReaderBase.cpp
+  src/base/v2/VideoReaderBaseTypes.cpp
   src/VideoSourceFromUrl.cpp
 )
 

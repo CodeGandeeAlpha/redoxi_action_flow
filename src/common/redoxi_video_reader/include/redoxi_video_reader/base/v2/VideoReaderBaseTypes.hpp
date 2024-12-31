@@ -9,12 +9,9 @@
 #include <sensor_msgs/image_encodings.hpp>
 #include <json_struct/json_struct.h>
 
-namespace redoxi_works
+namespace redoxi_works::video_reader::base::v2
 {
 class RedoxiVideoReaderBase;
-
-namespace video_reader_base
-{
 
 using OutputPortSpec = redoxi_works::image_ports::types::ImageActionOutputPortSpec;
 using OutputPortType = AsyncActionOutputPort<OutputPortSpec>;
@@ -111,6 +108,4 @@ class RuntimeConfig : public common_nodes::OpenCloseNode::RuntimeConfig_t
                          JS_MEMBER(frame_enqueue_policy));
 };
 
-} // namespace video_reader_base
-
-} // namespace redoxi_works
+} // namespace redoxi_works::video_reader::base::v2

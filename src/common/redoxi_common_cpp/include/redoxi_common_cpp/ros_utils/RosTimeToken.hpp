@@ -4,6 +4,7 @@
 
 #include <tbb/concurrent_queue.h>
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp_lifecycle/lifecycle_node.hpp>
 #include <rcpputils/asserts.hpp>
 #include <fmt/format.h>
 
@@ -22,15 +23,28 @@ class _RosTimeToken
     static_assert(std::is_base_of<std::chrono::duration<typename IntervalType::rep, typename IntervalType::period>, IntervalType>::value,
                   "IntervalType must be a std::chrono::duration");
 
-  public:
-    _RosTimeToken(rclcpp::Node *node, IntervalType interval = IntervalType(0), size_t token_capacity = 1)
+  private:
+    _RosTimeToken(IntervalType interval = IntervalType(0), size_t token_capacity = 1)
     {
-        m_node = node;
         m_interval = interval;
         m_token_capacity = token_capacity;
         m_queue = std::make_shared<tbb::concurrent_bounded_queue<TokenType>>();
         m_queue->set_capacity(token_capacity);
     }
+
+  public:
+    _RosTimeToken(rclcpp::Node *node, IntervalType interval = IntervalType(0), size_t token_capacity = 1)
+        : _RosTimeToken(interval, token_capacity)
+    {
+        m_node = node;
+    }
+
+    _RosTimeToken(rclcpp_lifecycle::LifecycleNode *node, IntervalType interval = IntervalType(0), size_t token_capacity = 1)
+        : _RosTimeToken(interval, token_capacity)
+    {
+        m_lifecycle_node = node;
+    }
+
     virtual ~_RosTimeToken()
     {
         stop();
@@ -60,7 +74,13 @@ class _RosTimeToken
         // when interval is positive, create tokens at the specified interval
         // when 0 or negative, the queue pretends to be always full, but tokens are created when popping
         if (m_interval > IntervalType(0)) {
-            m_timer = m_node->create_wall_timer(m_interval, [this]() { _create_token(); });
+            if (m_node) {
+                m_timer = m_node->create_wall_timer(m_interval, [this]() { _create_token(); });
+            } else if (m_lifecycle_node) {
+                m_timer = m_lifecycle_node->create_wall_timer(m_interval, [this]() { _create_token(); });
+            } else {
+                RDX_RAISE_ERROR("Node or LifecycleNode should be non nullptr in {}", __func__);
+            }
         }
 
         m_is_started = true;
@@ -170,7 +190,8 @@ class _RosTimeToken
         return TokenType();
     }
 
-    rclcpp::Node *m_node;
+    rclcpp::Node *m_node = nullptr;
+    rclcpp_lifecycle::LifecycleNode *m_lifecycle_node = nullptr;
     rclcpp::TimerBase::SharedPtr m_timer;
     size_t m_token_capacity;
     std::atomic<bool> m_is_started{false};

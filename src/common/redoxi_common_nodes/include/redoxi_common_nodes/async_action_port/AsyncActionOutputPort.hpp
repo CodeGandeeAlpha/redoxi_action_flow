@@ -28,7 +28,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
   public:
     AsyncActionOutputPort(rclcpp::Node *parent_node)
-        : m_parent_node(parent_node)
+        : m_parent_node(parent_node), m_node_logger(m_parent_node->get_logger())
+    {
+    }
+
+    AsyncActionOutputPort(rclcpp_lifecycle::LifecycleNode *parent_node)
+        : m_parent_lifecycle_node(parent_node), m_node_logger(m_parent_lifecycle_node->get_logger())
     {
     }
 
@@ -101,12 +106,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
         // must started first
         // RDX_ASSERT_CHECK_TRUE(m_status == NodeStatusCode::STARTED, "[{}] must started first", __func__);
         if (m_status != NodeStatusCode::STARTED) {
-            RDX_LOG_WARN(m_parent_node, __func__, true, "[{}] pushing to stopped port, please start first", __func__);
+            RDX_LOG_WARN(m_node_logger, __func__, true, "[{}] pushing to stopped port, please start first", __func__);
             return false;
         }
 
         if (!rclcpp::ok()) {
-            RDX_LOG_WARN(m_parent_node, __func__, true, "[{}] node is shutting down, cannot push request", __func__);
+            RDX_LOG_WARN(m_node_logger, __func__, true, "[{}] node is shutting down, cannot push request", __func__);
             return false;
         }
 
@@ -1168,6 +1173,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
     // the parent node
     rclcpp::Node *m_parent_node = nullptr;
+    rclcpp_lifecycle::LifecycleNode *m_parent_lifecycle_node = nullptr;
 
     // data publishers
     std::shared_ptr<SourceDataPublisher_t> m_data_pub_source_data;
@@ -1240,6 +1246,16 @@ class AsyncActionOutputPort : public IStartStopProtocol
     std::shared_ptr<DeliveryTaskNode_t> m_delivery_task_node;
     std::shared_ptr<tbb::flow::graph> m_delivery_graph;
     tbb::task_group m_task_group; // all async tasks
+    rclcpp::Logger m_node_logger;
+
+    auto _get_node_logger() const
+    {
+        if (m_parent_lifecycle_node) {
+            return m_parent_lifecycle_node->get_logger();
+        } else {
+            return m_parent_node->get_logger();
+        }
+    }
 };
 
 //! Concept to enforce a type to be convertible to AsyncActionOutputPort

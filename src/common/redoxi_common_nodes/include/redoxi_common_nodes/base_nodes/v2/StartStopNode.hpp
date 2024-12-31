@@ -22,13 +22,13 @@ class StartStopNode : public BaseRosNode,
     // ros lifecycle callbacks
 
     // init() if necessary, UNCONFIGURED -> INACTIVE
-    RosLifecycleCallbackReturn_t on_configure(const RosLifecycleState_t &state) override;
+    RosLifecycleCallbackReturn_t on_configure(const RosLifecycleState_t &state) final;
 
     // _start(), INACTIVE -> ACTIVE
-    RosLifecycleCallbackReturn_t on_activate(const RosLifecycleState_t &state) override;
+    RosLifecycleCallbackReturn_t on_activate(const RosLifecycleState_t &state) final;
 
     // _stop(), ACTIVE -> INACTIVE
-    RosLifecycleCallbackReturn_t on_deactivate(const RosLifecycleState_t &state) override;
+    RosLifecycleCallbackReturn_t on_deactivate(const RosLifecycleState_t &state) final;
 
   protected:
     //! async stop the node, after which you can start it again

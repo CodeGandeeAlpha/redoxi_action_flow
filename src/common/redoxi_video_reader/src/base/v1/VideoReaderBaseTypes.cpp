@@ -1,9 +1,9 @@
-#include <redoxi_video_reader/base/VideoReaderBaseTypes.hpp>
-#include <redoxi_video_reader/base/VideoReaderBase.hpp>
+#include <redoxi_video_reader/base/v1/VideoReaderBaseTypes.hpp>
+#include <redoxi_video_reader/base/v1/VideoReaderBase.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <json_struct/json_struct.h>
 
-namespace redoxi_works::video_reader_base
+namespace redoxi_works::video_reader::base::v1
 {
 // void InitConfig::from_node(const RedoxiVideoReaderBase *node)
 // {
@@ -17,4 +17,4 @@ namespace redoxi_works::video_reader_base
 //     RuntimeConfig::parse_from_node_parameters(this, node);
 // }
 
-} // namespace redoxi_works::video_reader_base
+} // namespace redoxi_works::video_reader::base::v1

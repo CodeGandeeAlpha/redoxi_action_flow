@@ -1,6 +1,3 @@
-// #include <redoxi_video_reader/base/VideoReaderBase.hpp>
-#include <redoxi_video_reader/base/VideoReaderBaseTypes.hpp>
-#include <redoxi_video_reader/base/VideoReaderBase.hpp>
 #include <redoxi_shared_memory/SharedMemoryClient.hpp>
 #include <redoxi_shared_memory/SharedMemoryFactory.hpp>
 #include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
@@ -9,9 +6,11 @@
 #include <json_struct/json_struct.h>
 #include <tbb/task_group.h>
 
+#include <redoxi_video_reader/base/v1/VideoReaderBaseTypes.hpp>
+#include <redoxi_video_reader/base/v1/VideoReaderBase.hpp>
 #define PRINT_THREAD_ID_IN_LOG (true)
 
-namespace redoxi_works
+namespace redoxi_works::video_reader::v1
 {
 
 struct RedoxiVideoReaderImpl {
@@ -389,4 +388,4 @@ void RedoxiVideoReaderBase::_step()
     }
 }
 
-} // namespace redoxi_works
+} // namespace redoxi_works::video_reader::v1

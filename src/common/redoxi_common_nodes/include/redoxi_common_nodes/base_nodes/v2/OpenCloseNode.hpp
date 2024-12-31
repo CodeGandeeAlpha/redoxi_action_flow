@@ -35,16 +35,16 @@ class OpenCloseNode : public BaseRosNode,
     // ros lifecycle callbacks
 
     // init() if necessary, and then _open(), UNCONFIGURED -> INACTIVE
-    RosLifecycleCallbackReturn_t on_configure(const RosLifecycleState_t &state) override;
+    RosLifecycleCallbackReturn_t on_configure(const RosLifecycleState_t &state) final;
 
     // _start(), INACTIVE -> ACTIVE
-    RosLifecycleCallbackReturn_t on_activate(const RosLifecycleState_t &state) override;
+    RosLifecycleCallbackReturn_t on_activate(const RosLifecycleState_t &state) final;
 
     // _stop(), ACTIVE -> INACTIVE
-    RosLifecycleCallbackReturn_t on_deactivate(const RosLifecycleState_t &state) override;
+    RosLifecycleCallbackReturn_t on_deactivate(const RosLifecycleState_t &state) final;
 
     // _close(), INACTIVE -> UNCONFIGURED
-    RosLifecycleCallbackReturn_t on_cleanup(const RosLifecycleState_t &state) override;
+    RosLifecycleCallbackReturn_t on_cleanup(const RosLifecycleState_t &state) final;
 
   protected:
     //! async close the node, after which you can open it again

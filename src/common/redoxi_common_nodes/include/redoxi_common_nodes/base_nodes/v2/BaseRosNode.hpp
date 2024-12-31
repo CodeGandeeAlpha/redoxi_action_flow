@@ -126,11 +126,6 @@ class BaseRosNode : public rclcpp_lifecycle::LifecycleNode
     }
 
   protected:
-    //! Initialize the node, will be called once in UNCONFIGURED state,
-    //! intended to be overridden by subclass, configs are created by _load_init_config() and _load_runtime_config()
-    virtual int _init(std::shared_ptr<BaseRosNodeInitConfig> init_config,
-                      std::shared_ptr<BaseRosNodeRuntimeConfig> runtime_config) = 0;
-
     //! Create init config, intended to be overridden by subclass
     virtual std::shared_ptr<BaseRosNodeInitConfig> _load_init_config() const = 0;
 
