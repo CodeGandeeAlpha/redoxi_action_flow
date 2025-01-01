@@ -24,4 +24,3 @@
 #include <rosidl_runtime_cpp/traits.hpp>
 #include <json_struct/json_struct.h>
 #include <nlohmann/json.hpp>
-#include <nav2_util/lifecycle_node.hpp>
