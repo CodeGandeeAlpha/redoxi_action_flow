@@ -37,7 +37,7 @@ int StampedImagePub::init(rclcpp::Node *node,
     if (qos) {
         m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, *qos);
     } else {
-        m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, DefaultQoS);
+        m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, DefaultParams::get_debug_publisher_qos());
     }
     return m_pub != nullptr ? 0 : -1;
 }
@@ -53,7 +53,7 @@ int StampedImagePub::init(rclcpp_lifecycle::LifecycleNode *node,
     if (qos) {
         m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, *qos);
     } else {
-        m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, DefaultQoS);
+        m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, DefaultParams::get_debug_publisher_qos());
     }
     return m_pub != nullptr ? 0 : -1;
 }

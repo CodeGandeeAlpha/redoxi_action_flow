@@ -148,7 +148,6 @@ class DownstreamDebugPublisher
     using Publisher_t = redoxi_works::StampedImagePub::Publisher_t;
     inline static const cv::Scalar DefaultHeaderColor{255, 0, 0};
     inline static constexpr double DefaultHeaderScale = 1.0;
-    inline static const rclcpp::QoS DefaultQoS = DefaultParams::DebugPublisherQoS;
 
     //! Constructor for DownstreamDebugPublisher with concept assert
     DownstreamDebugPublisher()
@@ -452,14 +451,15 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
         if (ret != 0) {
             RDX_RAISE_ERROR("[{}] failed to initialize downstream", __func__);
         }
-        auto qos_source = DownstreamSpec_t::SourceVisualizationPublisher_t::DefaultQoS;
-        auto qos_target = DownstreamSpec_t::TargetVisualizationPublisher_t::DefaultQoS;
+        auto qos_source = DefaultParams::get_debug_publisher_qos();
+        auto qos_target = DefaultParams::get_debug_publisher_qos();
         using SourceVisMsgType = typename DownstreamSpec_t::SourceVisualizationPublisher_t::MessageType_t;
         using TargetVisMsgType = typename DownstreamSpec_t::TargetVisualizationPublisher_t::MessageType_t;
 
         {
             auto topic = spec.get_vis_topic_source_data_failed();
             if (topic.has_value() && spec.get_use_debug_publish()) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Initializing source data failed publisher, topic={}", topic.value());
                 this->m_debug_pub_source_data_failed = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = node->template create_publisher<SourceVisMsgType>(topic.value(), qos_source);
                 this->m_debug_pub_source_data_failed->init(pub);
@@ -469,6 +469,7 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
         {
             auto topic = spec.get_vis_topic_source_data_sending();
             if (topic.has_value() && spec.get_use_debug_publish()) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Initializing source data sending publisher, topic={}", topic.value());
                 this->m_debug_pub_source_data_sending = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = node->template create_publisher<SourceVisMsgType>(topic.value(), qos_source);
                 this->m_debug_pub_source_data_sending->init(pub);
@@ -478,6 +479,7 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
         {
             auto topic = spec.get_vis_topic_source_data_succeeded();
             if (topic.has_value() && spec.get_use_debug_publish()) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Initializing source data succeeded publisher, topic={}", topic.value());
                 this->m_debug_pub_source_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = node->template create_publisher<SourceVisMsgType>(topic.value(), qos_source);
                 this->m_debug_pub_source_data_succeeded->init(pub);
@@ -487,6 +489,7 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
         {
             auto topic = spec.get_vis_topic_target_data_sending();
             if (topic.has_value() && spec.get_use_debug_publish()) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Initializing target data sending publisher, topic={}", topic.value());
                 this->m_debug_pub_target_data_sending = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = node->template create_publisher<TargetVisMsgType>(topic.value(), qos_target);
                 this->m_debug_pub_target_data_sending->init(pub);
@@ -496,6 +499,7 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
         {
             auto topic = spec.get_vis_topic_target_data_succeeded();
             if (topic.has_value() && spec.get_use_debug_publish()) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Initializing target data succeeded publisher, topic={}", topic.value());
                 this->m_debug_pub_target_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = node->template create_publisher<TargetVisMsgType>(topic.value(), qos_target);
                 this->m_debug_pub_target_data_succeeded->init(pub);
@@ -505,6 +509,7 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
         {
             auto topic = spec.get_vis_topic_target_data_failed();
             if (topic.has_value() && spec.get_use_debug_publish()) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Initializing target data failed publisher, topic={}", topic.value());
                 this->m_debug_pub_target_data_failed = std::make_shared<DownstreamDebugPublisher>();
                 auto pub = node->template create_publisher<TargetVisMsgType>(topic.value(), qos_target);
                 this->m_debug_pub_target_data_failed->init(pub);

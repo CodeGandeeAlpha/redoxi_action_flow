@@ -175,9 +175,9 @@ void FrameRelayPublisher::init(std::shared_ptr<InitConfig_t> config)
     // create publisher, regardless of whether debug pub is enabled
     RDX_INFO_DEV(this, __func__, print_thread_id, "{}", "Creating image publisher");
     m_debug_pub_accepted_goal = std::make_shared<StampedImagePub>();
-    m_debug_pub_accepted_goal->init(this, "debug_port/accepted_goal", DefaultParams::DebugPublisherQoS);
+    m_debug_pub_accepted_goal->init(this, "debug_port/accepted_goal", DefaultParams::get_debug_publisher_qos());
     m_debug_pub_rejected_goal = std::make_shared<StampedImagePub>();
-    m_debug_pub_rejected_goal->init(this, "debug_port/rejected_goal", DefaultParams::DebugPublisherQoS);
+    m_debug_pub_rejected_goal->init(this, "debug_port/rejected_goal", DefaultParams::get_debug_publisher_qos());
 
     RDX_INFO_DEV(this, __func__, print_thread_id, "{}", "Initialization completed");
 }

@@ -625,14 +625,19 @@ int Yolo8BaseNode<TModel>::_update_init_config(std::shared_ptr<BaseInitConfig_t>
 
     // create visualization publisher
     if (!config->publish_visualization_topic.empty()) {
+        RDX_INFO_DEV(this, __func__, false, "Initializing visualization publisher, topic={}", config->publish_visualization_topic);
+        // auto qos = rclcpp::QoS(10).best_effort().durability_volatile().keep_last(10);
         m_impl->pub_visualization = std::make_shared<StampedImagePub>(this, config->publish_visualization_topic);
+        RDX_INFO_DEV(this, __func__, false, "{}", "Visualization publisher initialized");
     }
 
     // create detection done publisher
     if (!config->publish_probe_detection_done_topic.empty()) {
+        RDX_INFO_DEV(this, __func__, false, "Initializing detection done publisher, topic={}", config->publish_probe_detection_done_topic);
         m_impl->pub_detection_done = this->create_publisher<std_msgs::msg::String>(
             config->publish_probe_detection_done_topic,
-            DefaultParams::ProbePublisherQoS);
+            DefaultParams::get_probe_publisher_qos());
+        RDX_INFO_DEV(this, __func__, false, "{}", "Detection done publisher initialized");
     }
 
     return 0;

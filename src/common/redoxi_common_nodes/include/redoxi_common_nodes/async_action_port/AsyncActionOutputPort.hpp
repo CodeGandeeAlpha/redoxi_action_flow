@@ -477,7 +477,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         }
 
         // initialize source data publisher
-        auto qos_source_data = DefaultParams::DataPublisherQoS;
+        auto qos_source_data = DefaultParams::get_data_publisher_qos();
         auto data_topic_for_source_data = init_config.get_data_topic_for_source_data();
         if (data_topic_for_source_data.has_value()) {
             m_data_pub_source_data = std::make_shared<SourceDataPublisher_t>();
@@ -486,7 +486,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         }
 
         // initialize source visualization publisher
-        auto qos_source_visualization = DefaultParams::DebugPublisherQoS;
+        auto qos_source_visualization = DefaultParams::get_debug_publisher_qos();
         auto visualization_topic_for_source_data = init_config.get_visualization_topic_for_source_data();
         if (visualization_topic_for_source_data.has_value()) {
             m_vis_pub_source_data = std::make_shared<SourceVisualizationPublisher_t>();
@@ -495,7 +495,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         }
 
         // initialize source probe publisher
-        auto qos_source_probe = DefaultParams::ProbePublisherQoS;
+        auto qos_source_probe = DefaultParams::get_probe_publisher_qos();
         auto probe_topic_for_source_data = init_config.get_probe_topic_for_source_data();
         if (probe_topic_for_source_data.has_value()) {
             m_probe_pub_source_data = std::make_shared<SourceProbePublisher_t>();
@@ -504,7 +504,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         }
 
         // initialize target data publisher
-        auto qos_target_data = DefaultParams::DataPublisherQoS;
+        auto qos_target_data = DefaultParams::get_data_publisher_qos();
         auto data_topic_for_target_data = init_config.get_data_topic_for_target_data();
         if (data_topic_for_target_data.has_value()) {
             m_data_pub_target_data = std::make_shared<TargetDataPublisher_t>();
@@ -513,7 +513,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         }
 
         // initialize target visualization publisher
-        auto qos_target_visualization = DefaultParams::DebugPublisherQoS;
+        auto qos_target_visualization = DefaultParams::get_debug_publisher_qos();
         auto visualization_topic_for_target_data = init_config.get_visualization_topic_for_target_data();
         if (visualization_topic_for_target_data.has_value()) {
             m_vis_pub_target_data = std::make_shared<TargetVisualizationPublisher_t>();
@@ -522,7 +522,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         }
 
         // initialize target probe publisher
-        auto qos_target_probe = DefaultParams::ProbePublisherQoS;
+        auto qos_target_probe = DefaultParams::get_probe_publisher_qos();
         auto probe_topic_for_target_data = init_config.get_probe_topic_for_target_data();
         if (probe_topic_for_target_data.has_value()) {
             m_probe_pub_target_data = std::make_shared<TargetProbePublisher_t>();

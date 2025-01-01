@@ -37,7 +37,8 @@ int DetectionRelayNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> co
     if (init_config->publish_visualization_topic.empty()) {
         RDX_INFO_DEV(this, __func__, false, "{}", "visualization publishing is disabled");
     } else {
-        m_pub_visualization.init(this, init_config->publish_visualization_topic, StampedImagePub::DefaultQoS);
+        m_pub_visualization.init(this, init_config->publish_visualization_topic,
+                                 DefaultParams::get_debug_publisher_qos());
     }
 
     RDX_INFO_DEV(this, __func__, false, "{}", "Init config update completed successfully");

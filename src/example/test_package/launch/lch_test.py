@@ -138,8 +138,8 @@ class VideoSourceParams:
                 downstream_specs=[
                     videoSrcCfg.DownstreamSpec(
                         name=DetectionDriverParams.node_name,
-                        action_name=f"/{DetectionDriverParams.node_name}/{DetectionDriverParams.input_action_name}",
-                        create_debug_pub=True,
+                        action_name=DetectionDriverParams.input_action_name,
+                        create_debug_pub=False,
                     ),
                 ],
                 # data_topic_for_source_data="data_msg/source_data",
@@ -233,9 +233,9 @@ lifecycle_manager = Node(
     parameters=[
         {
             "node_names": [
-                DetectorParams.node_name,
-                DetectionDriverParams.node_name,
-                VideoSourceParams.node_name,
+                f"{DetectorParams.node_name}",
+                f"{DetectionDriverParams.node_name}",
+                f"{VideoSourceParams.node_name}",
             ],
             "autostart": True,  # This will automatically configure and activate nodes
         }

@@ -39,9 +39,9 @@ int UniversalMotTrackerNode::_update_init_config(std::shared_ptr<BaseInitConfig_
     // create publisher for performance probe
     if (!init_config->publish_probe_topic.empty()) {
         RDX_INFO_DEV(this, __func__, "{}", "Creating publisher for probe");
-        m_pub_probe = this->create_publisher<std_msgs::msg::String>(init_config->publish_probe_topic, DefaultParams::ProbePublisherQoS);
+        m_pub_probe = this->create_publisher<std_msgs::msg::String>(init_config->publish_probe_topic,
+                                                                    DefaultParams::get_probe_publisher_qos());
     }
-
 
     return 0;
 }

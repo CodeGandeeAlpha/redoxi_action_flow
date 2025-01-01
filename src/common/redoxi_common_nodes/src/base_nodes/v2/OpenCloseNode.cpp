@@ -10,7 +10,7 @@ namespace redoxi_works::common_nodes::v2
 // {
 // }
 
-OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_configure(const RosLifecycleState_t &)
+OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_configure(const RosLifecycleState_t &state)
 {
     // init() if necessary, and then _open()
     if (!check_is_already_init()) {
@@ -24,11 +24,16 @@ OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_configure(const Ro
     if (ret != 0) {
         RDX_RAISE_ERROR("[f={}] Failed to open node", __func__);
     }
+
+    // do parent work
+    BaseRosNode::on_configure(state);
+
     return RosLifecycleCallbackReturn_t::SUCCESS;
 }
 
-OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_activate(const RosLifecycleState_t &)
+OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_activate(const RosLifecycleState_t &state)
 {
+
     auto ret = _start();
     if (ret != 0) {
         RDX_RAISE_ERROR("[f={}] Failed to start node", __func__);
@@ -37,10 +42,13 @@ OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_activate(const Ros
     //! Start step thread
     _start_step_thread();
 
+    // do parent work
+    BaseRosNode::on_activate(state);
+
     return RosLifecycleCallbackReturn_t::SUCCESS;
 }
 
-OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_deactivate(const RosLifecycleState_t &)
+OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_deactivate(const RosLifecycleState_t &state)
 {
     //! Stop step thread
     _stop_step_thread();
@@ -51,19 +59,26 @@ OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_deactivate(const R
         RDX_RAISE_ERROR("[f={}] Failed to stop node", __func__);
     }
 
+    // do parent work
+    BaseRosNode::on_deactivate(state);
+
     return RosLifecycleCallbackReturn_t::SUCCESS;
 }
 
-OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_cleanup(const RosLifecycleState_t &)
+OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_cleanup(const RosLifecycleState_t &state)
 {
     auto ret = _close();
     if (ret != 0) {
         RDX_RAISE_ERROR("[f={}] Failed to close node", __func__);
     }
+
+    // do parent work
+    BaseRosNode::on_cleanup(state);
+
     return RosLifecycleCallbackReturn_t::SUCCESS;
 }
 
-OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_shutdown(const RosLifecycleState_t &)
+OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_shutdown(const RosLifecycleState_t &state)
 {
     //! Stop step thread
     _stop_step_thread();
@@ -78,6 +93,9 @@ OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_shutdown(const Ros
     if (ret != 0) {
         RDX_RAISE_ERROR("[f={}] Failed to close node", __func__);
     }
+
+    // do parent work
+    BaseRosNode::on_shutdown(state);
 
     return RosLifecycleCallbackReturn_t::SUCCESS;
 }
@@ -154,7 +172,7 @@ int OpenCloseNode::open()
         RDX_RAISE_ERROR("[f={}] Cannot open node when not in unconfigured state", __func__);
     }
 
-    LifecycleNode::configure();
+    this->configure();
     return _on_opened();
 }
 
@@ -165,7 +183,7 @@ int OpenCloseNode::close()
         RDX_RAISE_ERROR("[f={}] Cannot close node when not in inactive state", __func__);
     }
 
-    LifecycleNode::cleanup();
+    this->cleanup();
     return _on_closed();
 }
 
@@ -176,7 +194,7 @@ int OpenCloseNode::start()
         RDX_RAISE_ERROR("[f={}] Cannot start node when not in inactive state", __func__);
     }
 
-    LifecycleNode::activate();
+    this->activate();
     return _on_started();
 }
 
@@ -187,7 +205,7 @@ int OpenCloseNode::stop()
         RDX_RAISE_ERROR("[f={}] Cannot stop node when not in active state", __func__);
     }
 
-    LifecycleNode::deactivate();
+    this->deactivate();
     return _on_stopped();
 }
 } // namespace redoxi_works::common_nodes::v2

@@ -46,9 +46,9 @@ int FrameRelayNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> config
 
     //! Step 4: Initialize publishers
     RDX_INFO_DEV(this, __func__, false, "{}", "Initializing publishers");
-    m_pub_relayed_frame.init(this, init_config->publish_topic, RelayedFrameQoS);
-    m_pub_frame_accepted.init(this, init_config->debug_topic_frame_accepted, StampedImagePub::DefaultUnreliableQoS);
-    m_pub_frame_rejected.init(this, init_config->debug_topic_frame_rejected, StampedImagePub::DefaultUnreliableQoS);
+    m_pub_relayed_frame.init(this, init_config->publish_topic, DefaultParams::get_data_publisher_qos());
+    m_pub_frame_accepted.init(this, init_config->debug_topic_frame_accepted, DefaultParams::get_debug_publisher_qos());
+    m_pub_frame_rejected.init(this, init_config->debug_topic_frame_rejected, DefaultParams::get_debug_publisher_qos());
 
     RDX_INFO_DEV(this, __func__, false, "{}", "Init config update completed successfully");
     return 0;

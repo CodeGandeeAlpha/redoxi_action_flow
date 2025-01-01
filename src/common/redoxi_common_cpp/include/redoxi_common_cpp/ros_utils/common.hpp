@@ -23,13 +23,42 @@ constexpr int DebugPublisherQueueSize = 10;
 constexpr int DataPublisherQueueSize = 50;
 
 //! QoS for the debug publisher
-const rclcpp::QoS DebugPublisherQoS = rclcpp::SensorDataQoS().durability_volatile();
+inline rclcpp::QoS get_debug_publisher_qos()
+{
+    return rclcpp::QoS(DebugPublisherQueueSize)
+        .best_effort()
+        .durability_volatile()
+        .keep_last(DebugPublisherQueueSize);
+};
+
+inline rclcpp::QoS get_data_publisher_qos()
+{
+    return rclcpp::QoS(DataPublisherQueueSize)
+        .reliable()
+        .durability_volatile()
+        .keep_last(DataPublisherQueueSize);
+};
+
+inline rclcpp::QoS get_probe_publisher_qos()
+{
+    return rclcpp::RosoutQoS()
+        .durability_volatile();
+};
+
+
+// const rclcpp::QoS DebugPublisherQoS = rclcpp::QoS(DebugPublisherQueueSize)
+//                                           .best_effort()
+//                                           .durability_volatile()
+//                                           .keep_last(DebugPublisherQueueSize);
 
 //! QoS for the data publisher, reliable and with larger history depth
-const rclcpp::QoS DataPublisherQoS = rclcpp::QoS(DataPublisherQueueSize).reliable().durability_volatile();
+// const rclcpp::QoS DataPublisherQoS = rclcpp::QoS(DataPublisherQueueSize)
+//                                          .reliable()
+//                                          .durability_volatile()
+//                                          .keep_last(DataPublisherQueueSize);
 
 // used for performance probing
-const rclcpp::QoS ProbePublisherQoS = rclcpp::RosoutQoS().durability_volatile();
+// const rclcpp::QoS ProbePublisherQoS = rclcpp::RosoutQoS().durability_volatile();
 
 } // namespace DefaultParams
 

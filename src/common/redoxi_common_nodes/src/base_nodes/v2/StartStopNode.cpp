@@ -19,10 +19,12 @@ StartStopNode::RosLifecycleCallbackReturn_t StartStopNode::on_configure(const Ro
             RDX_RAISE_ERROR("[f={}] Failed to init node", __func__);
         }
     }
+
+    RDX_INFO_DEV(this, __func__, false, "{}", "Node configured");
     return RosLifecycleCallbackReturn_t::SUCCESS;
 }
 
-StartStopNode::RosLifecycleCallbackReturn_t StartStopNode::on_activate(const RosLifecycleState_t &)
+StartStopNode::RosLifecycleCallbackReturn_t StartStopNode::on_activate(const RosLifecycleState_t &state)
 {
     auto ret = _start();
     if (ret != 0) {
@@ -31,10 +33,15 @@ StartStopNode::RosLifecycleCallbackReturn_t StartStopNode::on_activate(const Ros
 
     //! Start step thread
     _start_step_thread();
+
+    // do parent work
+    BaseRosNode::on_activate(state);
+
+    RDX_INFO_DEV(this, __func__, false, "{}", "Node activated");
     return RosLifecycleCallbackReturn_t::SUCCESS;
 }
 
-StartStopNode::RosLifecycleCallbackReturn_t StartStopNode::on_deactivate(const RosLifecycleState_t &)
+StartStopNode::RosLifecycleCallbackReturn_t StartStopNode::on_deactivate(const RosLifecycleState_t &state)
 {
     //! Stop step thread
     _stop_step_thread();
@@ -45,6 +52,10 @@ StartStopNode::RosLifecycleCallbackReturn_t StartStopNode::on_deactivate(const R
         RDX_RAISE_ERROR("[f={}] Failed to stop node", __func__);
     }
 
+    // do parent work
+    BaseRosNode::on_deactivate(state);
+
+    RDX_INFO_DEV(this, __func__, false, "{}", "Node deactivated");
     return RosLifecycleCallbackReturn_t::SUCCESS;
 }
 
@@ -59,6 +70,10 @@ StartStopNode::RosLifecycleCallbackReturn_t StartStopNode::on_shutdown(const Ros
         RDX_RAISE_ERROR("[f={}] Failed to stop node", __func__);
     }
 
+    // do parent work
+    BaseRosNode::on_shutdown(state);
+
+    RDX_INFO_DEV(this, __func__, false, "{}", "Node shutdown");
     return RosLifecycleCallbackReturn_t::SUCCESS;
 }
 
@@ -108,7 +123,9 @@ int StartStopNode::start()
         RDX_RAISE_ERROR("[f={}] Cannot start node when not in inactive state", __func__);
     }
 
-    LifecycleNode::activate();
+    // do parent work
+    this->activate();
+
     return _on_started();
 }
 
@@ -119,7 +136,8 @@ int StartStopNode::stop()
         RDX_RAISE_ERROR("[f={}] Cannot stop node when not in active state", __func__);
     }
 
-    LifecycleNode::deactivate();
+    // do parent work
+    this->deactivate();
 
     // clean up the node back to unconfigured state
     // LifecycleNode::cleanup();
