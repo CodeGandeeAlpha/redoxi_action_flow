@@ -23,13 +23,13 @@ constexpr int DebugPublisherQueueSize = 10;
 constexpr int DataPublisherQueueSize = 50;
 
 //! QoS for the debug publisher
-const rclcpp::QoS DebugPublisherQoS = rclcpp::SensorDataQoS();
+const rclcpp::QoS DebugPublisherQoS = rclcpp::SensorDataQoS().durability_volatile();
 
 //! QoS for the data publisher, reliable and with larger history depth
-const rclcpp::QoS DataPublisherQoS = rclcpp::QoS(DataPublisherQueueSize).reliable();
+const rclcpp::QoS DataPublisherQoS = rclcpp::QoS(DataPublisherQueueSize).reliable().durability_volatile();
 
 // used for performance probing
-const rclcpp::QoS ProbePublisherQoS = rclcpp::RosoutQoS();
+const rclcpp::QoS ProbePublisherQoS = rclcpp::RosoutQoS().durability_volatile();
 
 } // namespace DefaultParams
 

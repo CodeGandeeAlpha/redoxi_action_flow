@@ -15,7 +15,16 @@ class DetectionDriver : public CallActionDriverBase<image_ports::AsyncImageInput
     using BaseNode_t = CallActionDriverBase<image_ports::AsyncImageInputPort,
                                             detection_ports::request_response::DetectionRequestOutputPort,
                                             detection_ports::response_only::DetectionResponseOutputPort>;
-    using BaseNode_t::CallActionDriverBase;
+    DetectionDriver(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions())
+        : BaseNode_t(name, options)
+    {
+    }
+
+    DetectionDriver(const rclcpp::NodeOptions &options = rclcpp::NodeOptions())
+        : DetectionDriver("DetectionDriver", options)
+    {
+    }
+
 
   protected:
     int _on_process_callee_result(OutputTypes::OutputRequest_t *output_request,

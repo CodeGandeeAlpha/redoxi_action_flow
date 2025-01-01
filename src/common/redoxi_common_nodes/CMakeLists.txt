@@ -16,6 +16,7 @@ find_package(json_struct REQUIRED)
 find_package(rosidl_runtime_cpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
+find_package(rclcpp_components REQUIRED)
 # uncomment the following section in order to fill in further dependencies
 # manually. find_package(<dependency> REQUIRED)
 
@@ -57,6 +58,23 @@ target_precompile_headers(redoxi_common_nodes PRIVATE ${CMAKE_CURRENT_SOURCE_DIR
 target_compile_definitions(redoxi_common_nodes
                            PRIVATE "REDOXI_COMMON_NODES_BUILDING_LIBRARY")
 
+
+# add_executable(redoxi_common_nodes_executable src/redoxi_common_nodes_components.cpp)
+# ament_target_dependencies(
+#   redoxi_common_nodes_executable
+#   PUBLIC
+#   rclcpp
+#   rclcpp_action
+#   redoxi_common_cpp
+#   cv_bridge
+#   rosidl_runtime_cpp
+#   rclcpp_lifecycle
+#   lifecycle_msgs
+#   rclcpp_components)
+rclcpp_components_register_node(redoxi_common_nodes 
+  PLUGIN "redoxi_works::common_nodes::drivers::DetectionDriver"
+  EXECUTABLE redoxi_common_nodes_executable)
+
 ament_target_dependencies(
   redoxi_common_nodes
   PUBLIC
@@ -66,7 +84,8 @@ ament_target_dependencies(
   cv_bridge
   rosidl_runtime_cpp
   rclcpp_lifecycle
-  lifecycle_msgs)
+  lifecycle_msgs
+  rclcpp_components)
 
 install(DIRECTORY include/ DESTINATION include)
 install(
@@ -97,6 +116,7 @@ ament_export_dependencies(
   rosidl_runtime_cpp
   rclcpp_lifecycle
   lifecycle_msgs
+  rclcpp_components
   ${cpp_required_to_find})
 
 ament_export_include_directories(include)

@@ -22,7 +22,7 @@ namespace redoxi_works::model_nodes::yolo8
 {
 
 template <YoloModelConcept TModel>
-class Yolo8BaseNode : public redoxi_works::common_nodes::StartStopNode
+class Yolo8BaseNode : public common_nodes::StartStopNode
 {
   public:
     inline static constexpr const char *RequiredImageEncoding = sensor_msgs::image_encodings::RGB8;
@@ -62,6 +62,12 @@ class Yolo8BaseNode : public redoxi_works::common_nodes::StartStopNode
   public:
     explicit Yolo8BaseNode(const std::string &node_name,
                            const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+
+    explicit Yolo8BaseNode(const rclcpp::NodeOptions &options = rclcpp::NodeOptions())
+        : Yolo8BaseNode("Yolo8BaseNode", options)
+    {
+    }
+
     virtual ~Yolo8BaseNode() noexcept;
 
   protected:
@@ -754,14 +760,18 @@ template <YoloModelConcept TModel>
 int Yolo8BaseNode<TModel>::_create_all_inference_resources(
     const std::vector<std::shared_ptr<typename InitConfig_t::ModelConfig_t>> &model_configs)
 {
+    RDX_INFO_DEV(this, __func__, false, "{}", "Starting to create inference resources");
+
     if (model_configs.empty()) {
         RDX_INFO_DEV(this, __func__, false, "{}", "No model configs, skipping model resource creation");
         return 0;
     }
 
+    RDX_INFO_DEV(this, __func__, false, "{}", "Setting up inference resource pool capacity");
     // setup capacity of the inference resource pool
     m_impl->inference_resource_pool.set_capacity(model_configs.size());
 
+    RDX_INFO_DEV(this, __func__, false, "{}", "Counting replicas for each model config");
     // now fill the pool with inference resources
     std::map<std::shared_ptr<typename InitConfig_t::ModelConfig_t>, int> model_config_to_replicas;
 
@@ -770,8 +780,10 @@ int Yolo8BaseNode<TModel>::_create_all_inference_resources(
         model_config_to_replicas[model_config] += 1;
     }
 
+    RDX_INFO_DEV(this, __func__, false, "{}", "Creating inference resources for each model config");
     // create inference resources for each model config
     for (const auto &[model_config, replicas] : model_config_to_replicas) {
+        RDX_INFO_DEV(this, __func__, false, "Creating {} replicas for model config", replicas);
         auto ret = _create_inference_resource(model_config, replicas);
         if (ret != 0) {
             RDX_RAISE_ERROR("Failed to create inference resource, error code: {}", ret);

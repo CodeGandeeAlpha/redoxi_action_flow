@@ -1,3 +1,4 @@
+#include <yolo8_series/_pch.hpp>
 #include <yolo8_series/bodypose/Yolo8BodyPoseNode.hpp>
 
 namespace redoxi_works::model_nodes::yolo8

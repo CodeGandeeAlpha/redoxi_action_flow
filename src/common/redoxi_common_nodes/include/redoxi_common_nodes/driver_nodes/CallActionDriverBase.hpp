@@ -40,9 +40,7 @@ class CallActionDriverBase : public OpenCloseNode
     using BaseNode_t = OpenCloseNode;
     using BaseInitConfig_t = BaseNode_t::InitConfig_t;
     using BaseRuntimeConfig_t = BaseNode_t::RuntimeConfig_t;
-    using OpenCloseNode::OpenCloseNode;
-
-    // CallActionDriverBase(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+    using BaseNode_t::BaseNode_t;
 
   public:
     //! types of the input port of this node, which accepts incoming requests

@@ -27,6 +27,7 @@ find_package(Boost REQUIRED)
 
 
 set(source_files
+  src/redoxi_video_reader.cpp
   src/base/v1/VideoReaderBase.cpp
   src/base/v1/VideoReaderBaseTypes.cpp
   src/v1/VideoSourceFromUrl.cpp
@@ -67,6 +68,7 @@ ament_target_dependencies(
 target_compile_definitions(redoxi_video_reader PRIVATE "REDOXI_VIDEO_READER_BUILDING_LIBRARY")
 rclcpp_components_register_nodes(redoxi_video_reader
   "redoxi_works::video_readers::v2::VideoSourceFromUrl"
+  "redoxi_works::video_readers::VideoSourceFromUrl"
 )
 
 install(

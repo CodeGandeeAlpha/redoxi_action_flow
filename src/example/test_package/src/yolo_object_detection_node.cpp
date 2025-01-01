@@ -8,7 +8,7 @@ namespace fs = std::filesystem;
 
 namespace rdx = redoxi_works;
 namespace rdx_models = redoxi_works::model_nodes;
-using RosNode_t = rdx_models::yolo8::detection::Yolo8ObjectDetNode;
+using RosNode_t = rdx_models::yolo8::Yolo8ObjectDetNode;
 
 const fs::path model_path = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx";
 
