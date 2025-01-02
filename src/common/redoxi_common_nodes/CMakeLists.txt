@@ -17,6 +17,7 @@ find_package(rosidl_runtime_cpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
 find_package(rclcpp_components REQUIRED)
+find_package(nav2_util REQUIRED)
 # uncomment the following section in order to fill in further dependencies
 # manually. find_package(<dependency> REQUIRED)
 
@@ -85,6 +86,7 @@ ament_target_dependencies(
   rosidl_runtime_cpp
   rclcpp_lifecycle
   lifecycle_msgs
+  nav2_util
   rclcpp_components)
 
 install(DIRECTORY include/ DESTINATION include)
@@ -117,6 +119,7 @@ ament_export_dependencies(
   rclcpp_lifecycle
   lifecycle_msgs
   rclcpp_components
+  nav2_util
   ${cpp_required_to_find})
 
 ament_export_include_directories(include)

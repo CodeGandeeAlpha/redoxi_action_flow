@@ -1,3 +1,4 @@
+# test lifecycle node activate and deactivate using nav2_lifecycle_manager
 from launch import LaunchDescription
 from launch_ros.actions import Node, LoadComposableNodes, ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
@@ -39,6 +40,11 @@ log_level_arg = DeclareLaunchArgument(
     description="Logging level",
 )
 
+
+def get_logger_arg(node_name: str):
+    return ["--ros-args", "--log-level", [f"{node_name}:=", logger]]
+
+
 JsonParamKey = "param_as_json_string"
 
 
@@ -60,8 +66,6 @@ class InputCacheSize:
 # video_source -> detection_driver -> tracker_driver -> frame_relay
 #                       |                   |
 #                    detector           tracker
-
-
 class DetectorParams:
     fn_model = f"{workspace_root}/tmp/models/yolov8s-pose.onnx"
     node_name = "detector"
@@ -136,13 +140,13 @@ class VideoSourceParams:
             video_url=fn_video,
             auto_replay=True,
             primary_output_spec=videoSrcCfg.OutputPortConfig(
-                downstream_specs=[
-                    videoSrcCfg.DownstreamSpec(
-                        name=DetectionDriverParams.node_name,
-                        action_name=DetectionDriverParams.input_action_name,
-                        create_debug_pub=False,
-                    ),
-                ],
+                # downstream_specs=[
+                #     videoSrcCfg.DownstreamSpec(
+                #         name=DetectionDriverParams.node_name,
+                #         action_name=DetectionDriverParams.input_action_name,
+                #         create_debug_pub=False,
+                #     ),
+                # ],
                 # data_topic_for_source_data="data_msg/source_data",
                 # data_topic_for_target_data="data_msg/target_data",
                 probe_topic_for_target_data="probe/target_data",
@@ -151,7 +155,7 @@ class VideoSourceParams:
         runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
             step_interval=StepIntervals.Medium,
             video_start_time=0,
-            video_end_time=1000000,
+            video_end_time=-1,
             frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
                 precondition=videoSrcCfg.DeliveryPrecondition.DontCare,
                 drop_strategy=videoSrcCfg.DropStrategy.DropAsNeeded,
@@ -170,6 +174,22 @@ class VideoSourceParams:
         ),
     )
 
+
+node_video_source = Node(
+    package="test_package",
+    executable="video_from_url_node",
+    name=VideoSourceParams.node_name,
+    namespace=VideoSourceParams.node_name,
+    output="screen",
+    parameters=[
+        {
+            "param_as_json_string": VideoSourceParams.node_params.to_json(
+                ignore_none=True, compact=False
+            ),
+        },
+    ],
+    arguments=get_logger_arg(VideoSourceParams.node_name),
+)
 
 # Create container node
 container = ComposableNodeContainer(

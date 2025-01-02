@@ -5,7 +5,7 @@
 #include <nlohmann/json.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_lifecycle/lifecycle_node.hpp>
-// #include <nav2_util/lifecycle_node.hpp>
+#include <nav2_util/lifecycle_node.hpp>
 #include <lifecycle_msgs/msg/state.hpp>
 #include <lifecycle_msgs/msg/transition.hpp>
 #include <json_struct/json_struct.h>
@@ -71,13 +71,13 @@ class BaseRosNodeRuntimeConfig
 /**
  * @brief Base class for all ROS nodes, with step function
  */
-class BaseRosNode : public rclcpp_lifecycle::LifecycleNode
+class BaseRosNode : public nav2_util::LifecycleNode
 {
   public:
     using InitConfig_t = BaseRosNodeInitConfig;
     using RuntimeConfig_t = BaseRosNodeRuntimeConfig;
 
-    using RosBaseNode_t = rclcpp_lifecycle::LifecycleNode;
+    using RosBaseNode_t = nav2_util::LifecycleNode;
     using RosPrimaryState_t = lifecycle_msgs::msg::State;
     using RosLifecycleState_t = rclcpp_lifecycle::State;
     using RosLifecycleTransition_t = rclcpp_lifecycle::Transition;

@@ -132,25 +132,25 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
 # fn_model = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx"
 # fn_model = r"/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8m-pose-dynbatch.onnx"
 # fn_model = f"{workspace_root}/tmp/models/yolov8n-pose-640.onnx"
-# fn_model = f"{workspace_root}/tmp/models/yolov8s-pose.onnx"
+fn_model = f"{workspace_root}/tmp/models/yolov8s-pose.onnx"
 # fn_model = (
 #     f"{workspace_root}/tmp/models/rknn/pose/small/yolov8s-pose-224x384-bs1-pthq.rknn"
 # )
-fn_model = f"/data/code/psf_ros2_ws/tmp/models/rknn/pose/nano/yolov8n-pose-352x640-bs1-pthq.rknn"
+# fn_model = f"/data/code/psf_ros2_ws/tmp/models/rknn/pose/nano/yolov8n-pose-352x640-bs1-pthq.rknn"
 det_node_name = "detector"
 det_node_params = yolo.Yolo8ModelNodeConfig(
     init_config=yolo.Yolo8ModelInitConfig(
         model_configs=[
-            # {
-            #     "model_path": fn_model,
-            #     "device_type": "cuda",
-            #     "device_index": 0,
-            # },
             {
                 "model_path": fn_model,
-                "device_type": "rknpu",
-                "device_index": -2,
+                "device_type": "cuda",
+                "device_index": 0,
             },
+            # {
+            #     "model_path": fn_model,
+            #     "device_type": "rknpu",
+            #     "device_index": -2,
+            # },
         ],
         detection_request_config=yolo.DetectionRequestConfig(
             input_port_config=yolo.InputPortConfig(
@@ -237,7 +237,7 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
         step_interval=StepIntervals.Medium,
         video_start_time=0,
-        video_end_time=1000000,
+        video_end_time=-1,
         frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
             precondition=videoSrcCfg.DeliveryPrecondition.DontCare,
             drop_strategy=videoSrcCfg.DropStrategy.DropAsNeeded,
