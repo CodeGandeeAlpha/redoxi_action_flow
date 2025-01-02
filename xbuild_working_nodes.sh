@@ -26,6 +26,7 @@ PackagesToBuild="redoxi_common_nodes \
                  yolo8_series \
                  test_package \
                  universal_mot_trackers \
+                 redoxi_inference_rknn \
                  rosboard"
 
 # PackagesToBuild="redoxi_inference_rknn \

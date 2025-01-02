@@ -14,6 +14,7 @@
   <depend>redoxi_video_reader</depend>
   <depend>redoxi_shared_memory</depend>
   <depend>redoxi_inference</depend>
+  <depend>redoxi_inference_rknn</depend>
   <depend>redoxi_dnn_models</depend>
   <depend>yolo8_series</depend>
   <depend>universal_mot_trackers</depend>

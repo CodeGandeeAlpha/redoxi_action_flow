@@ -107,9 +107,9 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
             data_topic_for_source_data="output/data/source_data",  # source data msg is image, transmission is reliable, better smoothness in visualization
             # visualization_topic_for_source_data="vis_msg/source_data",  # source visualization msg is image, but transmission is unreliable, may drop frames
             # data_topic_for_target_data="data_msg/target_data",  # target data msg is tracking result, transmission is reliable, can be used for data processing
-            visualization_topic_for_target_data="output/vis/target_data",  # target visualization msg is image, but transmission is unreliable, may drop frames
+            # visualization_topic_for_target_data="output/vis/target_data",  # target visualization msg is image, but transmission is unreliable, may drop frames
             probe_topic_for_target_data="output/probe/target_data",
-            probe_topic_for_source_data="output/probe/source_data",
+            # probe_topic_for_source_data="output/probe/source_data",
         ),
         callee_request_port_config=motTrackersDriverCfg.OutputPortConfig(
             downstream_specs=[
@@ -118,12 +118,13 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
                     action_name=f"/{tracker_node_name}/{tracker_node_params.init_config.input_port_config.action_name}",
                 ),
             ],
-            probe_topic_for_source_data="callee/probe/source_data",
+            # probe_topic_for_source_data="callee/probe/source_data",
             probe_topic_for_target_data="callee/probe/target_data",
         ),
     ),
     runtime_config=motTrackersDriverCfg.TrackerDriverRuntimeConfig(
         enable_blocking_mode=False,
+        step_interval=StepIntervals.Fast,
     ),
 )
 
@@ -164,7 +165,8 @@ det_node_params = yolo.Yolo8ModelNodeConfig(
             conf_threshold=0.2,
             iou_threshold=0.6,
             selected_class_ids=[0],  # 0=person (ultralytics convention)
-        )
+        ),
+        step_interval=StepIntervals.Fast,
     ),
 )
 
@@ -189,7 +191,7 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
             # visualization_topic_for_source_data="output/vis/source_data",
             # visualization_topic_for_target_data="output/vis/target_data",
             probe_topic_for_target_data="output/probe/target_data",
-            probe_topic_for_source_data="output/probe/source_data",
+            # probe_topic_for_source_data="output/probe/source_data",
         ),
         callee_request_port_config=detDriverCfg.OutputPortConfig(
             downstream_specs=[
@@ -202,11 +204,12 @@ det_driver_node_params = detDriverCfg.DetectionDriverNodeConfig(
             # visualization_topic_for_source_data="vis/callee/source_data",
             # visualization_topic_for_target_data="callee/vis/target_data",
             probe_topic_for_target_data="callee/probe/target_data",
-            probe_topic_for_source_data="callee/probe/source_data",
+            # probe_topic_for_source_data="callee/probe/source_data",
         ),
     ),
     runtime_config=detDriverCfg.DetectionDriverRuntimeConfig(
         enable_blocking_mode=False,
+        step_interval=StepIntervals.Fast,
     ),
 )
 
@@ -237,7 +240,7 @@ video_src_node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
         step_interval=StepIntervals.Medium,
         video_start_time=0,
-        video_end_time=1000000,
+        video_end_time=-1,
         frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
             precondition=videoSrcCfg.DeliveryPrecondition.DontCare,
             drop_strategy=videoSrcCfg.DropStrategy.DropAsNeeded,
