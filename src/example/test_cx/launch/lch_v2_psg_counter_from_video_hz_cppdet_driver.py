@@ -26,6 +26,7 @@ log_level_arg = DeclareLaunchArgument(
 #                                                 |                                                  |
 #                                     yolo_body_pose_detection_node                           psg_tracker_node
 
+
 class StepIntervals:
     VerySlow = 3000000
     Slow = 200000
@@ -75,8 +76,8 @@ psg_counter_node_json_params = psgCounterCfg.PSGCounterNodeConfig(
                     action_name=f"/{document_sink_node_name}/{document_sink_node_json_params.init_config.input_port_config.action_name}",
                 )
             ],
-            data_topic_for_target_data="data_out/target_data",
-            data_topic_for_source_data="data_out/source_data",
+            # data_topic_for_target_data="data_out/target_data",
+            # data_topic_for_source_data="data_out/source_data",
         ),
     ),
     runtime_config=psgCounterCfg.PSGCounterRuntimeConfig(
@@ -84,14 +85,14 @@ psg_counter_node_json_params = psgCounterCfg.PSGCounterNodeConfig(
         document_interval=0,
         enable_blocking_mode=False,
         publish_to_debug_topic=False,
-        # frame_request_policy=psgCounterCfg.DeliveryPolicy(
-        #     precondition="no_precondition",
-        #     drop_strategy="no_drop",
-        # ),
-        # frame_enqueue_policy=psgCounterCfg.DeliveryPolicy(
-        #     precondition="no_precondition",
-        #     drop_strategy="no_drop",
-        # ),
+        frame_request_policy=psgCounterCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
+        frame_enqueue_policy=psgCounterCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
     ),
 )
 
@@ -132,9 +133,9 @@ psg_tracker_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeConfig(
                     action_name=f"/{psg_counter_node_name}/{psg_counter_node_json_params.init_config.input_port_config.action_name}",
                 )
             ],
-            data_topic_for_target_data="data_out/target_data_pipeline",
-            data_topic_for_source_data="data_out/source_data_pipeline",
-            visualization_topic_for_source_data="debug/source_data_visualization",
+            # data_topic_for_target_data="data_out/target_data_pipeline",
+            # data_topic_for_source_data="data_out/source_data_pipeline",
+            # visualization_topic_for_source_data="debug/source_data_visualization",
         ),
         callee_request_port_config=psgDriverBaseCfg.OutputPortConfig(
             downstream_specs=[
@@ -143,7 +144,7 @@ psg_tracker_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeConfig(
                     action_name=f"/{psg_tracker_node_name}/{psg_tracker_node_json_params.init_config.input_port_config.action_name}",
                 )
             ],
-            data_topic_for_target_data="data_out/target_data_model",
+            # data_topic_for_target_data="data_out/target_data_model",
         ),
     ),
     runtime_config=psgDriverBaseCfg.DriverBaseRuntimeConfig(
@@ -167,8 +168,8 @@ psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
                     action_name=f"/{psg_tracker_node_driver_name}/{psg_tracker_node_driver_json_params.init_config.input_port_config.action_name}",
                 )
             ],
-            data_topic_for_target_data="data_out/target_data",
-            data_topic_for_source_data="data_out/source_data",
+            # data_topic_for_target_data="data_out/target_data",
+            # data_topic_for_source_data="data_out/source_data",
         ),
     ),
     runtime_config=psgInoutBaseCfg.InoutBaseRuntimeConfig(
@@ -176,14 +177,14 @@ psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
         document_interval=0,
         enable_blocking_mode=False,
         publish_to_debug_topic=False,
-        # frame_request_policy=psgInoutBaseCfg.DeliveryPolicy(
-        #     precondition="no_precondition",
-        #     drop_strategy="no_drop",
-        # ),
-        # frame_enqueue_policy=psgInoutBaseCfg.DeliveryPolicy(
-        #     precondition="no_precondition",
-        #     drop_strategy="no_drop",
-        # ),
+        frame_request_policy=psgInoutBaseCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
+        frame_enqueue_policy=psgInoutBaseCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
     ),
 )
 
@@ -205,8 +206,8 @@ det_node_params = yolo.Yolo8ModelNodeConfig(
                 action_name="in/detection_request",
             ),
         ),
-        publish_visualization_topic="debug/visualization",
-        publish_probe_detection_done_topic="probe/detection_done",
+        # publish_visualization_topic="debug/visualization",
+        # publish_probe_detection_done_topic="probe/detection_done",
     ),
     runtime_config=yolo.Yolo8ModelRuntimeConfig(
         model_output_config=yolo.ModelPostprocessConfig(
@@ -234,9 +235,9 @@ psg_all_detector_cpp_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeCo
                     action_name=f"/{psg_person_generator_node_name}/{psg_person_generator_node_json_params.init_config.input_port_config.action_name}",
                 )
             ],
-            data_topic_for_target_data="data_out/target_data_pipeline",
-            data_topic_for_source_data="data_out/source_data_pipeline",
-            visualization_topic_for_source_data="debug/source_data_visualization",
+            # data_topic_for_target_data="data_out/target_data_pipeline",
+            # data_topic_for_source_data="data_out/source_data_pipeline",
+            # visualization_topic_for_source_data="debug/source_data_visualization",
         ),
         callee_request_port_config=psgDriverBaseCfg.OutputPortConfig(
             downstream_specs=[
@@ -245,7 +246,7 @@ psg_all_detector_cpp_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeCo
                     action_name=f"/{det_node_name}/{det_node_params.init_config.detection_request_config.input_port_config.action_name}",
                 )
             ],
-            data_topic_for_target_data="data_out/target_data_model",
+            # data_topic_for_target_data="data_out/target_data_model",
         ),
     ),
     runtime_config=psgDriverBaseCfg.DriverBaseRuntimeConfig(
@@ -269,7 +270,7 @@ psg_master_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
                     action_name=f"/{psg_all_detector_cpp_node_driver_name}/{psg_all_detector_cpp_node_driver_json_params.init_config.input_port_config.action_name}",
                 )
             ],
-            data_topic_for_target_data="data_out/target_data",
+            # data_topic_for_target_data="data_out/target_data",
         ),
     ),
     runtime_config=psgInoutBaseCfg.InoutBaseRuntimeConfig(
@@ -277,14 +278,14 @@ psg_master_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
         document_interval=0,
         enable_blocking_mode=False,
         publish_to_debug_topic=False,
-        # frame_request_policy=psgInoutBaseCfg.DeliveryPolicy(
-        #     precondition="no_precondition",
-        #     drop_strategy="no_drop",
-        # ),
-        # frame_enqueue_policy=psgInoutBaseCfg.DeliveryPolicy(
-        #     precondition="no_precondition",
-        #     drop_strategy="no_drop",
-        # ),
+        frame_request_policy=psgInoutBaseCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
+        frame_enqueue_policy=psgInoutBaseCfg.DeliveryPolicy(
+            precondition="no_precondition",
+            drop_strategy="no_drop",
+        ),
     ),
 )
 
@@ -304,7 +305,7 @@ video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
                     create_debug_pub=True,
                 ),
             ],
-            data_topic_for_target_data="data_out/target_data",
+            # data_topic_for_target_data="data_out/target_data",
         ),
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
@@ -312,10 +313,10 @@ video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
         output_image_size=videoSrcCfg.ImageSize(width=1920, height=1080),
         output_image_encoding="bgr8",
         frame_request_policy=videoSrcCfg.DeliveryPolicy(
-            drop_strategy="drop_as_needed",
+            drop_strategy="no_drop",
         ),
         frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
-            drop_strategy="drop_as_needed",
+            drop_strategy="no_drop",
         ),
     ),
 )

@@ -43,6 +43,8 @@ document_sink_node_json_params = psgDocSinkCfg.PSGDocumentSinkNodeConfig(
             action_name="in/action",
         ),
         publish_topic="out/relayed_document",
+        save_middle_result_dir_path="/3d/chengxiao/code/psf_ros2_ws/tmp/test_psg_document_sink",
+        enable_save_middle_result=True,
     ),
     runtime_config=psgDocSinkCfg.PSGDocumentSinkNodeRuntimeConfig(
         enable_debug_topics=True,

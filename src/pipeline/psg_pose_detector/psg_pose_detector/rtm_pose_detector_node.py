@@ -547,7 +547,7 @@ class PoseDetectorNode(Node, IOpenCloseProtocol):
                 bodypose_msg.keypoints_2.append(kpt)
                 bodypose_msg.confidence.append(scores[i][j])
                 bodypose_msg.semantic_type.append(j)
-            bodypose_msg.x_group_uid = uuids[i]
+            bodypose_msg.x_task_metadata.source_task_uid = uuids[i]
             bodypose_msg.frame_metadata = frame_msg.metadata
 
             bodyposes.append(bodypose_msg)
