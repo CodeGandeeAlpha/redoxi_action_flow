@@ -3,6 +3,9 @@ from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
 from launch.actions import SetEnvironmentVariable
 from launch.actions import DeclareLaunchArgument
+from launch.events import Shutdown
+from launch.event_handlers import OnProcessExit
+from launch.actions import RegisterEventHandler
 
 import redoxi_common_py.configs.video_source_from_url as videoSrcCfg
 import psg_common_py.configs.psg_document_sink as psgDocSinkCfg
@@ -12,7 +15,7 @@ import psg_common_py.configs.inout_base as psgInoutBaseCfg
 import psg_common_py.configs.psg_counter as psgCounterCfg
 import psg_common_py.configs.psg_tracker as psgTrackerCfg
 import yolo8_series.configs as yolo
-import json
+import os
 
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
@@ -35,10 +38,23 @@ class StepIntervals:
     VeryFast = 1000
 
 
-fn_video = (
-    # "/3d/chengxiao/code/psf_ros2_ws/data/20.22.6.214-2023-12-01-12-00-03_1400_1410.mp4"
-    # "/3d/chengxiao/data/passengerflow/fairmot_train_230907/videos/20.22.6.30-2023-06-18-15-00-02.mp4"
-    "/3d/chengxiao/data/passengerflow/50_wanda_30s/20.22.6.30-2023-06-18-15-00-02_27908_28658.mp4"
+ROS_FN_VIDEO = os.environ.get(
+    "ROS_FN_VIDEO",
+    "/3d/chengxiao/data/passengerflow/50_wanda_30s/20.22.6.30-2023-06-18-15-00-02_27908_28658.mp4",
+)
+ROS_SAVE_MIDDLE_RESULT_DIR_PATH = os.environ.get(
+    "ROS_SAVE_MIDDLE_RESULT_DIR_PATH",
+    "/3d/chengxiao/code/psf_ros2_ws/tmp/test_psg_document_sink",
+)
+
+ROS_FN_MODEL = os.environ.get(
+    "ROS_FN_MODEL",
+    "/3d/chengxiao/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx",
+)
+
+ROS_PSG_CONFIG_PATH = os.environ.get(
+    "ROS_PSG_CONFIG_PATH",
+    "/3d/chengxiao/data/passengerflow/fairmot_train_230907/psg_configs/20.22.6.30.json",
 )
 
 # 文档接收节点配置
@@ -50,7 +66,7 @@ document_sink_node_json_params = psgDocSinkCfg.PSGDocumentSinkNodeConfig(
             action_name="in/action",
         ),
         publish_topic="out/relayed_document",
-        save_middle_result_dir_path="/3d/chengxiao/code/psf_ros2_ws/tmp/test_psg_document_sink",
+        save_middle_result_dir_path=ROS_SAVE_MIDDLE_RESULT_DIR_PATH,
         enable_save_middle_result=True,
     ),
     runtime_config=psgDocSinkCfg.PSGDocumentSinkNodeRuntimeConfig(
@@ -65,7 +81,7 @@ psg_counter_node_name = "psg_counter"
 psg_counter_node_json_params = psgCounterCfg.PSGCounterNodeConfig(
     init_config=psgCounterCfg.PSGCounterInitConfig(
         create_debug_pub=True,
-        passengerflow_config_path="/3d/chengxiao/data/passengerflow/fairmot_train_230907/psg_configs/20.22.6.30.json",
+        passengerflow_config_path=ROS_PSG_CONFIG_PATH,
         input_port_config=psgCounterCfg.InputPortConfig(
             action_name="in/action",
         ),
@@ -190,13 +206,12 @@ psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
 
 # cpp 姿态检测节点配置
 # psg_all_detector_cpp <-> yolo_body_pose_detection_node
-fn_model_nano = "/3d/chengxiao/code/psf_ros2_ws/tmp/models/yolov8n-pose-640.onnx"
 det_node_name = "yolo_body_pose_detection_node"
 det_node_params = yolo.Yolo8ModelNodeConfig(
     init_config=yolo.Yolo8ModelInitConfig(
         model_configs=[
             {
-                "model_path": fn_model_nano,
+                "model_path": ROS_FN_MODEL,
                 "device_type": "cuda",
                 "device_index": 0,
             },
@@ -295,7 +310,7 @@ psg_master_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
 video_src_node_name = "video_source"
 video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
-        video_url=fn_video,
+        video_url=ROS_FN_VIDEO,
         auto_replay=False,
         primary_output_spec=videoSrcCfg.OutputPortConfig(
             downstream_specs=[
@@ -526,6 +541,16 @@ def generate_launch_description():
         SetEnvironmentVariable("ROS_DOMAIN_ID", "0"),
     ]
 
+    def on_document_sink_exit(event, context):
+        return Shutdown()
+
+    event_handler = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=document_sink_node,
+            on_exit=on_document_sink_exit,
+        )
+    )
+
     return LaunchDescription(
         [
             *env_var_settings,
@@ -539,5 +564,6 @@ def generate_launch_description():
             psg_tracker_node,
             psg_counter_node,
             document_sink_node,
+            event_handler,
         ]
     )

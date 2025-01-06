@@ -203,6 +203,13 @@ void PSGDocumentSink::_step()
     // at the end, terminate the goal
     auto result_msg = std::make_shared<InputPort_t::ActionResult_t>();
     goal_handle->abort(result_msg);
+
+    // 关闭整个ros2节点
+    if (control_signal_code == ControlSignalCode::Flush || control_signal_code == ControlSignalCode::Terminate) {
+        // 休眠10s
+        std::this_thread::sleep_for(std::chrono::seconds(10));
+        rclcpp::shutdown();
+    }
 }
 
 void PSGDocumentSink::_save_event_count(std::shared_ptr<InitConfig_t> init_config)
