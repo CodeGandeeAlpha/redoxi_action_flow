@@ -274,6 +274,7 @@ int PSGPersonGenerator::_create_document_request_handler(const RuntimeConfig_t &
 
             // from input source data to output source data
             OutputSourceData_t output_source_data;
+            output_source_data.auxiliary_data = std::string("person");
             output_source_data.set_document(document_msg);
 
             auto goal_handle = source_data->get_goal_handle_future().get();

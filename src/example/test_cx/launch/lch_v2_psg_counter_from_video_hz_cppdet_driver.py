@@ -152,7 +152,7 @@ psg_tracker_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeConfig(
             ],
             # data_topic_for_target_data="data_out/target_data_pipeline",
             # data_topic_for_source_data="data_out/source_data_pipeline",
-            # visualization_topic_for_source_data="debug/source_data_visualization",
+            visualization_topic_for_source_data="debug/source_data_visualization",
         ),
         callee_request_port_config=psgDriverBaseCfg.OutputPortConfig(
             downstream_specs=[
@@ -174,7 +174,7 @@ psg_tracker_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeConfig(
 psg_person_generator_node_name = "psg_person_generator"
 psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
     init_config=psgInoutBaseCfg.InoutBaseInitConfig(
-        create_debug_pub=True,
+        create_debug_pub=False,
         input_port_config=psgInoutBaseCfg.InputPortConfig(
             action_name="in/action",
         ),
@@ -187,6 +187,7 @@ psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
             ],
             # data_topic_for_target_data="data_out/target_data",
             # data_topic_for_source_data="data_out/source_data",
+            visualization_topic_for_source_data="debug/source_data_visualization",
         ),
     ),
     runtime_config=psgInoutBaseCfg.InoutBaseRuntimeConfig(
@@ -251,9 +252,9 @@ psg_all_detector_cpp_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeCo
                     action_name=f"/{psg_person_generator_node_name}/{psg_person_generator_node_json_params.init_config.input_port_config.action_name}",
                 )
             ],
-            # data_topic_for_target_data="data_out/target_data_pipeline",
+            data_topic_for_target_data="data_out/target_data_pipeline",
             # data_topic_for_source_data="data_out/source_data_pipeline",
-            # visualization_topic_for_source_data="debug/source_data_visualization",
+            visualization_topic_for_source_data="debug/source_data_visualization",
         ),
         callee_request_port_config=psgDriverBaseCfg.OutputPortConfig(
             downstream_specs=[
@@ -327,6 +328,7 @@ video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
         step_interval=StepIntervals.Fast,
+        # step_interval=StepIntervals.VerySlow,
         output_image_size=videoSrcCfg.ImageSize(width=1920, height=1080),
         output_image_encoding="bgr8",
         frame_request_policy=videoSrcCfg.DeliveryPolicy(

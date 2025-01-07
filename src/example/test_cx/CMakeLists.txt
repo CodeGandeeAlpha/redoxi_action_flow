@@ -85,6 +85,7 @@ option(BUILD_TEST_V2_PSG_ALL_DETECTOR_CPP_DRIVER "Build test_v2_psg_all_detector
 option(BUILD_TEST_V2_PSG_TRACKER_DRIVER "Build test_v2_psg_tracker_driver target" ON)
 option(BUILD_TEST_V2_PSG_DETECTOR_DRIVER "Build test_v2_psg_detector_driver target" ON)
 option(BUILD_TEST_V2_PSG_POSE_DETECTOR_DRIVER "Build test_v2_psg_pose_detector_driver target" ON)
+option(BUILD_TEST_ONNX_INFERENCE_API "Build test_onnx_inference_api target" ON)
 
 # Function to configure a target
 function(configure_target target_name)
@@ -232,6 +233,10 @@ endif()
 
 if(BUILD_TEST_V2_PSG_POSE_DETECTOR_DRIVER)
   configure_target(v2_psg_pose_detector_driver)
+endif()
+
+if(BUILD_TEST_ONNX_INFERENCE_API)
+  configure_target(onnx_inference_api)
 endif()
 
 # Install targets
