@@ -1,3 +1,5 @@
+#include <redoxi_dnn_models/_pch.hpp>
+
 #include <redoxi_dnn_models/visualizations.hpp>
 #include <redoxi_dnn_models/message_conversion.hpp>
 #include <redoxi_common_cpp/image_proc/utils.hpp>

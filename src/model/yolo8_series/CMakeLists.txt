@@ -30,6 +30,11 @@ target_include_directories(
 # Causes the visibility macros to use dllexport rather than dllimport, which is
 # appropriate when building the dll but not consuming it.
 target_compile_definitions(yolo8_series PRIVATE "YOLO8_SERIES_BUILDING_LIBRARY")
+target_precompile_headers(yolo8_series PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}/_pch.hpp)
+
+rclcpp_components_register_nodes(yolo8_series 
+  "redoxi_works::model_nodes::yolo8::Yolo8BodyPoseNode" 
+  "redoxi_works::model_nodes::yolo8::Yolo8ObjectDetNode")
 
 ament_target_dependencies(yolo8_series PUBLIC redoxi_inference
                           redoxi_dnn_models redoxi_common_nodes json_struct)

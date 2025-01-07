@@ -28,15 +28,6 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
     using FrameData_t = image_ports::types::FrameWithMetadata;
     using VisualizationPublisher_t = image_ports::types::DeliverySourceData::VisualizationPublisher_t;
 
-    DeliverySourceData()
-    {
-        static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>,
-                      "DeliverySourceData must satisfy DeliverySourceDataConcept");
-        uid = boost::uuids::random_generator()();
-    }
-
-    virtual ~DeliverySourceData() = default;
-
     int to_publish_data(PubDataMsgType_t &msg) const override
     {
         return to_publish_visualization(msg);
@@ -80,17 +71,18 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
 
     // auxiliary data for easy extension without inheritance
     std::any auxiliary_data;
-    boost::uuids::uuid uid;
     std::vector<redoxi_public_msgs::msg::Detection> detections;
 
     // the image is for publish only
     std::optional<FrameData_t> frame_data;
 };
+static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>,
+              "DeliverySourceData must satisfy DeliverySourceDataConcept");
 
 //! Delivery target data type for detection output port
-using DeliveryTargetDataBase = output_port_types::DefaultTargetData<DetectionResponseActionType,
-                                                                    DetectionResponseActionDataTrait,
-                                                                    DeliverySourceData::PubVisualizationMsgType_t>;
+using DeliveryTargetDataBase = output_port_types::DefaultDeliveryTargetData<DetectionResponseActionType,
+                                                                            DetectionResponseActionDataTrait,
+                                                                            DeliverySourceData::PubVisualizationMsgType_t>;
 
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
@@ -114,6 +106,14 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         tmp.detections = this->m_goal.detections;
         tmp.frame_data = this->frame_data;
         return tmp.to_publish_visualization(msg);
+    }
+
+    int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const override
+    {
+        nlohmann::json jsdata = _get_default_probe_json(context);
+        jsdata["frame_number"] = m_goal.frame_bundle.primary_frame.metadata.frame_num;
+        msg.data = jsdata.dump();
+        return 0;
     }
 
     // auxiliary data for easy extension without inheritance
@@ -184,8 +184,8 @@ static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
 
 //! Init config type for detection output port
 using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
-                                                        DeliverySourceData::DataPublisher_t,
-                                                        DeliveryTargetData::DataPublisher_t>;
+                                                        DeliverySourceData,
+                                                        DeliveryTargetData>;
 
 //! Downstream type for detection output port
 // using Downstream = output_port_types::DefaultDownstream<DownstreamSpec>;
@@ -226,6 +226,12 @@ struct DetectionResponseOutputPortSpec {
     //! Source data publisher type
     using SourceDataPublisher_t = DeliverySourceData_t::DataPublisher_t;
 
+    //! Source data probe message type
+    using SourcePubProbeMsgType_t = DeliverySourceData_t::PubProbeMsgType_t;
+
+    //! Source data probe publisher type
+    using SourceProbePublisher_t = DeliverySourceData_t::ProbePublisher_t;
+
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
 
@@ -240,6 +246,12 @@ struct DetectionResponseOutputPortSpec {
 
     //! Target data publisher type
     using TargetDataPublisher_t = DeliveryTargetData_t::DataPublisher_t;
+
+    //! Target data probe message type
+    using TargetPubProbeMsgType_t = DeliveryTargetData_t::PubProbeMsgType_t;
+
+    //! Target data probe publisher type
+    using TargetProbePublisher_t = DeliveryTargetData_t::ProbePublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;

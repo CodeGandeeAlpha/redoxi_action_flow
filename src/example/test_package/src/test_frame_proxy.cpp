@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <optional>
 #include <chrono>
 #include <filesystem>

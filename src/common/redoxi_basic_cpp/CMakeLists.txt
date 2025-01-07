@@ -13,13 +13,14 @@ find_package(rcpputils REQUIRED)
 find_package(json_struct REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
 find_package(Boost REQUIRED)
 find_package(fmt REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-add_library(redoxi_basic_cpp src/redoxi_basic_cpp.cpp)
+add_library(redoxi_basic_cpp src/redoxi_basic_cpp.cpp src/logging/utils.cpp)
 add_library(redoxi_basic_cpp::redoxi_basic_cpp ALIAS redoxi_basic_cpp)
 target_compile_features(redoxi_basic_cpp PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 target_include_directories(redoxi_basic_cpp PUBLIC
@@ -41,6 +42,7 @@ ament_target_dependencies(redoxi_basic_cpp
   rcpputils
   rcutils
   rclcpp_action
+  rclcpp_lifecycle
 )
 
 install(
@@ -74,6 +76,7 @@ ament_export_dependencies(
   rcutils
   Boost
   rclcpp_action
+  rclcpp_lifecycle
   fmt
 )
 

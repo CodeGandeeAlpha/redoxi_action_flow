@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <redoxi_common_nodes/driver_nodes/DetectionDriver.hpp>
 #include <json_struct/json_struct.h>
 #include <spdlog/spdlog.h>
@@ -46,7 +48,7 @@ int main(int argc, char **argv)
     node->start();
 
     //! Spin until shutdown
-    rclcpp::spin(node);
+    rclcpp::spin(node->get_node_base_interface());
 
     //! Stop node and shutdown
     node->stop();

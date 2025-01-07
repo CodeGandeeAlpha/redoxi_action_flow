@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <onnxruntime_cxx_api.h>
 #include <spdlog/spdlog.h>
 #include <string>

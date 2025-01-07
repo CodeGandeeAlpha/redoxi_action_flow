@@ -22,7 +22,7 @@ namespace redoxi_works::model_nodes::yolo8
 {
 
 template <YoloModelConcept TModel>
-class Yolo8BaseNode : public redoxi_works::common_nodes::StartStopNode
+class Yolo8BaseNode : public common_nodes::StartStopNode
 {
   public:
     inline static constexpr const char *RequiredImageEncoding = sensor_msgs::image_encodings::RGB8;
@@ -62,6 +62,12 @@ class Yolo8BaseNode : public redoxi_works::common_nodes::StartStopNode
   public:
     explicit Yolo8BaseNode(const std::string &node_name,
                            const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+
+    explicit Yolo8BaseNode(const rclcpp::NodeOptions &options = rclcpp::NodeOptions())
+        : Yolo8BaseNode("Yolo8BaseNode", options)
+    {
+    }
+
     virtual ~Yolo8BaseNode() noexcept;
 
   protected:
@@ -71,6 +77,8 @@ class Yolo8BaseNode : public redoxi_works::common_nodes::StartStopNode
     void _step() override;
     int _update_init_config(std::shared_ptr<BaseInitConfig_t> init_config) override;
     int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config) override;
+
+    DEFAULT_CONFIG_LOADER_IMPL(InitConfig_t, RuntimeConfig_t);
 
   protected:
     // from this class
@@ -407,7 +415,7 @@ int Yolo8BaseNode<TModel>::_create_detection_request_handler(const RuntimeConfig
     process_handler->init(
         m_detection_request_input_port.get(),
         &m_impl->inference_resource_pool,
-        handler_config, this);
+        handler_config);
 
     typename Impl::PullProcessReplyHandler_t::OnProcessInputDataCallback_t process_func =
         [this, enable_visualization, enable_performance_probe](typename Impl::PullProcessReplyHandler_t::InputActionResult_t *output_action_result,
@@ -617,14 +625,19 @@ int Yolo8BaseNode<TModel>::_update_init_config(std::shared_ptr<BaseInitConfig_t>
 
     // create visualization publisher
     if (!config->publish_visualization_topic.empty()) {
+        RDX_INFO_DEV(this, __func__, false, "Initializing visualization publisher, topic={}", config->publish_visualization_topic);
+        // auto qos = rclcpp::QoS(10).best_effort().durability_volatile().keep_last(10);
         m_impl->pub_visualization = std::make_shared<StampedImagePub>(this, config->publish_visualization_topic);
+        RDX_INFO_DEV(this, __func__, false, "{}", "Visualization publisher initialized");
     }
 
     // create detection done publisher
     if (!config->publish_probe_detection_done_topic.empty()) {
+        RDX_INFO_DEV(this, __func__, false, "Initializing detection done publisher, topic={}", config->publish_probe_detection_done_topic);
         m_impl->pub_detection_done = this->create_publisher<std_msgs::msg::String>(
             config->publish_probe_detection_done_topic,
-            DefaultParams::ProbePublisherQoS);
+            DefaultParams::get_probe_publisher_qos());
+        RDX_INFO_DEV(this, __func__, false, "{}", "Detection done publisher initialized");
     }
 
     return 0;
@@ -752,14 +765,18 @@ template <YoloModelConcept TModel>
 int Yolo8BaseNode<TModel>::_create_all_inference_resources(
     const std::vector<std::shared_ptr<typename InitConfig_t::ModelConfig_t>> &model_configs)
 {
+    RDX_INFO_DEV(this, __func__, false, "{}", "Starting to create inference resources");
+
     if (model_configs.empty()) {
         RDX_INFO_DEV(this, __func__, false, "{}", "No model configs, skipping model resource creation");
         return 0;
     }
 
+    RDX_INFO_DEV(this, __func__, false, "{}", "Setting up inference resource pool capacity");
     // setup capacity of the inference resource pool
     m_impl->inference_resource_pool.set_capacity(model_configs.size());
 
+    RDX_INFO_DEV(this, __func__, false, "{}", "Counting replicas for each model config");
     // now fill the pool with inference resources
     std::map<std::shared_ptr<typename InitConfig_t::ModelConfig_t>, int> model_config_to_replicas;
 
@@ -768,8 +785,10 @@ int Yolo8BaseNode<TModel>::_create_all_inference_resources(
         model_config_to_replicas[model_config] += 1;
     }
 
+    RDX_INFO_DEV(this, __func__, false, "{}", "Creating inference resources for each model config");
     // create inference resources for each model config
     for (const auto &[model_config, replicas] : model_config_to_replicas) {
+        RDX_INFO_DEV(this, __func__, false, "Creating {} replicas for model config", replicas);
         auto ret = _create_inference_resource(model_config, replicas);
         if (ret != 0) {
             RDX_RAISE_ERROR("Failed to create inference resource, error code: {}", ret);

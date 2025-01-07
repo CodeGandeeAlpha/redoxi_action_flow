@@ -148,7 +148,6 @@ class DownstreamDebugPublisher
     using Publisher_t = redoxi_works::StampedImagePub::Publisher_t;
     inline static const cv::Scalar DefaultHeaderColor{255, 0, 0};
     inline static constexpr double DefaultHeaderScale = 1.0;
-    inline static const rclcpp::QoS DefaultQoS = DefaultParams::DebugPublisherQoS;
 
     //! Constructor for DownstreamDebugPublisher with concept assert
     DownstreamDebugPublisher()
@@ -210,13 +209,6 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
     using VisualizationPublisher_t = DownstreamDebugPublisher;
     using DataPublisher_t = DownstreamDebugPublisher; // also used for data publisher
 
-    DeliverySourceData()
-    {
-        static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>, "DeliverySourceData must satisfy DeliverySourceDataConcept");
-        m_uuid = boost::uuids::random_generator()();
-    }
-    virtual ~DeliverySourceData() = default;
-
     //! Get the image
     virtual const FrameData_t &get_primary_frame() const
     {
@@ -273,6 +265,14 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
         return 0;
     }
 
+    int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const override
+    {
+        nlohmann::json jsdata = _get_default_probe_json(context);
+        jsdata["frame_number"] = m_primary_frame.get_metadata().frame_num;
+        msg.data = jsdata.dump();
+        return 0;
+    }
+
     int to_publish_data(PubDataMsgType_t &msg) const override
     {
         return to_publish_visualization(msg);
@@ -296,13 +296,15 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
     FrameWithMetadata m_primary_frame;
     std::vector<FrameWithMetadata> m_secondary_frames;
 };
+static_assert(output_port_types::DeliverySourceDataConcept<DeliverySourceData>,
+              "DeliverySourceData must satisfy DeliverySourceDataConcept");
 
 
 //! Delivery target data type for image output port
 using DeliveryTargetDataBase =
-    output_port_types::DefaultTargetData<DeliveryActionType,
-                                         RedoxiActionDataTrait<DeliveryActionType>,
-                                         DeliverySourceData::PubVisualizationMsgType_t>;
+    output_port_types::DefaultDeliveryTargetData<DeliveryActionType,
+                                                 RedoxiActionDataTrait<DeliveryActionType>,
+                                                 DeliverySourceData::PubVisualizationMsgType_t>;
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
   public:
@@ -324,6 +326,14 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         image_utils::FrameMediator fm(&this->m_goal.frame_bundle.primary_frame);
         auto ret = fm.to_image_msg(msg);
         return ret;
+    }
+
+    int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const override
+    {
+        nlohmann::json jsdata = _get_default_probe_json(context);
+        jsdata["frame_number"] = image_utils::FrameMediator(&this->m_goal.frame_bundle.primary_frame).get_frame_number();
+        msg.data = jsdata.dump();
+        return 0;
     }
 
     // auxiliary data for easy extension without inheritance
@@ -423,22 +433,35 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
     using DownstreamBase_t = output_port_types::DefaultDownstream<DownstreamSpecWithImagePub<ActionType, DeliveryPolicyType>>;
     using typename DownstreamBase_t::DownstreamSpec_t;
 
-    virtual int init_by_spec(const DownstreamSpec_t &spec, rclcpp::Node *node)
+    int init_by_spec(const DownstreamSpec_t &spec, rclcpp::Node *node) override
+    {
+        return _init_by_spec(spec, node);
+    }
+
+    int init_by_spec(const DownstreamSpec_t &spec, rclcpp_lifecycle::LifecycleNode *node) override
+    {
+        return _init_by_spec(spec, node);
+    }
+
+  private:
+    template <RosNodeConcept NodeType>
+    int _init_by_spec(const DownstreamSpec_t &spec, NodeType *node)
     {
         auto ret = DownstreamBase_t::init_by_spec(spec, node);
         if (ret != 0) {
             RDX_RAISE_ERROR("[{}] failed to initialize downstream", __func__);
         }
-        auto qos_source = DownstreamSpec_t::SourceVisualizationPublisher_t::DefaultQoS;
-        auto qos_target = DownstreamSpec_t::TargetVisualizationPublisher_t::DefaultQoS;
+        auto qos_source = DefaultParams::get_debug_publisher_qos();
+        auto qos_target = DefaultParams::get_debug_publisher_qos();
         using SourceVisMsgType = typename DownstreamSpec_t::SourceVisualizationPublisher_t::MessageType_t;
         using TargetVisMsgType = typename DownstreamSpec_t::TargetVisualizationPublisher_t::MessageType_t;
 
         {
             auto topic = spec.get_vis_topic_source_data_failed();
             if (topic.has_value() && spec.get_use_debug_publish()) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Initializing source data failed publisher, topic={}", topic.value());
                 this->m_debug_pub_source_data_failed = std::make_shared<DownstreamDebugPublisher>();
-                auto pub = node->create_publisher<SourceVisMsgType>(topic.value(), qos_source);
+                auto pub = node->template create_publisher<SourceVisMsgType>(topic.value(), qos_source);
                 this->m_debug_pub_source_data_failed->init(pub);
             }
         }
@@ -446,8 +469,9 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
         {
             auto topic = spec.get_vis_topic_source_data_sending();
             if (topic.has_value() && spec.get_use_debug_publish()) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Initializing source data sending publisher, topic={}", topic.value());
                 this->m_debug_pub_source_data_sending = std::make_shared<DownstreamDebugPublisher>();
-                auto pub = node->create_publisher<SourceVisMsgType>(topic.value(), qos_source);
+                auto pub = node->template create_publisher<SourceVisMsgType>(topic.value(), qos_source);
                 this->m_debug_pub_source_data_sending->init(pub);
             }
         }
@@ -455,8 +479,9 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
         {
             auto topic = spec.get_vis_topic_source_data_succeeded();
             if (topic.has_value() && spec.get_use_debug_publish()) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Initializing source data succeeded publisher, topic={}", topic.value());
                 this->m_debug_pub_source_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
-                auto pub = node->create_publisher<SourceVisMsgType>(topic.value(), qos_source);
+                auto pub = node->template create_publisher<SourceVisMsgType>(topic.value(), qos_source);
                 this->m_debug_pub_source_data_succeeded->init(pub);
             }
         }
@@ -464,8 +489,9 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
         {
             auto topic = spec.get_vis_topic_target_data_sending();
             if (topic.has_value() && spec.get_use_debug_publish()) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Initializing target data sending publisher, topic={}", topic.value());
                 this->m_debug_pub_target_data_sending = std::make_shared<DownstreamDebugPublisher>();
-                auto pub = node->create_publisher<TargetVisMsgType>(topic.value(), qos_target);
+                auto pub = node->template create_publisher<TargetVisMsgType>(topic.value(), qos_target);
                 this->m_debug_pub_target_data_sending->init(pub);
             }
         }
@@ -473,8 +499,9 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
         {
             auto topic = spec.get_vis_topic_target_data_succeeded();
             if (topic.has_value() && spec.get_use_debug_publish()) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Initializing target data succeeded publisher, topic={}", topic.value());
                 this->m_debug_pub_target_data_succeeded = std::make_shared<DownstreamDebugPublisher>();
-                auto pub = node->create_publisher<TargetVisMsgType>(topic.value(), qos_target);
+                auto pub = node->template create_publisher<TargetVisMsgType>(topic.value(), qos_target);
                 this->m_debug_pub_target_data_succeeded->init(pub);
             }
         }
@@ -482,8 +509,9 @@ class DownstreamBaseWithImagePub : public output_port_types::DefaultDownstream<
         {
             auto topic = spec.get_vis_topic_target_data_failed();
             if (topic.has_value() && spec.get_use_debug_publish()) {
+                RDX_INFO_DEV(nullptr, __func__, false, "Initializing target data failed publisher, topic={}", topic.value());
                 this->m_debug_pub_target_data_failed = std::make_shared<DownstreamDebugPublisher>();
-                auto pub = node->create_publisher<TargetVisMsgType>(topic.value(), qos_target);
+                auto pub = node->template create_publisher<TargetVisMsgType>(topic.value(), qos_target);
                 this->m_debug_pub_target_data_failed->init(pub);
             }
         }
@@ -496,8 +524,8 @@ static_assert(output_port_types::DownstreamConcept<Downstream>,
 
 //! Init config type for image output port
 using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
-                                                        DeliverySourceData::DataPublisher_t,
-                                                        DeliveryTargetData::DataPublisher_t>;
+                                                        DeliverySourceData,
+                                                        DeliveryTargetData>;
 
 //! Image output port spec
 //! This type must satisfy the AsyncActionOutputPortSpecConcept
@@ -538,6 +566,12 @@ struct ImageActionOutputPortSpec {
     //! Source data publisher type
     using SourceDataPublisher_t = DeliverySourceData_t::DataPublisher_t;
 
+    //! Source data probe message type
+    using SourcePubProbeMsgType_t = DeliverySourceData_t::PubProbeMsgType_t;
+
+    //! Source data probe publisher type
+    using SourceProbePublisher_t = DeliverySourceData_t::ProbePublisher_t;
+
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
 
@@ -552,6 +586,12 @@ struct ImageActionOutputPortSpec {
 
     //! Target data publisher type
     using TargetDataPublisher_t = DeliveryTargetData_t::DataPublisher_t;
+
+    //! Target data probe message type
+    using TargetPubProbeMsgType_t = DeliveryTargetData_t::PubProbeMsgType_t;
+
+    //! Target data probe publisher type
+    using TargetProbePublisher_t = DeliveryTargetData_t::ProbePublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = output_port_types::DefaultStampData;

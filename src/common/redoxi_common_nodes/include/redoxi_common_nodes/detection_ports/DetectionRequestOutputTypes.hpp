@@ -20,9 +20,9 @@ using RetryPolicy = output_port_types::DefaultRetryPolicy<TimeUnit>;
 using DeliverySourceData = image_ports::types::DeliverySourceData;
 
 //! Delivery target data type for detection request output port
-using DeliveryTargetDataBase = output_port_types::DefaultTargetData<DetectionRequestActionType,
-                                                                    DetectionRequestActionDataTrait,
-                                                                    DeliverySourceData::PubVisualizationMsgType_t>;
+using DeliveryTargetDataBase = output_port_types::DefaultDeliveryTargetData<DetectionRequestActionType,
+                                                                            DetectionRequestActionDataTrait,
+                                                                            DeliverySourceData::PubVisualizationMsgType_t>;
 
 class DeliveryTargetData : public DeliveryTargetDataBase
 {
@@ -53,6 +53,14 @@ class DeliveryTargetData : public DeliveryTargetDataBase
         header.stamp = rclcpp::Clock().now();
         cv_bridge::CvImage cv_bridge_img(header, vis_image.get_encoding(), canvas);
         cv_bridge_img.toImageMsg(msg);
+        return 0;
+    }
+
+    int to_publish_probe(PubProbeMsgType_t &msg, const std::string &context) const override
+    {
+        nlohmann::json jsdata = _get_default_probe_json(context);
+        jsdata["frame_number"] = m_goal.frame_bundle.primary_frame.metadata.frame_num;
+        msg.data = jsdata.dump();
         return 0;
     }
 
@@ -120,20 +128,10 @@ class DeliveryRequest : public DeliveryRequestBase
         // set the visualization frame
         target_data.set_visualization_frame(source_data.get_primary_frame());
 
-        // {
-        //     const auto &raw_image = target_data.get_visualization_frame().get_data_as<image_ports::types::FrameWithMetadata::Frame_t>().raw_image;
-        //     RDX_INFO_DEV(nullptr, __func__, "visualization raw_image size={}, empty={}",
-        //                  raw_image.data.size(), target_data.get_visualization_frame().is_empty());
-        // }
-
         // convert primary frame to goal
         {
             const auto &frame_data = source_data.get_primary_frame();
             frame_data.to_frame_mediator().to_frame_msg(goal.frame_bundle.primary_frame);
-            // {
-            //     const auto &raw_image = goal.frame_bundle.primary_frame.raw_image;
-            //     RDX_INFO_DEV(nullptr, __func__, "primary_frame raw_image size={}", raw_image.data.size());
-            // }
         }
 
         // convert secondary frame to goal
@@ -173,8 +171,8 @@ using DownstreamSpec = typename Downstream::DownstreamSpec_t;
 
 //! Init config type for detection request output port
 using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
-                                                        SimpleRosPublisher<typename DeliverySourceData::PubDataMsgType_t>,
-                                                        SimpleRosPublisher<typename DeliveryTargetData::PubDataMsgType_t>>;
+                                                        DeliverySourceData,
+                                                        DeliveryTargetData>;
 
 //! Detection request output port spec
 struct DetectionRequestOutputPortSpec {
@@ -212,6 +210,12 @@ struct DetectionRequestOutputPortSpec {
     //! Source data publisher type
     using SourceDataPublisher_t = typename InitConfig::SourceDataPublisher_t;
 
+    //! Source data probe message type
+    using SourcePubProbeMsgType_t = DeliverySourceData_t::PubProbeMsgType_t;
+
+    //! Source data probe publisher type
+    using SourceProbePublisher_t = DeliverySourceData_t::ProbePublisher_t;
+
     //! Target data type
     using DeliveryTargetData_t = DeliveryTargetData;
 
@@ -226,6 +230,12 @@ struct DetectionRequestOutputPortSpec {
 
     //! Target data publisher type
     using TargetDataPublisher_t = typename InitConfig::TargetDataPublisher_t;
+
+    //! Target data probe message type
+    using TargetPubProbeMsgType_t = DeliveryTargetData_t::PubProbeMsgType_t;
+
+    //! Target data probe publisher type
+    using TargetProbePublisher_t = DeliveryTargetData_t::ProbePublisher_t;
 
     //! Stamp type
     using DeliveryStamp_t = DeliveryStampData;

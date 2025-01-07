@@ -16,6 +16,13 @@ find_package(TBB REQUIRED)
 find_package(xtensor REQUIRED)
 find_package(OpenCV REQUIRED)
 
+
+find_package(redoxi_inference_rknn QUIET)
+
+if(NOT redoxi_inference_rknn_FOUND)
+  message(STATUS "redoxi_inference_rknn not found, skipping")
+endif()
+
 # Set dependencies
 set(DEPENDENCIES
     psg_private_msgs
@@ -27,8 +34,12 @@ set(DEPENDENCIES
     redoxi_dnn_models
     yolo8_series
     pluginlib
-    universal_mot_trackers
-    redoxi_inference_rknn)
+    universal_mot_trackers)
+
+if(redoxi_inference_rknn_FOUND)
+  list(APPEND DEPENDENCIES redoxi_inference_rknn)
+endif()
+
 # set(DEPENDENCIES 
 #     redoxi_inference 
 #     # redoxi_inference_rknn 
@@ -62,11 +73,6 @@ option(BUILD_TEST_VIDEO_SINK "Build test_video_sink target" OFF)
 option(BUILD_TEST_SIMPLE_ACTION_GENERATOR
        "Build test_simple_action_generator target" OFF)
 option(BUILD_TEST_UUID_CONVERSION "Build test_uuid_conversion target" OFF)
-option(BUILD_TEST_V2_JSON_EXAMPLES "Build test_v2_json_examples target" OFF)
-option(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2
-       "Build test_simple_action_generator_v2 target" OFF)
-option(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE "Build v2_random_video_source target"
-       OFF)
 option(BUILD_ONNX_HELLO_WORLD "Build onnx_hello_world target" OFF)
 option(BUILD_ONNX_INFERENCE_API "Build onnx_inference_api target" OFF)
 option(BUILD_ONNX_YOLO8POSE "Build onnx_yolo8pose target" OFF)
@@ -90,10 +96,12 @@ option(BUILD_TEST_V6D_PLUGIN "Build test_v6d_plugin target" OFF)
 option(BUILD_TEST_SHM_TIMEOUT "Build test_shm_timeout target" OFF)
 
 # RKNN tests
-option(BUILD_TEST_RKNN_INFER "Build test_rknn_infer target" ON)
-option(BUILD_TEST_RKNN_OFFICIAL_INFER "Build test_rknn_official_infer target" ON)
-option(BUILD_TEST_RKNN_PLUGIN "Build test_rknn_plugin target" ON)
-option(BUILD_TEST_RKNN_YOLO8_POSE "Build test_rknn_yolo8_pose target" ON)
+if(redoxi_inference_rknn_FOUND)
+  option(BUILD_TEST_RKNN_INFER "Build test_rknn_infer target" ON)
+  option(BUILD_TEST_RKNN_OFFICIAL_INFER "Build test_rknn_official_infer target" ON)
+  option(BUILD_TEST_RKNN_PLUGIN "Build test_rknn_plugin target" ON)
+  option(BUILD_TEST_RKNN_YOLO8_POSE "Build test_rknn_yolo8_pose target" ON)
+endif()
 
 # Function to configure a target
 function(configure_target target_name)
@@ -105,6 +113,9 @@ function(configure_target target_name)
   target_include_directories(
     ${target_name} PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                           $<INSTALL_INTERFACE:include>)
+
+  target_precompile_headers(
+    ${target_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}/_pch.hpp)
 
   # global directories defined using macro
   target_compile_definitions(
@@ -195,24 +206,12 @@ if(BUILD_TEST_V6D_PLUGIN)
   configure_target(test_v6d_plugin)
 endif()
 
-if(BUILD_TEST_V2_RANDOM_VIDEO_SOURCE)
-  configure_target(v2_random_video_source)
-endif()
-
 if(BUILD_FRAME_RELAY_NODE)
   configure_target(frame_relay_node)
 endif()
 
 if(BUILD_TEST_UUID_CONVERSION)
   configure_target(test_uuid_conversion)
-endif()
-
-if(BUILD_TEST_V2_JSON_EXAMPLES)
-  configure_target(v2_json_examples)
-endif()
-
-if(BUILD_TEST_SIMPLE_ACTION_GENERATOR_V2)
-  configure_target(v2_simple_action)
 endif()
 
 if(BUILD_TEST_SIMPLE_ACTION_GENERATOR)

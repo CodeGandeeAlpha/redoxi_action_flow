@@ -8,6 +8,7 @@
 #include <redoxi_basic_cpp/configs/rdx_configs.hpp>
 #include <redoxi_basic_cpp/types/rdx_uuid.hpp>
 #include <redoxi_basic_cpp/concepts/basic_concepts.hpp>
+#include <lifecycle_msgs/msg/state.hpp>
 
 namespace redoxi_works
 {
@@ -85,15 +86,36 @@ const int ERROR = -1;
 const int MAX_RESERVED_STATUS = 10000;
 }; // namespace ReturnCode
 
+
+// // for ROS lifecycle node, init()->CLOSED->open()->STOPPED->start()->STARTED->stop()->STOPPED->close()->CLOSED
+// // for ROS node, BEFORE_INIT->init()->CLOSED->open()->OPENED->start()->STARTED->stop()->STOPPED->close()->CLOSED
+// namespace NodeStatusCode
+// {
+// const int BEFORE_INIT = 0;
+// const int OPENED = 2;     // open() is called
+// const int STARTED = 3;    // step() is running
+// const int STOPPED = 4;    // you can still start it again
+// const int CLOSED = 5;     // you can still open it again
+// const int TERMINATED = 6; // if you end up here, you can no longer change it to anything else
+
+// const int INITIALIZED = 1; // NOT USED anymore
+
+// // reserved status code, your custom status code should be greater than this
+// const int MAX_RESERVED_STATUS = 10000;
+// }; // namespace NodeStatusCode
+
+// for ROS lifecycle node, init()->CLOSED->open()->STOPPED->start()->STARTED->stop()->STOPPED->close()->CLOSED
+// for ROS node, BEFORE_INIT->init()->CLOSED->open()->OPENED->start()->STARTED->stop()->STOPPED->close()->CLOSED
 namespace NodeStatusCode
 {
-const int BEFORE_INIT = 0;
-const int OPENED = 2;
-const int STARTED = 3;
-const int STOPPED = 4;
-const int CLOSED = 5;
+const int BEFORE_INIT = lifecycle_msgs::msg::State::PRIMARY_STATE_UNKNOWN;
+// const int OPENED = 2;                                                       // open() is called
+const int STARTED = lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE;       // step() is running
+const int STOPPED = lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE;     // you can still start it again
+const int CLOSED = lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED;  // you can still open it again
+const int TERMINATED = lifecycle_msgs::msg::State::PRIMARY_STATE_FINALIZED; // if you end up here, you can no longer change it to anything else
 
-const int INITIALIZED = 1; // NOT USED anymore
+// const int INITIALIZED = 1; // NOT USED anymore
 
 // reserved status code, your custom status code should be greater than this
 const int MAX_RESERVED_STATUS = 10000;
@@ -104,16 +126,12 @@ inline constexpr const char *NodeStatusCodeToString(int status_code)
     switch (status_code) {
         case NodeStatusCode::BEFORE_INIT:
             return "BEFORE_INIT";
-        case NodeStatusCode::OPENED:
-            return "OPENED";
         case NodeStatusCode::STARTED:
             return "STARTED";
         case NodeStatusCode::STOPPED:
             return "STOPPED";
         case NodeStatusCode::CLOSED:
             return "CLOSED";
-        case NodeStatusCode::INITIALIZED:
-            return "INITIALIZED";
         default:
             return "UNKNOWN_STATUS";
     }

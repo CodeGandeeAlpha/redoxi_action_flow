@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <redoxi_samples_nodes/sinks/FrameRelayPublisher.hpp>
 #include <spdlog/spdlog.h>
 

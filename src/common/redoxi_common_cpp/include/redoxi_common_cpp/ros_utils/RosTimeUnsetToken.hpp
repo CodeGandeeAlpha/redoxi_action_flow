@@ -23,12 +23,26 @@ class _RosTimeUnsetToken
     static_assert(std::is_base_of<std::chrono::duration<typename IntervalType::rep, typename IntervalType::period>, IntervalType>::value,
                   "IntervalType must be a std::chrono::duration");
 
-  public:
-    _RosTimeUnsetToken(rclcpp::Node *node, IntervalType interval = IntervalType(0), size_t token_capacity = 1)
-        : m_node(node), m_interval(interval), m_token_capacity(token_capacity)
+  private:
+    _RosTimeUnsetToken(IntervalType interval = IntervalType(0), size_t token_capacity = 1)
     {
+        m_interval = interval;
+        m_token_capacity = token_capacity;
         m_queue = std::make_shared<tbb::concurrent_bounded_queue<TokenType>>();
         m_queue->set_capacity(token_capacity);
+    }
+
+  public:
+    _RosTimeUnsetToken(rclcpp::Node *node, IntervalType interval = IntervalType(0), size_t token_capacity = 1)
+        : _RosTimeUnsetToken(interval, token_capacity)
+    {
+        m_node = node;
+    }
+
+    _RosTimeUnsetToken(rclcpp_lifecycle::LifecycleNode *node, IntervalType interval = IntervalType(0), size_t token_capacity = 1)
+        : _RosTimeUnsetToken(interval, token_capacity)
+    {
+        m_lifecycle_node = node;
     }
 
     virtual ~_RosTimeUnsetToken()
@@ -50,7 +64,9 @@ class _RosTimeUnsetToken
         // when interval is positive, pop tokens at the specified interval
         // when interval <= 0, the queue is always empty (popping as soon as possible)
         if (m_interval > IntervalType(0)) {
-            m_timer = m_node->create_wall_timer(m_interval, [this]() { _try_pop_token(); });
+            auto timer_callback = [this]() { _try_pop_token(); };
+            m_timer = m_node ? m_node->create_wall_timer(m_interval, timer_callback)
+                             : m_lifecycle_node->create_wall_timer(m_interval, timer_callback);
         } else {
             // when interval <= 0, the queue is always empty (popping as soon as possible)
             // clean up the queue
@@ -149,7 +165,8 @@ class _RosTimeUnsetToken
     }
 
   protected:
-    rclcpp::Node *m_node;
+    rclcpp::Node *m_node = nullptr;
+    rclcpp_lifecycle::LifecycleNode *m_lifecycle_node = nullptr;
     rclcpp::TimerBase::SharedPtr m_timer;
     size_t m_token_capacity;
     std::atomic<bool> m_is_started{false};

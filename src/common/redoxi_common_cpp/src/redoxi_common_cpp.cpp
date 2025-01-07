@@ -1,3 +1,5 @@
+#include <redoxi_common_cpp/_pch.hpp>
+
 #include <cstdlib>
 #include <cstdint>
 #include "redoxi_common_cpp/redoxi_common_cpp.hpp"

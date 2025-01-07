@@ -1,3 +1,5 @@
+#include <redoxi_dnn_models/_pch.hpp>
+
 #include <redoxi_dnn_models/yolo8/Yolo8Preprocessor.hpp>
 #include <redoxi_common_cpp/image_proc/utils.hpp>
 #include <sensor_msgs/image_encodings.hpp>

@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 // #include <yolo8_body_pose_detector/Yolo8BodyPoseDetectorNode.hpp>
 #include <yolo8_series/detection/Yolo8ObjectDetNode.hpp>
 #include <spdlog/spdlog.h>
@@ -6,7 +8,7 @@ namespace fs = std::filesystem;
 
 namespace rdx = redoxi_works;
 namespace rdx_models = redoxi_works::model_nodes;
-using RosNode_t = rdx_models::yolo8::detection::Yolo8ObjectDetNode;
+using RosNode_t = rdx_models::yolo8::Yolo8ObjectDetNode;
 
 const fs::path model_path = "/soft/workspace/code/psf_ros2_ws/tmp/models/yolov8s.onnx";
 
@@ -38,7 +40,7 @@ int main(int argc, char **argv)
 
     spdlog::info("Spinning node...");
     //! Spin node
-    rclcpp::spin(node);
+    rclcpp::spin(node->get_node_base_interface());
 
     spdlog::info("Stopping node...");
     node->stop();

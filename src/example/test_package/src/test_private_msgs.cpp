@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include "geometry_msgs/msg/point.hpp"
 #include "psg_private_msgs/msg/person.hpp"
 #include "rclcpp/rclcpp.hpp"

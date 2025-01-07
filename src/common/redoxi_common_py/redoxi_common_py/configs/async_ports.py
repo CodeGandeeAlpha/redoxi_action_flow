@@ -77,3 +77,5 @@ class OutputPortConfig(commonTypes.JsonConvertible):
     data_topic_for_target_data: str | None = field(default=None)
     visualization_topic_for_source_data: str | None = field(default=None)
     visualization_topic_for_target_data: str | None = field(default=None)
+    probe_topic_for_source_data: str | None = field(default=None)
+    probe_topic_for_target_data: str | None = field(default=None)

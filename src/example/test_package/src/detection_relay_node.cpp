@@ -1,9 +1,10 @@
+#include <test_package/_pch.hpp>
+
 #include <redoxi_samples_nodes/sinks/DetectionRelayNode.hpp>
 #include <json_struct/json_struct.h>
 #include <spdlog/spdlog.h>
 
 namespace rdx = redoxi_works;
-namespace rdx_nodes = redoxi_works::common_nodes;
 
 using InitConfig_t = rdx::DetectionRelayNode::InitConfig_t;
 using RuntimeConfig_t = rdx::DetectionRelayNode::RuntimeConfig_t;
@@ -44,7 +45,7 @@ int main(int argc, char **argv)
     node->start();
 
     spdlog::info("Node started successfully. Spinning until shutdown...");
-    rclcpp::spin(node);
+    rclcpp::spin(node->get_node_base_interface());
 
     spdlog::info("Stopping the node...");
     node->stop();

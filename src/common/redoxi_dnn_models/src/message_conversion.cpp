@@ -1,3 +1,5 @@
+#include <redoxi_dnn_models/_pch.hpp>
+
 #include <redoxi_dnn_models/message_conversion.hpp>
 #include <geometry_msgs/msg/point.hpp>
 

@@ -1,4 +1,5 @@
 // test the single overwrite exec node
+#include <test_package/_pch.hpp>
 
 #include <iostream>
 #include <tbb/flow_graph.h>

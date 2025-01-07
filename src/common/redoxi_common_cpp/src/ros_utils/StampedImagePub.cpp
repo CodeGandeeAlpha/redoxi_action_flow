@@ -1,3 +1,5 @@
+#include <redoxi_common_cpp/_pch.hpp>
+
 #include "redoxi_common_cpp/ros_utils/StampedImagePub.hpp"
 #include <redoxi_common_cpp/image_proc/ImageStamper.hpp>
 #include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
@@ -9,6 +11,12 @@ namespace redoxi_works
 
 StampedImagePub::StampedImagePub(rclcpp::Node *node, const std::string &topic_name, std::optional<rclcpp::QoS> qos)
     : m_node(node)
+{
+    init(node, topic_name, qos);
+}
+
+StampedImagePub::StampedImagePub(rclcpp_lifecycle::LifecycleNode *node, const std::string &topic_name, std::optional<rclcpp::QoS> qos)
+    : m_lifecycle_node(node)
 {
     init(node, topic_name, qos);
 }
@@ -29,7 +37,23 @@ int StampedImagePub::init(rclcpp::Node *node,
     if (qos) {
         m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, *qos);
     } else {
-        m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, DefaultQoS);
+        m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, DefaultParams::get_debug_publisher_qos());
+    }
+    return m_pub != nullptr ? 0 : -1;
+}
+
+int StampedImagePub::init(rclcpp_lifecycle::LifecycleNode *node,
+                          const std::string &topic_name,
+                          std::optional<rclcpp::QoS> qos)
+{
+    RDX_ASSERT_CHECK_TRUE(node, "Node should not be nullptr in {}", __func__);
+    RDX_ASSERT_CHECK_TRUE(!m_pub, "Publisher should not be initialized in {}", __func__);
+
+    m_lifecycle_node = node;
+    if (qos) {
+        m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, *qos);
+    } else {
+        m_pub = node->create_publisher<sensor_msgs::msg::Image>(topic_name, DefaultParams::get_debug_publisher_qos());
     }
     return m_pub != nullptr ? 0 : -1;
 }

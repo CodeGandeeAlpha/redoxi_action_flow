@@ -1,3 +1,5 @@
+#include <redoxi_samples_nodes/_pch.hpp>
+
 #include <redoxi_samples_nodes/sinks/DetectionRelayNode.hpp>
 #include <redoxi_dnn_models/message_conversion.hpp>
 #include <redoxi_dnn_models/visualizations.hpp>
@@ -35,7 +37,8 @@ int DetectionRelayNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> co
     if (init_config->publish_visualization_topic.empty()) {
         RDX_INFO_DEV(this, __func__, false, "{}", "visualization publishing is disabled");
     } else {
-        m_pub_visualization.init(this, init_config->publish_visualization_topic, StampedImagePub::DefaultQoS);
+        m_pub_visualization.init(this, init_config->publish_visualization_topic,
+                                 DefaultParams::get_debug_publisher_qos());
     }
 
     RDX_INFO_DEV(this, __func__, false, "{}", "Init config update completed successfully");
@@ -101,7 +104,7 @@ int DetectionRelayNode::_create_port_handler(
     auto port_handler_config = std::make_shared<PortHandler_t::InitConfig_t>();
     port_handler_config->block_input_reading = runtime_config->enable_blocking_mode;
     port_handler_config->block_resource_acquisition = runtime_config->enable_blocking_mode;
-    m_port_handler->init(m_input_port.get(), nullptr, port_handler_config, this);
+    m_port_handler->init(m_input_port.get(), nullptr, port_handler_config);
 
     m_port_handler->on_process_input_data =
         [this, runtime_config](InputPort_t::ActionResult_t *output_action_result,

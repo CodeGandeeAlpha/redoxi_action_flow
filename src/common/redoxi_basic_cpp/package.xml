@@ -11,6 +11,7 @@
 
   <depend>rclcpp</depend>
   <depend>rclcpp_action</depend>
+  <depend>rclcpp_lifecycle</depend>
   <depend>rcpputils</depend>
   <depend>rcutils</depend>
   <depend>json_struct</depend>

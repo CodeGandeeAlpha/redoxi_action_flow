@@ -38,6 +38,8 @@ target_include_directories(
 target_compile_definitions(redoxi_dnn_models
                            PRIVATE "REDOXI_DNN_MODELS_BUILDING_LIBRARY")
 
+target_precompile_headers(redoxi_dnn_models PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}/_pch.hpp)
+
 ament_target_dependencies(redoxi_dnn_models PUBLIC redoxi_common_cpp
                           redoxi_inference sensor_msgs)
 

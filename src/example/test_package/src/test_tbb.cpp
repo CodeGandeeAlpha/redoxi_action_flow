@@ -1,4 +1,5 @@
 // test onetbb library, learn to use it
+#include <test_package/_pch.hpp>
 #include <iostream>
 #include <thread>
 #include <random>

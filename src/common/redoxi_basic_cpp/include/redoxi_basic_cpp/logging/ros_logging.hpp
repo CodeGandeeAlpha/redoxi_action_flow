@@ -6,6 +6,7 @@
 #include <atomic>
 
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp_lifecycle/lifecycle_node.hpp>
 #include <rcpputils/asserts.hpp>
 #include <rcutils/logging_macros.h>
 #include <fmt/format.h>
@@ -187,6 +188,8 @@ concept NodeOrLoggerConcept = requires(T t)
     requires std::is_same_v<std::remove_cvref_t<T>, rclcpp::Logger> ||
         std::is_convertible_v < std::remove_cvref_t<T>,
     const rclcpp::Node * > ||
+        std::is_convertible_v<std::remove_cvref_t<T>,
+                              const rclcpp_lifecycle::LifecycleNode *> ||
         std::is_null_pointer_v<std::remove_cvref_t<T>>;
 };
 
@@ -209,8 +212,11 @@ void RDX_LOG_GENERIC_(NodeOrLogger node_or_logger, const char *func_name, _Stric
             return rclcpp::get_logger(DefaultRDXLoggerName);
         } else if constexpr (std::is_same_v<NodeOrLogger, rclcpp::Logger>) {
             return node_or_logger;
-        } else if constexpr (std::is_convertible_v<NodeOrLogger, const rclcpp::Node *>) {
-            return node_or_logger->get_logger();
+        } else if constexpr (std::is_convertible_v<NodeOrLogger, const rclcpp::Node *> || std::is_convertible_v<NodeOrLogger, const rclcpp_lifecycle::LifecycleNode *>) {
+            if (node_or_logger)
+                return node_or_logger->get_logger();
+            else
+                return rclcpp::get_logger(DefaultRDXLoggerName);
         } else {
             return rclcpp::get_logger(DefaultRDXLoggerName);
         }

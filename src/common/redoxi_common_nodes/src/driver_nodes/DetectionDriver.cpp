@@ -1,3 +1,5 @@
+#include <redoxi_common_nodes/_pch.hpp>
+
 #include <redoxi_common_nodes/driver_nodes/DetectionDriver.hpp>
 #include <redoxi_common_cpp/ros_utils/shm_utils.hpp>
 
@@ -16,7 +18,6 @@ int DetectionDriver::_on_process_callee_result(OutputTypes::OutputRequest_t *out
     OutputTypes::OutputSourceData_t output_source_data;
     output_source_data.detections = callee_result->detections;
     output_source_data.frame_data = callee_request.get_source_data().get_primary_frame();
-    output_source_data.uid = callee_request.get_source_data().get_uuid();
     output_request->set_source_data(output_source_data);
     return 0;
 }
@@ -78,3 +79,6 @@ int DetectionDriver::_on_process_input_request(InputRequestHandler_t::OutputRequ
 }
 
 } // namespace redoxi_works::common_nodes::drivers
+
+#include <rclcpp_components/register_node_macro.hpp>
+RCLCPP_COMPONENTS_REGISTER_NODE(redoxi_works::common_nodes::drivers::DetectionDriver)

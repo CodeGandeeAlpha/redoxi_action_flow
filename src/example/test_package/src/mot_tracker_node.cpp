@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <universal_mot_trackers/UniversalMotTrackerNode.hpp>
 #include <spdlog/spdlog.h>
 #include <filesystem>
@@ -65,7 +67,7 @@ int main(int argc, char **argv)
 
     //! Spin node
     spdlog::info("Spinning node...");
-    rclcpp::spin(node);
+    rclcpp::spin(node->get_node_base_interface());
 
     //! Stop node
     spdlog::info("Stopping node...");

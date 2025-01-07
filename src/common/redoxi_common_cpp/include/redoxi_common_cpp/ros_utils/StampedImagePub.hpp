@@ -16,15 +16,16 @@ class StampedImagePub
   public:
     using MessageType_t = sensor_msgs::msg::Image;
     using Publisher_t = rclcpp::Publisher<MessageType_t>;
-    inline static const rclcpp::QoS DefaultQoS = rclcpp::SensorDataQoS();
-    inline static const rclcpp::QoS DefaultReliableQoS = rclcpp::SystemDefaultsQoS().reliable();
-    inline static const rclcpp::QoS DefaultUnreliableQoS = rclcpp::SensorDataQoS();
+    // inline static const rclcpp::QoS DefaultQoS = DefaultParams::DebugPublisherQoS;
+    // inline static const rclcpp::QoS DefaultReliableQoS = DefaultParams::DataPublisherQoS;
+    // inline static const rclcpp::QoS DefaultUnreliableQoS = DefaultParams::DebugPublisherQoS;
 
     //! Constructor
     StampedImagePub() = default;
 
     //! Constructor that creates publisher during construction
     StampedImagePub(rclcpp::Node *node, const std::string &topic_name, std::optional<rclcpp::QoS> qos = std::nullopt);
+    StampedImagePub(rclcpp_lifecycle::LifecycleNode *node, const std::string &topic_name, std::optional<rclcpp::QoS> qos = std::nullopt);
 
     //! Check if the publisher is valid
     bool valid() const
@@ -34,6 +35,10 @@ class StampedImagePub
 
     //! Initialize the publisher
     int init(rclcpp::Node *node,
+             const std::string &topic_name,
+             std::optional<rclcpp::QoS> qos = std::nullopt);
+
+    int init(rclcpp_lifecycle::LifecycleNode *node,
              const std::string &topic_name,
              std::optional<rclcpp::QoS> qos = std::nullopt);
 
@@ -71,6 +76,7 @@ class StampedImagePub
   private:
     Publisher_t::SharedPtr m_pub;
     rclcpp::Node *m_node = nullptr;
+    rclcpp_lifecycle::LifecycleNode *m_lifecycle_node = nullptr;
 };
 static_assert(RosPublisherConcept<StampedImagePub>,
               "StampedImagePub must satisfy RosPublisherConcept");

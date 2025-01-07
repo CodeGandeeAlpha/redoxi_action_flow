@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <redoxi_inference/redoxi_inference.hpp>
 #include <pluginlib/class_loader.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>

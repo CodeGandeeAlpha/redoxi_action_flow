@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include <redoxi_common_nodes/async_action_port/AsyncActionInputPort.hpp>
 #include <redoxi_samples_nodes/sinks/FrameRelayNode.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
@@ -58,7 +60,7 @@ int main(int argc, char **argv)
 
     //! Keep the node running
     spdlog::info("Spinning node");
-    rclcpp::spin(frame_relay_node);
+    rclcpp::spin(frame_relay_node->get_node_base_interface());
 
     //! Stop the node before shutdown
     spdlog::info("Stopping node");

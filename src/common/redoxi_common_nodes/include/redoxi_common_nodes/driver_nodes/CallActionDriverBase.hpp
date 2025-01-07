@@ -40,9 +40,7 @@ class CallActionDriverBase : public OpenCloseNode
     using BaseNode_t = OpenCloseNode;
     using BaseInitConfig_t = BaseNode_t::InitConfig_t;
     using BaseRuntimeConfig_t = BaseNode_t::RuntimeConfig_t;
-    using OpenCloseNode::OpenCloseNode;
-
-    // CallActionDriverBase(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+    using BaseNode_t::BaseNode_t;
 
   public:
     //! types of the input port of this node, which accepts incoming requests
@@ -116,6 +114,8 @@ class CallActionDriverBase : public OpenCloseNode
     int _update_init_config(std::shared_ptr<BaseInitConfig_t> init_config) override;
     int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config) override;
 
+    DEFAULT_CONFIG_LOADER_IMPL(InitConfig_t, RuntimeConfig_t);
+
     /**
      * @brief After the request is received from the input port, process it
      * @details This is the data-processing callback of the input port handler
@@ -184,6 +184,8 @@ class CallActionDriverBase : public OpenCloseNode
         out_callee_request->set_source_task_metadata(task_metadata);
         out_callee_request->set_control_signal_code(signal_code);
 
+        // TODO: request uuid?
+
         // call class member function
         auto ret_member = _on_process_input_request(out_callee_request,
                                                     out_callee_enqueue_policy,
@@ -220,11 +222,7 @@ class CallActionDriverBase : public OpenCloseNode
                                         const typename CalleeTypes::RequestOutputRequest_t &callee_request,
                                         const typename CalleeTypes::Downstream_t &downstream)
     {
-        // pass along task metadata and signal code
-        // auto task_metadata = callee_request.get_source_task_metadata();
-        // auto signal_code = callee_request.get_control_signal_code();
-        // out_downstream_request->set_source_task_metadata(task_metadata);
-        // out_downstream_request->set_control_signal_code(signal_code);
+        // pass along meta data from callee request
         out_downstream_request->copy_meta_info_from(callee_request);
 
         // call class member function
@@ -455,8 +453,7 @@ int CallActionDriverBase<InputPortType, CalleeRequestPortType, OutputPortType>::
             m_callee_port.get(),
             nullptr,
             handler_config,
-            config->callee_request_enqueue_policy,
-            this);
+            config->callee_request_enqueue_policy);
 
         m_input_request_handler->on_process_input_data =
             std::bind(&CallActionDriverBase::_internal_process_input_request, this,

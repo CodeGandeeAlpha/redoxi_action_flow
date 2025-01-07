@@ -1,3 +1,5 @@
+#include <test_package/_pch.hpp>
+
 #include "redoxi_inference_rknn/RknnModelInference.hpp"
 #include <filesystem>
 #include <opencv2/opencv.hpp>
@@ -20,7 +22,7 @@ fs::path model_path = "/data/code/psf_ros2_ws/tmp/models/rknn/yolov8s-pose-pthq.
 fs::path image_path = "/data/code/psf_ros2_ws/data/ori_img.jpg";
 
 template <typename DataType, typename ShapeType = std::vector<size_t>>
-    requires std::ranges::range<ShapeType>
+requires std::ranges::range<ShapeType>
 void save_tensor_to_npy(const DataType *tensor_data, const ShapeType &shape, const std::string &output_path)
 {
     auto num_elements = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<size_t>());

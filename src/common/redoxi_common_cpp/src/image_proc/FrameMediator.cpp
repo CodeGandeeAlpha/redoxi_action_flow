@@ -1,3 +1,5 @@
+#include <redoxi_common_cpp/_pch.hpp>
+
 #include "redoxi_common_cpp/image_proc/FrameMediator.hpp"
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 #include <redoxi_common_cpp/image_proc/utils.hpp>

@@ -28,7 +28,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
   public:
     AsyncActionOutputPort(rclcpp::Node *parent_node)
-        : m_parent_node(parent_node)
+        : m_parent_node(parent_node), m_node_logger(m_parent_node->get_logger())
+    {
+    }
+
+    AsyncActionOutputPort(rclcpp_lifecycle::LifecycleNode *parent_node)
+        : m_parent_lifecycle_node(parent_node), m_node_logger(m_parent_lifecycle_node->get_logger())
     {
     }
 
@@ -59,6 +64,8 @@ class AsyncActionOutputPort : public IStartStopProtocol
     using TargetDataPublisher_t = typename TSpec::TargetDataPublisher_t;
     using SourceVisualizationPublisher_t = typename TSpec::SourceVisualizationPublisher_t;
     using TargetVisualizationPublisher_t = typename TSpec::TargetVisualizationPublisher_t;
+    using SourceProbePublisher_t = typename TSpec::SourceProbePublisher_t;
+    using TargetProbePublisher_t = typename TSpec::TargetProbePublisher_t;
 
     // synchronous action sender
     using SyncActionSender_t = SyncActionSender<ActionType_t, TimeUnit_t>;
@@ -99,12 +106,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
         // must started first
         // RDX_ASSERT_CHECK_TRUE(m_status == NodeStatusCode::STARTED, "[{}] must started first", __func__);
         if (m_status != NodeStatusCode::STARTED) {
-            RDX_LOG_WARN(m_parent_node, __func__, true, "[{}] pushing to stopped port, please start first", __func__);
+            RDX_LOG_WARN(m_node_logger, __func__, true, "[{}] pushing to stopped port, please start first", __func__);
             return false;
         }
 
         if (!rclcpp::ok()) {
-            RDX_LOG_WARN(m_parent_node, __func__, true, "[{}] node is shutting down, cannot push request", __func__);
+            RDX_LOG_WARN(m_node_logger, __func__, true, "[{}] node is shutting down, cannot push request", __func__);
             return false;
         }
 
@@ -125,7 +132,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         auto interval_between_attempts = enqueue_policy.get_retry_policy().get_wait_time_between_retry(true).value();
         auto drop_frame_strategy = enqueue_policy.get_drop_strategy();
 
-        RDX_INFO_DEV(m_parent_node, __func__, false,
+        RDX_INFO_DEV(m_node_logger, __func__, false,
                      "[msg_uuid={}] try to push request in {} attempts, retry interval={}ms",
                      msg_uuid_str, drop_frame_strategy == DropStrategy::NoDrop ? "inf" : std::to_string(max_attempts),
                      std::chrono::duration<double, std::milli>(interval_between_attempts).count());
@@ -136,18 +143,18 @@ class AsyncActionOutputPort : public IStartStopProtocol
             int attempt = 0;
             while (!try_push_request(request) && rclcpp::ok()) {
                 attempt++;
-                RDX_INFO_DEV(m_parent_node, __func__, false,
+                RDX_INFO_DEV(m_node_logger, __func__, false,
                              "[msg_uuid={}] enqueue attempt {}/inf failed, retrying...",
                              msg_uuid_str, attempt);
                 std::this_thread::sleep_for(interval_between_attempts);
             }
             if (rclcpp::ok()) {
-                RDX_INFO_DEV(m_parent_node, __func__, false,
+                RDX_INFO_DEV(m_node_logger, __func__, false,
                              "[msg_uuid={}] succeeded after {} enqueue attempts",
                              msg_uuid_str, attempt + 1);
                 success = true;
             } else {
-                RDX_INFO_DEV(m_parent_node, __func__, false,
+                RDX_INFO_DEV(m_node_logger, __func__, false,
                              "[msg_uuid={}] failed to push request, node is shutting down",
                              msg_uuid_str);
                 success = false;
@@ -155,12 +162,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
         } else if (drop_frame_strategy == DropStrategy::DropAsNeeded) {
             // Try up to max attempts if dropping is allowed
             for (int attempt = 0; attempt < max_attempts && rclcpp::ok(); ++attempt) {
-                RDX_INFO_DEV(m_parent_node, __func__, false,
+                RDX_INFO_DEV(m_node_logger, __func__, false,
                              "[msg_uuid={}] enqueue attempt {}/{}",
                              msg_uuid_str, attempt + 1, max_attempts);
                 if (try_push_request(request)) {
                     success = true;
-                    RDX_INFO_DEV(m_parent_node, __func__, false,
+                    RDX_INFO_DEV(m_node_logger, __func__, false,
                                  "[msg_uuid={}] succeeded after {} enqueueattempts",
                                  msg_uuid_str, attempt + 1);
                     break;
@@ -170,7 +177,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
             }
         } else if (drop_frame_strategy == DropStrategy::DontCare) {
             // just try once, regardless of success or failure
-            RDX_INFO_DEV(m_parent_node, __func__, false,
+            RDX_INFO_DEV(m_node_logger, __func__, false,
                          "[msg_uuid={}] drop strategy is DontCare, just try once",
                          msg_uuid_str);
             success = try_push_request(request);
@@ -228,7 +235,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         // create data publishers
         {
-            auto ret = _create_data_publishers(*init_config, m_parent_node);
+            auto ret = 0;
+            if (m_parent_node) {
+                ret = _create_data_publishers(*init_config, m_parent_node);
+            } else {
+                ret = _create_data_publishers(*init_config, m_parent_lifecycle_node);
+            }
             if (ret != 0) {
                 RDX_RAISE_ERROR("[{}] failed to create data publishers", __func__);
             }
@@ -362,27 +374,27 @@ class AsyncActionOutputPort : public IStartStopProtocol
         constexpr auto PRINT_THREAD_ID = false;
 
         // create graph and node
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Creating graph ...");
+        RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID, "{}", "Creating graph ...");
         m_delivery_graph = std::make_shared<tbb::flow::graph>();
         auto &g = *m_delivery_graph;
 
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Creating frame delivery node ...");
+        RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID, "{}", "Creating frame delivery node ...");
         m_delivery_task_node = std::make_shared<
             async_processor::SingleBufferExecNode<DeliveryTask_t>>(g);
         auto &node = *m_delivery_task_node;
         {
             auto is_built = node.is_built();
-            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "Frame delivery node is built: {}", is_built ? "true" : "false");
+            RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID, "Frame delivery node is built: {}", is_built ? "true" : "false");
         }
 
         // set node params
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Setting node params ...");
+        RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID, "{}", "Setting node params ...");
         auto buffer_size = m_init_config->get_num_buffer_requests();
         node.set_input_data_buffer_size(buffer_size);
         node.set_preserve_order(m_init_config->get_preserve_request_order());
 
         // sync mode, all functions are executed in the graph
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Setting node to sync mode ...");
+        RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID, "{}", "Setting node to sync mode ...");
         node.set_use_async_callback(false);
         using DeliveryTaskNode_t = async_processor::SingleBufferExecNode<DeliveryTask_t>;
         using WorkInput_t = typename DeliveryTaskNode_t::InputWithTokens_t;
@@ -390,7 +402,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         // setup work function, nothing to do because during work function
         // frames are out of order
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Setting work function ...");
+        RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID, "{}", "Setting work function ...");
         node.set_work_function(
             [this](const WorkInput_t &input, WorkOutput_t &output) -> int {
                 // copy input to output
@@ -398,7 +410,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 const auto &in_payload = std::get<0>(input);
                 auto ret = this->_do_task_delivery_preprocess(in_payload, out_payload);
                 if (ret != 0) {
-                    RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Failed to preprocess data, error code: {}", ret);
+                    RDX_INFO_DEV(m_node_logger, __func__, PRINT_THREAD_ID, "Failed to preprocess data, error code: {}", ret);
                 }
 
                 return ret;
@@ -406,19 +418,19 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         // output callback
         // send frame to downstreams
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Setting output callback ...");
+        RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID, "{}", "Setting output callback ...");
         node.set_output_callback(
             [this](const WorkOutput_t &output) -> int {
                 auto &out_payload = std::get<0>(output);
                 auto result = this->_do_task_delivery_main(out_payload);
                 if (result.result_code != DeliveryResultCode::Success) {
-                    RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Failed to deliver data, error code: {}", (int)result.result_code);
+                    RDX_INFO_DEV(m_node_logger, __func__, PRINT_THREAD_ID, "Failed to deliver data, error code: {}", (int)result.result_code);
                 }
                 return static_cast<int>(result.result_code);
             });
 
         // build the node
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Building frame delivery node ...");
+        RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID, "{}", "Building frame delivery node ...");
         node.build();
 
         return 0;
@@ -433,17 +445,22 @@ class AsyncActionOutputPort : public IStartStopProtocol
         m_downstreams.clear();
         for (auto &it : m_init_config->get_downstream_specs()) {
             Downstream_t ds;
-            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Connecting to downstream with action name: {}", it.get_action_name());
-            auto ret = ds.init_by_spec(it, m_parent_node);
+            RDX_INFO_DEV(m_node_logger, __func__, PRINT_THREAD_ID, "Connecting to downstream with action name: {}", it.get_action_name());
+            int ret = 0;
+            if (m_parent_node) {
+                ret = ds.init_by_spec(it, m_parent_node);
+            } else {
+                ret = ds.init_by_spec(it, m_parent_lifecycle_node);
+            }
             if (ret != 0) {
                 RDX_RAISE_ERROR("[{}] failed to initialize downstream", __func__);
             }
             m_downstreams.push_back(ds);
-            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "Connected to downstream: {}", it.get_action_name());
+            RDX_INFO_DEV(m_node_logger, __func__, PRINT_THREAD_ID, "Connected to downstream: {}", it.get_action_name());
         }
 
         if (m_downstreams.empty()) {
-            RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID,
+            RDX_LOG_WARN(m_node_logger, __func__, PRINT_THREAD_ID,
                          "{}", "No downstreams found");
         }
 
@@ -452,42 +469,65 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
     //! Create data publishers
     //! @return 0 if success, otherwise return error code
-    virtual int _create_data_publishers(const InitConfig_t &init_config, rclcpp::Node *parent_node)
+    template <RosNodeConcept NodeType>
+    int _create_data_publishers(const InitConfig_t &init_config, NodeType *parent_node)
     {
         if (!parent_node) {
             return -1;
         }
 
-        auto qos_source_data = DefaultParams::DataPublisherQoS;
+        // initialize source data publisher
+        auto qos_source_data = DefaultParams::get_data_publisher_qos();
         auto data_topic_for_source_data = init_config.get_data_topic_for_source_data();
         if (data_topic_for_source_data.has_value()) {
             m_data_pub_source_data = std::make_shared<SourceDataPublisher_t>();
-            auto inner_pub = parent_node->create_publisher<typename SourceDataPublisher_t::MessageType_t>(data_topic_for_source_data.value(), qos_source_data);
+            auto inner_pub = parent_node->template create_publisher<typename SourceDataPublisher_t::MessageType_t>(data_topic_for_source_data.value(), qos_source_data);
             m_data_pub_source_data->init(inner_pub);
         }
 
-        auto qos_source_visualization = DefaultParams::DebugPublisherQoS;
+        // initialize source visualization publisher
+        auto qos_source_visualization = DefaultParams::get_debug_publisher_qos();
         auto visualization_topic_for_source_data = init_config.get_visualization_topic_for_source_data();
         if (visualization_topic_for_source_data.has_value()) {
             m_vis_pub_source_data = std::make_shared<SourceVisualizationPublisher_t>();
-            auto inner_pub = parent_node->create_publisher<typename SourceVisualizationPublisher_t::MessageType_t>(visualization_topic_for_source_data.value(), qos_source_visualization);
+            auto inner_pub = parent_node->template create_publisher<typename SourceVisualizationPublisher_t::MessageType_t>(visualization_topic_for_source_data.value(), qos_source_visualization);
             m_vis_pub_source_data->init(inner_pub);
         }
 
-        auto qos_target_data = DefaultParams::DataPublisherQoS;
+        // initialize source probe publisher
+        auto qos_source_probe = DefaultParams::get_probe_publisher_qos();
+        auto probe_topic_for_source_data = init_config.get_probe_topic_for_source_data();
+        if (probe_topic_for_source_data.has_value()) {
+            m_probe_pub_source_data = std::make_shared<SourceProbePublisher_t>();
+            auto inner_pub = parent_node->template create_publisher<typename SourceProbePublisher_t::MessageType_t>(probe_topic_for_source_data.value(), qos_source_probe);
+            m_probe_pub_source_data->init(inner_pub);
+        }
+
+        // initialize target data publisher
+        auto qos_target_data = DefaultParams::get_data_publisher_qos();
         auto data_topic_for_target_data = init_config.get_data_topic_for_target_data();
         if (data_topic_for_target_data.has_value()) {
             m_data_pub_target_data = std::make_shared<TargetDataPublisher_t>();
-            auto inner_pub = parent_node->create_publisher<typename TargetDataPublisher_t::MessageType_t>(data_topic_for_target_data.value(), qos_target_data);
+            auto inner_pub = parent_node->template create_publisher<typename TargetDataPublisher_t::MessageType_t>(data_topic_for_target_data.value(), qos_target_data);
             m_data_pub_target_data->init(inner_pub);
         }
 
-        auto qos_target_visualization = DefaultParams::DebugPublisherQoS;
+        // initialize target visualization publisher
+        auto qos_target_visualization = DefaultParams::get_debug_publisher_qos();
         auto visualization_topic_for_target_data = init_config.get_visualization_topic_for_target_data();
         if (visualization_topic_for_target_data.has_value()) {
             m_vis_pub_target_data = std::make_shared<TargetVisualizationPublisher_t>();
-            auto inner_pub = parent_node->create_publisher<typename TargetVisualizationPublisher_t::MessageType_t>(visualization_topic_for_target_data.value(), qos_target_visualization);
+            auto inner_pub = parent_node->template create_publisher<typename TargetVisualizationPublisher_t::MessageType_t>(visualization_topic_for_target_data.value(), qos_target_visualization);
             m_vis_pub_target_data->init(inner_pub);
+        }
+
+        // initialize target probe publisher
+        auto qos_target_probe = DefaultParams::get_probe_publisher_qos();
+        auto probe_topic_for_target_data = init_config.get_probe_topic_for_target_data();
+        if (probe_topic_for_target_data.has_value()) {
+            m_probe_pub_target_data = std::make_shared<TargetProbePublisher_t>();
+            auto inner_pub = parent_node->template create_publisher<typename TargetProbePublisher_t::MessageType_t>(probe_topic_for_target_data.value(), qos_target_probe);
+            m_probe_pub_target_data->init(inner_pub);
         }
 
         return 0;
@@ -501,7 +541,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
     virtual void _create_frame_delivery_task(const DeliveryRequest_t &request, DeliveryTask_t &task_output)
     {
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID,
+        RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID,
                       "[msg_uuid={}] creating frame delivery task",
                       boost::uuids::to_string(request.get_source_data().get_uuid()));
         task_output.set_request(request);
@@ -525,27 +565,27 @@ class AsyncActionOutputPort : public IStartStopProtocol
     {
         if (source_data != nullptr) {
             auto msg_uuid = source_data->get_uuid();
-            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID,
+            RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID,
                           "[msg_uuid={}] Publishing failed to send to downstream debug message ...", boost::uuids::to_string(msg_uuid));
         }
 
         if (target_data != nullptr) {
             auto msg_uuid = target_data->get_source_data_uuid();
-            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID,
+            RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID,
                           "[msg_uuid={}] Publishing failed to send to downstream debug message ...", boost::uuids::to_string(msg_uuid));
         }
 
         if (!get_publish_to_debug_topic()) {
-            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Publishing to debug topic is disabled");
+            RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID, "{}", "Publishing to debug topic is disabled");
             return 0;
         }
 
         if (source_data != nullptr) {
-            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Source publisher existence: {}",
+            RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Source publisher existence: {}",
                           boost::uuids::to_string(source_data->get_uuid()), source_data != nullptr);
             auto pub = ds.get_debug_pub_source_data_failed();
             if (pub != nullptr) {
-                RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Publishing to source publisher ...",
+                RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Publishing to source publisher ...",
                               boost::uuids::to_string(source_data->get_uuid()));
                 typename SourceData_t::PubVisualizationMsgType_t source_pub_msg;
                 source_data->to_publish_visualization(source_pub_msg);
@@ -554,11 +594,11 @@ class AsyncActionOutputPort : public IStartStopProtocol
             }
         }
         if (target_data != nullptr) {
-            RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Target publisher existence: {}",
+            RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Target publisher existence: {}",
                           boost::uuids::to_string(target_data->get_source_data_uuid()), target_data != nullptr);
             auto pub = ds.get_debug_pub_target_data_failed();
             if (pub != nullptr) {
-                RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Publishing to target publisher ...",
+                RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Publishing to target publisher ...",
                               boost::uuids::to_string(target_data->get_source_data_uuid()));
                 typename TargetData_t::PubVisualizationMsgType_t target_pub_msg;
                 target_data->to_publish_visualization(target_pub_msg);
@@ -567,7 +607,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
             }
         }
 
-        RDX_LOG_DEBUG(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Leaving publish failed to send to downstream debug message ...");
+        RDX_LOG_DEBUG(m_node_logger, __func__, PRINT_THREAD_ID, "{}", "Leaving publish failed to send to downstream debug message ...");
         return 0;
     }
 
@@ -708,6 +748,28 @@ class AsyncActionOutputPort : public IStartStopProtocol
         return 0;
     }
 
+    virtual int _publish_probe_message(const SourceData_t *source_data,
+                                       const TargetData_t *target_data)
+    {
+        if (source_data != nullptr) {
+            auto pub = m_probe_pub_source_data;
+            if (pub != nullptr) {
+                typename SourceData_t::PubProbeMsgType_t source_pub_msg;
+                source_data->to_publish_probe(source_pub_msg, "output port sending");
+                pub->publish(source_pub_msg);
+            }
+        }
+        if (target_data != nullptr) {
+            auto pub = m_probe_pub_target_data;
+            if (pub != nullptr) {
+                typename TargetData_t::PubProbeMsgType_t target_pub_msg;
+                target_data->to_publish_probe(target_pub_msg, "output port sending");
+                pub->publish(target_pub_msg);
+            }
+        }
+        return 0;
+    }
+
     virtual int _create_target_data(TargetData_t &target_data, const DeliveryRequest_t &request)
     {
         request.to_target_data(target_data);
@@ -734,7 +796,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
     //! @note request's precondition is checked before delivery happens, downstream precondition is ignored
     virtual DeliveryResult_t _do_task_delivery_main(const DeliveryTask_t &task)
     {
-        RDX_LOG_DEBUG(m_parent_node, __func__, "[msg_uuid={}] received delivery task",
+        RDX_LOG_DEBUG(m_node_logger, __func__, "[msg_uuid={}] received delivery task",
                       boost::uuids::to_string(task.get_request().get_source_data().get_uuid()));
 
         // default precondition is any downstream ready
@@ -750,7 +812,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         // check if precondition is satisfied
         bool precondition_satisfied = false;
         if (request_precondition == DeliveryPrecondition::DontCare || request_precondition == DeliveryPrecondition::NoPrecondition) {
-            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "{}",
+            RDX_INFO_DEV(m_node_logger, __func__, PRINT_THREAD_ID, "{}",
                          "Precondition is set to dont care or no precondition, proceed with delivery");
             // if precondition is dont care or no precondition, it is regarded as satisfied
             precondition_satisfied = true;
@@ -764,7 +826,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
             size_t num_downstream_ready = 0;
             for (auto &ds : m_downstreams) {
                 bool ds_ready = false;
-                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
+                RDX_INFO_DEV(m_node_logger, __func__, PRINT_THREAD_ID,
                              "Testing precondition for downstream {}", ds.get_downstream_spec().get_name());
 
                 // when testing precondition, we use the downstream's delivery policy
@@ -776,7 +838,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 auto ping_wait_time = retry_policy.get_wait_time_retry_response().value_or(fallback_wait_time);
                 ds_ready = _ping(ds, ping_wait_time);
 
-                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
+                RDX_INFO_DEV(m_node_logger, __func__,
                              "Downstream readiness is: {}", ds_ready ? "READY" : "NOT READY");
 
                 // count the number of downstreams that are ready
@@ -798,11 +860,11 @@ class AsyncActionOutputPort : public IStartStopProtocol
         }
 
         if (!precondition_satisfied) {
-            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Precondition is not satisfied");
+            RDX_INFO_DEV(m_node_logger, __func__, PRINT_THREAD_ID, "{}", "Precondition is not satisfied");
             return DeliveryResult_t{DeliveryResultCode::NotTried};
         }
 
-        RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Precondition is satisfied, start delivery ...");
+        RDX_INFO_DEV(m_node_logger, __func__, PRINT_THREAD_ID, "{}", "Precondition is satisfied, start delivery ...");
 
         // create target delivery data
         TargetData_t target_data;
@@ -812,7 +874,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         if (m_cb_on_deliver_task_begin) {
             auto ret = m_cb_on_deliver_task_begin(target_data, task);
             if (ret != 0) {
-                RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "on_deliver_before callback failed");
+                RDX_LOG_WARN(m_node_logger, __func__, "{}", "on_deliver_before callback failed");
             }
         }
 
@@ -820,7 +882,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         {
             auto ret = _publish_data_message(&task.get_request().get_source_data(), &target_data);
             if (ret != 0) {
-                RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Failed to publish data message");
+                RDX_LOG_WARN(m_node_logger, __func__, PRINT_THREAD_ID, "{}", "Failed to publish data message");
             }
         }
 
@@ -828,7 +890,15 @@ class AsyncActionOutputPort : public IStartStopProtocol
         {
             auto ret = _publish_visualization_message(&task.get_request().get_source_data(), &target_data);
             if (ret != 0) {
-                RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Failed to publish visualization message");
+                RDX_LOG_WARN(m_node_logger, __func__, PRINT_THREAD_ID, "{}", "Failed to publish visualization message");
+            }
+        }
+
+        // publish probe message
+        {
+            auto ret = _publish_probe_message(&task.get_request().get_source_data(), &target_data);
+            if (ret != 0) {
+                RDX_LOG_WARN(m_node_logger, __func__, PRINT_THREAD_ID, "{}", "Failed to publish probe message");
             }
         }
 
@@ -848,7 +918,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                     m_cb_on_deliver_to_downstream_finish(target_data, result_for_ds, task.get_request(), ds);
                 }
                 if (ret != 0) {
-                    RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
+                    RDX_INFO_DEV(m_node_logger, __func__,
                                  "Failed to deliver data to downstream {}",
                                  ds.get_downstream_spec().get_name());
                 } else {
@@ -857,10 +927,10 @@ class AsyncActionOutputPort : public IStartStopProtocol
             }
 
             if (!delivered_to_any_downstream) {
-                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Failed to deliver data to any downstream");
+                RDX_INFO_DEV(m_node_logger, __func__, "{}", "Failed to deliver data to any downstream");
                 result = DeliveryResult_t{DeliveryResultCode::TriedButFailed};
             } else {
-                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "Successfully delivered data to some downstreams");
+                RDX_INFO_DEV(m_node_logger, __func__, "{}", "Successfully delivered data to some downstreams");
                 result = DeliveryResult_t{DeliveryResultCode::Success};
             }
         }
@@ -869,7 +939,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         if (m_cb_on_deliver_task_finish) {
             auto ret = m_cb_on_deliver_task_finish(target_data, task, result);
             if (ret != 0) {
-                RDX_LOG_WARN(m_parent_node, __func__, PRINT_THREAD_ID, "{}", "on_deliver_after callback failed");
+                RDX_LOG_WARN(m_node_logger, __func__, "{}", "on_deliver_after callback failed");
             }
         }
 
@@ -887,7 +957,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
     {
         //! Set up retry strategy
         int attempts = 0;
-        RDX_LOG_DEBUG(m_parent_node, __func__, "[msg_uuid={}] Delivering data to downstream {}",
+        RDX_LOG_DEBUG(m_node_logger, __func__, "[msg_uuid={}] Delivering data to downstream {}",
                       boost::uuids::to_string(target_data.get_source_data_uuid()),
                       ds.get_downstream_spec().get_name());
 
@@ -908,7 +978,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
         auto msg_uuid = target_data.get_source_data_uuid();
 
         // deliver until max attempts reached, or until success when no drop is required
-        RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
+        RDX_INFO_DEV(m_node_logger, __func__,
                      "Delivering data to downstream {}, max attempts: {}, timeout each attempt: {}, interval between attempts: {}",
                      ds.get_downstream_spec().get_name(), max_attempts,
                      timeout_each_attempt.count(), interval_between_attempts.count());
@@ -923,7 +993,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 (void)client;
                 (void)time_waited;
                 (void)goal_handle_future;
-                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
+                RDX_INFO_DEV(m_node_logger, __func__,
                              "[msg_uuid={}] Timeout after waiting for {} {} for downstream {}, do it again",
                              boost::uuids::to_string(msg_uuid), time_waited.count(),
                              _get_time_unit_name<TimeUnit_t>(), ds.get_downstream_spec().get_name());
@@ -943,12 +1013,11 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
             // for no_drop, we need to keep trying until the frame is delivered (return in the loop)
             //! Publish the frame to the debug topic
-            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Publishing frame to debug topic", boost::uuids::to_string(msg_uuid));
+            RDX_INFO_DEV(m_node_logger, __func__, "[msg_uuid={}] Publishing frame to debug topic", boost::uuids::to_string(msg_uuid));
             _debug_publish_sending_to_downstream(nullptr, &target_data, ds, attempts + 1, max_attempts);
 
             //! Send the frame to the downstream
-            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID,
-                         "[msg_uuid={}] Sending frame to downstream {} (attempt {}/{}, no_drop={})",
+            RDX_INFO_DEV(m_node_logger, __func__, "[msg_uuid={}] Sending frame to downstream {} (attempt {}/{}, no_drop={})",
                          boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name(),
                          attempts + 1, max_attempts, no_drop ? "true" : "false");
 
@@ -971,7 +1040,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
             }
 
             if (!result.goal_handle_future.valid()) {
-                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Not sending frame to downstream {}, goal handle future is invalid",
+                RDX_INFO_DEV(m_node_logger, __func__, "[msg_uuid={}] Not sending frame to downstream {}, goal handle future is invalid",
                              boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
             } else {
                 bool wait_indefinitely = timeout_each_attempt < DefaultTimeUnit_t::zero();
@@ -980,7 +1049,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                     // it has a response code, check it
                     switch (*result.response_code) {
                         case ActionDownstreamResponse::ACCEPTED:
-                            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame accepted by downstream {}",
+                            RDX_INFO_DEV(m_node_logger, __func__, "[msg_uuid={}] Frame accepted by downstream {}",
                                          boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
 
                             //! Publish the frame sent message
@@ -988,7 +1057,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
                             return 0; // Success
                         case ActionDownstreamResponse::REJECTED:
-                            RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Frame rejected by downstream {}",
+                            RDX_INFO_DEV(m_node_logger, __func__, "[msg_uuid={}] Frame rejected by downstream {}",
                                          boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
                             break;
                         case ActionDownstreamResponse::TIMEOUT:
@@ -1005,7 +1074,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
                     // may or maynot have a response code, check the goal handle future
                     if (wait_indefinitely) {
                         //! Wait indefinitely for the goal handle future
-                        RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Waiting indefinitely for the goal handle future from downstream {}",
+                        RDX_INFO_DEV(m_node_logger, __func__, "[msg_uuid={}] Waiting indefinitely for the goal handle future from downstream {}",
                                      boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name());
                         auto goal_handle = result.goal_handle_future.get();
                         if (goal_handle) {
@@ -1026,7 +1095,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
             attempts++;
             if (attempts < max_attempts) {
-                RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Retrying frame delivery to downstream {} (attempt {}/{})",
+                RDX_INFO_DEV(m_node_logger, __func__, "[msg_uuid={}] Retrying frame delivery to downstream {} (attempt {}/{})",
                              boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name(), attempts + 1, max_attempts);
             }
 
@@ -1036,7 +1105,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         _debug_publish_failed_to_send_to_downstream(nullptr, &target_data, ds, attempts, max_attempts);
 
-        RDX_INFO_DEV(m_parent_node, __func__, PRINT_THREAD_ID, "[msg_uuid={}] Failed to deliver frame to downstream {} after {} attempts",
+        RDX_INFO_DEV(m_node_logger, __func__, "[msg_uuid={}] Failed to deliver frame to downstream {} after {} attempts",
                      boost::uuids::to_string(msg_uuid), ds.get_downstream_spec().get_name(), max_attempts);
         return -1;
     }
@@ -1056,12 +1125,12 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
         //! Create a goal object and populate it with frame message data
         auto &goal = target_data.get_goal();
-        RDX_LOG_DEBUG(m_parent_node, __func__, "[msg_uuid={}] Sending goal to downstream {}",
+        RDX_LOG_DEBUG(m_node_logger, __func__, "[msg_uuid={}] Sending goal to downstream {}",
                       boost::uuids::to_string(target_data.get_source_data_uuid()),
                       ds.get_downstream_spec().get_name());
 
         //! Use SyncActionSender to send the goal and wait for the response
-        SyncActionSender_t sender(m_parent_node);
+        SyncActionSender_t sender;
         // auto logging_callbacks = sender.template get_logging_callbacks<ActionDataTrait_t>(goal);
         // auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout, logging_callbacks);
         auto result = sender.template send<ActionDataTrait_t>(goal, *client, timeout, send_goal_options, timeout_callback);
@@ -1114,6 +1183,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
 
     // the parent node
     rclcpp::Node *m_parent_node = nullptr;
+    rclcpp_lifecycle::LifecycleNode *m_parent_lifecycle_node = nullptr;
 
     // data publishers
     std::shared_ptr<SourceDataPublisher_t> m_data_pub_source_data;
@@ -1122,6 +1192,10 @@ class AsyncActionOutputPort : public IStartStopProtocol
     // visualization publishers
     std::shared_ptr<SourceVisualizationPublisher_t> m_vis_pub_source_data;
     std::shared_ptr<TargetVisualizationPublisher_t> m_vis_pub_target_data;
+
+    // probe publishers
+    std::shared_ptr<SourceProbePublisher_t> m_probe_pub_source_data;
+    std::shared_ptr<TargetProbePublisher_t> m_probe_pub_target_data;
 
   protected:
     // callback functions
@@ -1182,6 +1256,16 @@ class AsyncActionOutputPort : public IStartStopProtocol
     std::shared_ptr<DeliveryTaskNode_t> m_delivery_task_node;
     std::shared_ptr<tbb::flow::graph> m_delivery_graph;
     tbb::task_group m_task_group; // all async tasks
+    rclcpp::Logger m_node_logger;
+
+    auto _get_node_logger() const
+    {
+        if (m_parent_lifecycle_node) {
+            return m_parent_lifecycle_node->get_logger();
+        } else {
+            return m_parent_node->get_logger();
+        }
+    }
 };
 
 //! Concept to enforce a type to be convertible to AsyncActionOutputPort

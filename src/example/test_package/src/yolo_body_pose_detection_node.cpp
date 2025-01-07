@@ -1,3 +1,4 @@
+#include <test_package/_pch.hpp>
 // #include <yolo8_body_pose_detector/Yolo8BodyPoseDetectorNode.hpp>
 #include <yolo8_series/bodypose/Yolo8BodyPoseNode.hpp>
 #include <spdlog/spdlog.h>
@@ -41,7 +42,7 @@ int main(int argc, char **argv)
 
     spdlog::info("Spinning node...");
     //! Spin node
-    rclcpp::spin(node);
+    rclcpp::spin(node->get_node_base_interface());
 
     spdlog::info("Stopping node...");
     node->stop();
