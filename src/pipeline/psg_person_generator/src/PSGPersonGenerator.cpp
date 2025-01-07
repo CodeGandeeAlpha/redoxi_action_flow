@@ -28,11 +28,6 @@ struct PSGPersonGeneratorImpl {
     std::shared_ptr<PullProcessSendHandler_t> work_then_send_handler;
 };
 
-PSGPersonGenerator::PSGPersonGenerator(const std::string &name, const rclcpp::NodeOptions &options)
-    : common_nodes::StartStopNode(name, options)
-{
-}
-
 PSGPersonGenerator::~PSGPersonGenerator()
 {
     // wait for all requests to be processed
@@ -141,7 +136,7 @@ int PSGPersonGenerator::_update_init_config(std::shared_ptr<BaseInitConfig_t> co
                      "initialize debug publishers, enqueue topic={}, drop topic={}",
                      init_config->debug_pub_task_enqueue_name,
                      init_config->debug_pub_task_drop_name);
-        auto debug_qos = DefaultParams::DebugPublisherQoS;
+        auto debug_qos = DefaultParams::get_debug_publisher_qos();
         m_pub_task_enqueue.init(this, init_config->debug_pub_task_enqueue_name, debug_qos);
         m_pub_task_drop.init(this, init_config->debug_pub_task_drop_name, debug_qos);
     }

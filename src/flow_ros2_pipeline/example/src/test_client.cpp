@@ -208,7 +208,7 @@ int main(int argc, char *argv[])
 
     auto node = std::make_shared<FlowRos2Pipeline::TestClient>();
 
-    rclcpp::spin(node);
+    rclcpp::spin(node->get_node_base_interface());
     rclcpp::shutdown();
     return 0;
 }

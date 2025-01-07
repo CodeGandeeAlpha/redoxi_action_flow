@@ -29,7 +29,7 @@ int main(int argc, char **argv)
     frame_relay_node->start();
 
     //! Keep the node running
-    rclcpp::spin(frame_relay_node);
+    rclcpp::spin(frame_relay_node->get_node_base_interface());
 
     //! Stop the node before shutdown
     frame_relay_node->stop();

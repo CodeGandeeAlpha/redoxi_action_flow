@@ -92,6 +92,7 @@ psg_counter_node_json_params = psgCounterCfg.PSGCounterNodeConfig(
                     action_name=f"/{document_sink_node_name}/{document_sink_node_json_params.init_config.input_port_config.action_name}",
                 )
             ],
+            probe_topic_for_target_data="debug/probe_target_data",
             # data_topic_for_target_data="data_out/target_data",
             # data_topic_for_source_data="data_out/source_data",
         ),
@@ -321,6 +322,7 @@ video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
                 ),
             ],
             # data_topic_for_target_data="data_out/target_data",
+            probe_topic_for_target_data="debug/probe_target_data",
         ),
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(

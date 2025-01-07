@@ -25,7 +25,7 @@ int main(int argc, char **argv)
     video_generator->start();
 
     //! Spin the node to process callbacks and keep it running
-    rclcpp::spin(video_generator);
+    rclcpp::spin(video_generator->get_node_base_interface());
 
     //! Stop and close the node before shutting down
     video_generator->stop();

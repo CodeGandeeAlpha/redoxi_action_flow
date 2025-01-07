@@ -55,7 +55,8 @@ struct PSGDocumentSinkRuntimeConfig : public common_nodes::StartStopNode::Runtim
 class PSGDocumentSink : public common_nodes::StartStopNode
 {
   public:
-    PSGDocumentSink(const std::string &node_name, const rclcpp::NodeOptions &options);
+    using BaseNode_t = common_nodes::StartStopNode;
+    using BaseNode_t::BaseNode_t;
     virtual ~PSGDocumentSink();
 
   public: // useful types
@@ -76,6 +77,8 @@ class PSGDocumentSink : public common_nodes::StartStopNode
     void _step() override;
     int _update_init_config(std::shared_ptr<BaseInitConfig_t> init_config) override;
     int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config) override;
+
+    DEFAULT_CONFIG_LOADER_IMPL(InitConfig_t, RuntimeConfig_t);
 
   protected:
     void _save_event_count(std::shared_ptr<InitConfig_t> init_config);

@@ -37,6 +37,10 @@ class StampedDocumentPub
              const std::string &topic_name,
              std::optional<rclcpp::QoS> qos = std::nullopt);
 
+    int init(rclcpp_lifecycle::LifecycleNode *node,
+             const std::string &topic_name,
+             std::optional<rclcpp::QoS> qos = std::nullopt);
+
     //! Get the publisher
     Publisher_t::SharedPtr get_publisher() const;
 
@@ -75,5 +79,6 @@ class StampedDocumentPub
   private:
     Publisher_t::SharedPtr m_pub;
     rclcpp::Node *m_node = nullptr;
+    rclcpp_lifecycle::LifecycleNode *m_lifecycle_node = nullptr;
 };
 } // namespace redoxi_works

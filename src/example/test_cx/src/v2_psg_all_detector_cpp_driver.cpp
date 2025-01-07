@@ -31,7 +31,7 @@ int main(int argc, char **argv)
     psg_detector_node->start();
 
     //! Keep the node running
-    rclcpp::spin(psg_detector_node);
+    rclcpp::spin(psg_detector_node->get_node_base_interface());
 
     //! Stop the node before shutdown
     psg_detector_node->stop();

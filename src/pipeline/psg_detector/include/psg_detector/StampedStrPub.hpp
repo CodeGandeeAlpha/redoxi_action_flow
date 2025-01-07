@@ -15,8 +15,6 @@ class StampedStrPub
   public:
     using MessageType_t = std_msgs::msg::String;
     using Publisher_t = rclcpp::Publisher<MessageType_t>;
-    inline static const rclcpp::QoS DefaultQoS = rclcpp::QoS(10).reliable();
-    inline static const rclcpp::QoS DefaultUnreliableQoS = rclcpp::QoS(10).best_effort();
 
     //! Constructor
     StampedStrPub() = default;
@@ -32,6 +30,10 @@ class StampedStrPub
 
     //! Initialize the publisher
     int init(rclcpp::Node *node,
+             const std::string &topic_name,
+             std::optional<rclcpp::QoS> qos = std::nullopt);
+
+    int init(rclcpp_lifecycle::LifecycleNode *node,
              const std::string &topic_name,
              std::optional<rclcpp::QoS> qos = std::nullopt);
 
@@ -51,5 +53,6 @@ class StampedStrPub
   private:
     Publisher_t::SharedPtr m_pub;
     rclcpp::Node *m_node = nullptr;
+    rclcpp_lifecycle::LifecycleNode *m_lifecycle_node = nullptr;
 };
 } // namespace redoxi_works

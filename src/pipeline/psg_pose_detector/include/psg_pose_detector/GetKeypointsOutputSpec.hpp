@@ -200,8 +200,8 @@ static_assert(output_port_types::DownstreamSpecConcept<DownstreamSpec>,
 
 //! Init config type for image output port
 using InitConfig = output_port_types::DefaultInitConfig<DownstreamSpec,
-                                                        DeliverySourceData::DataPublisher_t,
-                                                        DeliveryTargetData::DataPublisher_t>;
+                                                        DeliverySourceData,
+                                                        DeliveryTargetData>;
 
 //! PSG get detections output port spec
 //! This type must satisfy the AsyncActionOutputPortSpecConcept
@@ -277,6 +277,18 @@ struct PSGGetKeypointsOutputPortSpec {
 
     //! Downstream type
     using Downstream_t = Downstream;
+
+    //! Source data probe message type
+    using SourcePubProbeMsgType_t = DeliverySourceData_t::PubProbeMsgType_t;
+
+    //! Source data probe publisher type
+    using SourceProbePublisher_t = DeliverySourceData_t::ProbePublisher_t;
+
+    //! Target data probe message type
+    using TargetPubProbeMsgType_t = DeliveryTargetData_t::PubProbeMsgType_t;
+
+    //! Target data probe publisher type
+    using TargetProbePublisher_t = DeliveryTargetData_t::ProbePublisher_t;
 };
 
 } // namespace async_action_get_keypoints_output_port

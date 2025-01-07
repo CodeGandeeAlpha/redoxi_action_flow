@@ -33,9 +33,10 @@ struct VideoReaderOrbbecRuntimeConfig : public RedoxiVideoReaderBase::RuntimeCon
 class VideoReaderOrbbec : public RedoxiVideoReaderBase
 {
   public:
-    VideoReaderOrbbec(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
     using InitConfig_t = VideoReaderOrbbecInitConfig;
     using RuntimeConfig_t = VideoReaderOrbbecRuntimeConfig;
+    using BaseNode_t = RedoxiVideoReaderBase;
+    using BaseNode_t::BaseNode_t;
     ~VideoReaderOrbbec();
 
   protected:
@@ -44,6 +45,8 @@ class VideoReaderOrbbec : public RedoxiVideoReaderBase
 
     //! Override to update runtime configuration
     int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config) override;
+
+    DEFAULT_CONFIG_LOADER_IMPL(InitConfig_t, RuntimeConfig_t);
 
   protected:
     virtual ReadFrameResult _read_frame(SourceData_t &source_data,

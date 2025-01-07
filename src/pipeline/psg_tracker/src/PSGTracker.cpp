@@ -59,7 +59,7 @@ int PSGTracker::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
                      "initialize debug publishers, person accepted topic={}, person rejected topic={}",
                      init_config->debug_topic_person_accepted,
                      init_config->debug_topic_person_rejected);
-        auto debug_qos = DefaultParams::DebugPublisherQoS;
+        auto debug_qos = DefaultParams::get_debug_publisher_qos();
         m_pub_person_accepted.init(this, init_config->debug_topic_person_accepted, debug_qos);
         m_pub_person_rejected.init(this, init_config->debug_topic_person_rejected, debug_qos);
     }

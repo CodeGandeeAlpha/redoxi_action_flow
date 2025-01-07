@@ -40,7 +40,7 @@ int main(int argc, char **argv)
 
     //! Spin until shutdown
     spdlog::info("Node started successfully. Spinning until shutdown...");
-    rclcpp::spin(node);
+    rclcpp::spin(node->get_node_base_interface());
 
     //! Cleanup
     node->stop();

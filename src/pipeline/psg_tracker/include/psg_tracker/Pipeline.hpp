@@ -74,7 +74,8 @@ class PSGTrackerPipelineNode : public common_nodes::StartStopNode
 
   public:
     //! Constructor with node options and name
-    explicit PSGTrackerPipelineNode(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+    using BaseNode_t = common_nodes::StartStopNode;
+    using BaseNode_t::BaseNode_t;
 
     //! Destructor
     virtual ~PSGTrackerPipelineNode();
@@ -90,6 +91,8 @@ class PSGTrackerPipelineNode : public common_nodes::StartStopNode
     void _step() override;
     int _update_init_config(std::shared_ptr<BaseInitConfig_t> config) override;
     int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config) override;
+
+    DEFAULT_CONFIG_LOADER_IMPL(InitConfig_t, RuntimeConfig_t);
 
   protected:
     /**

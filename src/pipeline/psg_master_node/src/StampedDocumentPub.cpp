@@ -27,6 +27,22 @@ int StampedDocumentPub::init(rclcpp::Node *node,
     return m_pub != nullptr ? 0 : -1;
 }
 
+int StampedDocumentPub::init(rclcpp_lifecycle::LifecycleNode *node,
+                             const std::string &topic_name,
+                             std::optional<rclcpp::QoS> qos)
+{
+    RDX_ASSERT_CHECK_TRUE(node, "Node should not be nullptr in {}", __func__);
+    RDX_ASSERT_CHECK_TRUE(!m_pub, "Publisher should not be initialized in {}", __func__);
+
+    m_lifecycle_node = node;
+    if (qos) {
+        m_pub = node->create_publisher<psg_private_msgs::msg::PsgDocument>(topic_name, *qos);
+    } else {
+        m_pub = node->create_publisher<psg_private_msgs::msg::PsgDocument>(topic_name, DefaultParams::get_debug_publisher_qos());
+    }
+    return m_pub != nullptr ? 0 : -1;
+}
+
 StampedDocumentPub::Publisher_t::SharedPtr StampedDocumentPub::get_publisher() const
 {
     return m_pub;
@@ -47,8 +63,11 @@ int StampedDocumentPub::publish(const psg_private_msgs::msg::PsgDocument &docume
     //     stamped_image = stamper.stamp(false);
     // }
     psg_private_msgs::msg::PsgDocument stamped_document = document;
-
-    stamped_document.header.stamp = m_node->now();
+    if (m_lifecycle_node) {
+        stamped_document.header.stamp = m_lifecycle_node->now();
+    } else {
+        stamped_document.header.stamp = m_node->now();
+    }
     m_pub->publish(stamped_document);
 
     return 0;

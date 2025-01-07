@@ -52,6 +52,8 @@ class PSGTracker : public common_nodes::OpenCloseNode
     int _update_init_config(std::shared_ptr<BaseInitConfig_t> init_config) override;
     int _update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> runtime_config) override;
 
+    DEFAULT_CONFIG_LOADER_IMPL(InitConfig_t, RuntimeConfig_t);
+
     //! create implementation details of this node
     //! @note this must be called before any other operations, so it cannot access any member variables
     virtual std::shared_ptr<PSGTrackerImpl> _create_impl();

@@ -34,7 +34,7 @@ int main(int argc, char **argv)
     psg_frame_det_source_sink_node->start();
 
     //! Keep the node running
-    rclcpp::spin(psg_frame_det_source_sink_node);
+    rclcpp::spin(psg_frame_det_source_sink_node->get_node_base_interface());
 
     //! Stop the node before shutdown
     psg_frame_det_source_sink_node->stop();

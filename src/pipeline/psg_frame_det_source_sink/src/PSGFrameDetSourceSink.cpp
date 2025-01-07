@@ -33,11 +33,6 @@ struct PSGFrameDetSourceSinkImpl {
     tbb::task_group m_model_result_task_group;
 };
 
-PSGFrameDetSourceSink::PSGFrameDetSourceSink(const std::string &name, const rclcpp::NodeOptions &options)
-    : common_nodes::StartStopNode(name, options)
-{
-}
-
 PSGFrameDetSourceSink::~PSGFrameDetSourceSink()
 {
     // wait for all requests to be processed
@@ -154,7 +149,7 @@ int PSGFrameDetSourceSink::_update_init_config(std::shared_ptr<BaseInitConfig_t>
                      "initialize debug publishers, task enqueue topic={}, task drop topic={}",
                      init_config->debug_pub_task_enqueue_name,
                      init_config->debug_pub_task_drop_name);
-        auto debug_qos = DefaultParams::DebugPublisherQoS;
+        auto debug_qos = DefaultParams::get_debug_publisher_qos();
         m_pub_task_enqueue.init(this, init_config->debug_pub_task_enqueue_name, debug_qos);
         m_pub_task_drop.init(this, init_config->debug_pub_task_drop_name, debug_qos);
     }

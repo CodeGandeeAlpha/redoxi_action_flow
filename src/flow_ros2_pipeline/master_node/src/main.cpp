@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
     runtime_config->from_parameters(node.get());
     node->init(init_config, runtime_config);
     node->start();
-    rclcpp::spin(node);
+    rclcpp::spin(node->get_node_base_interface());
     rclcpp::shutdown();
     return 0;
 }

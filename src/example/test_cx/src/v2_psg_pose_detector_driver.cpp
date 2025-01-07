@@ -32,7 +32,7 @@ int main(int argc, char **argv)
     psg_pose_detector_driver->start();
 
     //! Keep the node running
-    rclcpp::spin(psg_pose_detector_driver);
+    rclcpp::spin(psg_pose_detector_driver->get_node_base_interface());
 
     //! Stop the node before shutdown
     psg_pose_detector_driver->stop();

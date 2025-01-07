@@ -37,7 +37,7 @@ int main(int argc, char **argv)
     psg_tracker_node->start();
 
     //! Keep the node running
-    rclcpp::spin(psg_tracker_node);
+    rclcpp::spin(psg_tracker_node->get_node_base_interface());
 
     //! Stop the node before shutdown
     psg_tracker_node->stop();

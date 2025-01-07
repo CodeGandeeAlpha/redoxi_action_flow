@@ -5,11 +5,6 @@
 
 namespace redoxi_works
 {
-VideoReaderOrbbec::VideoReaderOrbbec(const std::string &name, const rclcpp::NodeOptions &options)
-    : RedoxiVideoReaderBase(name, options)
-{
-}
-
 VideoReaderOrbbec::~VideoReaderOrbbec()
 {
     // closing, release orbbec pipeline

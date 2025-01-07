@@ -41,11 +41,6 @@ struct PSGAllDetectorCppImpl {
     std::shared_ptr<PullProcessSendHandler_t> work_then_send_to_model_handler;
 };
 
-PSGAllDetectorCppNode::PSGAllDetectorCppNode(const std::string &name, const rclcpp::NodeOptions &options)
-    : common_nodes::StartStopNode(name, options)
-{
-}
-
 PSGAllDetectorCppNode::~PSGAllDetectorCppNode()
 {
     // wait for all requests to be processed
@@ -203,7 +198,7 @@ int PSGAllDetectorCppNode::_update_init_config(std::shared_ptr<BaseInitConfig_t>
                      init_config->debug_pub_pipeline_drop_name,
                      init_config->debug_pub_model_enqueue_name,
                      init_config->debug_pub_model_drop_name);
-        auto debug_qos = DefaultParams::DebugPublisherQoS;
+        auto debug_qos = DefaultParams::get_debug_publisher_qos();
         m_pub_pipeline_enqueue.init(this, init_config->debug_pub_pipeline_enqueue_name, debug_qos);
         m_pub_pipeline_drop.init(this, init_config->debug_pub_pipeline_drop_name, debug_qos);
         m_pub_model_enqueue.init(this, init_config->debug_pub_model_enqueue_name, debug_qos);

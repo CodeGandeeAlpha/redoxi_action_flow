@@ -41,7 +41,7 @@ int main(int argc, char **argv)
     document_sink_node->start();
 
     //! Keep the node running
-    rclcpp::spin(document_sink_node);
+    rclcpp::spin(document_sink_node->get_node_base_interface());
 
     //! Stop the node before shutdown
     document_sink_node->stop();

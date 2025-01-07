@@ -20,7 +20,7 @@ int main(int argc, char **argv)
     node->start();
 
     // Spin the node to process callbacks
-    rclcpp::spin(node);
+    rclcpp::spin(node->get_node_base_interface());
 
     // Clean up and shutdown
     node->stop();

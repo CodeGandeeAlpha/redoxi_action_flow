@@ -16,11 +16,6 @@ PSGDocumentSinkInitConfig::PSGDocumentSinkInitConfig()
     input_port_config->set_buffer_capacity(1);
 }
 
-PSGDocumentSink::PSGDocumentSink(const std::string &node_name, const rclcpp::NodeOptions &options)
-    : common_nodes::StartStopNode(node_name, options)
-{
-}
-
 PSGDocumentSink::~PSGDocumentSink()
 {
 }
@@ -49,10 +44,10 @@ int PSGDocumentSink::_update_init_config(std::shared_ptr<BaseInitConfig_t> confi
 
     //! Step 4: Initialize publishers
     RDX_INFO_DEV(this, __func__, false, "{}", "Initializing publishers");
-    m_pub_relayed_document.init(this, init_config->publish_topic, StampedImagePub::DefaultQoS);
-    m_pub_relayed_image.init(this, init_config->publish_topic_image, StampedImagePub::DefaultQoS);
-    m_pub_debug_document_accepted.init(this, init_config->debug_topic_document_accepted, StampedImagePub::DefaultUnreliableQoS);
-    m_pub_debug_document_rejected.init(this, init_config->debug_topic_document_rejected, StampedImagePub::DefaultUnreliableQoS);
+    m_pub_relayed_document.init(this, init_config->publish_topic, DefaultParams::get_debug_publisher_qos());
+    m_pub_relayed_image.init(this, init_config->publish_topic_image, DefaultParams::get_debug_publisher_qos());
+    m_pub_debug_document_accepted.init(this, init_config->debug_topic_document_accepted, DefaultParams::get_debug_publisher_qos());
+    m_pub_debug_document_rejected.init(this, init_config->debug_topic_document_rejected, DefaultParams::get_debug_publisher_qos());
 
 
     // 创建中间结果保存路径
@@ -208,7 +203,11 @@ void PSGDocumentSink::_step()
     if (control_signal_code == ControlSignalCode::Flush || control_signal_code == ControlSignalCode::Terminate) {
         // 休眠10s
         std::this_thread::sleep_for(std::chrono::seconds(10));
-        rclcpp::shutdown();
+        auto fut = _async_stop();
+        m_async_task_group.run([fut]() {
+            fut.wait();
+            rclcpp::shutdown();
+        });
     }
 }
 
