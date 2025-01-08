@@ -67,7 +67,7 @@ class InputCacheSize:
 #                       |                   |
 #                    detector           tracker
 class DetectorParams:
-    fn_model = f"{workspace_root}/tmp/models/yolov8s-pose.onnx"
+    fn_model = f"{workspace_root}/tmp/models/yolov8m-pose-640.onnx"
     node_name = "detector"
     input_action_name = f"/{node_name}/in/detection_request"
     node_params = yolo.Yolo8ModelNodeConfig(
@@ -108,8 +108,10 @@ class DetectionDriverParams:
                 buffer_capacity=InputCacheSize.Medium,
             ),
             output_port_config=detDriverCfg.OutputPortConfig(
-                probe_topic_for_target_data="output/probe/target_data",
-                probe_topic_for_source_data="output/probe/source_data",
+                visualization_topic_for_source_data=f"/{node_name}/output/vis/source_data",
+                visualization_topic_for_target_data=f"/{node_name}/output/vis/target_data",
+                probe_topic_for_target_data=f"/{node_name}/output/probe/target_data",
+                probe_topic_for_source_data=f"/{node_name}/output/probe/source_data",
             ),
             callee_request_port_config=detDriverCfg.OutputPortConfig(
                 downstream_specs=[
@@ -121,8 +123,8 @@ class DetectionDriverParams:
                 ],
                 # visualization_topic_for_source_data="vis/callee/source_data",
                 # visualization_topic_for_target_data="callee/vis/target_data",
-                probe_topic_for_target_data="callee/probe/target_data",
-                probe_topic_for_source_data="callee/probe/source_data",
+                probe_topic_for_target_data=f"/{node_name}/probe/target_data",
+                probe_topic_for_source_data=f"/{node_name}/probe/source_data",
             ),
         ),
         runtime_config=detDriverCfg.DetectionDriverRuntimeConfig(
@@ -134,22 +136,22 @@ class DetectionDriverParams:
 class VideoSourceParams:
     # video_source -> detection_driver
     node_name = "video_source"
-    fn_video = f"{workspace_root}/.bigdata/crowded_0820.coded.mp4"
+    fn_video = f"{workspace_root}/.bigdata/crowded_0820.mp4"
     node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
         init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
             video_url=fn_video,
             auto_replay=True,
             primary_output_spec=videoSrcCfg.OutputPortConfig(
-                # downstream_specs=[
-                #     videoSrcCfg.DownstreamSpec(
-                #         name=DetectionDriverParams.node_name,
-                #         action_name=DetectionDriverParams.input_action_name,
-                #         create_debug_pub=False,
-                #     ),
-                # ],
-                # data_topic_for_source_data="data_msg/source_data",
-                # data_topic_for_target_data="data_msg/target_data",
-                probe_topic_for_target_data="probe/target_data",
+                downstream_specs=[
+                    videoSrcCfg.DownstreamSpec(
+                        name=DetectionDriverParams.node_name,
+                        action_name=DetectionDriverParams.input_action_name,
+                        create_debug_pub=False,
+                    ),
+                ],
+                data_topic_for_source_data=f"/{node_name}/data_msg/source_data",
+                data_topic_for_target_data=f"/{node_name}/data_msg/target_data",
+                probe_topic_for_target_data=f"/{node_name}/probe/target_data",
             ),
         ),
         runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
@@ -175,26 +177,10 @@ class VideoSourceParams:
     )
 
 
-node_video_source = Node(
-    package="test_package",
-    executable="video_from_url_node",
-    name=VideoSourceParams.node_name,
-    namespace=VideoSourceParams.node_name,
-    output="screen",
-    parameters=[
-        {
-            "param_as_json_string": VideoSourceParams.node_params.to_json(
-                ignore_none=True, compact=False
-            ),
-        },
-    ],
-    arguments=get_logger_arg(VideoSourceParams.node_name),
-)
-
 # Create container node
 container = ComposableNodeContainer(
     name="main_container",
-    namespace="",
+    namespace="root",
     package="rclcpp_components",
     executable="component_container",
     composable_node_descriptions=[
@@ -258,8 +244,9 @@ lifecycle_manager = Node(
                 f"{DetectionDriverParams.node_name}",
                 f"{VideoSourceParams.node_name}",
             ],
+            "bond_timeout": 0.0,
             "autostart": True,  # This will automatically configure and activate nodes
-        }
+        },
     ],
 )
 
@@ -278,7 +265,7 @@ def generate_launch_description():
         [
             *env_var_settings,
             log_level_arg,
-            container,
             lifecycle_manager,
+            container,
         ]
     )
