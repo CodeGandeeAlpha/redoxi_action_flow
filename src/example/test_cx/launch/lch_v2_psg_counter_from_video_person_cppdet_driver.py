@@ -481,7 +481,7 @@ def generate_launch_description():
             "RCUTILS_CONSOLE_OUTPUT_FORMAT", "[{severity}][{time}]: {message}"
         ),
         SetEnvironmentVariable("ROS_LOG_DIR", "/3d/chengxiao/code/psf_ros2_ws/tmp/"),
-        SetEnvironmentVariable("ROS_DOMAIN_ID", "0"),
+        # SetEnvironmentVariable("ROS_DOMAIN_ID", "0"),
     ]
 
     def on_document_sink_exit(event, context):
