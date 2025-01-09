@@ -76,6 +76,12 @@ rclcpp_components_register_node(redoxi_common_nodes
   PLUGIN "redoxi_works::common_nodes::drivers::DetectionDriver"
   EXECUTABLE redoxi_common_nodes_executable)
 
+add_library(redoxi_common_nodes_components src/redoxi_common_nodes_components.cpp)
+target_link_libraries(redoxi_common_nodes_components PUBLIC redoxi_common_nodes)
+rclcpp_components_register_node(redoxi_common_nodes_components 
+  PLUGIN "redoxi_works::common_nodes::drivers::DetectionDriver"
+  EXECUTABLE redoxi_common_nodes_executable)
+
 ament_target_dependencies(
   redoxi_common_nodes
   PUBLIC
