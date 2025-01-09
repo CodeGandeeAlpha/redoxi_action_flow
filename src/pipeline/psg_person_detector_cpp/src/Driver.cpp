@@ -65,6 +65,7 @@ int PSGPersonDetectorCppDriver::_on_process_callee_result(OutputTypes::OutputReq
             psg_private_msgs::msg::Person person;
             person.true_head = head_detection;
             person.true_body = body_detection;
+            person.frame_metadata = document.frame_bundle.primary_frame.metadata;
             person.x_uid = to_ros_uuid_msg(boost::uuids::random_generator()()); // 不加这个会导致tracker无法匹配
             document.persons.push_back(person);
         }
@@ -104,6 +105,7 @@ int PSGPersonDetectorCppDriver::_on_process_callee_result(OutputTypes::OutputReq
             psg_private_msgs::msg::Person person;
             person.true_head = head_detection;
             person.true_body = body_detection;
+            person.frame_metadata = document.frame_bundle.primary_frame.metadata;
             person.x_uid = to_ros_uuid_msg(boost::uuids::random_generator()()); // 不加这个会导致tracker无法匹配
             document.persons.push_back(person);
         }
