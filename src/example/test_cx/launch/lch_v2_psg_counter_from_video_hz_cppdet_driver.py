@@ -17,6 +17,8 @@ import psg_common_py.configs.psg_tracker as psgTrackerCfg
 import yolo8_series.configs as yolo
 import os
 
+# TODO: 删除pub的debug topic
+
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
     "log_level",

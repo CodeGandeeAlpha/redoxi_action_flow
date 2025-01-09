@@ -69,7 +69,7 @@ document_sink_node_json_params = psgDocSinkCfg.PSGDocumentSinkNodeConfig(
         enable_save_middle_result=True,
     ),
     runtime_config=psgDocSinkCfg.PSGDocumentSinkNodeRuntimeConfig(
-        enable_debug_topics=True,
+        enable_debug_topics=False,
         enable_blocking_mode=False,
     ),
 )
@@ -79,7 +79,7 @@ document_sink_node_json_params = psgDocSinkCfg.PSGDocumentSinkNodeConfig(
 psg_counter_node_name = "psg_counter"
 psg_counter_node_json_params = psgCounterCfg.PSGCounterNodeConfig(
     init_config=psgCounterCfg.PSGCounterInitConfig(
-        create_debug_pub=True,
+        create_debug_pub=False,
         passengerflow_config_path=ROS_PSG_CONFIG_PATH,
         input_port_config=psgCounterCfg.InputPortConfig(
             action_name="in/action",
@@ -195,7 +195,7 @@ det_node_params = yolo.Yolo8ModelNodeConfig(
         ),
         enable_blocking_mode=False,
         enable_performance_probe=True,
-        enable_visualization=True,
+        enable_visualization=False,
     ),
 )
 
@@ -238,7 +238,7 @@ psg_person_detector_cpp_node_driver_json_params = psgDriverBaseCfg.DriverBaseNod
 psg_master_node_name = "psg_master_node"
 psg_master_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
     init_config=psgInoutBaseCfg.InoutBaseInitConfig(
-        create_debug_pub=True,
+        create_debug_pub=False,
         input_port_config=psgInoutBaseCfg.InputPortConfig(
             action_name="in/action",
         ),
@@ -281,7 +281,7 @@ video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
                 videoSrcCfg.DownstreamSpec(
                     name=psg_master_node_name,
                     action_name=f"/{psg_master_node_name}/{psg_master_node_json_params.init_config.input_port_config.action_name}",
-                    create_debug_pub=True,
+                    create_debug_pub=False,
                 ),
             ],
             # data_topic_for_target_data="data_out/target_data",

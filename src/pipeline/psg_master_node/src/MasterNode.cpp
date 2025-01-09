@@ -120,17 +120,6 @@ int PSGMasterNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
     m_input_port = std::make_shared<InputPort_t>(this);
     m_input_port->init(init_config->input_port_config);
 
-    //! Initialize debug publishers
-    if (init_config->create_debug_pub) {
-        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                     "initialize debug publishers, enqueue topic={}, drop topic={}",
-                     init_config->debug_pub_task_enqueue_name,
-                     init_config->debug_pub_task_drop_name);
-        auto debug_qos = DefaultParams::get_debug_publisher_qos();
-        m_pub_task_enqueue.init(this, init_config->debug_pub_task_enqueue_name, debug_qos);
-        m_pub_task_drop.init(this, init_config->debug_pub_task_drop_name, debug_qos);
-    }
-
     return 0;
 }
 
@@ -254,11 +243,6 @@ int PSGMasterNode::_create_document_request_handler(const RuntimeConfig_t &runti
             RDX_INFO_DEV(this, __func__, true,
                          "output_request signal code: {}",
                          control_signal_code_to_string(output_request->get_control_signal_code()));
-
-            image_utils::FrameMediator fm(&msg.frame_bundle.primary_frame);
-            sensor_msgs::msg::Image image_msg;
-            fm.to_image_msg(image_msg);
-            m_pub_task_enqueue.publish(image_msg);
 
             // fill the action result, nothing to do
             (void)action_result;
