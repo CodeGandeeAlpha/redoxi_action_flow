@@ -110,9 +110,29 @@ class AsyncActionOutputPort : public IStartStopProtocol
             return false;
         }
 
-        if (!rclcpp::ok()) {
+        if (_is_shutting_down()) {
             RDX_LOG_WARN(m_node_logger, __func__, true, "[{}] node is shutting down, cannot push request", __func__);
             return false;
+        }
+
+        // first time check if all downstreams are ready (action servers started)
+        if (!m_checked_downstreams_online) {
+            RDX_INFO_DEV(m_node_logger, __func__, false, "Waiting for all {} downstreams to be online...", m_downstreams.size());
+            for (auto &ds : m_downstreams) {
+                RDX_INFO_DEV(m_node_logger, __func__, false, "Connecting to downstream '{}'...", ds.get_downstream_spec().get_action_name());
+                auto client = ds.get_action_client();
+
+                // not even has a client?
+                if (client == nullptr) {
+                    RDX_RAISE_ERROR("[{}] no client for downstream '{}', did you init the downstream?", __func__, ds.get_downstream_spec().get_action_name());
+                }
+
+                // wait for action server to be online
+                if (!client->wait_for_action_server()) {
+                    RDX_RAISE_ERROR("[{}] failed to connect to downstream '{}'", __func__, ds.get_downstream_spec().get_action_name());
+                }
+            }
+            m_checked_downstreams_online = true;
         }
 
         DeliveryTask_t task;
@@ -141,14 +161,14 @@ class AsyncActionOutputPort : public IStartStopProtocol
         if (drop_frame_strategy == DropStrategy::NoDrop) {
             // Keep trying until success if no drop strategy
             int attempt = 0;
-            while (!try_push_request(request) && rclcpp::ok()) {
+            while (!try_push_request(request) && !_is_shutting_down()) {
                 attempt++;
                 RDX_INFO_DEV(m_node_logger, __func__, false,
                              "[msg_uuid={}] enqueue attempt {}/inf failed, retrying...",
                              msg_uuid_str, attempt);
                 std::this_thread::sleep_for(interval_between_attempts);
             }
-            if (rclcpp::ok()) {
+            if (!_is_shutting_down()) {
                 RDX_INFO_DEV(m_node_logger, __func__, false,
                              "[msg_uuid={}] succeeded after {} enqueue attempts",
                              msg_uuid_str, attempt + 1);
@@ -161,7 +181,7 @@ class AsyncActionOutputPort : public IStartStopProtocol
             }
         } else if (drop_frame_strategy == DropStrategy::DropAsNeeded) {
             // Try up to max attempts if dropping is allowed
-            for (int attempt = 0; attempt < max_attempts && rclcpp::ok(); ++attempt) {
+            for (int attempt = 0; attempt < max_attempts && !_is_shutting_down(); ++attempt) {
                 RDX_INFO_DEV(m_node_logger, __func__, false,
                              "[msg_uuid={}] enqueue attempt {}/{}",
                              msg_uuid_str, attempt + 1, max_attempts);
@@ -314,6 +334,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 RDX_RAISE_ERROR("[{}] failed to stop the port", __func__);
             }
         }
+
+        // reset the flag
+        m_checked_downstreams_online = false;
 
         // state transition: STARTED -> STOPPED
         _set_status_code(NodeStatusCode::STOPPED);
@@ -993,11 +1016,19 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 (void)client;
                 (void)time_waited;
                 (void)goal_handle_future;
-                RDX_INFO_DEV(m_node_logger, __func__,
-                             "[msg_uuid={}] Timeout after waiting for {} {} for downstream {}, do it again",
-                             boost::uuids::to_string(msg_uuid), time_waited.count(),
-                             _get_time_unit_name<TimeUnit_t>(), ds.get_downstream_spec().get_name());
-                return ActionAfterTimeout::WaitAgain;
+                if (!_is_shutting_down()) {
+                    RDX_INFO_DEV(m_node_logger, __func__,
+                                 "[msg_uuid={}] Timeout after waiting for {} {} for downstream {}, do it again",
+                                 boost::uuids::to_string(msg_uuid), time_waited.count(),
+                                 _get_time_unit_name<TimeUnit_t>(), ds.get_downstream_spec().get_name());
+                    return ActionAfterTimeout::WaitAgain;
+                } else {
+                    RDX_INFO_DEV(m_node_logger, __func__,
+                                 "[msg_uuid={}] Timeout after waiting for {} {} for downstream {}, ros2 is shutting down, do nothing",
+                                 boost::uuids::to_string(msg_uuid), time_waited.count(),
+                                 _get_time_unit_name<TimeUnit_t>(), ds.get_downstream_spec().get_name());
+                    return ActionAfterTimeout::NoAction;
+                }
             };
 
         // FIXME: for no_drop and shared memory delivery, it will have problem,
@@ -1006,9 +1037,16 @@ class AsyncActionOutputPort : public IStartStopProtocol
         // currently a workaround is to set shared memory timeout to inf, and handle it in the last node.
         // TODO: find a better solution, consider using builtin shared memory (in fastDDS or cycloneDDS)
         while (attempts < max_attempts || no_drop) {
-            if (!rclcpp::ok()) {
+            if (_is_shutting_down()) {
                 // system is shutting down, get out
                 return -1;
+            }
+
+            {
+                RDX_INFO_DEV(m_node_logger, __func__, "[msg_uuid={}] _is_shutting_down()={}", boost::uuids::to_string(msg_uuid), _is_shutting_down());
+                RDX_INFO_DEV(m_node_logger, __func__, "[msg_uuid={}] rclcpp::ok()={}", boost::uuids::to_string(msg_uuid), rclcpp::ok());
+                RDX_INFO_DEV(m_node_logger, __func__, "[msg_uuid={}] parent node state={}", boost::uuids::to_string(msg_uuid), m_parent_lifecycle_node->get_current_state().id());
+                lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE;
             }
 
             // for no_drop, we need to keep trying until the frame is delivered (return in the loop)
@@ -1258,6 +1296,9 @@ class AsyncActionOutputPort : public IStartStopProtocol
     tbb::task_group m_task_group; // all async tasks
     rclcpp::Logger m_node_logger;
 
+    // check if all downstreams are ready (action servers started)
+    std::atomic<bool> m_checked_downstreams_online{false};
+
     auto _get_node_logger() const
     {
         if (m_parent_lifecycle_node) {
@@ -1265,6 +1306,16 @@ class AsyncActionOutputPort : public IStartStopProtocol
         } else {
             return m_parent_node->get_logger();
         }
+    }
+
+    //! check if the node or ros2 system is shutting down
+    bool _is_shutting_down() const
+    {
+        bool is_shutting_down = !rclcpp::ok();
+        if (m_parent_lifecycle_node) {
+            is_shutting_down |= m_parent_lifecycle_node->get_current_state().id() == lifecycle_msgs::msg::State::TRANSITION_STATE_SHUTTINGDOWN;
+        }
+        return is_shutting_down;
     }
 };
 

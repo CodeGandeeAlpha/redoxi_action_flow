@@ -16,12 +16,12 @@
   <depend>rclcpp_action</depend>
   <depend>rclcpp_lifecycle</depend>
   <depend>rclcpp_components</depend>
-  <depend>nav2_util</depend>
   <depend>lifecycle_msgs</depend>
   <depend>rosidl_runtime_cpp</depend>
   <depend>redoxi_common_cpp</depend>
   <depend>json_struct</depend>
   <depend>cv_bridge</depend>
+  <!-- <depend>nav2_util</depend> -->
 
   <depend>libboost-dev</depend>
   <depend>nlohmann-json3-dev</depend>

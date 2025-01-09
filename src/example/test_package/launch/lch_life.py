@@ -67,7 +67,8 @@ class InputCacheSize:
 #                       |                   |
 #                    detector           tracker
 class DetectorParams:
-    fn_model = f"{workspace_root}/tmp/models/yolov8m-pose-640.onnx"
+    # fn_model = f"{workspace_root}/tmp/models/yolov8m-pose-640.onnx"
+    fn_model = f"{workspace_root}/tmp/models/yolov8s-pose.onnx"
     node_name = "detector"
     input_action_name = f"/{node_name}/in/detection_request"
     node_params = yolo.Yolo8ModelNodeConfig(
@@ -136,7 +137,8 @@ class DetectionDriverParams:
 class VideoSourceParams:
     # video_source -> detection_driver
     node_name = "video_source"
-    fn_video = f"{workspace_root}/.bigdata/crowded_0820.mp4"
+    fn_video = f"{workspace_root}/.bigdata/crowded_0820.coded.mp4"
+    # fn_video = f"{workspace_root}/.bigdata/crowded_0820.mp4"
     node_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
         init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
             video_url=fn_video,

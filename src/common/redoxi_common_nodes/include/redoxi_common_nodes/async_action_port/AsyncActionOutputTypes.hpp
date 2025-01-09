@@ -1311,10 +1311,11 @@ class DefaultDownstream
             RDX_RAISE_ERROR("[{}()]: Failed to create action client for action '{}'", __func__, spec.get_action_name());
         }
 
-        bool ret = m_action_client->wait_for_action_server();
-        if (!ret) {
-            RDX_RAISE_ERROR("[{}()]: Failed to wait for action server for action '{}'", __func__, spec.get_action_name());
-        }
+        // FIXME:do not wait, move this check on first send
+        // bool ret = m_action_client->wait_for_action_server();
+        // if (!ret) {
+        //     RDX_RAISE_ERROR("[{}()]: Failed to wait for action server for action '{}'", __func__, spec.get_action_name());
+        // }
 
         RDX_INFO_DEV(node, __func__, "Action client for action '{}' created", spec.get_action_name());
 
