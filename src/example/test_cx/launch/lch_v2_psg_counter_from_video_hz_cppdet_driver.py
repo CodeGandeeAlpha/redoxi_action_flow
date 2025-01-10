@@ -337,7 +337,7 @@ video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
         step_interval=StepIntervals.Fast,
         # step_interval=StepIntervals.Medium,
         output_image_size=videoSrcCfg.ImageSize(width=1920, height=1080),
-        video_end_time=1000000,
+        video_end_time=-1,
         output_image_encoding="bgr8",
         frame_request_policy=videoSrcCfg.DeliveryPolicy(
             drop_strategy="no_drop",

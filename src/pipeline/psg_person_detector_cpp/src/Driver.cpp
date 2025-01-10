@@ -41,6 +41,7 @@ int PSGPersonDetectorCppDriver::_on_process_callee_result(OutputTypes::OutputReq
             head_detection.bbox.height = head_bbox.height;
             head_detection.category = 1;
             head_detection.confidence = 1.0;
+            head_detection.frame_metadata = detection.frame_metadata; // 不加这个会导致event中start_time和end_time为-1
             // head_detection.is_detected_by_camera = true;
             document.detections.push_back(head_detection);
 
@@ -59,6 +60,7 @@ int PSGPersonDetectorCppDriver::_on_process_callee_result(OutputTypes::OutputReq
                 body_detection.keypoints.confidence.push_back(detection.keypoints.confidence[i]);
                 body_detection.keypoints.semantic_type.push_back(i);
             }
+            body_detection.frame_metadata = detection.frame_metadata; // 不加这个会导致event中start_time和end_time为-1
             document.detections.push_back(body_detection);
 
             // 构建person
@@ -99,6 +101,7 @@ int PSGPersonDetectorCppDriver::_on_process_callee_result(OutputTypes::OutputReq
                 body_detection.keypoints.confidence.push_back(detection.keypoints.confidence[i]);
                 body_detection.keypoints.semantic_type.push_back(i - 2);
             }
+            body_detection.frame_metadata = detection.frame_metadata; // 不加这个会导致event中start_time和end_time为-1
             document.detections.push_back(body_detection);
 
             // 构建person
