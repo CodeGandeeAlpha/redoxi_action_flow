@@ -36,6 +36,7 @@ set(DEPENDENCIES
     psg_counter
     universal_mot_trackers
     psg_person_detector_cpp
+    psg_tracker_sink
     pluginlib)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb)
