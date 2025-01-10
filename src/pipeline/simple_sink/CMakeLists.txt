@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(psg_tracker_sink)
+project(simple_sink)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -39,7 +39,7 @@ find_package(psg_common REQUIRED)
 ament_python_install_package(${PROJECT_NAME})
 # Install Python executables
 install(PROGRAMS
-  ${PROJECT_NAME}/psg_tracker_sink_node.py
+  ${PROJECT_NAME}/simple_sink_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -62,9 +62,7 @@ endif()
 ament_export_dependencies(
   rclcpp
   rclpy
-  psg_document_sink
   psg_common
-  RedoxiTrack
 )
 
 ament_package()

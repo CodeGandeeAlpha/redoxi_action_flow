@@ -9,11 +9,15 @@ from rclpy.action.server import ServerGoalHandle
 from rclpy.node import Node
 from attr import field, define
 
-from redoxi_public_msgs.action import ProcessDetectionsByFrame
-from redoxi_public_msgs.msg import Detection, Frame, ReturnResponse
+from typing import Generic, TypeVar
+
+from psg_common.constants import ReturnCode
+
+ActionType = TypeVar("ActionType")
+SubscriberMsgType = TypeVar("SubscriberMsgType")
 
 
-class TrackerSinkNode(Node):
+class SimpleSinkNode(Node, Generic[ActionType, SubscriberMsgType]):
     @define(kw_only=True)
     class RuntimeConfig:
         step_interval_ms: int = field(default=-1)
@@ -55,7 +59,7 @@ class TrackerSinkNode(Node):
         ), "process_action_name is empty"
         self.m_action = ActionServer(
             self,
-            ProcessDetectionsByFrame,  # TODO: 修改为你需要的action类型, 如tracktarget
+            ActionType,
             self.m_init_config.process_action_name,
             self._execute_task,
             goal_callback=self._goal_callback,
@@ -64,7 +68,7 @@ class TrackerSinkNode(Node):
         # 创建一个订阅者，用于接收输入数据
         if self.m_init_config.process_topic_name != "":
             self.m_sub = self.create_subscription(
-                Frame,  # TODO: 修改为你需要的msg类型，如Detection
+                SubscriberMsgType,
                 self.m_init_config.process_topic_name,
                 self._sub_callback,
                 10,
@@ -82,35 +86,36 @@ class TrackerSinkNode(Node):
 
         return GoalResponse.ACCEPT
 
-    def _execute_task(
-        self, goal_handle: ServerGoalHandle
-    ):  # TODO: 修改为你需要的处理函数
-
-        # TODO: 处理action接收到的数据
+    def _execute_task(self, goal_handle: ServerGoalHandle):
+        action_result = ActionType.Result()
+        return_code = self._process_goal_handle(goal_handle, action_result)
 
         self._m_in_process_queue.put(
             "ticket"
         )  # 处理完后往in_process_queue中放一个ticket
 
-        goal_handle.succeed()
-        result = ProcessDetectionsByFrame.Result()  # TODO: 修改为你需要的返回类型
-        result.x_return.message = "Accepted frame"  # TODO: 修改为你需要的返回数据
-        result.x_return.code = ReturnResponse.SUCCESS  # TODO: 修改为你需要的返回数据
-        # result.detections = detections_msg  # TODO: 修改为你需要的返回数据
-        return result
+        if return_code == ReturnCode.SUCCESS:
+            goal_handle.succeed()
+        else:
+            goal_handle.abort()
+        return action_result
 
-    def _sub_callback(self, msg: Frame):  # TODO: 修改为你需要的订阅数据类型
-        # TODO: 处理订阅到的数据
-        pass
+    def _sub_callback(self, msg: SubscriberMsgType):
+        raise NotImplementedError("sub_callback is not implemented")
+
+    def _process_goal_handle(
+        self, goal_handle: ServerGoalHandle, action_result: ActionType.Result
+    ) -> int:
+        raise NotImplementedError("process_goal_handle is not implemented")
 
 
 def main(args=None):
     # init node
     rclpy.init(args=args)
 
-    tracker_sink_node = TrackerSinkNode("tracker_sink_node")
+    simple_sink_node = SimpleSinkNode("simple_sink_node")
 
-    rclpy.spin(tracker_sink_node)
+    rclpy.spin(simple_sink_node)
     rclpy.shutdown()
 
 
