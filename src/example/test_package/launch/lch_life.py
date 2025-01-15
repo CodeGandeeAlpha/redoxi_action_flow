@@ -215,19 +215,19 @@ container = ComposableNodeContainer(
             extra_arguments=[{"use_intra_process_comms": True}],
         ),
         # Detector node
-        ComposableNode(
-            package="yolo8_series",
-            plugin="redoxi_works::model_nodes::yolo8::Yolo8BodyPoseNode",
-            name=DetectorParams.node_name,
-            parameters=[
-                {
-                    JsonParamKey: DetectorParams.node_params.to_json(
-                        ignore_none=True, compact=False
-                    ),
-                }
-            ],
-            extra_arguments=[{"use_intra_process_comms": True}],
-        ),
+        # ComposableNode(
+        #     package="yolo8_series",
+        #     plugin="redoxi_works::model_nodes::yolo8::Yolo8BodyPoseNode",
+        #     name=DetectorParams.node_name,
+        #     parameters=[
+        #         {
+        #             JsonParamKey: DetectorParams.node_params.to_json(
+        #                 ignore_none=True, compact=False
+        #             ),
+        #         }
+        #     ],
+        #     extra_arguments=[{"use_intra_process_comms": True}],
+        # ),
     ],
     output="screen",
     arguments=["--ros-args", "--log-level", logger],
@@ -242,9 +242,9 @@ lifecycle_manager = Node(
     parameters=[
         {
             "node_names": [
-                f"{DetectorParams.node_name}",
+                # f"{DetectorParams.node_name}",
                 f"{DetectionDriverParams.node_name}",
-                f"{VideoSourceParams.node_name}",
+                # f"{VideoSourceParams.node_name}",
             ],
             "bond_timeout": 0.0,
             "autostart": True,  # This will automatically configure and activate nodes

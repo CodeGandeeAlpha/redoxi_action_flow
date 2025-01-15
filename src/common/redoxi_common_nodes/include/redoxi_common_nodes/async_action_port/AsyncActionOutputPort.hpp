@@ -1046,7 +1046,6 @@ class AsyncActionOutputPort : public IStartStopProtocol
                 RDX_INFO_DEV(m_node_logger, __func__, "[msg_uuid={}] _is_shutting_down()={}", boost::uuids::to_string(msg_uuid), _is_shutting_down());
                 RDX_INFO_DEV(m_node_logger, __func__, "[msg_uuid={}] rclcpp::ok()={}", boost::uuids::to_string(msg_uuid), rclcpp::ok());
                 RDX_INFO_DEV(m_node_logger, __func__, "[msg_uuid={}] parent node state={}", boost::uuids::to_string(msg_uuid), m_parent_lifecycle_node->get_current_state().id());
-                lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE;
             }
 
             // for no_drop, we need to keep trying until the frame is delivered (return in the loop)
