@@ -24,8 +24,39 @@ int VideoReaderFromUrl::_open()
             return -1;
         }
 
+        //! 读取视频长宽
+        int video_width = m_video_capture->get(cv::CAP_PROP_FRAME_WIDTH);
+        int video_height = m_video_capture->get(cv::CAP_PROP_FRAME_HEIGHT);
+        RDX_INFO_DEV(this, __func__, "video_width: {}, video_height: {}", video_width, video_height);
+
         std::string crop_cfg_json_str((std::istreambuf_iterator<char>(crop_cfg_file)), std::istreambuf_iterator<char>());
-        m_crop_cfg_json_str = crop_cfg_json_str;
+        //! 根据视频长宽与runtime_config中的output_image_size，生成crop配置
+        auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+        int output_image_width = runtime_config->output_image_size.width;
+        int output_image_height = runtime_config->output_image_size.height;
+        RDX_INFO_DEV(this, __func__, "output_image_width: {}, output_image_height: {}", output_image_width, output_image_height);
+
+        auto crop_json_data = nlohmann::json::parse(crop_cfg_json_str);
+        double scale_x = 0;
+        double scale_y = 0;
+        if (output_image_width > 0 && output_image_height > 0) {
+            scale_x = static_cast<double>(output_image_width) / video_width;
+            scale_y = static_cast<double>(output_image_height) / video_height;
+        } else if (output_image_width > 0) {
+            scale_x = static_cast<double>(output_image_width) / video_width;
+            scale_y = scale_x;
+        } else if (output_image_height > 0) {
+            scale_y = static_cast<double>(output_image_height) / video_height;
+            scale_x = scale_y;
+        }
+        crop_json_data["top_left"][0] = static_cast<int>(crop_json_data["top_left"][0].get<int>() * scale_x);
+        crop_json_data["top_left"][1] = static_cast<int>(crop_json_data["top_left"][1].get<int>() * scale_y);
+        crop_json_data["bottom_right"][0] = static_cast<int>(crop_json_data["bottom_right"][0].get<int>() * scale_x);
+        crop_json_data["bottom_right"][1] = static_cast<int>(crop_json_data["bottom_right"][1].get<int>() * scale_y);
+        crop_json_data["w"] = static_cast<int>(crop_json_data["w"].get<int>() * scale_x);
+        crop_json_data["h"] = static_cast<int>(crop_json_data["h"].get<int>() * scale_y);
+        m_crop_cfg_json_str = crop_json_data.dump();
+        RDX_INFO_DEV(this, __func__, "根据视频画面长宽与output_image_size，生成crop配置: {}", m_crop_cfg_json_str);
     } else {
         RDX_INFO_DEV(this, __func__, "{}", "crop配置路径为空，跳过读取crop配置");
     }
