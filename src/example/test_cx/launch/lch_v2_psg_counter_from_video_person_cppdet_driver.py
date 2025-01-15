@@ -8,6 +8,8 @@ from launch.event_handlers import OnProcessExit
 from launch.actions import RegisterEventHandler
 
 import redoxi_common_py.configs.video_source_from_url as videoSrcCfg
+
+import psg_common_py.configs.video_reader_with_crop as psgVideoReaderWithCropCfg
 import psg_common_py.configs.psg_document_sink as psgDocSinkCfg
 import psg_common_py.configs.driver_base as psgDriverBaseCfg
 import psg_common_py.configs.inout_base as psgInoutBaseCfg
@@ -19,7 +21,7 @@ import os
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
     "log_level",
-    default_value="debug",
+    default_value="info",
     description="Logging level",
 )
 
@@ -54,6 +56,11 @@ ROS_FN_MODEL = os.environ.get(
 ROS_PSG_CONFIG_PATH = os.environ.get(
     "ROS_PSG_CONFIG_PATH",
     "/3d/chengxiao/data/passengerflow/fairmot_train_230907/psg_configs/20.22.6.30.json",
+)
+
+ROS_CROP_CONFIG_PATH = os.environ.get(
+    "ROS_CROP_CONFIG_PATH",
+    "/3d/chengxiao/data/passengerflow/fairmot_train_230907/psg_configs/crop_20.22.6.30.json",
 )
 
 # 文档接收节点配置
@@ -272,13 +279,14 @@ psg_master_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
 # 视频源配置
 # video_source -> psg_master_node
 video_src_node_name = "video_source"
-video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
-    init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
+video_source_params = psgVideoReaderWithCropCfg.VideoReaderWithCropNodeConfig(
+    init_config=psgVideoReaderWithCropCfg.VideoReaderWithCropInitConfig(
         video_url=ROS_FN_VIDEO,
+        crop_cfg_path=ROS_CROP_CONFIG_PATH,
         auto_replay=False,
-        primary_output_spec=videoSrcCfg.OutputPortConfig(
+        primary_output_spec=psgVideoReaderWithCropCfg.OutputPortConfig(
             downstream_specs=[
-                videoSrcCfg.DownstreamSpec(
+                psgVideoReaderWithCropCfg.DownstreamSpec(
                     name=psg_master_node_name,
                     action_name=f"/{psg_master_node_name}/{psg_master_node_json_params.init_config.input_port_config.action_name}",
                     create_debug_pub=False,
@@ -288,17 +296,19 @@ video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
             probe_topic_for_target_data="debug/probe_target_data",
         ),
     ),
-    runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
+    runtime_config=psgVideoReaderWithCropCfg.VideoReaderWithCropRuntimeConfig(
         step_interval=StepIntervals.Fast,
         # step_interval=StepIntervals.VerySlow,
-        output_image_size=videoSrcCfg.ImageSize(width=1920, height=1080),
+        output_image_size=psgVideoReaderWithCropCfg.ImageSize(width=1920, height=1080),
         output_image_encoding="bgr8",
-        frame_request_policy=videoSrcCfg.DeliveryPolicy(
+        frame_request_policy=psgVideoReaderWithCropCfg.DeliveryPolicy(
             drop_strategy="no_drop",
         ),
-        frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
+        frame_enqueue_policy=psgVideoReaderWithCropCfg.DeliveryPolicy(
             drop_strategy="no_drop",
         ),
+        # video_start_time=0,
+        # video_end_time=1000000,
     ),
 )
 
