@@ -143,17 +143,6 @@ int PSGFrameDetSourceSink::_update_init_config(std::shared_ptr<BaseInitConfig_t>
     }
     m_primary_output_port = primary_output_port;
 
-    //! Initialize debug publishers
-    if (init_config->create_debug_pub) {
-        RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG,
-                     "initialize debug publishers, task enqueue topic={}, task drop topic={}",
-                     init_config->debug_pub_task_enqueue_name,
-                     init_config->debug_pub_task_drop_name);
-        auto debug_qos = DefaultParams::get_debug_publisher_qos();
-        m_pub_task_enqueue.init(this, init_config->debug_pub_task_enqueue_name, debug_qos);
-        m_pub_task_drop.init(this, init_config->debug_pub_task_drop_name, debug_qos);
-    }
-
     return 0;
 }
 
@@ -338,13 +327,6 @@ void PSGFrameDetSourceSink::_get_model_result()
                                    det.bbox.x, det.bbox.y, det.bbox.width, det.bbox.height);
         }
         msg.data = det_str;
-
-        //! 通过debug publisher发布
-        if (init_config->create_debug_pub) {
-            RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] Publishing detection result: {}",
-                         boost::uuids::to_string(output_model_result.source_data->get_uuid()), det_str);
-            m_pub_task_enqueue.publish(msg);
-        }
     } else {
         RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "[msg_uuid={}] Model result is null",
                      boost::uuids::to_string(output_model_result.source_data->get_uuid()));

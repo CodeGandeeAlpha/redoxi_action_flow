@@ -85,6 +85,8 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
         image_utils::FrameMediator fm(&m_document.frame_bundle.primary_frame);
         cv::Mat cv_image;
         fm.to_cv_image_copy(cv_image);
+        if (cv_image.empty())
+            return;
         auto encoding = fm.get_encoding();
 
         //! 为不同类别设置不同颜色
@@ -132,6 +134,8 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
         cv::Mat cv_image;
         image_utils::FrameMediator fm(&m_document.frame_bundle.primary_frame);
         fm.to_cv_image_copy(cv_image);
+        if (cv_image.empty())
+            return;
 
         //! 为关键点设置颜色
         cv::Scalar keypoint_color(0, 255, 0); // 绿色
@@ -198,6 +202,8 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
         cv::Mat cv_image;
         image_utils::FrameMediator fm(&m_document.frame_bundle.primary_frame);
         fm.to_cv_image_copy(cv_image);
+        if (cv_image.empty())
+            return;
 
         //! 在图像上画person相关的框和keypoints
         for (const auto &person : m_document.persons) {
@@ -304,6 +310,8 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
         cv::Mat cv_image;
         image_utils::FrameMediator fm(&m_document.frame_bundle.primary_frame);
         fm.to_cv_image_copy(cv_image);
+        if (cv_image.empty())
+            return;
 
         //! 在图像上画关键点和骨架连接
         for (const auto &person : m_document.persons) {
@@ -434,6 +442,7 @@ class DeliverySourceData : public output_port_types::SimpleImageSourceData
                 return -1;
             }
         }
+        RDX_INFO_DEV(nullptr, __func__, false, "{}", "绘制完成");
         return 0;
     }
 
@@ -496,28 +505,34 @@ class DeliveryRequest : public DeliveryRequestBase
   protected:
     virtual int _to_target_data(DeliveryTargetData &target_data) const override
     {
-        // apply custom function if set
+        auto _uuid = DeliveryTargetData::ActionDataTrait_t::get_uuid(target_data.get_goal());
+        //! 检查是否设置了自定义转换函数
         if (custom_to_target_data) {
+            RDX_INFO_DEV(nullptr, __func__, false, "[uuid={}] 使用自定义转换函数", UUIDTrait::to_string(_uuid));
             custom_to_target_data(target_data, *this);
             return 0;
         }
 
+        RDX_INFO_DEV(nullptr, __func__, false, "[uuid={}] 使用默认转换函数", UUIDTrait::to_string(_uuid));
         auto &goal = target_data.get_goal();
 
-        // fill payload
+        //! 获取源数据中的文档
         auto document = this->m_source_data.get_document();
+        RDX_INFO_DEV(nullptr, __func__, false, "[uuid={}] 已获取源文档", UUIDTrait::to_string(_uuid));
 
-        // convert frame to document
+        //! 将文档复制到目标数据
         goal.document = document;
+        RDX_INFO_DEV(nullptr, __func__, false, "[uuid={}] 已复制文档到目标数据", UUIDTrait::to_string(_uuid));
 
-        // // set additional information into the goal
+        // // 设置额外的目标信息
         // using ActionTrait = DeliveryTargetData::ActionDataTrait_t;
 
-        // // set the source data UUID
+        // // 设置源数据UUID
         // ActionTrait::set_uuid(goal, this->m_source_data.get_uuid());
 
         // ActionTrait::mark_with_control_signal(goal, get_control_signal_code());
 
+        RDX_INFO_DEV(nullptr, __func__, false, "[uuid={}] 转换完成", UUIDTrait::to_string(_uuid));
         return 0;
     }
 

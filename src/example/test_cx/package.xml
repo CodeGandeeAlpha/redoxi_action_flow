@@ -29,7 +29,8 @@
   <depend>psg_counter</depend>
   <depend>universal_mot_trackers</depend>
   <depend>psg_common_py</depend>
-
+  <depend>psg_person_detector_cpp</depend>
+  <depend>simple_sink</depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 

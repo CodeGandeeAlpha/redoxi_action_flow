@@ -8,16 +8,15 @@ from launch.event_handlers import OnProcessExit
 from launch.actions import RegisterEventHandler
 
 import redoxi_common_py.configs.video_source_from_url as videoSrcCfg
+
+import psg_common_py.configs.video_reader_with_crop as psgVideoReaderWithCropCfg
 import psg_common_py.configs.psg_document_sink as psgDocSinkCfg
-import psg_common_py.configs.pipeline_base as psgPipelineBaseCfg
 import psg_common_py.configs.driver_base as psgDriverBaseCfg
 import psg_common_py.configs.inout_base as psgInoutBaseCfg
 import psg_common_py.configs.psg_counter as psgCounterCfg
 import psg_common_py.configs.psg_tracker as psgTrackerCfg
 import yolo8_series.configs as yolo
 import os
-
-# TODO: 删除pub的debug topic
 
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
@@ -59,6 +58,11 @@ ROS_PSG_CONFIG_PATH = os.environ.get(
     "/3d/chengxiao/data/passengerflow/fairmot_train_230907/psg_configs/20.22.6.30.json",
 )
 
+ROS_CROP_CONFIG_PATH = os.environ.get(
+    "ROS_CROP_CONFIG_PATH",
+    "/3d/chengxiao/data/passengerflow/fairmot_train_230907/psg_configs/crop_20.22.6.30.json",
+)
+
 # 文档接收节点配置
 # psg_counter -> document_sink
 document_sink_node_name = "document_sink"
@@ -72,7 +76,7 @@ document_sink_node_json_params = psgDocSinkCfg.PSGDocumentSinkNodeConfig(
         enable_save_middle_result=True,
     ),
     runtime_config=psgDocSinkCfg.PSGDocumentSinkNodeRuntimeConfig(
-        enable_debug_topics=True,
+        enable_debug_topics=False,
         enable_blocking_mode=False,
     ),
 )
@@ -82,7 +86,7 @@ document_sink_node_json_params = psgDocSinkCfg.PSGDocumentSinkNodeConfig(
 psg_counter_node_name = "psg_counter"
 psg_counter_node_json_params = psgCounterCfg.PSGCounterNodeConfig(
     init_config=psgCounterCfg.PSGCounterInitConfig(
-        create_debug_pub=True,
+        create_debug_pub=False,
         passengerflow_config_path=ROS_PSG_CONFIG_PATH,
         input_port_config=psgCounterCfg.InputPortConfig(
             action_name="in/action",
@@ -155,7 +159,6 @@ psg_tracker_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeConfig(
             # data_topic_for_target_data="data_out/target_data_pipeline",
             # data_topic_for_source_data="data_out/source_data_pipeline",
             visualization_topic_for_source_data="debug/source_data_visualization",
-            probe_topic_for_target_data="debug/probe_target_data",
         ),
         callee_request_port_config=psgDriverBaseCfg.OutputPortConfig(
             downstream_specs=[
@@ -172,46 +175,8 @@ psg_tracker_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeConfig(
     ),
 )
 
-# PSG人员生成器节点配置
-# psg_all_detector_cpp -> psg_person_generator -> psg_tracker_pipeline_node
-psg_person_generator_node_name = "psg_person_generator"
-psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
-    init_config=psgInoutBaseCfg.InoutBaseInitConfig(
-        create_debug_pub=False,
-        input_port_config=psgInoutBaseCfg.InputPortConfig(
-            action_name="in/action",
-        ),
-        output_port_config=psgInoutBaseCfg.OutputPortConfig(
-            downstream_specs=[
-                psgInoutBaseCfg.DownstreamSpec(
-                    name=psg_tracker_node_driver_name,
-                    action_name=f"/{psg_tracker_node_driver_name}/{psg_tracker_node_driver_json_params.init_config.input_port_config.action_name}",
-                )
-            ],
-            # data_topic_for_target_data="data_out/target_data",
-            # data_topic_for_source_data="data_out/source_data",
-            visualization_topic_for_source_data="debug/source_data_visualization",
-            probe_topic_for_target_data="debug/probe_target_data",
-        ),
-    ),
-    runtime_config=psgInoutBaseCfg.InoutBaseRuntimeConfig(
-        # step_interval=StepIntervals.VeryFast,
-        document_interval=0,
-        enable_blocking_mode=False,
-        publish_to_debug_topic=False,
-        frame_request_policy=psgInoutBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-        frame_enqueue_policy=psgInoutBaseCfg.DeliveryPolicy(
-            precondition="no_precondition",
-            drop_strategy="no_drop",
-        ),
-    ),
-)
-
-# cpp 姿态检测节点配置
-# psg_all_detector_cpp <-> yolo_body_pose_detection_node
+# cpp 检测节点配置
+# psg_person_detector_cpp <-> yolo_body_pose_detection_node
 det_node_name = "yolo_body_pose_detection_node"
 det_node_params = yolo.Yolo8ModelNodeConfig(
     init_config=yolo.Yolo8ModelInitConfig(
@@ -237,14 +202,14 @@ det_node_params = yolo.Yolo8ModelNodeConfig(
         ),
         enable_blocking_mode=False,
         enable_performance_probe=True,
-        enable_visualization=True,
+        enable_visualization=False,
     ),
 )
 
-# PSG cpp 姿态检测pipeline节点配置
-# psg_all_detector_cpp <-> yolo_body_pose_detection_node
-psg_all_detector_cpp_node_driver_name = "psg_all_detector_cpp_driver"
-psg_all_detector_cpp_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeConfig(
+# PSG cpp 检测pipeline节点配置
+# psg_person_detector_cpp <-> yolo_body_pose_detection_node
+psg_person_detector_cpp_node_driver_name = "psg_person_detector_cpp_driver"
+psg_person_detector_cpp_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeConfig(
     init_config=psgDriverBaseCfg.DriverBaseInitConfig(
         input_port_config=psgDriverBaseCfg.InputPortConfig(
             action_name="in/action",
@@ -252,14 +217,13 @@ psg_all_detector_cpp_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeCo
         output_port_config=psgDriverBaseCfg.OutputPortConfig(
             downstream_specs=[
                 psgDriverBaseCfg.DownstreamSpec(
-                    name=psg_person_generator_node_name,
-                    action_name=f"/{psg_person_generator_node_name}/{psg_person_generator_node_json_params.init_config.input_port_config.action_name}",
+                    name=psg_tracker_node_driver_name,
+                    action_name=f"/{psg_tracker_node_driver_name}/{psg_tracker_node_driver_json_params.init_config.input_port_config.action_name}",
                 )
             ],
             data_topic_for_target_data="data_out/target_data_pipeline",
             # data_topic_for_source_data="data_out/source_data_pipeline",
             visualization_topic_for_source_data="debug/source_data_visualization",
-            probe_topic_for_target_data="debug/probe_target_data",
         ),
         callee_request_port_config=psgDriverBaseCfg.OutputPortConfig(
             downstream_specs=[
@@ -269,7 +233,6 @@ psg_all_detector_cpp_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeCo
                 )
             ],
             # data_topic_for_target_data="data_out/target_data_model",
-            probe_topic_for_target_data="debug_callee/probe_target_data",
         ),
     ),
     runtime_config=psgDriverBaseCfg.DriverBaseRuntimeConfig(
@@ -278,23 +241,22 @@ psg_all_detector_cpp_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeCo
 )
 
 # PSG主节点配置
-# psg_master_node -> psg_all_detector_cpp_node_pipeline
+# psg_master_node -> psg_person_detector_cpp_node_pipeline
 psg_master_node_name = "psg_master_node"
 psg_master_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
     init_config=psgInoutBaseCfg.InoutBaseInitConfig(
-        create_debug_pub=True,
+        create_debug_pub=False,
         input_port_config=psgInoutBaseCfg.InputPortConfig(
             action_name="in/action",
         ),
         output_port_config=psgInoutBaseCfg.OutputPortConfig(
             downstream_specs=[
                 psgInoutBaseCfg.DownstreamSpec(
-                    name=psg_all_detector_cpp_node_driver_name,
-                    action_name=f"/{psg_all_detector_cpp_node_driver_name}/{psg_all_detector_cpp_node_driver_json_params.init_config.input_port_config.action_name}",
+                    name=psg_person_detector_cpp_node_driver_name,
+                    action_name=f"/{psg_person_detector_cpp_node_driver_name}/{psg_person_detector_cpp_node_driver_json_params.init_config.input_port_config.action_name}",
                 )
             ],
             # data_topic_for_target_data="data_out/target_data",
-            probe_topic_for_target_data="debug/probe_target_data",
         ),
     ),
     runtime_config=psgInoutBaseCfg.InoutBaseRuntimeConfig(
@@ -317,34 +279,36 @@ psg_master_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
 # 视频源配置
 # video_source -> psg_master_node
 video_src_node_name = "video_source"
-video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
-    init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
+video_source_params = psgVideoReaderWithCropCfg.VideoReaderWithCropNodeConfig(
+    init_config=psgVideoReaderWithCropCfg.VideoReaderWithCropInitConfig(
         video_url=ROS_FN_VIDEO,
+        crop_cfg_path=ROS_CROP_CONFIG_PATH,
         auto_replay=False,
-        primary_output_spec=videoSrcCfg.OutputPortConfig(
+        primary_output_spec=psgVideoReaderWithCropCfg.OutputPortConfig(
             downstream_specs=[
-                videoSrcCfg.DownstreamSpec(
+                psgVideoReaderWithCropCfg.DownstreamSpec(
                     name=psg_master_node_name,
                     action_name=f"/{psg_master_node_name}/{psg_master_node_json_params.init_config.input_port_config.action_name}",
-                    create_debug_pub=True,
+                    create_debug_pub=False,
                 ),
             ],
             # data_topic_for_target_data="data_out/target_data",
             probe_topic_for_target_data="debug/probe_target_data",
         ),
     ),
-    runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
+    runtime_config=psgVideoReaderWithCropCfg.VideoReaderWithCropRuntimeConfig(
         step_interval=StepIntervals.Fast,
-        # step_interval=StepIntervals.Medium,
-        output_image_size=videoSrcCfg.ImageSize(width=1920, height=1080),
-        video_end_time=-1,
+        # step_interval=StepIntervals.VerySlow,
+        output_image_size=psgVideoReaderWithCropCfg.ImageSize(width=1920, height=1080),
         output_image_encoding="bgr8",
-        frame_request_policy=videoSrcCfg.DeliveryPolicy(
+        frame_request_policy=psgVideoReaderWithCropCfg.DeliveryPolicy(
             drop_strategy="no_drop",
         ),
-        frame_enqueue_policy=videoSrcCfg.DeliveryPolicy(
+        frame_enqueue_policy=psgVideoReaderWithCropCfg.DeliveryPolicy(
             drop_strategy="no_drop",
         ),
+        # video_start_time=0,
+        # video_end_time=1000000,
     ),
 )
 
@@ -395,13 +359,13 @@ psg_master_node = Node(
 
 psg_detector_driver_node = Node(
     package="test_cx",
-    executable="v2_psg_all_detector_cpp_driver",
-    name=psg_all_detector_cpp_node_driver_name,
-    namespace=psg_all_detector_cpp_node_driver_name,
+    executable="v2_psg_person_detector_cpp_driver",
+    name=psg_person_detector_cpp_node_driver_name,
+    namespace=psg_person_detector_cpp_node_driver_name,
     prefix=common_prefix,
     parameters=[
         {
-            "param_as_json_string": psg_all_detector_cpp_node_driver_json_params.to_json(
+            "param_as_json_string": psg_person_detector_cpp_node_driver_json_params.to_json(
                 ignore_none=True, compact=False
             ),
         },
@@ -409,7 +373,7 @@ psg_detector_driver_node = Node(
     arguments=[
         "--ros-args",
         "--log-level",
-        [f"{psg_all_detector_cpp_node_driver_name}:=", logger],
+        [f"{psg_person_detector_cpp_node_driver_name}:=", logger],
     ]
     + common_ros_args,
 )
@@ -431,29 +395,6 @@ detection_node = Node(
     arguments=["--ros-args", "--log-level", [f"{det_node_name}:=", logger]]
     + common_ros_args,
     # arguments=["--ros-args", "--disable-external-lib-logs"],
-)
-
-psg_person_generator_node = Node(
-    package="test_cx",
-    executable="v2_psg_person_generator",
-    output="screen",  # 将输出重定向到屏幕
-    emulate_tty=True,  # 保持颜色输出
-    name=psg_person_generator_node_name,
-    namespace=psg_person_generator_node_name,
-    prefix=common_prefix,
-    parameters=[
-        {
-            "param_as_json_string": psg_person_generator_node_json_params.to_json(
-                ignore_none=True, compact=False
-            ),
-        },
-    ],
-    arguments=[
-        "--ros-args",
-        "--log-level",
-        [f"{psg_person_generator_node_name}:=", logger],
-    ]
-    + common_ros_args,
 )
 
 psg_tracker_driver_node = Node(
@@ -550,7 +491,7 @@ def generate_launch_description():
             "RCUTILS_CONSOLE_OUTPUT_FORMAT", "[{severity}][{time}]: {message}"
         ),
         SetEnvironmentVariable("ROS_LOG_DIR", "/3d/chengxiao/code/psf_ros2_ws/tmp/"),
-        SetEnvironmentVariable("ROS_DOMAIN_ID", "0"),
+        # SetEnvironmentVariable("ROS_DOMAIN_ID", "0"),
     ]
 
     def on_document_sink_exit(event, context):
@@ -571,7 +512,6 @@ def generate_launch_description():
             psg_master_node,
             psg_detector_driver_node,
             detection_node,
-            psg_person_generator_node,
             psg_tracker_driver_node,
             psg_tracker_node,
             psg_counter_node,

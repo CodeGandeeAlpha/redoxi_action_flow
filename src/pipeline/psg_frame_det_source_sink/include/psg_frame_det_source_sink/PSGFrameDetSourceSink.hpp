@@ -147,10 +147,6 @@ class PSGFrameDetSourceSink : public common_nodes::StartStopNode
     //! implementation details of this node
     std::shared_ptr<PSGFrameDetSourceSinkImpl> m_impl;
 
-    //! debug publishers
-    StampedStrPub m_pub_task_enqueue;
-    StampedStrPub m_pub_task_drop;
-
     //! thread for model result
     std::shared_ptr<std::thread> m_get_model_result_thread;
     std::atomic<bool> m_get_model_result_thread_running{false};

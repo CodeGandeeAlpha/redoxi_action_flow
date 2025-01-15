@@ -90,9 +90,6 @@ class PSGPersonGenerator : public common_nodes::StartStopNode
     //! @note this must be called before any other operations, so it cannot access any member variables
     virtual std::shared_ptr<PSGPersonGeneratorImpl> _create_impl();
 
-    //! create debug image
-    virtual sensor_msgs::msg::Image _create_debug_image(const psg_private_msgs::msg::PsgDocument &document);
-
     //! create document request handler
     virtual int _create_document_request_handler(const RuntimeConfig_t &runtime_config);
 
@@ -110,10 +107,6 @@ class PSGPersonGenerator : public common_nodes::StartStopNode
 
     //! implementation details of this node
     std::shared_ptr<PSGPersonGeneratorImpl> m_impl;
-
-    //! debug publishers
-    StampedImagePub m_pub_task_enqueue;
-    StampedImagePub m_pub_task_drop;
 };
 
 } // namespace redoxi_works
