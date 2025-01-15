@@ -49,12 +49,12 @@ int VideoReaderFromUrl::_open()
             scale_y = static_cast<double>(output_image_height) / video_height;
             scale_x = scale_y;
         }
-        crop_json_data["top_left"][0] = static_cast<int>(crop_json_data["top_left"][0].get<int>() * scale_x);
-        crop_json_data["top_left"][1] = static_cast<int>(crop_json_data["top_left"][1].get<int>() * scale_y);
-        crop_json_data["bottom_right"][0] = static_cast<int>(crop_json_data["bottom_right"][0].get<int>() * scale_x);
-        crop_json_data["bottom_right"][1] = static_cast<int>(crop_json_data["bottom_right"][1].get<int>() * scale_y);
-        crop_json_data["w"] = static_cast<int>(crop_json_data["w"].get<int>() * scale_x);
-        crop_json_data["h"] = static_cast<int>(crop_json_data["h"].get<int>() * scale_y);
+        crop_json_data["top_left"][0] = std::max(0, static_cast<int>(crop_json_data["top_left"][0].get<int>() * scale_x));
+        crop_json_data["top_left"][1] = std::max(0, static_cast<int>(crop_json_data["top_left"][1].get<int>() * scale_y));
+        crop_json_data["bottom_right"][0] = std::min(output_image_width, static_cast<int>(crop_json_data["bottom_right"][0].get<int>() * scale_x));
+        crop_json_data["bottom_right"][1] = std::min(output_image_height, static_cast<int>(crop_json_data["bottom_right"][1].get<int>() * scale_y));
+        crop_json_data["w"] = crop_json_data["bottom_right"][0].get<int>() - crop_json_data["top_left"][0].get<int>();
+        crop_json_data["h"] = crop_json_data["bottom_right"][1].get<int>() - crop_json_data["top_left"][1].get<int>();
         m_crop_cfg_json_str = crop_json_data.dump();
         RDX_INFO_DEV(this, __func__, "根据视频画面长宽与output_image_size，生成crop配置: {}", m_crop_cfg_json_str);
     } else {
