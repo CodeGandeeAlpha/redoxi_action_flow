@@ -507,8 +507,8 @@ void FrameMediator::make_metadata_compatible(Metadata_t *frame_metadata, const c
 bool FrameMediator::is_compatible(const cv::Mat &mat, const Metadata_t &metadata)
 {
     if (mat.empty())
-        // return metadata == Metadata_t();
-        return true;
+        return metadata.width == 0 && metadata.height == 0;
+
     bool size_compatible = mat.cols == metadata.width && mat.rows == metadata.height;
     if (!size_compatible) {
         RDX_INFO_DEV(nullptr, __func__, "frame size is not compatible with metadata, frame size={}, metadata size={}",
@@ -533,8 +533,7 @@ bool FrameMediator::is_compatible(const cv::Mat &mat, const Metadata_t &metadata
 bool FrameMediator::is_compatible(const ImageMsg_t &image_msg, const Metadata_t &metadata)
 {
     if (image_msg.data.empty())
-        // return metadata == Metadata_t();
-        return true;
+        return metadata.width == 0 && metadata.height == 0;
 
     bool size_compatible = image_msg.width == metadata.width && image_msg.height == metadata.height;
     if (!size_compatible) {
