@@ -189,7 +189,7 @@ container = ComposableNodeContainer(
         # Detection driver node
         ComposableNode(
             package="redoxi_common_nodes",
-            plugin="redoxi_works::common_nodes::drivers::DetectionDriver",
+            plugin="redoxi_works::node_pack::detection::DetectionDriver",
             name=DetectionDriverParams.node_name,
             parameters=[
                 {
@@ -203,7 +203,7 @@ container = ComposableNodeContainer(
         # Video source node
         ComposableNode(
             package="redoxi_video_reader",
-            plugin="redoxi_works::video_readers::VideoSourceFromUrl",
+            plugin="redoxi_works::node_pack::video_readers::VideoSourceFromUrl",
             name=VideoSourceParams.node_name,
             parameters=[
                 {

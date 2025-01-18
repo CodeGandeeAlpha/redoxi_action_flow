@@ -18,6 +18,7 @@
   <depend>redoxi_common_nodes</depend>
   <depend>json_struct</depend>
   <depend>redoxi_common_py</depend>
+  <depend>redoxi_cmake_utils</depend>
   
   <export>
     <build_type>ament_cmake</build_type>

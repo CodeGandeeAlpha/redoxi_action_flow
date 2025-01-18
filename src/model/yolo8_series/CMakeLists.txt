@@ -12,6 +12,7 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(redoxi_inference REQUIRED)
 find_package(redoxi_dnn_models REQUIRED)
 find_package(redoxi_common_nodes REQUIRED)
+find_package(redoxi_cmake_utils REQUIRED)
 find_package(json_struct REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 
@@ -32,10 +33,6 @@ target_include_directories(
 target_compile_definitions(yolo8_series PRIVATE "YOLO8_SERIES_BUILDING_LIBRARY")
 target_precompile_headers(yolo8_series PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}/_pch.hpp)
 
-rclcpp_components_register_nodes(yolo8_series 
-  "redoxi_works::model_nodes::yolo8::Yolo8BodyPoseNode" 
-  "redoxi_works::model_nodes::yolo8::Yolo8ObjectDetNode")
-
 ament_target_dependencies(yolo8_series PUBLIC redoxi_inference
                           redoxi_dnn_models redoxi_common_nodes json_struct)
 
@@ -46,6 +43,15 @@ install(
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
+
+create_composable_components(yolo8_series
+  SOURCE_FILE "src/yolo8_series_node_pack.cpp"
+  PLUGINS
+    "redoxi_works::node_pack::detection::yolo8::ObjectDetector"
+    "redoxi_works::node_pack::bodypose::yolo8::BodyPoseDetector"
+  EXECUTABLES
+    "node_pack_detection_yolo8_ObjectDetector"
+    "node_pack_detection_yolo8_BodyPoseDetector")
 
 # install python modules
 ament_python_install_package(${PROJECT_NAME})

@@ -126,7 +126,7 @@ install(
 create_composable_components(redoxi_video_reader
   SOURCE_FILE "src/redoxi_video_reader_components.cpp"
   PLUGINS
-    "redoxi_works::video_readers::VideoSourceFromUrl"
+    "redoxi_works::node_pack::video_readers::VideoSourceFromUrl"
     # "redoxi_works::video_readers::RTSPVideoSource"
     # "redoxi_works::video_readers::YoutubeVideoSource"
   EXECUTABLES
