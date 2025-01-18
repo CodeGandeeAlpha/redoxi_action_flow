@@ -95,8 +95,8 @@ class UniversalMotTrackersInitConfig(nodeCfg.BaseRosNodeInitConfig):
 @define(kw_only=True)
 class UniversalMotTrackersRuntimeConfig(nodeCfg.BaseRosNodeRuntimeConfig):
     enable_blocking_mode: bool = field(default=False)
-    enable_visualization: bool = field(default=True)
-    enable_performance_probe: bool = field(default=True)
+    enable_visualization: bool = field(default=False)
+    enable_performance_probe: bool = field(default=False)
 
 
 @define(kw_only=True)

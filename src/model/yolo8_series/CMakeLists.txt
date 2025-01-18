@@ -48,7 +48,7 @@ create_composable_components(yolo8_series
   SOURCE_FILE "src/yolo8_series_node_pack.cpp"
   PLUGINS
     "redoxi_works::node_pack::detection::yolo8::ObjectDetector"
-    "redoxi_works::node_pack::bodypose::yolo8::BodyPoseDetector"
+    "redoxi_works::node_pack::detection::yolo8::BodyPoseDetector"
   EXECUTABLES
     "node_pack_detection_yolo8_ObjectDetector"
     "node_pack_detection_yolo8_BodyPoseDetector")

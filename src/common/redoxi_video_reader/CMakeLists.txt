@@ -127,12 +127,8 @@ create_composable_components(redoxi_video_reader
   SOURCE_FILE "src/redoxi_video_reader_components.cpp"
   PLUGINS
     "redoxi_works::node_pack::video_readers::VideoSourceFromUrl"
-    # "redoxi_works::video_readers::RTSPVideoSource"
-    # "redoxi_works::video_readers::YoutubeVideoSource"
   EXECUTABLES
-    "node_executable_VideoSourceFromUrl"
-    # "node_executable_RTSPVideoSource"
-    # "node_executable_YoutubeVideoSource"
+    "node_pack_video_readers_VideoSourceFromUrl"
 )
 
 if(BUILD_TESTING)

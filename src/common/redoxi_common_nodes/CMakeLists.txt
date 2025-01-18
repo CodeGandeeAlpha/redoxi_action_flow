@@ -90,7 +90,7 @@ target_compile_definitions(redoxi_common_nodes
 create_composable_components(${PROJECT_NAME}
   SOURCE_FILE src/redoxi_common_nodes_components.cpp
   PLUGINS "redoxi_works::node_pack::detection::DetectionDriver"
-  EXECUTABLES node_executable_DetectionDriver)
+  EXECUTABLES "node_pack_detection_DetectionDriver")
 
 ament_target_dependencies(
   redoxi_common_nodes

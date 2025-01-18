@@ -63,12 +63,56 @@ class InputCacheSize:
 
 
 # the graph structure is:
-# video_source -> detection_driver -> tracker_driver -> frame_relay
+# video_source -> detection_driver -> tracker_driver -> null
 #                       |                   |
 #                    detector           tracker
+
+
+class TrackerParams:
+    node_name = "tracker"
+    input_action_name = f"/{node_name}/in/track_request"
+
+    node_params = motTrackersCfg.UniversalMotTrackersNodeConfig(
+        init_config=motTrackersCfg.UniversalMotTrackersInitConfig(
+            input_port_config=motTrackersCfg.InputPortConfig(
+                action_name=input_action_name,
+                buffer_capacity=InputCacheSize.Medium,
+            ),
+        ),
+    )
+
+
+class TrackerDriverParams:
+    node_name = "tracker_driver"
+    input_action_name = f"/{node_name}/in/track_request"
+
+    node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
+        init_config=motTrackersDriverCfg.TrackerDriverInitConfig(
+            input_port_config=motTrackersDriverCfg.InputPortConfig(
+                action_name=input_action_name,
+                buffer_capacity=InputCacheSize.Medium,
+            ),
+            # tracker_driver -> null
+            output_port_config=motTrackersDriverCfg.OutputPortConfig(
+                visualization_topic_for_target_data=f"/{node_name}/output/vis/target_data",
+                probe_topic_for_target_data=f"/{node_name}/output/probe/target_data",
+            ),
+            # tracker_driver -> tracker
+            callee_request_port_config=motTrackersDriverCfg.OutputPortConfig(
+                downstream_specs=[
+                    motTrackersDriverCfg.DownstreamSpec(
+                        name=TrackerParams.node_name,
+                        action_name=TrackerParams.input_action_name,
+                    ),
+                ],
+            ),
+        ),
+    )
+
+
 class DetectorParams:
-    # fn_model = f"{workspace_root}/tmp/models/yolov8m-pose-640.onnx"
-    fn_model = f"{workspace_root}/tmp/models/yolov8s-pose.onnx"
+    fn_model = f"{workspace_root}/tmp/models/yolov8m-pose-640.onnx"
+    # fn_model = f"{workspace_root}/tmp/models/yolov8s-pose.onnx"
     node_name = "detector"
     input_action_name = f"/{node_name}/in/detection_request"
     node_params = yolo.Yolo8ModelNodeConfig(
@@ -108,12 +152,18 @@ class DetectionDriverParams:
                 action_name=input_action_name,
                 buffer_capacity=InputCacheSize.Medium,
             ),
+            # detection_driver -> tracker_driver
             output_port_config=detDriverCfg.OutputPortConfig(
-                visualization_topic_for_source_data=f"/{node_name}/output/vis/source_data",
+                downstream_specs=[
+                    detDriverCfg.DownstreamSpec(
+                        name=TrackerDriverParams.node_name,
+                        action_name=TrackerDriverParams.input_action_name,
+                    ),
+                ],
                 visualization_topic_for_target_data=f"/{node_name}/output/vis/target_data",
-                probe_topic_for_target_data=f"/{node_name}/output/probe/target_data",
                 probe_topic_for_source_data=f"/{node_name}/output/probe/source_data",
             ),
+            # detection_driver -> detector
             callee_request_port_config=detDriverCfg.OutputPortConfig(
                 downstream_specs=[
                     detDriverCfg.DownstreamSpec(
@@ -122,14 +172,9 @@ class DetectionDriverParams:
                         # create_debug_pub=True,
                     ),
                 ],
-                # visualization_topic_for_source_data="vis/callee/source_data",
-                # visualization_topic_for_target_data="callee/vis/target_data",
-                probe_topic_for_target_data=f"/{node_name}/probe/target_data",
-                probe_topic_for_source_data=f"/{node_name}/probe/source_data",
+                visualization_topic_for_target_data=f"/{node_name}/callee/vis/target_data",
+                probe_topic_for_source_data=f"/{node_name}/callee/probe/source_data",
             ),
-        ),
-        runtime_config=detDriverCfg.DetectionDriverRuntimeConfig(
-            enable_blocking_mode=False,
         ),
     )
 
@@ -186,20 +231,6 @@ container = ComposableNodeContainer(
     package="rclcpp_components",
     executable="component_container",
     composable_node_descriptions=[
-        # Detection driver node
-        ComposableNode(
-            package="redoxi_common_nodes",
-            plugin="redoxi_works::node_pack::detection::DetectionDriver",
-            name=DetectionDriverParams.node_name,
-            parameters=[
-                {
-                    JsonParamKey: DetectionDriverParams.node_params.to_json(
-                        ignore_none=True, compact=False
-                    ),
-                }
-            ],
-            extra_arguments=[{"use_intra_process_comms": True}],
-        ),
         # Video source node
         ComposableNode(
             package="redoxi_video_reader",
@@ -214,20 +245,62 @@ container = ComposableNodeContainer(
             ],
             extra_arguments=[{"use_intra_process_comms": True}],
         ),
+        # Detection driver node
+        ComposableNode(
+            package="redoxi_common_nodes",
+            plugin="redoxi_works::node_pack::detection::DetectionDriver",
+            name=DetectionDriverParams.node_name,
+            parameters=[
+                {
+                    JsonParamKey: DetectionDriverParams.node_params.to_json(
+                        ignore_none=True, compact=False
+                    ),
+                }
+            ],
+            extra_arguments=[{"use_intra_process_comms": True}],
+        ),
         # Detector node
-        # ComposableNode(
-        #     package="yolo8_series",
-        #     plugin="redoxi_works::model_nodes::yolo8::Yolo8BodyPoseNode",
-        #     name=DetectorParams.node_name,
-        #     parameters=[
-        #         {
-        #             JsonParamKey: DetectorParams.node_params.to_json(
-        #                 ignore_none=True, compact=False
-        #             ),
-        #         }
-        #     ],
-        #     extra_arguments=[{"use_intra_process_comms": True}],
-        # ),
+        ComposableNode(
+            package="yolo8_series",
+            plugin="redoxi_works::node_pack::detection::yolo8::BodyPoseDetector",
+            name=DetectorParams.node_name,
+            parameters=[
+                {
+                    JsonParamKey: DetectorParams.node_params.to_json(
+                        ignore_none=True, compact=False
+                    ),
+                }
+            ],
+            extra_arguments=[{"use_intra_process_comms": True}],
+        ),
+        # Tracker driver node
+        ComposableNode(
+            package="universal_mot_trackers",
+            plugin="redoxi_works::node_pack::tracking::MotTrackerDriver",
+            name=TrackerDriverParams.node_name,
+            parameters=[
+                {
+                    JsonParamKey: TrackerDriverParams.node_params.to_json(
+                        ignore_none=True, compact=False
+                    ),
+                }
+            ],
+            extra_arguments=[{"use_intra_process_comms": True}],
+        ),
+        # Tracker node
+        ComposableNode(
+            package="universal_mot_trackers",
+            plugin="redoxi_works::node_pack::tracking::UniversalMotTracker",
+            name=TrackerParams.node_name,
+            parameters=[
+                {
+                    JsonParamKey: TrackerParams.node_params.to_json(
+                        ignore_none=True, compact=False
+                    ),
+                }
+            ],
+            extra_arguments=[{"use_intra_process_comms": True}],
+        ),
     ],
     output="screen",
     arguments=["--ros-args", "--log-level", logger],
@@ -242,9 +315,11 @@ lifecycle_manager = Node(
     parameters=[
         {
             "node_names": [
-                # f"{DetectorParams.node_name}",
+                f"{DetectorParams.node_name}",
                 f"{DetectionDriverParams.node_name}",
-                # f"{VideoSourceParams.node_name}",
+                f"{VideoSourceParams.node_name}",
+                f"{TrackerParams.node_name}",
+                f"{TrackerDriverParams.node_name}",
             ],
             "bond_timeout": 0.0,
             "autostart": True,  # This will automatically configure and activate nodes

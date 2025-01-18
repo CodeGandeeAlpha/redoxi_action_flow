@@ -11,9 +11,9 @@ Creates and registers ROS2 composable components from a list of plugins.
   .. code-block:: cmake
 
     create_composable_components(<ProjectName>
-      [SOURCE_FILE <source_file>]
+      SOURCE_FILE source_file1 [source_file2 ...]
       PLUGINS plugin1 [plugin2 ...]
-      [EXECUTABLES exec1 [exec2 ...]]
+      EXECUTABLES exec1 [exec2 ...]
     )
 
 Creates a library containing composable components and registers each plugin as a
@@ -26,16 +26,14 @@ Arguments
   Name of the project, used to generate default names
 
 ``SOURCE_FILE``
-  Optional path to the source file containing component implementations.
-  Defaults to "src/${ProjectName}_components.cpp"
+  Required list of source files containing component implementations.
 
 ``PLUGINS``
   List of plugin class names to register as components
 
 ``EXECUTABLES`` 
-  Optional list of executable names corresponding to each plugin.
-  If not provided, names are generated from plugin names by replacing "::" with "_"
-  and prefixing with "node_executable_"
+  Required list of executable names corresponding to each plugin.
+  Must have same length as PLUGINS list.
 
 The macro:
 - Creates a library named ${ProjectName}_components
@@ -45,11 +43,26 @@ The macro:
 - Installs the components library to the appropriate destinations
 #]=======================================================================]
 macro(create_composable_components ProjectName)
-  cmake_parse_arguments(ARG "" "SOURCE_FILE" "PLUGINS;EXECUTABLES" ${ARGN})
+  cmake_parse_arguments(ARG "" "" "SOURCE_FILE;PLUGINS;EXECUTABLES" ${ARGN})
   
-  # Set default source file if not provided
-  if(NOT ARG_SOURCE_FILE)
-    set(ARG_SOURCE_FILE "src/${ProjectName}_components.cpp")
+  # Validate required arguments
+  if(NOT DEFINED ARG_SOURCE_FILE)
+    message(FATAL_ERROR "SOURCE_FILE argument is required")
+  endif()
+
+  if(NOT DEFINED ARG_PLUGINS)
+    message(FATAL_ERROR "PLUGINS argument is required")
+  endif()
+  
+  if(NOT DEFINED ARG_EXECUTABLES)
+    message(FATAL_ERROR "EXECUTABLES argument is required")
+  endif()
+
+  # Validate lengths match
+  list(LENGTH ARG_PLUGINS num_plugins)
+  list(LENGTH ARG_EXECUTABLES num_executables)
+  if(NOT num_plugins EQUAL num_executables)
+    message(FATAL_ERROR "Number of PLUGINS (${num_plugins}) must match number of EXECUTABLES (${num_executables})")
   endif()
 
   # Create components library
@@ -57,19 +70,11 @@ macro(create_composable_components ProjectName)
   target_link_libraries(${ProjectName}_components PUBLIC ${ProjectName})
 
   # Register each plugin
-  list(LENGTH ARG_PLUGINS num_plugins)
   math(EXPR last_idx "${num_plugins} - 1")
   
   foreach(idx RANGE ${last_idx})
     list(GET ARG_PLUGINS ${idx} plugin)
-    
-    # Use provided executable name if available, otherwise generate one
-    if(DEFINED ARG_EXECUTABLES)
-      list(GET ARG_EXECUTABLES ${idx} exec_name)
-    else()
-      string(REPLACE "::" "_" exec_name "${plugin}")
-      set(exec_name "node_executable_${exec_name}")
-    endif()
+    list(GET ARG_EXECUTABLES ${idx} exec_name)
     
     rclcpp_components_register_node(${ProjectName}_components
       PLUGIN "${plugin}"

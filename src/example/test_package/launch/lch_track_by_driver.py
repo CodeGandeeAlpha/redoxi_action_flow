@@ -122,9 +122,6 @@ tracker_driver_node_params = motTrackersDriverCfg.TrackerDriverNodeConfig(
             probe_topic_for_target_data="callee/probe/target_data",
         ),
     ),
-    runtime_config=motTrackersDriverCfg.TrackerDriverRuntimeConfig(
-        enable_blocking_mode=False,
-    ),
 )
 
 
