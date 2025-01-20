@@ -27,7 +27,7 @@ find_package(redoxi_cmake_utils REQUIRED)
 find_package(Boost REQUIRED)
 
 
-set(source_files
+set(srcfiles
   src/redoxi_video_reader.cpp
   src/base/v1/VideoReaderBase.cpp
   src/base/v1/VideoReaderBaseTypes.cpp
@@ -35,9 +35,10 @@ set(source_files
   src/v2/VideoSourceFromUrl.cpp
   src/base/v2/VideoReaderBase.cpp
   src/base/v2/VideoReaderBaseTypes.cpp
+  src/FFmpegVideoReader.cpp
 )
 
-add_library(redoxi_video_reader ${source_files})
+add_library(redoxi_video_reader ${srcfiles})
 add_library(redoxi_video_reader::redoxi_video_reader ALIAS redoxi_video_reader)
 target_compile_features(redoxi_video_reader PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 target_include_directories(redoxi_video_reader PUBLIC
