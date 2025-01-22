@@ -159,4 +159,55 @@ void draw_detections(cv::Mat *output,
         }
     }
 }
+
+void convert_cv_mat_encoding(
+    cv::Mat *output_image, const cv::Mat &input_image,
+    const std::string &src_encoding, const std::string &dst_encoding)
+{
+    //! Skip if output image is not valid
+    if (!output_image) {
+        return;
+    }
+
+    //! Skip if encodings are the same
+    if (src_encoding == dst_encoding) {
+        input_image.copyTo(*output_image);
+        return;
+    }
+
+    //! Convert between RGB8 and BGR8
+    if ((src_encoding == "rgb8" && dst_encoding == "bgr8") ||
+        (src_encoding == "bgr8" && dst_encoding == "rgb8")) {
+        cv::cvtColor(input_image, *output_image, cv::COLOR_RGB2BGR);
+        return;
+    }
+
+    //! Convert from RGB8/BGR8 to MONO8
+    if (dst_encoding == "mono8") {
+        if (src_encoding == "rgb8") {
+            cv::cvtColor(input_image, *output_image, cv::COLOR_RGB2GRAY);
+            return;
+        }
+        if (src_encoding == "bgr8") {
+            cv::cvtColor(input_image, *output_image, cv::COLOR_BGR2GRAY);
+            return;
+        }
+    }
+
+    //! Convert from MONO8 to RGB8/BGR8
+    if (src_encoding == "mono8") {
+        if (dst_encoding == "rgb8") {
+            cv::cvtColor(input_image, *output_image, cv::COLOR_GRAY2RGB);
+            return;
+        }
+        if (dst_encoding == "bgr8") {
+            cv::cvtColor(input_image, *output_image, cv::COLOR_GRAY2BGR);
+            return;
+        }
+    }
+
+    //! Unsupported conversion, throw error
+    RDX_RAISE_ERROR("[f={}()] Unsupported encoding conversion: {} -> {}", __func__, src_encoding, dst_encoding);
+}
+
 } // namespace redoxi_works::image_utils
