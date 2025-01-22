@@ -1,17 +1,13 @@
 @echo off
 setlocal
 
-set PORT="5555"
+set PORT=5555
 
 :parse_args
 for %%A in (%*) do (
-    if "%%~A"=="--port" (
-        set PORT="%%~B"
-    ) else (
-        for /f "tokens=1,2 delims==" %%B in ("%%~A") do (
-            if /i "%%B"=="--port" (
-                set PORT="%%C"
-            )
+    for /f "tokens=1,2 delims==" %%B in ("%%~A") do (
+        if /i "%%B"=="--port" (
+            set PORT=%%C
         )
     )
 )
