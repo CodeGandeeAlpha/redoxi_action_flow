@@ -15,6 +15,17 @@ int FFmpegVideoReader::_open()
     auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
     m_ffmpeg_data_pipe = std::make_shared<boost::process::ipstream>();
     m_ffmpeg_logging_pipe = std::make_shared<boost::process::ipstream>();
+
+    // start reading ffmpeg output
+    m_ffmpeg_logging_thread = std::make_shared<std::thread>([this]() {
+        // read ffmpeg logs
+        std::string line;
+        while (std::getline(*m_ffmpeg_logging_pipe, line)) {
+            RDX_INFO_DEV(this, __func__, "ffmpeg: {}", line);
+        }
+    });
+
+    RDX_INFO_DEV(this, __func__, "opening ffmpeg process with args: {}", init_config->ffmpeg_args);
     auto ffmpeg_process = std::make_shared<boost::process::child>(
         init_config->ffmpeg_path,
         init_config->ffmpeg_args,
@@ -28,14 +39,7 @@ int FFmpegVideoReader::_open()
         return -1;
     }
 
-    // start reading ffmpeg output
-    m_ffmpeg_logging_thread = std::make_shared<std::thread>([this]() {
-        // read ffmpeg logs
-        std::string line;
-        while (std::getline(*m_ffmpeg_logging_pipe, line)) {
-            RDX_INFO_DEV(this, __func__, "ffmpeg: {}", line);
-        }
-    });
+    RDX_INFO_DEV(this, __func__, "{}", "ffmpeg process opened successfully");
 
     return 0;
 }
@@ -48,14 +52,17 @@ FFmpegVideoReader::ReadFrameResult
     auto height = init_config->frame_height;
     auto channels = init_config->frame_channels;
     auto src_encoding = init_config->frame_encoding;
-
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
     auto dst_encoding = runtime_config->output_image_encoding;
+
+    RDX_INFO_DEV(this, __func__, "reading frame width={}, height={}, channels={}, src_encoding={}, dst_encoding={}",
+                 width, height, channels, src_encoding, dst_encoding);
 
     // read raw frame from ffmpeg, assuming 8bit per-channel video
     cv::Mat raw_frame(height, width, CV_8UC(channels));
     if (!m_ffmpeg_data_pipe->read(reinterpret_cast<char *>(raw_frame.data), raw_frame.total() * raw_frame.elemSize())) {
         // no more data to read, end of video
+        RDX_INFO_DEV(this, __func__, "{}", "no more data to read, end of video");
         return ReadFrameResult::END_OF_VIDEO;
     }
 
@@ -70,6 +77,8 @@ FFmpegVideoReader::ReadFrameResult
     metadata.source_frame_index = fno;
     metadata.source_timestamp = rclcpp::Clock().now(); // assuming real time video
     metadata.frame_num = fno;
+
+    RDX_INFO_DEV(this, __func__, "got frame, index={}", fno);
 
     // fill source data
     source_data.get_primary_frame().from_raw_data({.image = raw_frame, .metadata = metadata});
