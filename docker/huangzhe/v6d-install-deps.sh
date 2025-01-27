@@ -15,7 +15,14 @@ sudo apt-get install -y doxygen \
                    libunwind-dev \
                    libz-dev \
                    protobuf-compiler-grpc \
-                   wget
+                   wget \
+                   build-essential \
+                   cmake \
+                   git \
+                   libtool \
+                   autoconf \
+                   automake \
+                   libtool-bin
 
 # allow pip3 to break the system package
 sudo pip3 config --global set global.break-system-packages true
