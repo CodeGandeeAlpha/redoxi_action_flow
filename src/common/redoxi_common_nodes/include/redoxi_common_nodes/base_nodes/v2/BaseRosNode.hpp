@@ -1,15 +1,25 @@
 #pragma once
 
+// use nav2_util::LifecycleNode or rclcpp_lifecycle::LifecycleNode?
+// #ifndef REDOXI_WORKS_USE_NAV2_LIFECYCLE_NODE
+// #    define REDOXI_WORKS_USE_NAV2_LIFECYCLE_NODE
+// #endif
+
+#ifdef REDOXI_WORKS_USE_NAV2_LIFECYCLE_NODE
+#    include <nav2_util/lifecycle_node.hpp>
+using BaseLifecycleNode = nav2_util::LifecycleNode;
+#else
+#    include <rclcpp_lifecycle/lifecycle_node.hpp>
+using BaseLifecycleNode = rclcpp_lifecycle::LifecycleNode;
+#endif
+
 #include <future>
 #include <tbb/task_group.h>
 #include <nlohmann/json.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <rclcpp_lifecycle/lifecycle_node.hpp>
-#include <nav2_util/lifecycle_node.hpp>
 #include <lifecycle_msgs/msg/state.hpp>
 #include <lifecycle_msgs/msg/transition.hpp>
 #include <json_struct/json_struct.h>
-
 #include <redoxi_common_nodes/redoxi_common_nodes.hpp>
 #include <redoxi_common_cpp/common_concepts.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
@@ -71,13 +81,13 @@ class BaseRosNodeRuntimeConfig
 /**
  * @brief Base class for all ROS nodes, with step function
  */
-class BaseRosNode : public nav2_util::LifecycleNode
+class BaseRosNode : public BaseLifecycleNode
 {
   public:
     using InitConfig_t = BaseRosNodeInitConfig;
     using RuntimeConfig_t = BaseRosNodeRuntimeConfig;
 
-    using RosBaseNode_t = nav2_util::LifecycleNode;
+    using RosBaseNode_t = BaseLifecycleNode;
     using RosPrimaryState_t = lifecycle_msgs::msg::State;
     using RosLifecycleState_t = rclcpp_lifecycle::State;
     using RosLifecycleTransition_t = rclcpp_lifecycle::Transition;

@@ -14,6 +14,11 @@ UniversalMotTrackerNode::UniversalMotTrackerNode(const std::string &name, const 
     m_impl = std::make_shared<Impl>();
 }
 
+UniversalMotTrackerNode::UniversalMotTrackerNode(const rclcpp::NodeOptions &options)
+    : UniversalMotTrackerNode("UniversalMotTracker", options)
+{
+}
+
 int UniversalMotTrackerNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
 {
     auto init_config = std::static_pointer_cast<InitConfig_t>(config);

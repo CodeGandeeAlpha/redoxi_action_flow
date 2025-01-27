@@ -61,17 +61,16 @@ StartStopNode::RosLifecycleCallbackReturn_t StartStopNode::on_deactivate(const R
 
 StartStopNode::RosLifecycleCallbackReturn_t StartStopNode::on_shutdown(const RosLifecycleState_t &state)
 {
+    // do parent work
+    BaseRosNode::on_shutdown(state);
     // perform stop and cleanup
     _stop_step_thread();
-
     // perform deactivate and cleanup
     auto ret = _stop();
     if (ret != 0) {
         RDX_RAISE_ERROR("[f={}] Failed to stop node", __func__);
     }
 
-    // do parent work
-    BaseRosNode::on_shutdown(state);
 
     RDX_INFO_DEV(this, __func__, false, "{}", "Node shutdown");
     return RosLifecycleCallbackReturn_t::SUCCESS;

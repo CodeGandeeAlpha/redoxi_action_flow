@@ -80,6 +80,9 @@ OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_cleanup(const RosL
 
 OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_shutdown(const RosLifecycleState_t &state)
 {
+    // do parent work
+    BaseRosNode::on_shutdown(state);
+
     //! Stop step thread
     _stop_step_thread();
 
@@ -93,9 +96,6 @@ OpenCloseNode::RosLifecycleCallbackReturn_t OpenCloseNode::on_shutdown(const Ros
     if (ret != 0) {
         RDX_RAISE_ERROR("[f={}] Failed to close node", __func__);
     }
-
-    // do parent work
-    BaseRosNode::on_shutdown(state);
 
     return RosLifecycleCallbackReturn_t::SUCCESS;
 }

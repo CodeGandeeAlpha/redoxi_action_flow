@@ -3,6 +3,7 @@
 #include <redoxi_common_cpp/common_concepts.hpp>
 #include <redoxi_common_cpp/ros_utils/message_conversion.hpp>
 #include <redoxi_public_msgs/msg/control.hpp>
+#include <redoxi_public_msgs/msg/task_metadata.hpp>
 
 namespace redoxi_works
 {
@@ -22,6 +23,11 @@ concept RedoxiActionConcept = requires(T t)
     {
         std::declval<typename T::Goal>().x_uid
         } -> std::convertible_to<unique_identifier_msgs::msg::UUID>;
+
+    // the goal must have a task metadata
+    {
+        std::declval<typename T::Goal>().x_task_metadata
+        } -> std::convertible_to<redoxi_public_msgs::msg::TaskMetadata>;
 };
 
 //! Default implementation of ActionDataTraitConcept

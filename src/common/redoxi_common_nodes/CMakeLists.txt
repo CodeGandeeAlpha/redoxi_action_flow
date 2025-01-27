@@ -17,7 +17,8 @@ find_package(rosidl_runtime_cpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
 find_package(rclcpp_components REQUIRED)
-find_package(nav2_util REQUIRED)
+find_package(redoxi_cmake_utils REQUIRED)
+# find_package(nav2_util REQUIRED)
 # uncomment the following section in order to fill in further dependencies
 # manually. find_package(<dependency> REQUIRED)
 
@@ -72,9 +73,24 @@ target_compile_definitions(redoxi_common_nodes
 #   rclcpp_lifecycle
 #   lifecycle_msgs
 #   rclcpp_components)
-rclcpp_components_register_node(redoxi_common_nodes 
-  PLUGIN "redoxi_works::common_nodes::drivers::DetectionDriver"
-  EXECUTABLE redoxi_common_nodes_executable)
+# rclcpp_components_register_node(redoxi_common_nodes 
+#   PLUGIN "redoxi_works::common_nodes::drivers::DetectionDriver"
+#   EXECUTABLE redoxi_common_nodes_executable)
+
+# add_library(redoxi_common_nodes_components src/redoxi_common_nodes_components.cpp)
+# target_link_libraries(redoxi_common_nodes_components PUBLIC redoxi_common_nodes)
+# rclcpp_components_register_node(redoxi_common_nodes_components 
+#   PLUGIN "redoxi_works::common_nodes::drivers::DetectionDriver"
+#   EXECUTABLE redoxi_common_nodes_executable)
+# install(TARGETS redoxi_common_nodes_components
+#   ARCHIVE DESTINATION lib
+#   LIBRARY DESTINATION lib
+#   RUNTIME DESTINATION bin)
+
+create_composable_components(${PROJECT_NAME}
+  SOURCE_FILE src/redoxi_common_nodes_components.cpp
+  PLUGINS "redoxi_works::node_pack::detection::DetectionDriver"
+  EXECUTABLES "node_pack_detection_DetectionDriver")
 
 ament_target_dependencies(
   redoxi_common_nodes
@@ -86,7 +102,6 @@ ament_target_dependencies(
   rosidl_runtime_cpp
   rclcpp_lifecycle
   lifecycle_msgs
-  nav2_util
   rclcpp_components)
 
 install(DIRECTORY include/ DESTINATION include)
@@ -119,7 +134,6 @@ ament_export_dependencies(
   rclcpp_lifecycle
   lifecycle_msgs
   rclcpp_components
-  nav2_util
   ${cpp_required_to_find})
 
 ament_export_include_directories(include)

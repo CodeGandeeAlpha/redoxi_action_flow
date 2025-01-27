@@ -175,6 +175,3 @@ VideoSourceFromUrl::ReadFrameResult VideoSourceFromUrl::_read_frame(SourceData_t
     return ReadFrameResult::OK;
 }
 } // namespace redoxi_works::video_readers::v2
-
-#include <rclcpp_components/register_node_macro.hpp>
-RCLCPP_COMPONENTS_REGISTER_NODE(redoxi_works::video_readers::v2::VideoSourceFromUrl)

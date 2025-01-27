@@ -116,10 +116,6 @@ class PSGMasterNode : public common_nodes::StartStopNode
 
     //! implementation details of this node
     std::shared_ptr<PSGMasterNodeImpl> m_impl;
-
-    //! debug publishers
-    StampedImagePub m_pub_task_enqueue;
-    StampedImagePub m_pub_task_drop;
 };
 
 } // namespace redoxi_works

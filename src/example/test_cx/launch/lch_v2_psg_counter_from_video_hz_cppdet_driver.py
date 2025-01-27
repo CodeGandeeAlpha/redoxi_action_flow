@@ -17,6 +17,8 @@ import psg_common_py.configs.psg_tracker as psgTrackerCfg
 import yolo8_series.configs as yolo
 import os
 
+# TODO: 删除pub的debug topic
+
 logger = LaunchConfiguration("log_level")
 log_level_arg = DeclareLaunchArgument(
     "log_level",
@@ -152,7 +154,8 @@ psg_tracker_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeConfig(
             ],
             # data_topic_for_target_data="data_out/target_data_pipeline",
             # data_topic_for_source_data="data_out/source_data_pipeline",
-            # visualization_topic_for_source_data="debug/source_data_visualization",
+            visualization_topic_for_source_data="debug/source_data_visualization",
+            probe_topic_for_target_data="debug/probe_target_data",
         ),
         callee_request_port_config=psgDriverBaseCfg.OutputPortConfig(
             downstream_specs=[
@@ -174,7 +177,7 @@ psg_tracker_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeConfig(
 psg_person_generator_node_name = "psg_person_generator"
 psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
     init_config=psgInoutBaseCfg.InoutBaseInitConfig(
-        create_debug_pub=True,
+        create_debug_pub=False,
         input_port_config=psgInoutBaseCfg.InputPortConfig(
             action_name="in/action",
         ),
@@ -187,6 +190,8 @@ psg_person_generator_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
             ],
             # data_topic_for_target_data="data_out/target_data",
             # data_topic_for_source_data="data_out/source_data",
+            visualization_topic_for_source_data="debug/source_data_visualization",
+            probe_topic_for_target_data="debug/probe_target_data",
         ),
     ),
     runtime_config=psgInoutBaseCfg.InoutBaseRuntimeConfig(
@@ -251,9 +256,10 @@ psg_all_detector_cpp_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeCo
                     action_name=f"/{psg_person_generator_node_name}/{psg_person_generator_node_json_params.init_config.input_port_config.action_name}",
                 )
             ],
-            # data_topic_for_target_data="data_out/target_data_pipeline",
+            data_topic_for_target_data="data_out/target_data_pipeline",
             # data_topic_for_source_data="data_out/source_data_pipeline",
-            # visualization_topic_for_source_data="debug/source_data_visualization",
+            visualization_topic_for_source_data="debug/source_data_visualization",
+            probe_topic_for_target_data="debug/probe_target_data",
         ),
         callee_request_port_config=psgDriverBaseCfg.OutputPortConfig(
             downstream_specs=[
@@ -263,6 +269,7 @@ psg_all_detector_cpp_node_driver_json_params = psgDriverBaseCfg.DriverBaseNodeCo
                 )
             ],
             # data_topic_for_target_data="data_out/target_data_model",
+            probe_topic_for_target_data="debug_callee/probe_target_data",
         ),
     ),
     runtime_config=psgDriverBaseCfg.DriverBaseRuntimeConfig(
@@ -287,6 +294,7 @@ psg_master_node_json_params = psgInoutBaseCfg.InoutBaseNodeConfig(
                 )
             ],
             # data_topic_for_target_data="data_out/target_data",
+            probe_topic_for_target_data="debug/probe_target_data",
         ),
     ),
     runtime_config=psgInoutBaseCfg.InoutBaseRuntimeConfig(
@@ -327,7 +335,9 @@ video_source_params = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
         step_interval=StepIntervals.Fast,
+        # step_interval=StepIntervals.Medium,
         output_image_size=videoSrcCfg.ImageSize(width=1920, height=1080),
+        video_end_time=-1,
         output_image_encoding="bgr8",
         frame_request_policy=videoSrcCfg.DeliveryPolicy(
             drop_strategy="no_drop",

@@ -80,12 +80,18 @@ json_struct_flags=" \
     -DJS_STL_MAP \
     -DJS_STL_ARRAY"
 
+# c++ macros to control the log level
+redoxi_works_flags=" \
+    -DREDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_INFO=0 \
+    -DREDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_DEBUG=0 \
+    -DREDOXI_WORKS_LOG_IMPORTANCE_THRESHOLD_WARN=0"
+
 colcon build --packages-up-to $PackagesToBuild \
     $VERBOSE \
     --parallel-workers $NUM_JOBS \
     --symlink-install \
     --cmake-args \
-    -DCMAKE_CXX_FLAGS="$json_struct_flags" \
+    -DCMAKE_CXX_FLAGS="$json_struct_flags $redoxi_works_flags" \
     -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
     -DCMAKE_CXX_STANDARD=20 \
     -DCMAKE_CXX_STANDARD_REQUIRED=ON \

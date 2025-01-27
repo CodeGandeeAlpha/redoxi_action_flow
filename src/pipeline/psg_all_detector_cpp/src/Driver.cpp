@@ -20,27 +20,74 @@ int PSGAllDetectorCppDriver::_on_process_callee_result(OutputTypes::OutputReques
     psg_private_msgs::msg::PsgDocument document;
     callee_request.get_source_data().get_primary_frame().to_frame_mediator().to_frame_msg(document.frame_bundle.primary_frame);
 
-    document.detections = callee_result->detections;
+    // document.detections = callee_result->detections;
+
+    auto is_with_head_detection = !callee_result->detections.empty() && callee_result->detections[0].keypoints.keypoints_2.size() == 19;
 
     // 根据detections中的keypoints的头点，构建头的bbox
-    for (const auto &detection : callee_result->detections) {
-        auto head_keypoint = detection.keypoints.keypoints_2[0];
-        auto body_width = detection.bbox.width;
-        auto body_height = detection.bbox.height;
-        auto head_bbox = cv::Rect(head_keypoint.x - body_width / 3 / 2,
-                                  head_keypoint.y - body_height / 6 / 2,
-                                  body_width / 3,
-                                  body_height / 6);
-        redoxi_public_msgs::msg::Detection head_detection;
-        head_detection.bbox.x = head_bbox.x;
-        head_detection.bbox.y = head_bbox.y;
-        head_detection.bbox.width = head_bbox.width;
-        head_detection.bbox.height = head_bbox.height;
-        head_detection.category = 1;
-        head_detection.confidence = 1.0;
-        // head_detection.is_detected_by_camera = true;
-        document.detections.push_back(head_detection);
+    if (!is_with_head_detection) {
+        for (const auto &detection : callee_result->detections) {
+            auto head_keypoint = detection.keypoints.keypoints_2[0];
+            auto body_width = detection.bbox.width;
+            auto body_height = detection.bbox.height;
+            auto head_bbox = cv::Rect(head_keypoint.x - body_width / 3 / 2,
+                                      head_keypoint.y - body_height / 6 / 2,
+                                      body_width / 3,
+                                      body_height / 6);
+            redoxi_public_msgs::msg::Detection head_detection;
+            head_detection.bbox.x = head_bbox.x;
+            head_detection.bbox.y = head_bbox.y;
+            head_detection.bbox.width = head_bbox.width;
+            head_detection.bbox.height = head_bbox.height;
+            head_detection.category = 1;
+            head_detection.confidence = 1.0;
+            head_detection.frame_metadata = detection.frame_metadata; // 不加这个会导致event中start_time和end_time为-1
+            // head_detection.is_detected_by_camera = true;
+            document.detections.push_back(head_detection);
+
+            // 新建人体的detection
+            redoxi_public_msgs::msg::Detection body_detection;
+            body_detection.bbox = detection.bbox;
+            body_detection.category = 0;
+            body_detection.confidence = detection.confidence;
+            body_detection.frame_metadata = detection.frame_metadata; // 不加这个会导致event中start_time和end_time为-1
+            document.detections.push_back(body_detection);
+        }
+    } else {
+        // 如果包含头部, 则将前两个关键点作为头部, 剩下17个关键点作为身体
+        for (const auto &detection : callee_result->detections) {
+            auto head_lt_keypoint = detection.keypoints.keypoints_2[0];
+            auto head_rb_keypoint = detection.keypoints.keypoints_2[1];
+            auto head_bbox = cv::Rect(head_lt_keypoint.x, head_lt_keypoint.y, head_rb_keypoint.x - head_lt_keypoint.x, head_rb_keypoint.y - head_lt_keypoint.y);
+            redoxi_public_msgs::msg::Detection head_detection;
+            head_detection.bbox.x = head_bbox.x;
+            head_detection.bbox.y = head_bbox.y;
+            head_detection.bbox.width = head_bbox.width;
+            head_detection.bbox.height = head_bbox.height;
+            head_detection.category = 1;
+            head_detection.confidence = (detection.keypoints.confidence[0] + detection.keypoints.confidence[1]) / 2;
+            // head_detection.is_detected_by_camera = true;
+            document.detections.push_back(head_detection);
+
+            // 新建人体的detection
+            redoxi_public_msgs::msg::Detection body_detection;
+            body_detection.bbox = detection.bbox;
+            body_detection.category = 0;
+            body_detection.confidence = detection.confidence;
+            for (size_t i = 2; i < detection.keypoints.keypoints_2.size(); ++i) {
+                const auto &kp = detection.keypoints.keypoints_2[i];
+                geometry_msgs::msg::Point point;
+                point.x = kp.x;
+                point.y = kp.y;
+                body_detection.keypoints.keypoints_2.push_back(point);
+                body_detection.keypoints.confidence.push_back(detection.keypoints.confidence[i]);
+                body_detection.keypoints.semantic_type.push_back(i - 2);
+            }
+            body_detection.frame_metadata = detection.frame_metadata; // 不加这个会导致event中start_time和end_time为-1
+            document.detections.push_back(body_detection);
+        }
     }
+
 
     output_pipeline_source_data.set_document(document);
     output_request->set_source_data(output_pipeline_source_data);

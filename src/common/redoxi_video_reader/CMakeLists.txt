@@ -21,12 +21,13 @@ find_package(cv_bridge REQUIRED)
 find_package(fmt REQUIRED)
 find_package(TBB REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(redoxi_cmake_utils REQUIRED)
 
 # Find Boost (header-only)
 find_package(Boost REQUIRED)
 
 
-set(source_files
+set(srcfiles
   src/redoxi_video_reader.cpp
   src/base/v1/VideoReaderBase.cpp
   src/base/v1/VideoReaderBaseTypes.cpp
@@ -34,9 +35,10 @@ set(source_files
   src/v2/VideoSourceFromUrl.cpp
   src/base/v2/VideoReaderBase.cpp
   src/base/v2/VideoReaderBaseTypes.cpp
+  src/FFmpegVideoReader.cpp
 )
 
-add_library(redoxi_video_reader ${source_files})
+add_library(redoxi_video_reader ${srcfiles})
 add_library(redoxi_video_reader::redoxi_video_reader ALIAS redoxi_video_reader)
 target_compile_features(redoxi_video_reader PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 target_include_directories(redoxi_video_reader PUBLIC
@@ -66,10 +68,6 @@ ament_target_dependencies(
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
 target_compile_definitions(redoxi_video_reader PRIVATE "REDOXI_VIDEO_READER_BUILDING_LIBRARY")
-rclcpp_components_register_nodes(redoxi_video_reader
-  "redoxi_works::video_readers::v2::VideoSourceFromUrl"
-  "redoxi_works::video_readers::VideoSourceFromUrl"
-)
 
 install(
   DIRECTORY include/
@@ -82,6 +80,58 @@ install(
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
+)
+
+# create composable components
+# macro(create_composable_components ProjectName)
+#   cmake_parse_arguments(ARG "" "SOURCE_FILE" "PLUGINS;EXECUTABLES" ${ARGN})
+  
+#   # Set default source file if not provided
+#   if(NOT ARG_SOURCE_FILE)
+#     set(ARG_SOURCE_FILE "src/${ProjectName}_components.cpp")
+#   endif()
+
+#   # Create components library
+#   add_library(${ProjectName}_components ${ARG_SOURCE_FILE})
+#   target_link_libraries(${ProjectName}_components PUBLIC ${ProjectName})
+
+#   # Register each plugin
+#   list(LENGTH ARG_PLUGINS num_plugins)
+#   math(EXPR last_idx "${num_plugins} - 1")
+  
+#   foreach(idx RANGE ${last_idx})
+#     list(GET ARG_PLUGINS ${idx} plugin)
+    
+#     # Use provided executable name if available, otherwise generate one
+#     if(DEFINED ARG_EXECUTABLES)
+#       list(GET ARG_EXECUTABLES ${idx} exec_name)
+#     else()
+#       string(REPLACE "::" "_" exec_name "${plugin}")
+#       set(exec_name "node_executable_${exec_name}")
+#     endif()
+    
+#     rclcpp_components_register_node(${ProjectName}_components
+#       PLUGIN "${plugin}"
+#       EXECUTABLE ${exec_name}
+#     )
+#   endforeach()
+
+#   # Install targets
+#   install(TARGETS ${ProjectName}_components
+#     ARCHIVE DESTINATION lib
+#     LIBRARY DESTINATION lib
+#     RUNTIME DESTINATION bin)
+# endmacro()
+
+# Call the function with project-specific parameters
+create_composable_components(redoxi_video_reader
+  SOURCE_FILE "src/redoxi_video_reader_components.cpp"
+  PLUGINS
+    "redoxi_works::node_pack::video_readers::VideoSourceFromUrl"
+    "redoxi_works::node_pack::video_readers::FFmpegVideoReader"
+  EXECUTABLES
+    "node_pack_video_readers_VideoSourceFromUrl"
+    "node_pack_video_readers_FFmpegVideoReader"
 )
 
 if(BUILD_TESTING)

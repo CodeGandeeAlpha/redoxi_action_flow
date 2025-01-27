@@ -222,7 +222,7 @@ int OnnxModelInference::do_inference(InferenceInOutData::Ptr inout_data)
                 const uint8_t *raw_output_data = ov.GetTensorData<uint8_t>();
                 port_data->set_tensor_data(raw_output_data, o_shape);
             } else {
-                RDX_RAISE_ERROR("[f={}] Unsupported output data type: {}", __func__, o_dtype);
+                RDX_RAISE_ERROR("[f={}] Unsupported output data type: {}", __func__, (int)o_dtype);
                 return -1;
             }
         }

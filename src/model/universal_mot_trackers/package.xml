@@ -16,6 +16,7 @@
   <depend>redoxi_common_nodes</depend>
   <depend>redoxi_public_msgs</depend>
   <depend>redoxi_common_py</depend>
+  <depend>redoxi_cmake_utils</depend>
   <depend>RedoxiTrack</depend>
 
   <export>

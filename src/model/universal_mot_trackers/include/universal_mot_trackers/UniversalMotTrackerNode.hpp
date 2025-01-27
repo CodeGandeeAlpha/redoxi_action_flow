@@ -12,6 +12,7 @@ class UniversalMotTrackerNode : public common_nodes::OpenCloseNode
 {
   public:
     UniversalMotTrackerNode(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+    UniversalMotTrackerNode(const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
 
     using BaseNode_t = common_nodes::OpenCloseNode;
     using BaseInitConfig_t = BaseNode_t::InitConfig_t;

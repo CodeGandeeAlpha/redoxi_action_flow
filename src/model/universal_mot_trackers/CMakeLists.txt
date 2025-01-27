@@ -12,6 +12,7 @@ find_package(RedoxiTrack REQUIRED)
 find_package(redoxi_common_nodes REQUIRED)
 find_package(redoxi_public_msgs REQUIRED)
 find_package(ament_cmake_python REQUIRED)
+find_package(redoxi_cmake_utils REQUIRED)
 # uncomment the following section in order to fill in further dependencies
 # manually. find_package(<dependency> REQUIRED)
 
@@ -46,6 +47,16 @@ install(
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
+
+create_composable_components(${PROJECT_NAME}
+SOURCE_FILE src/universal_mot_trackers_node_pack.cpp
+PLUGINS 
+  "redoxi_works::node_pack::tracking::UniversalMotTracker"
+  "redoxi_works::node_pack::tracking::MotTrackerDriver"
+EXECUTABLES
+  "node_pack_tracking_UniversalMotTracker"
+  "node_pack_tracking_MotTrackerDriver"
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

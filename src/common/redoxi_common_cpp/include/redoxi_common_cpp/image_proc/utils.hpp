@@ -130,4 +130,16 @@ inline const char *cv_type_to_string(int cvtype)
     }
 }
 
+// convert cv::Mat between encodings
+void convert_cv_mat_encoding(
+    cv::Mat *output_image, const cv::Mat &input_image,
+    const std::string &src_encoding, const std::string &dst_encoding);
+
+inline void convert_cv_mat_encoding(
+    cv::Mat &inout_image,
+    const std::string &src_encoding, const std::string &dst_encoding)
+{
+    convert_cv_mat_encoding(&inout_image, inout_image, src_encoding, dst_encoding);
+}
+
 } // namespace redoxi_works::image_utils

@@ -20,7 +20,7 @@
   <depend>redoxi_public_msgs</depend>
   <depend>redoxi_common_nodes</depend>
   <depend>redoxi_shared_memory</depend>
-  
+  <depend>redoxi_cmake_utils</depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
