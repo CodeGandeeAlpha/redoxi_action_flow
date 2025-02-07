@@ -157,12 +157,12 @@ class FFmpegReaderByPipe
 
         //! Construct ffmpeg command to read from /dev/video0
         std::vector<std::string> args = {
-            "-hwaccel", "cuvid", "-c:v", "mjpeg_cuvid",
             "-framerate", "30",
             "-input_format", "mjpeg",
             "-f", "v4l2",
             "-fflags", "nobuffer", "-flags", "low_delay",
-            "-i", "/dev/video0", // Input from webcam
+            "-discard", "nokey",
+            "-i", "/dev/video4", // Input from webcam
             "-f", "rawvideo",
             "-video_size", "1920x1080",
             "-pix_fmt", "bgr24", // Set pixel format to BGR24
@@ -210,8 +210,8 @@ class FFmpegReaderByPipe
                         spdlog::info("read frame, copy to output buffer");
                         frame_input_buf_.copyTo(*buf);
 
-                        auto mean_pixel = cv::mean(*buf);
-                        spdlog::info("mean pixel: {},{},{}", mean_pixel[0], mean_pixel[1], mean_pixel[2]);
+                        // auto mean_pixel = cv::mean(*buf);
+                        // spdlog::info("mean pixel: {},{},{}", mean_pixel[0], mean_pixel[1], mean_pixel[2]);
                     }
 
                     // async read next frame
@@ -243,8 +243,8 @@ class FFmpegReaderByPipe
                 auto frame_data = frame_output_buf_.synchronize();
                 frame_data->copyTo(frame_show_buf);
             }
-            auto mean_pixel = cv::mean(frame_show_buf);
-            spdlog::info("imshow mean pixel: {},{},{}", mean_pixel[0], mean_pixel[1], mean_pixel[2]);
+            // auto mean_pixel = cv::mean(frame_show_buf);
+            // spdlog::info("imshow mean pixel: {},{},{}", mean_pixel[0], mean_pixel[1], mean_pixel[2]);
             cv::imshow("frame", frame_show_buf);
             cv::waitKey(1);
         }
