@@ -50,7 +50,8 @@ class InputCacheSize:
 class VideoSourceParams:
     # video_source -> detection_driver
     node_name = "video_source"
-    video_url = "udp://localhost:5555/live"
+    # video_url = "udp://localhost:5555/live"
+    video_url = "/dev/video0"
     node_params = ffmpegVideoReaderCfg.FFmpegVideoReaderNodeConfig(
         init_config=ffmpegVideoReaderCfg.FFmpegVideoReaderInitConfig(
             ffmpeg_path="/usr/bin/ffmpeg",
@@ -59,9 +60,15 @@ class VideoSourceParams:
                 video_url,
                 "-f",
                 "rawvideo",
+                "-input_format",
+                "mjpeg",
+                "-framerate",
+                "5",
                 "-pix_fmt",
                 "bgr24",
-                "pipe:",
+                "-video_size",
+                "1920x1080",
+                "-",
             ],
             frame_width=1920,
             frame_height=1080,
@@ -72,7 +79,7 @@ class VideoSourceParams:
             ),
         ),
         runtime_config=ffmpegVideoReaderCfg.FFmpegVideoReaderRuntimeConfig(
-            step_interval=StepIntervals.Medium,
+            step_interval=StepIntervals.Slow,
         ),
     )
 

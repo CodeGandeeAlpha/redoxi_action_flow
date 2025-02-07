@@ -1,112 +1,273 @@
-#include <spdlog/spdlog.h>
-#include <vector>
-#include <thread>
+
 #include <boost/process.hpp>
+#include <boost/asio.hpp>
+#include <boost/asio/read_until.hpp>
+#include <boost/thread/synchronized_value.hpp>
+#include <boost/interprocess/shared_memory_object.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+#include <iostream>
+#include <string>
+#include <spdlog/spdlog.h>
 #include <opencv2/opencv.hpp>
 
 namespace bp = boost::process;
+namespace bi = boost::interprocess;
 
-// const std::string video_url = "udp://localhost:5555/live";
-const std::string video_url = "tcp://localhost:5555/live?listen";
-const std::string ffmpeg_exec = "/usr/bin/ffmpeg";
-const std::vector<std::string> ffmpeg_args = {
-    "-i", video_url, "-f", "rawvideo",
-    "-fflags", "nobuffer", "-flags", "low_delay",
-    "-pix_fmt", "bgr24", "pipe:"};
-const int frame_width = 1920;
-const int frame_height = 1080;
-const int frame_channels = 3;
-
-int main(int argc, char **argv)
+class FFmpegReaderByShm
 {
-    bp::ipstream data_pipe;
-    bp::ipstream error_pipe;
+  private:
+    // ffmpeg process control
+    boost::asio::io_context io_context_;
+    std::vector<char> logging_buffer_;
+    bp::child ffmpeg_process_;
+    bp::async_pipe pipe_err_;
 
-    // Create a shared frame buffer
-    cv::Mat frame(frame_height, frame_width, CV_8UC(frame_channels));
-    const size_t frame_size = frame.total() * frame.elemSize();
-    bool new_frame_available = false;
-    bool should_exit = false;
-    std::mutex frame_mutex;
-    std::condition_variable frame_cv;
+    // shared memory
+    int frame_width_ = 1920;
+    int frame_height_ = 1080;
+    int frame_channels_ = 3;
+    bi::shared_memory_object shm_obj_;
+    bi::mapped_region shm_region_;
+    cv::Mat frame_input_buf_;
+    boost::synchronized_value<cv::Mat> frame_output_buf_;
 
-    // start logging thread
-    std::thread logging_thread([&]() {
-        std::string line;
-        while (std::getline(error_pipe, line)) {
-            spdlog::info("ffmpeg log: {}", line);
-        }
-    });
-    logging_thread.detach();
+  public:
+    FFmpegReaderByShm()
+        : pipe_err_(io_context_),
+          shm_obj_(bi::create_only, "ffmpeg_shm", bi::read_write)
+    {
+        shm_obj_.truncate(frame_width_ * frame_height_ * frame_channels_);
+        shm_region_ = bi::mapped_region(shm_obj_, bi::read_only);
 
-    // start frame reading thread
-    std::thread frame_reader([&]() {
-        // Thread local storage for frame reading
-        static thread_local cv::Mat local_frame(frame_height, frame_width, CV_8UC(frame_channels));
+        //! Construct ffmpeg command to read from /dev/video0
+        std::vector<std::string> args = {
+            "-framerate",
+            "30",
+            "-input_format",
+            "mjpeg",
+            "-f",
+            "v4l2",
+            "-fflags",
+            "nobuffer",
+            "-flags",
+            "low_delay",
+            "-i",
+            "/dev/video0", // Input from webcam
+            "-f",
+            "rawvideo",
+            "-video_size",
+            "1920x1080",
+            "-pix_fmt",
+            "bgr24", // Set pixel format to BGR24
+            "/dev/shm/ffmpeg_shm",
+        };
 
-        bp::child ffmpeg_process(ffmpeg_exec, ffmpeg_args, bp::std_out > data_pipe, bp::std_err > error_pipe);
+        //! Launch ffmpeg process with pipes for stdout and stderr
+        ffmpeg_process_ = bp::child(
+            "/usr/bin/ffmpeg",
+            args,
+            bp::std_err > pipe_err_,
+            io_context_);
+    }
 
-        while (!should_exit) {
-            // Check if FFmpeg process is still running
-            if (!ffmpeg_process.running()) {
-                spdlog::error("FFmpeg process terminated unexpectedly");
-                break;
-            }
+    //! Start async reading from stderr pipe
+    void asyncReadStderr()
+    {
+        boost::asio::async_read(
+            pipe_err_,
+            boost::asio::buffer(logging_buffer_),
+            [this](const boost::system::error_code &ec, std::size_t size) {
+                if (!ec) {
+                    //! Print the received log data
+                    // spdlog::info(std::string(buffer_.data(), size));
+                    std::cout.write(logging_buffer_.data(), size);
+                    std::cout.flush();
 
-            // Read frame with timeout
-            bool read_success = false;
-            try {
-                read_success = (bool)data_pipe.read(reinterpret_cast<char *>(local_frame.data), frame_size);
-
-                if (read_success) {
-                    std::lock_guard<std::mutex> lock(frame_mutex);
-                    local_frame.copyTo(frame);
-                    new_frame_available = true;
-                    frame_cv.notify_one();
-                    spdlog::info("read frame");
+                    //! Continue reading
+                    asyncReadStderr();
                 }
-            } catch (const std::exception &e) {
-                spdlog::error("Error reading frame: {}", e.what());
-                break;
-            }
-
-            if (!read_success) {
-                spdlog::warn("Failed to read frame");
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            }
-        }
-
-        // Cleanup
-        if (ffmpeg_process.running()) {
-            ffmpeg_process.terminate();
-        }
-    });
-
-    // Main thread handles display
-    cv::namedWindow("frame", cv::WINDOW_AUTOSIZE);
-
-    while (true) {
-        cv::Mat display_frame;
-        {
-            std::unique_lock<std::mutex> lock(frame_mutex);
-            frame_cv.wait(lock, [&] { return new_frame_available; });
-            frame.copyTo(display_frame);
-            new_frame_available = false;
-        }
-
-        cv::imshow("frame", display_frame);
-        int key = cv::waitKey(1);
-        if (key == 27) { // ESC key
-            should_exit = true;
-            break;
-        }
+            });
     }
 
-    // Cleanup and join threads
-    if (frame_reader.joinable()) {
-        frame_reader.join();
+    void asyncReadShm()
+    {
     }
 
-    cv::destroyAllWindows();
+    //! Run the io_context to process async operations
+    void run()
+    {
+        //! Start async reading from stderr pipe
+        asyncReadStderr();
+
+        //! Start async reading from stdout pipe
+        asyncReadShm();
+
+        //! Run the io_context to process async operations
+        std::thread io_thread([this]() {
+            io_context_.run();
+        });
+
+        cv::namedWindow("frame", cv::WINDOW_AUTOSIZE);
+        auto frame_show_buf = frame_output_buf_->clone();
+        while (ffmpeg_process_.running()) {
+            {
+                auto frame_data = frame_output_buf_.synchronize();
+                frame_data->copyTo(frame_show_buf);
+            }
+            auto mean_pixel = cv::mean(frame_show_buf);
+            spdlog::info("imshow mean pixel: {},{},{}", mean_pixel[0], mean_pixel[1], mean_pixel[2]);
+            cv::imshow("frame", frame_show_buf);
+            cv::waitKey(1);
+        }
+        io_thread.join();
+    }
+
+    //! Destructor to ensure cleanup
+    ~FFmpegReaderByShm()
+    {
+        if (ffmpeg_process_.running()) {
+            ffmpeg_process_.terminate();
+        }
+        shm_obj_.remove("ffmpeg_shm");
+    }
+};
+
+class FFmpegReaderByPipe
+{
+  private:
+    boost::asio::io_context io_context_;
+    std::vector<char> buffer_;
+    bp::child ffmpeg_process_;
+    bp::async_pipe pipe_out_;
+    bp::async_pipe pipe_err_;
+
+    // frame data
+    int frame_width_ = 1920;
+    int frame_height_ = 1080;
+    int frame_channels_ = 3;
+    cv::Mat frame_input_buf_;
+    boost::synchronized_value<cv::Mat> frame_output_buf_;
+
+  public:
+    FFmpegReaderByPipe()
+        : buffer_(20), pipe_out_(io_context_), pipe_err_(io_context_)
+    {
+        frame_input_buf_ = cv::Mat(frame_height_, frame_width_, CV_8UC(frame_channels_));
+        frame_output_buf_ = frame_input_buf_.clone();
+
+        //! Construct ffmpeg command to read from /dev/video0
+        std::vector<std::string> args = {
+            "-hwaccel", "cuvid", "-c:v", "mjpeg_cuvid",
+            "-framerate", "30",
+            "-input_format", "mjpeg",
+            "-f", "v4l2",
+            "-fflags", "nobuffer", "-flags", "low_delay",
+            "-i", "/dev/video0", // Input from webcam
+            "-f", "rawvideo",
+            "-video_size", "1920x1080",
+            "-pix_fmt", "bgr24", // Set pixel format to BGR24
+            "-",                 // output to stdout
+        };
+
+        //! Launch ffmpeg process with pipes for stdout and stderr
+        ffmpeg_process_ = bp::child(
+            "/usr/bin/ffmpeg",
+            args,
+            bp::std_out > pipe_out_,
+            bp::std_err > pipe_err_,
+            io_context_);
+    }
+
+    //! Start async reading from stderr pipe
+    void asyncReadStderr()
+    {
+        boost::asio::async_read(
+            pipe_err_,
+            boost::asio::buffer(buffer_),
+            [this](const boost::system::error_code &ec, std::size_t size) {
+                if (!ec) {
+                    //! Print the received log data
+                    // spdlog::info(std::string(buffer_.data(), size));
+                    std::cout.write(buffer_.data(), size);
+                    std::cout.flush();
+
+                    //! Continue reading
+                    asyncReadStderr();
+                }
+            });
+    }
+
+    void asyncReadStdout()
+    {
+        boost::asio::async_read(
+            pipe_out_,
+            boost::asio::buffer(frame_input_buf_.data, frame_input_buf_.total() * frame_input_buf_.elemSize()),
+            boost::asio::transfer_exactly(frame_input_buf_.total() * frame_input_buf_.elemSize()),
+            [this](const boost::system::error_code &ec, std::size_t size) {
+                if (!ec) {
+                    auto buf = frame_output_buf_.try_to_synchronize();
+                    if (buf) {
+                        spdlog::info("read frame, copy to output buffer");
+                        frame_input_buf_.copyTo(*buf);
+
+                        auto mean_pixel = cv::mean(*buf);
+                        spdlog::info("mean pixel: {},{},{}", mean_pixel[0], mean_pixel[1], mean_pixel[2]);
+                    }
+
+                    // async read next frame
+                    asyncReadStdout();
+                } else {
+                    spdlog::error("Error reading frame: {}", ec.message());
+                }
+            });
+    }
+
+    //! Run the io_context to process async operations
+    void run()
+    {
+        //! Start async reading from stderr pipe
+        asyncReadStderr();
+
+        //! Start async reading from stdout pipe
+        asyncReadStdout();
+
+        //! Run the io_context to process async operations
+        std::thread io_thread([this]() {
+            io_context_.run();
+        });
+
+        cv::namedWindow("frame", cv::WINDOW_AUTOSIZE);
+        auto frame_show_buf = frame_output_buf_->clone();
+        while (ffmpeg_process_.running()) {
+            {
+                auto frame_data = frame_output_buf_.synchronize();
+                frame_data->copyTo(frame_show_buf);
+            }
+            auto mean_pixel = cv::mean(frame_show_buf);
+            spdlog::info("imshow mean pixel: {},{},{}", mean_pixel[0], mean_pixel[1], mean_pixel[2]);
+            cv::imshow("frame", frame_show_buf);
+            cv::waitKey(1);
+        }
+        io_thread.join();
+    }
+
+    //! Destructor to ensure cleanup
+    ~FFmpegReaderByPipe()
+    {
+        if (ffmpeg_process_.running()) {
+            ffmpeg_process_.terminate();
+        }
+    }
+};
+
+int main()
+{
+    try {
+        FFmpegReaderByPipe reader;
+        reader.run();
+    } catch (const std::exception &e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    }
     return 0;
 }

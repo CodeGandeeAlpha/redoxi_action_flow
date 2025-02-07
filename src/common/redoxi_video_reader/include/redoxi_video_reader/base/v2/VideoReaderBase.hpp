@@ -32,10 +32,10 @@ class RedoxiVideoReaderBase : public common_nodes::v2::OpenCloseNode
   public:
     //! result of read frame operation
     enum class ReadFrameResult {
-        OK = 0,           // success
-        END_OF_VIDEO = 1, // end of video
-        NO_DATA = 2,      // this frame has no data (reading too fast?), not an error
-        ERROR = -1,       // unknown error
+        OK = 0,            // success
+        END_OF_VIDEO = 1,  // end of video
+        NO_FRAME_DATA = 2, // this frame has no data (reading too fast?), not an error
+        ERROR = -1,        // unknown error
     };
 
   public:

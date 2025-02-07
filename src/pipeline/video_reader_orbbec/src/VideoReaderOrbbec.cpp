@@ -124,7 +124,7 @@ VideoReaderOrbbec::ReadFrameResult VideoReaderOrbbec::_read_frame(SourceData_t &
         // data.set_image(black_frame);
         // data.set_frame_number(frame_number);
         // frame_number++;
-        return ReadFrameResult::NO_DATA;
+        return ReadFrameResult::NO_FRAME_DATA;
     }
 
     // get color frame frameset->colorFrame()
@@ -135,7 +135,7 @@ VideoReaderOrbbec::ReadFrameResult VideoReaderOrbbec::_read_frame(SourceData_t &
         // data.set_image(black_frame);
         // data.set_frame_number(frame_number);
         // frame_number++;
-        return ReadFrameResult::NO_DATA;
+        return ReadFrameResult::NO_FRAME_DATA;
     }
 
     // get color frame data

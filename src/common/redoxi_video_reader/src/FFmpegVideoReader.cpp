@@ -21,11 +21,20 @@ int FFmpegVideoReader::_open()
         // read ffmpeg logs
         std::string line;
         while (std::getline(*m_ffmpeg_logging_pipe, line)) {
-            RDX_INFO_DEV(this, __func__, "ffmpeg: {}", line);
+            RDX_INFO_DEV(this, __func__, "ffmpeg log: {}", line);
         }
     });
 
-    RDX_INFO_DEV(this, __func__, "opening ffmpeg process with args: {}", init_config->ffmpeg_args);
+    {
+        RDX_INFO_DEV(this, __func__, "opening ffmpeg process with args: {}", init_config->ffmpeg_args);
+        std::stringstream ss;
+        ss << init_config->ffmpeg_path << " ";
+        for (const auto &arg : init_config->ffmpeg_args) {
+            ss << arg << " ";
+        }
+        RDX_INFO_DEV(this, __func__, "complete ffmpeg command: {}", ss.str());
+    }
+
     auto ffmpeg_process = std::make_shared<boost::process::child>(
         init_config->ffmpeg_path,
         init_config->ffmpeg_args,
@@ -58,12 +67,17 @@ FFmpegVideoReader::ReadFrameResult
     RDX_INFO_DEV(this, __func__, "reading frame width={}, height={}, channels={}, src_encoding={}, dst_encoding={}",
                  width, height, channels, src_encoding, dst_encoding);
 
+    if (!m_ffmpeg_data_pipe || !m_ffmpeg_data_pipe->is_open()) {
+        RDX_RAISE_ERROR("[f={}()] ffmpeg data pipe is closed, end of video", __func__);
+        return ReadFrameResult::END_OF_VIDEO;
+    }
+
     // read raw frame from ffmpeg, assuming 8bit per-channel video
     cv::Mat raw_frame(height, width, CV_8UC(channels));
     if (!m_ffmpeg_data_pipe->read(reinterpret_cast<char *>(raw_frame.data), raw_frame.total() * raw_frame.elemSize())) {
         // no more data to read, end of video
-        RDX_INFO_DEV(this, __func__, "{}", "no more data to read, end of video");
-        return ReadFrameResult::END_OF_VIDEO;
+        RDX_INFO_DEV(this, __func__, "{}", "no data, skipping frame");
+        return ReadFrameResult::NO_FRAME_DATA;
     }
 
     // convert encoding if necessary
@@ -93,6 +107,13 @@ int FFmpegVideoReader::_close()
     if (m_ffmpeg_process && m_ffmpeg_process->running()) {
         m_ffmpeg_process->terminate();
         m_ffmpeg_process->wait();
+    }
+
+    if (m_ffmpeg_data_pipe) {
+        m_ffmpeg_data_pipe->close();
+    }
+    if (m_ffmpeg_logging_pipe) {
+        m_ffmpeg_logging_pipe->close();
     }
 
     // join ffmpeg logging thread

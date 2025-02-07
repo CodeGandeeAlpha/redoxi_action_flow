@@ -308,7 +308,7 @@ void RedoxiVideoReaderBase::_step()
                 RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "End of video, send this frame and then stop");
                 // the source data will still be sent with its original content, but it will be marked as a flush signal
                 break;
-            case ReadFrameResult::NO_DATA: // no data, try again
+            case ReadFrameResult::NO_FRAME_DATA: // no data, try again
                 return;
             case ReadFrameResult::ERROR: // unknown error, raise an error
                 RDX_INFO_DEV(this, __func__, PRINT_THREAD_ID_IN_LOG, "{}", "Failed to read frame for unknown reason, skipping");
