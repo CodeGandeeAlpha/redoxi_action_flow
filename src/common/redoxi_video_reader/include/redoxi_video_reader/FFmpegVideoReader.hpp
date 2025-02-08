@@ -53,10 +53,17 @@ class FFmpegVideoReader : public RedoxiVideoReaderBase
     DEFAULT_CONFIG_LOADER_IMPL(InitConfig_t, RuntimeConfig_t);
 
   private:
+    void _async_read_ffmpeg_data();
+    void _async_read_ffmpeg_logging();
+
+  private:
     // ffmpeg process and output pipe
     std::shared_ptr<boost::process::child> m_ffmpeg_process;
-    std::shared_ptr<boost::process::ipstream> m_ffmpeg_data_pipe;
-    std::shared_ptr<boost::process::ipstream> m_ffmpeg_logging_pipe;
+    std::shared_ptr<boost::process::async_pipe> m_ffmpeg_data_pipe;
+    std::shared_ptr<boost::process::async_pipe> m_ffmpeg_logging_pipe;
+
     std::shared_ptr<std::thread> m_ffmpeg_logging_thread;
+    std::shared_ptr<std::thread> m_ffmpeg_data_thread;
+    std::shared_ptr<boost::asio::io_context> m_io_context;
 };
 } // namespace redoxi_works::video_readers

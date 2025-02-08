@@ -11,19 +11,21 @@ int FFmpegVideoReader::_open()
         return ret;
     }
 
+
     // open ffmpeg process and output pipe
     auto init_config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);
-    m_ffmpeg_data_pipe = std::make_shared<boost::process::ipstream>();
-    m_ffmpeg_logging_pipe = std::make_shared<boost::process::ipstream>();
+    m_io_context = std::make_shared<boost::asio::io_context>();
+    m_ffmpeg_data_pipe = std::make_shared<boost::process::async_pipe>(*m_io_context);
+    m_ffmpeg_logging_pipe = std::make_shared<boost::process::async_pipe>(*m_io_context);
 
     // start reading ffmpeg output
-    m_ffmpeg_logging_thread = std::make_shared<std::thread>([this]() {
-        // read ffmpeg logs
-        std::string line;
-        while (std::getline(*m_ffmpeg_logging_pipe, line)) {
-            RDX_INFO_DEV(this, __func__, "ffmpeg log: {}", line);
-        }
-    });
+    // m_ffmpeg_logging_thread = std::make_shared<std::thread>([this]() {
+    //     // read ffmpeg logs
+    //     std::string line;
+    //     while (std::getline(*m_ffmpeg_logging_pipe, line)) {
+    //         RDX_INFO_DEV(this, __func__, "ffmpeg log: {}", line);
+    //     }
+    // });
 
     {
         RDX_INFO_DEV(this, __func__, "opening ffmpeg process with args: {}", init_config->ffmpeg_args);
@@ -74,11 +76,11 @@ FFmpegVideoReader::ReadFrameResult
 
     // read raw frame from ffmpeg, assuming 8bit per-channel video
     cv::Mat raw_frame(height, width, CV_8UC(channels));
-    if (!m_ffmpeg_data_pipe->read(reinterpret_cast<char *>(raw_frame.data), raw_frame.total() * raw_frame.elemSize())) {
-        // no more data to read, end of video
-        RDX_INFO_DEV(this, __func__, "{}", "no data, skipping frame");
-        return ReadFrameResult::NO_FRAME_DATA;
-    }
+    // if (!m_ffmpeg_data_pipe->read(reinterpret_cast<char *>(raw_frame.data), raw_frame.total() * raw_frame.elemSize())) {
+    //     // no more data to read, end of video
+    //     RDX_INFO_DEV(this, __func__, "{}", "no data, skipping frame");
+    //     return ReadFrameResult::NO_FRAME_DATA;
+    // }
 
     // convert encoding if necessary
     if (src_encoding != dst_encoding) {
