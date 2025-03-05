@@ -92,6 +92,8 @@ video_reader_node = Node(
     package="redoxi_video_reader",
     executable="node_pack_video_readers_FFmpegVideoReader",
     name=VideoSourceParams.node_name,
+    # output="screen",
+    emulate_tty=True,
     parameters=[
         {
             JsonParamKey: VideoSourceParams.node_params.to_json(

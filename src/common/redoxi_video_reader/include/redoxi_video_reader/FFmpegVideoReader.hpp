@@ -84,6 +84,7 @@ class FFmpegVideoReader : public RedoxiVideoReaderBase
 
   private:
     // ffmpeg process and output pipe
+    std::shared_ptr<boost::process::group> m_child_process_group; // used to control detached child processes
     std::shared_ptr<boost::process::child> m_ffmpeg_process;
 
     // manage the pipes and threads

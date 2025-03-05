@@ -12,6 +12,7 @@
 
 namespace bp = boost::process;
 namespace bi = boost::interprocess;
+const std::string stderr_test_command = "while true; do echo \"current time is $(date +%H-%M-%S)\" >&2; sleep 1; done";
 
 class FFmpegReaderByPipe
 {
@@ -51,11 +52,16 @@ class FFmpegReaderByPipe
         };
 
         //! Launch ffmpeg process with pipes for stdout and stderr
+        // ffmpeg_process_ = bp::child(
+        //     "/usr/bin/ffmpeg",
+        //     args,
+        //     bp::std_out > pipe_out_async_,
+        //     bp::std_err > pipe_err_async_,
+        //     io_context_);
         ffmpeg_process_ = bp::child(
-            "/usr/bin/ffmpeg",
-            args,
-            bp::std_out > pipe_out_async_,
-            bp::std_err > pipe_err_async_,
+            "/usr/bin/echo",
+            std::vector<std::string>{"hello", "world"},
+            (bp::std_out & bp::std_err) > "my_output.txt",
             io_context_);
     }
 
@@ -108,8 +114,8 @@ class FFmpegReaderByPipe
 
     bool readStderrOnce()
     {
-        boost::asio::read_until(pipe_err_async_, logging_buffer_, "\n");
         try {
+            boost::asio::read_until(pipe_err_async_, logging_buffer_, "\n");
             std::istream is(&logging_buffer_);
             std::string line;
             std::getline(is, line);
@@ -154,30 +160,30 @@ class FFmpegReaderByPipe
             }
         });
 
-        std::thread read_stdout_thread([this]() {
-            while (readStdoutOnce()) {
-            }
-        });
+        // std::thread read_stdout_thread([this]() {
+        //     while (readStdoutOnce()) {
+        //     }
+        // });
 
         //! Run the io_context to process async operations
         // std::thread io_thread([this]() {
         //     io_context_.run();
         // });
 
-        cv::namedWindow("frame", cv::WINDOW_AUTOSIZE);
-        auto frame_show_buf = frame_output_buf_->clone();
-        while (ffmpeg_process_.running()) {
-            {
-                auto frame_data = frame_output_buf_.synchronize();
-                frame_data->copyTo(frame_show_buf);
-            }
-            // auto mean_pixel = cv::mean(frame_show_buf);
-            // spdlog::info("imshow mean pixel: {},{},{}", mean_pixel[0], mean_pixel[1], mean_pixel[2]);
-            cv::imshow("frame", frame_show_buf);
-            cv::waitKey(1);
-        }
+        // cv::namedWindow("frame", cv::WINDOW_AUTOSIZE);
+        // auto frame_show_buf = frame_output_buf_->clone();
+        // while (ffmpeg_process_.running()) {
+        //     {
+        //         auto frame_data = frame_output_buf_.synchronize();
+        //         frame_data->copyTo(frame_show_buf);
+        //     }
+        //     // auto mean_pixel = cv::mean(frame_show_buf);
+        //     // spdlog::info("imshow mean pixel: {},{},{}", mean_pixel[0], mean_pixel[1], mean_pixel[2]);
+        //     cv::imshow("frame", frame_show_buf);
+        //     cv::waitKey(1);
+        // }
         read_stderr_thread.join();
-        read_stdout_thread.join();
+        // read_stdout_thread.join();
         // io_thread.join();
     }
 

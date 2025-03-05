@@ -2,6 +2,8 @@
 #include <filesystem>
 #include <boost/asio/read_until.hpp>
 
+const std::string stderr_test_command = "while true; do echo \"current time is $(date +%H-%M-%S)\" >&1; sleep 1; done";
+
 namespace redoxi_works::video_readers
 {
 
@@ -49,31 +51,38 @@ int FFmpegVideoReader::_create_ffmpeg_process()
     m_io_context = std::make_shared<boost::asio::io_context>();
     m_ffmpeg_data_pipe = std::make_shared<boost::process::async_pipe>(*m_io_context);
     m_ffmpeg_logging_pipe = std::make_shared<boost::process::async_pipe>(*m_io_context);
+    m_child_process_group = std::make_shared<boost::process::group>();
 
-
-    {
-        RDX_INFO_DEV(this, __func__, "opening ffmpeg process with args: {}", runtime_config->ffmpeg_args);
-        std::stringstream ss;
-        ss << ffmpeg_path << " ";
-        for (const auto &arg : runtime_config->ffmpeg_args) {
-            ss << arg << " ";
-        }
-        RDX_INFO_DEV(this, __func__, "complete ffmpeg command: {}", ss.str());
-    }
+    // {
+    //     RDX_INFO_DEV(this, __func__, "opening ffmpeg process with args: {}", runtime_config->ffmpeg_args);
+    //     std::stringstream ss;
+    //     ss << ffmpeg_path << " ";
+    //     for (const auto &arg : runtime_config->ffmpeg_args) {
+    //         ss << arg << " ";
+    //     }
+    //     RDX_INFO_DEV(this, __func__, "complete ffmpeg command: {}", ss.str());
+    // }
 
     auto ffmpeg_process = std::make_shared<boost::process::child>(
         ffmpeg_path,
         runtime_config->ffmpeg_args,
         boost::process::std_out > *m_ffmpeg_data_pipe,
         boost::process::std_err > *m_ffmpeg_logging_pipe,
-        *m_io_context);
+        *m_io_context,
+        *m_child_process_group);
 
-    if (!ffmpeg_process->running()) {
-        RDX_RAISE_ERROR("[f={}()] Failed to open ffmpeg process: {}", __func__, runtime_config->ffmpeg_args);
-        m_ffmpeg_data_pipe = nullptr;
-        m_ffmpeg_logging_pipe = nullptr;
-        return -1;
-    }
+    // detach the process so that the stdout and stderr are not affected by ROS2
+    // otherwise, you get no data
+    // the detached process will run in the background and managed by the process group
+    ffmpeg_process->detach();
+    RDX_INFO_DEV(this, __func__, "{}", "process created");
+
+    // if (!ffmpeg_process->running()) {
+    //     RDX_RAISE_ERROR("[f={}()] Failed to open ffmpeg process: {}", __func__, runtime_config->ffmpeg_args);
+    //     m_ffmpeg_data_pipe = nullptr;
+    //     m_ffmpeg_logging_pipe = nullptr;
+    //     return -1;
+    // }
 
     if (!m_ffmpeg_logging_pipe->is_open()) {
         RDX_RAISE_ERROR("[f={}()] Failed to open ffmpeg logging pipe", __func__);
@@ -119,14 +128,14 @@ int FFmpegVideoReader::_start()
     }
 
     // start frame reading thread
-    // {
-    //     RDX_INFO_DEV(this, __func__, "{}", "creating frame reading thread");
-    //     auto ret = _create_frame_reading_thread();
-    //     if (ret != 0) {
-    //         return ret;
-    //     }
-    //     RDX_INFO_DEV(this, __func__, "{}", "frame reading thread created");
-    // }
+    {
+        RDX_INFO_DEV(this, __func__, "{}", "creating frame reading thread");
+        auto ret = _create_frame_reading_thread();
+        if (ret != 0) {
+            return ret;
+        }
+        RDX_INFO_DEV(this, __func__, "{}", "frame reading thread created");
+    }
 
     return 0;
 }
@@ -223,9 +232,15 @@ FFmpegVideoReader::ReadFrameResult
 int FFmpegVideoReader::_stop()
 {
     // stop ffmpeg process, closing all pipes
-    if (m_ffmpeg_process && m_ffmpeg_process->running()) {
-        m_ffmpeg_process->terminate();
-        m_ffmpeg_process->wait();
+    // if (m_ffmpeg_process && m_ffmpeg_process->running()) {
+    //     m_ffmpeg_process->terminate();
+    //     m_ffmpeg_process->wait();
+    // }
+
+    // stop child process group
+    if (m_child_process_group) {
+        m_child_process_group->terminate();
+        m_child_process_group->wait();
     }
 
     if (m_ffmpeg_data_pipe) {
@@ -298,7 +313,12 @@ int FFmpegVideoReader::_read_ffmpeg_data_once()
     }
     m_frame_queue.push(frame_buffer);
 
-    RDX_INFO_DEV(this, __func__, "{}", "read frame once, and the frame is pushed to queue");
+    // compute the mean value of the frame
+    auto mean_value = cv::mean(frame_buffer);
+
+    RDX_INFO_DEV(this, __func__,
+                 "read frame once, and the frame is pushed to queue, mean value: ({},{},{})",
+                 mean_value[0], mean_value[1], mean_value[2]);
 
     return 0;
 }
@@ -313,8 +333,8 @@ int FFmpegVideoReader::_read_ffmpeg_logging_once(std::string &out_log)
         return 0;
     } catch (const boost::system::system_error &e) {
         RDX_INFO_DEV(this, __func__, "EOF for logging pipe: {}", e.what());
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        return 0;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        return -1;
     } catch (const std::exception &e) {
         RDX_RAISE_ERROR("[f={}()] failed to read ffmpeg logging: {}", __func__, e.what());
         return -1;
