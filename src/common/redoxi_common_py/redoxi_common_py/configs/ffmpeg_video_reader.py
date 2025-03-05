@@ -22,16 +22,15 @@ __all__ = [
 @define(kw_only=True)
 class FFmpegVideoReaderInitConfig(videoReaderBaseCfg.VideoReaderBaseInitConfig):
     ffmpeg_path: str = field(default="/usr/bin/ffmpeg")
+
+
+@define(kw_only=True)
+class FFmpegVideoReaderRuntimeConfig(videoReaderBaseCfg.VideoReaderBaseRuntimeConfig):
     ffmpeg_args: list[str] = field()
     frame_width: int = field()
     frame_height: int = field()
     frame_channels: int = field()
     frame_encoding: str | None = field(default=None)
-
-
-@define(kw_only=True)
-class FFmpegVideoReaderRuntimeConfig(videoReaderBaseCfg.VideoReaderBaseRuntimeConfig):
-    pass
 
 
 @define(kw_only=True)

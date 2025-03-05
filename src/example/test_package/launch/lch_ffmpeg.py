@@ -55,31 +55,35 @@ class VideoSourceParams:
     node_params = ffmpegVideoReaderCfg.FFmpegVideoReaderNodeConfig(
         init_config=ffmpegVideoReaderCfg.FFmpegVideoReaderInitConfig(
             ffmpeg_path="/usr/bin/ffmpeg",
+            primary_output_spec=ffmpegVideoReaderCfg.OutputPortConfig(
+                visualization_topic_for_target_data=f"vis/target_data",
+            ),
+        ),
+        runtime_config=ffmpegVideoReaderCfg.FFmpegVideoReaderRuntimeConfig(
             ffmpeg_args=[
-                "-i",
-                video_url,
                 "-f",
-                "rawvideo",
+                "v4l2",
                 "-input_format",
                 "mjpeg",
                 "-framerate",
                 "5",
-                "-pix_fmt",
-                "bgr24",
                 "-video_size",
                 "1920x1080",
+                "-discard",
+                "nokey",
+                "-i",
+                video_url,
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "bgr24",
                 "-",
             ],
             frame_width=1920,
             frame_height=1080,
             frame_channels=3,
             frame_encoding="bgr8",
-            primary_output_spec=ffmpegVideoReaderCfg.OutputPortConfig(
-                visualization_topic_for_target_data=f"vis/target_data",
-            ),
-        ),
-        runtime_config=ffmpegVideoReaderCfg.FFmpegVideoReaderRuntimeConfig(
-            step_interval=StepIntervals.Slow,
+            step_interval=StepIntervals.VerySlow,
         ),
     )
 
