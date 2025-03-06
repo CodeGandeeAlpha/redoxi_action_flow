@@ -121,8 +121,8 @@ class TrackerDriverParams:
 
 
 class DetectorParams:
-    # fn_model = f"{workspace_root}/tmp/models/yolov8s-pose.onnx"
-    fn_model = f"{workspace_root}/tmp/models/yolov8n-pose-dynbatch.onnx"
+    fn_model = f"{workspace_root}/tmp/models/yolov8s-pose.onnx"
+    # fn_model = f"{workspace_root}/tmp/models/yolov8n-pose-dynbatch.onnx"
     node_name = "detector"
     input_action_name = f"/{node_name}/in/detection_request"
     node_params = yolo.Yolo8ModelNodeConfig(
@@ -194,7 +194,7 @@ class DetectionDriverParams:
 class VideoSourceParams:
     # video_source -> detection_driver
     node_name = "video_source"
-    video_url = "/dev/video0"
+    video_url = "/dev/video4"
 
     node_params = ffmpegVideoReaderCfg.FFmpegVideoReaderNodeConfig(
         init_config=ffmpegVideoReaderCfg.FFmpegVideoReaderInitConfig(
