@@ -19,10 +19,8 @@ from redoxi_common_py.configs.video_reader_base import (
     DeliveryPrecondition,
     DropStrategy,
 )
-import redoxi_common_py.configs.detection_relay as detRelayCfg
-import redoxi_common_py.configs.video_source_from_url as videoSrcCfg
+
 import redoxi_common_py.configs.detection_driver as detDriverCfg
-import redoxi_common_py.configs.frame_relay as frameRelayCfg
 import redoxi_common_py.configs.ffmpeg_video_reader as ffmpegVideoReaderCfg
 import universal_mot_trackers.node_configs as motTrackersCfg
 import universal_mot_trackers.driver_configs as motTrackersDriverCfg
@@ -30,13 +28,20 @@ import universal_mot_trackers.driver_configs as motTrackersDriverCfg
 # Get workspace root from COLCON_PREFIX_PATH
 import os
 
+
 # workspace_root = os.getenv("COLCON_PREFIX_PATH", "")
 # if workspace_root:
 #     # Remove /install from the end if present
 #     if workspace_root.endswith("/install"):
 #         workspace_root = workspace_root[:-8]  # Remove last 8 characters ('/install')
+class GlobalSettings:
+    WorkspaceRoot = "/soft/workspace/code/psf_ros2_ws"
+    DeviceName = "/dev/video0"
+    FrameWidth = 1920
+    FrameHeight = 1080
+    FrameChannels = 3
+    FrameEncoding = "bgr8"
 
-workspace_root = "/soft/workspace/code/psf_ros2_ws"
 
 try:
     from attrs import asdict
@@ -121,8 +126,8 @@ class TrackerDriverParams:
 
 
 class DetectorParams:
-    fn_model = f"{workspace_root}/tmp/models/yolov8s-pose.onnx"
-    # fn_model = f"{workspace_root}/tmp/models/yolov8n-pose-dynbatch.onnx"
+    fn_model = f"{GlobalSettings.WorkspaceRoot}/tmp/models/yolov8s-pose.onnx"
+    # fn_model = f"{GlobalSettings.WorkspaceRoot}/tmp/models/yolov8n-pose-dynbatch.onnx"
     node_name = "detector"
     input_action_name = f"/{node_name}/in/detection_request"
     node_params = yolo.Yolo8ModelNodeConfig(
@@ -194,7 +199,7 @@ class DetectionDriverParams:
 class VideoSourceParams:
     # video_source -> detection_driver
     node_name = "video_source"
-    video_url = "/dev/video4"
+    video_url = GlobalSettings.DeviceName
 
     node_params = ffmpegVideoReaderCfg.FFmpegVideoReaderNodeConfig(
         init_config=ffmpegVideoReaderCfg.FFmpegVideoReaderInitConfig(
@@ -220,7 +225,7 @@ class VideoSourceParams:
                 "-input_format",
                 "mjpeg",
                 "-video_size",
-                "1920x1080",
+                f"{GlobalSettings.FrameWidth}x{GlobalSettings.FrameHeight}",
                 "-discard",
                 "nokey",
                 "-thread_queue_size",
@@ -237,11 +242,12 @@ class VideoSourceParams:
                 "bgr24",
                 "-",
             ],
-            frame_width=1920,
-            frame_height=1080,
-            frame_channels=3,
-            frame_encoding="bgr8",
+            frame_width=GlobalSettings.FrameWidth,
+            frame_height=GlobalSettings.FrameHeight,
+            frame_channels=GlobalSettings.FrameChannels,
+            frame_encoding=GlobalSettings.FrameEncoding,
             step_interval=StepIntervals.Medium,
+            # resize and re-encode the frame when sending to downstream nodes
             output_image_size={"width": 1024, "height": -1},
             output_image_encoding="rgb8",
         ),
@@ -358,7 +364,9 @@ def generate_launch_description():
         SetEnvironmentVariable(
             "RCUTILS_CONSOLE_OUTPUT_FORMAT", "[{severity}][{time}]: {message}"
         ),
-        SetEnvironmentVariable("ROS_LOG_DIR", f"{workspace_root}/tmp/roslog"),
+        SetEnvironmentVariable(
+            "ROS_LOG_DIR", f"{GlobalSettings.WorkspaceRoot}/tmp/roslog"
+        ),
         SetEnvironmentVariable("ROS_DOMAIN_ID", "0"),
     ]
 
