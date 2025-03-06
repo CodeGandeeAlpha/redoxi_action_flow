@@ -27,6 +27,8 @@ class FFmpegVideoReaderInitConfig(videoReaderBaseCfg.VideoReaderBaseInitConfig):
 @define(kw_only=True)
 class FFmpegVideoReaderRuntimeConfig(videoReaderBaseCfg.VideoReaderBaseRuntimeConfig):
     ffmpeg_args: list[str] = field()
+
+    # input frame data format
     frame_width: int = field()
     frame_height: int = field()
     frame_channels: int = field()

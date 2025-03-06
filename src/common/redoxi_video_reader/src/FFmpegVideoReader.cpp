@@ -2,8 +2,6 @@
 #include <filesystem>
 #include <boost/asio/read_until.hpp>
 
-const std::string stderr_test_command = "while true; do echo \"current time is $(date +%H-%M-%S)\" >&1; sleep 1; done";
-
 namespace redoxi_works::video_readers
 {
 
@@ -53,15 +51,15 @@ int FFmpegVideoReader::_create_ffmpeg_process()
     m_ffmpeg_logging_pipe = std::make_shared<boost::process::async_pipe>(*m_io_context);
     m_child_process_group = std::make_shared<boost::process::group>();
 
-    // {
-    //     RDX_INFO_DEV(this, __func__, "opening ffmpeg process with args: {}", runtime_config->ffmpeg_args);
-    //     std::stringstream ss;
-    //     ss << ffmpeg_path << " ";
-    //     for (const auto &arg : runtime_config->ffmpeg_args) {
-    //         ss << arg << " ";
-    //     }
-    //     RDX_INFO_DEV(this, __func__, "complete ffmpeg command: {}", ss.str());
-    // }
+    {
+        RDX_INFO_DEV(this, __func__, "opening ffmpeg process with args: {}", runtime_config->ffmpeg_args);
+        std::stringstream ss;
+        ss << ffmpeg_path << " ";
+        for (const auto &arg : runtime_config->ffmpeg_args) {
+            ss << arg << " ";
+        }
+        RDX_INFO_DEV(this, __func__, "complete ffmpeg command: {}", ss.str());
+    }
 
     auto ffmpeg_process = std::make_shared<boost::process::child>(
         ffmpeg_path,
@@ -76,13 +74,6 @@ int FFmpegVideoReader::_create_ffmpeg_process()
     // the detached process will run in the background and managed by the process group
     ffmpeg_process->detach();
     RDX_INFO_DEV(this, __func__, "{}", "process created");
-
-    // if (!ffmpeg_process->running()) {
-    //     RDX_RAISE_ERROR("[f={}()] Failed to open ffmpeg process: {}", __func__, runtime_config->ffmpeg_args);
-    //     m_ffmpeg_data_pipe = nullptr;
-    //     m_ffmpeg_logging_pipe = nullptr;
-    //     return -1;
-    // }
 
     if (!m_ffmpeg_logging_pipe->is_open()) {
         RDX_RAISE_ERROR("[f={}()] Failed to open ffmpeg logging pipe", __func__);
@@ -186,15 +177,14 @@ FFmpegVideoReader::ReadFrameResult
     FFmpegVideoReader::_read_frame(SourceData_t &source_data, std::atomic<int64_t> &frame_number)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(m_runtime_config);
+    auto src_encoding = get_frame_encoding();
     auto dst_encoding = runtime_config->output_image_encoding;
 
-    auto width = get_frame_size().width;
-    auto height = get_frame_size().height;
-    auto channels = get_frame_channels();
-    auto src_encoding = get_frame_encoding();
-
-    RDX_INFO_DEV(this, __func__, "reading frame width={}, height={}, channels={}, src_encoding={}, dst_encoding={}",
-                 width, height, channels, src_encoding, dst_encoding);
+    // auto width = get_frame_size().width;
+    // auto height = get_frame_size().height;
+    // auto channels = get_frame_channels();
+    // RDX_INFO_DEV(this, __func__, "reading frame width={}, height={}, channels={}, src_encoding={}, dst_encoding={}",
+    //              width, height, channels, src_encoding, dst_encoding);
 
     if (!m_ffmpeg_data_pipe || !m_ffmpeg_data_pipe->is_open()) {
         RDX_RAISE_ERROR("[f={}()] ffmpeg data pipe is closed, end of video", __func__);
@@ -203,54 +193,58 @@ FFmpegVideoReader::ReadFrameResult
 
     // copy frame from reading buffer to sending buffer
     cv::Mat frame_sending;
-    if (m_frame_queue.try_pop(frame_sending)) {
+
+    try {
+        // wait until a frame is available
+        m_frame_queue.pop(frame_sending);
+
         // convert encoding if necessary
         if (src_encoding != dst_encoding) {
             image_utils::convert_cv_mat_encoding(&frame_sending, frame_sending, src_encoding, dst_encoding);
         }
-    } else {
-        // no frame, skip
-        return ReadFrameResult::NO_FRAME_DATA;
+
+        // fill metadata
+        auto metadata = image_utils::FrameMediator(frame_sending, dst_encoding).get_metadata();
+        auto fno = _increment_frame_number_by(frame_number, 1);
+        metadata.source_frame_index = fno;
+        metadata.source_timestamp = rclcpp::Clock().now(); // assuming real time video
+        metadata.frame_num = fno;
+
+        // fill source data
+        source_data.get_primary_frame().from_raw_data({.image = frame_sending, .metadata = metadata});
+
+        // done
+        return ReadFrameResult::OK;
+    } catch (const tbb::user_abort &e) {
+        //! Queue was aborted during pop operation
+        RDX_INFO_DEV(this, __func__, "{}", "queue aborted, treating as end of video");
+        return ReadFrameResult::END_OF_VIDEO;
+    } catch (const std::exception &e) {
+        RDX_RAISE_ERROR("[f={}()] failed to read frame: {}", __func__, e.what());
+        return ReadFrameResult::ERROR;
     }
-
-    // fill metadata
-    auto metadata = image_utils::FrameMediator(frame_sending, dst_encoding).get_metadata();
-    auto fno = _increment_frame_number_by(frame_number, 1);
-    metadata.source_frame_index = fno;
-    metadata.source_timestamp = rclcpp::Clock().now(); // assuming real time video
-    metadata.frame_num = fno;
-
-    RDX_INFO_DEV(this, __func__, "got frame, index={}", fno);
-
-    // fill source data
-    source_data.get_primary_frame().from_raw_data({.image = frame_sending, .metadata = metadata});
-
-    // done
-    return ReadFrameResult::OK;
 }
 
 int FFmpegVideoReader::_stop()
 {
-    // stop ffmpeg process, closing all pipes
-    // if (m_ffmpeg_process && m_ffmpeg_process->running()) {
-    //     m_ffmpeg_process->terminate();
-    //     m_ffmpeg_process->wait();
-    // }
-
     // stop child process group
     if (m_child_process_group) {
+        RDX_INFO_DEV(this, __func__, "{}", "terminating child process group");
         m_child_process_group->terminate();
         m_child_process_group->wait();
     }
 
     if (m_ffmpeg_data_pipe) {
+        RDX_INFO_DEV(this, __func__, "{}", "closing ffmpeg data pipe");
         m_ffmpeg_data_pipe->close();
     }
     if (m_ffmpeg_logging_pipe) {
+        RDX_INFO_DEV(this, __func__, "{}", "closing ffmpeg logging pipe");
         m_ffmpeg_logging_pipe->close();
     }
 
     // clear frame queue
+    RDX_INFO_DEV(this, __func__, "{}", "aborting frame queue");
     m_frame_queue.abort(); // abort any waiting threads
     m_frame_queue.clear(); // clear all remaining frames
 
@@ -270,6 +264,7 @@ int FFmpegVideoReader::_stop()
     m_ffmpeg_logging_pipe = nullptr;
     m_ffmpeg_logging_thread = nullptr;
     m_ffmpeg_process = nullptr;
+    m_child_process_group = nullptr;
 
     // base stop
     RedoxiVideoReaderBase::_stop();
@@ -279,6 +274,11 @@ int FFmpegVideoReader::_stop()
 
 int FFmpegVideoReader::_read_ffmpeg_data_once()
 {
+    if (!m_ffmpeg_data_pipe || !m_ffmpeg_data_pipe->is_open()) {
+        RDX_RAISE_ERROR("[f={}()] ffmpeg data pipe is closed", __func__);
+        return -1;
+    }
+
     // read data from ffmpeg
     auto expected_frame_size = get_frame_size();
     auto expected_frame_channels = get_frame_channels();
@@ -302,7 +302,7 @@ int FFmpegVideoReader::_read_ffmpeg_data_once()
     }
 
     // replace or create a new frame and push to queue
-    RDX_INFO_DEV(this, __func__, "{}", "pushing frame buffer to queue");
+    // RDX_INFO_DEV(this, __func__, "{}", "pushing frame buffer to queue");
     cv::Mat frame_buffer;
     if (m_frame_queue.try_pop(frame_buffer)) {
         // if the queue has frame, just replace it
@@ -314,17 +314,23 @@ int FFmpegVideoReader::_read_ffmpeg_data_once()
     m_frame_queue.push(frame_buffer);
 
     // compute the mean value of the frame
-    auto mean_value = cv::mean(frame_buffer);
-
-    RDX_INFO_DEV(this, __func__,
-                 "read frame once, and the frame is pushed to queue, mean value: ({},{},{})",
-                 mean_value[0], mean_value[1], mean_value[2]);
+    // {
+    //     auto mean_value = cv::mean(frame_buffer);
+    //     RDX_INFO_DEV(this, __func__,
+    //                  "read frame once, and the frame is pushed to queue, mean value: ({},{},{})",
+    //                  mean_value[0], mean_value[1], mean_value[2]);
+    // }
 
     return 0;
 }
 
 int FFmpegVideoReader::_read_ffmpeg_logging_once(std::string &out_log)
 {
+    if (!m_ffmpeg_logging_pipe || !m_ffmpeg_logging_pipe->is_open()) {
+        RDX_RAISE_ERROR("[f={}()] ffmpeg logging pipe is closed", __func__);
+        return -1;
+    }
+
     // read logging from ffmpeg
     try {
         boost::asio::read_until(*m_ffmpeg_logging_pipe, m_ffmpeg_logging_buffer, "\n");
@@ -332,8 +338,7 @@ int FFmpegVideoReader::_read_ffmpeg_logging_once(std::string &out_log)
         std::getline(is, out_log);
         return 0;
     } catch (const boost::system::system_error &e) {
-        RDX_INFO_DEV(this, __func__, "EOF for logging pipe: {}", e.what());
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        RDX_INFO_DEV(this, __func__, "EOF for logging: {}", e.what());
         return -1;
     } catch (const std::exception &e) {
         RDX_RAISE_ERROR("[f={}()] failed to read ffmpeg logging: {}", __func__, e.what());
