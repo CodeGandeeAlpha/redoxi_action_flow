@@ -1,6 +1,0 @@
-int64 frame_num
-string meaning
----
-string obj_id
-string flag
-int64 return_code
