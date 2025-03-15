@@ -1,8 +1,3 @@
-[submodule "data"]
-	path = data
-	url = git@codeup.aliyun.com:61adcb80e05da4a409ab67b8/intellif/debug_video_data.git
-	branch = master
-	
 [submodule "src/extern/json_struct"]
 	path = src/extern/json_struct
 	url = https://github.com/jorgen/json_struct.git
