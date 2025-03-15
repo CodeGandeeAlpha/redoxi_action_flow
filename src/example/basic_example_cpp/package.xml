@@ -13,7 +13,6 @@
   <depend>redoxi_video_reader</depend>
   <depend>redoxi_samples_lib</depend>
   <depend>redoxi_samples_nodes</depend>
-  <depend>redoxi_video_reader</depend>
   <depend>redoxi_shared_memory</depend>
   <depend>redoxi_inference</depend>
   <depend>redoxi_dnn_models</depend>
