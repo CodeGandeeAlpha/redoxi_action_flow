@@ -16,7 +16,6 @@ find_package(TBB REQUIRED)
 find_package(xtensor REQUIRED)
 find_package(OpenCV REQUIRED)
 
-
 find_package(redoxi_inference_rknn QUIET)
 
 if(NOT redoxi_inference_rknn_FOUND)
@@ -25,7 +24,6 @@ endif()
 
 # Set dependencies
 set(DEPENDENCIES
-    psg_private_msgs
     redoxi_video_reader
     redoxi_samples_lib
     redoxi_samples_nodes
@@ -40,11 +38,8 @@ if(redoxi_inference_rknn_FOUND)
   list(APPEND DEPENDENCIES redoxi_inference_rknn)
 endif()
 
-# set(DEPENDENCIES 
-#     redoxi_inference 
-#     # redoxi_inference_rknn 
-#     cv_bridge
-#     yolo8_series)
+# set(DEPENDENCIES redoxi_inference # redoxi_inference_rknn cv_bridge
+# yolo8_series)
 
 set(additional_dependencies spdlog::spdlog TBB::tbb xtensor)
 
@@ -98,7 +93,8 @@ option(BUILD_TEST_FFMPEG_READ_FRAMES "Build test_ffmpeg_read_frames target" ON)
 # RKNN tests
 if(redoxi_inference_rknn_FOUND)
   option(BUILD_TEST_RKNN_INFER "Build test_rknn_infer target" ON)
-  option(BUILD_TEST_RKNN_OFFICIAL_INFER "Build test_rknn_official_infer target" ON)
+  option(BUILD_TEST_RKNN_OFFICIAL_INFER "Build test_rknn_official_infer target"
+         ON)
   option(BUILD_TEST_RKNN_PLUGIN "Build test_rknn_plugin target" ON)
   option(BUILD_TEST_RKNN_YOLO8_POSE "Build test_rknn_yolo8_pose target" ON)
 endif()
@@ -115,7 +111,8 @@ function(configure_target target_name)
                           $<INSTALL_INTERFACE:include>)
 
   target_precompile_headers(
-    ${target_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}/_pch.hpp)
+    ${target_name} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}/_pch.hpp)
 
   # global directories defined using macro
   target_compile_definitions(
