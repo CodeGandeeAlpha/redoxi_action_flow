@@ -7,16 +7,23 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(OpenCV REQUIRED)
+# find_package(OpenCV REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(TBB REQUIRED)
 find_package(xtensor REQUIRED)
 
 # dependencies for ros packages
 set(ROS_DEPENDENCIES rclcpp redoxi_video_reader)
-set(ADDITIONAL_DEPENDENCIES ${ROS_DEPENDENCIES})
+set(ADDITIONAL_DEPENDENCIES spdlog::spdlog TBB::tbb xtensor)
 
 option(BUILD_READ_VIDEO_FROM_FILE_NODE "Build read video from file node" ON)
+
+# Find each dependency
+foreach(dependency ${ROS_DEPENDENCIES})
+  find_package(${dependency} REQUIRED)
+endforeach()
+
+set(ALL_EXAMPLE_TARGETS "")
 
 # Function to configure a target
 function(configure_target target_name)
@@ -26,7 +33,7 @@ function(configure_target target_name)
     ${target_name} PUBLIC c_std_99 cxx_std_17) # Require C99 and C++17
 
   # link to all ros dependencies
-  ament_target_dependencies(${target_name} PUBLIC ${DEPENDENCIES})
+  ament_target_dependencies(${target_name} PUBLIC ${ROS_DEPENDENCIES})
 
   # link to all additional dependencies
   target_link_libraries(${target_name} PUBLIC ${ADDITIONAL_DEPENDENCIES})
@@ -53,8 +60,8 @@ function(configure_target target_name)
   # target_compile_definitions(${target_name} PUBLIC
   # -DDISPLAY_ENV_VAR="$ENV{DISPLAY}") endif()
 
-  set(ALL_TEST_TARGETS
-      ${ALL_TEST_TARGETS} ${target_name}
+  set(ALL_EXAMPLE_TARGETS
+      ${ALL_EXAMPLE_TARGETS} ${target_name}
       PARENT_SCOPE)
 endfunction()
 
@@ -63,7 +70,7 @@ if(BUILD_READ_VIDEO_FROM_FILE_NODE)
 endif()
 
 # install targets
-install(TARGETS ${ALL_TEST_TARGETS} DESTINATION lib/${PROJECT_NAME})
+install(TARGETS ${ALL_EXAMPLE_TARGETS} DESTINATION lib/${PROJECT_NAME})
 
 # install launch files
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME})
