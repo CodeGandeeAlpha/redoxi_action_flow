@@ -18,21 +18,21 @@ display_help() {
 # Get the absolute path of the directory containing this script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-PackagesToBuild="redoxi_common_nodes \
-                 redoxi_inference \
-                 redoxi_inference_onnx \
-                 redoxi_dnn_models \
-                 redoxi_shm_v6d \
-                 yolo8_series \
-                 test_package \
-                 universal_mot_trackers \
-                 rosboard"
-
-# PackagesToBuild="redoxi_inference_rknn \
+# PackagesToBuild="redoxi_common_nodes \
 #                  redoxi_inference \
-#                  redoxi_basic_cpp \
 #                  redoxi_inference_onnx \
-#                  test_package"
+#                  redoxi_dnn_models \
+#                  redoxi_shm_v6d \
+#                  yolo8_series \
+#                  test_package \
+#                  universal_mot_trackers \
+#                  rosboard"
+
+PackagesToBuild="basic_example_cpp \
+                 redoxi_inference \
+                 redoxi_basic_cpp \
+                 redoxi_inference_onnx \
+                 test_package"
 
 # Check if --help flag is provided
 if [[ "$*" == *"--help"* ]]; then
