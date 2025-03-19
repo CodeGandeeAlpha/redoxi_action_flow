@@ -11,6 +11,16 @@ namespace redoxi_works::common_nodes::v2
 BaseRosNode::BaseRosNode(const std::string &node_name, const rclcpp::NodeOptions &options)
     : RosBaseNode_t(node_name, "", options)
 {
+}
+
+BaseRosNode::BaseRosNode(const rclcpp::NodeOptions &options)
+    : BaseRosNode("BaseRosNode", options)
+{
+}
+
+BaseRosNode::BaseRosNode(const std::string &node_name, const std::string &ros_namespace, const rclcpp::NodeOptions &options)
+    : RosBaseNode_t(node_name, ros_namespace, options)
+{
     auto ret = declare_default_parameters_for_node(this);
     if (ret != 0) {
         RDX_RAISE_ERROR("Failed to declare default parameters for node {}", node_name);
@@ -20,12 +30,6 @@ BaseRosNode::BaseRosNode(const std::string &node_name, const rclcpp::NodeOptions
     auto node = this;
     m_json_parameters = RDX_GET_JSON_PARAM_FROM_LIFECYCLE_NODE(node);
 }
-
-BaseRosNode::BaseRosNode(const rclcpp::NodeOptions &options)
-    : BaseRosNode("BaseRosNode", options)
-{
-}
-
 std::shared_future<void> BaseRosNode::_async_stop_step_thread()
 {
     // make sure the step thread cannot proceed anymore

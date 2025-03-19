@@ -100,6 +100,7 @@ class BaseRosNode : public BaseLifecycleNode
   public:
     BaseRosNode(const std::string &node_name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
     BaseRosNode(const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+    BaseRosNode(const std::string &node_name, const std::string &ros_namespace, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
     virtual ~BaseRosNode() noexcept;
 
   public:
