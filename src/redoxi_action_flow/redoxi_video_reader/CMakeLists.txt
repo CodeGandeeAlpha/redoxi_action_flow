@@ -29,12 +29,9 @@ find_package(Boost REQUIRED)
 
 set(srcfiles
   src/redoxi_video_reader.cpp
-  src/base/v1/VideoReaderBase.cpp
-  src/base/v1/VideoReaderBaseTypes.cpp
-  src/v1/VideoSourceFromUrl.cpp
-  src/v2/VideoSourceFromUrl.cpp
-  src/base/v2/VideoReaderBase.cpp
-  src/base/v2/VideoReaderBaseTypes.cpp
+  src/VideoSourceFromUrl.cpp
+  src/base/VideoReaderBase.cpp
+  src/base/VideoReaderBaseTypes.cpp
   src/FFmpegVideoReader.cpp
 )
 

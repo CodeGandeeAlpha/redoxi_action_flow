@@ -6,11 +6,11 @@
 #include <json_struct/json_struct.h>
 #include <tbb/task_group.h>
 
-#include <redoxi_video_reader/base/v1/VideoReaderBaseTypes.hpp>
-#include <redoxi_video_reader/base/v1/VideoReaderBase.hpp>
+#include <redoxi_video_reader/base/VideoReaderBaseTypes.hpp>
+#include <redoxi_video_reader/base/VideoReaderBase.hpp>
 #define PRINT_THREAD_ID_IN_LOG (true)
 
-namespace redoxi_works::video_readers::v1
+namespace redoxi_works::video_readers
 {
 
 struct RedoxiVideoReaderImpl {
@@ -19,12 +19,12 @@ struct RedoxiVideoReaderImpl {
     tbb::task_group m_tasks;
 };
 
-RedoxiVideoReaderBase::RedoxiVideoReaderBase(const std::string &name, const rclcpp::NodeOptions &options)
-    : common_nodes::OpenCloseNode(name, options)
-{
-}
+// RedoxiVideoReaderBase::RedoxiVideoReaderBase(const std::string &name, const rclcpp::NodeOptions &options)
+//     : BaseNode_t(name, options)
+// {
+// }
 
-RedoxiVideoReaderBase::~RedoxiVideoReaderBase()
+RedoxiVideoReaderBase::~RedoxiVideoReaderBase() noexcept
 {
     // wait for all requests to be processed
     if (m_primary_output_port) {
@@ -114,7 +114,7 @@ int64_t RedoxiVideoReaderBase::get_last_read_frame_number() const
     return m_last_read_frame_number;
 }
 
-int RedoxiVideoReaderBase::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
+int RedoxiVideoReaderBase::_update_init_config(std::shared_ptr<RootInitConfig_t> config)
 {
     auto init_config = std::dynamic_pointer_cast<InitConfig_t>(config);
 
@@ -166,7 +166,7 @@ int RedoxiVideoReaderBase::_on_delivery_task_finish(TargetData_t &target_data,
     return 0;
 }
 
-int RedoxiVideoReaderBase::_update_runtime_config(std::shared_ptr<BaseRuntimeConfig_t> config)
+int RedoxiVideoReaderBase::_update_runtime_config(std::shared_ptr<RootRuntimeConfig_t> config)
 {
     auto runtime_config = std::dynamic_pointer_cast<RuntimeConfig_t>(config);
 
@@ -388,4 +388,4 @@ void RedoxiVideoReaderBase::_step()
     }
 }
 
-} // namespace redoxi_works::video_readers::v1
+} // namespace redoxi_works::video_readers

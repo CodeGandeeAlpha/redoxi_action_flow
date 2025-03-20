@@ -9,7 +9,7 @@ namespace redoxi_works::common_nodes::v2
 {
 
 BaseRosNode::BaseRosNode(const std::string &node_name, const rclcpp::NodeOptions &options)
-    : RosBaseNode_t(node_name, "", options)
+    : BaseRosNode(node_name, "", options)
 {
 }
 

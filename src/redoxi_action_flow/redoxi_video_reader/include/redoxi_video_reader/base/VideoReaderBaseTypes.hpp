@@ -1,15 +1,16 @@
 #pragma once
 
-#include <redoxi_common_nodes/async_action_port/AsyncActionOutputPort.hpp>
-#include <redoxi_common_nodes/image_ports/ImageOutputPortSpec.hpp>
-#include <redoxi_common_nodes/base_nodes/OpenCloseNode.hpp>
-#include <redoxi_common_cpp/redoxi_common_cpp.hpp>
-#include <redoxi_common_cpp/redoxi_json_struct_conversion.hpp>
 #include <redoxi_video_reader/visibility_control.h>
 #include <sensor_msgs/image_encodings.hpp>
 #include <json_struct/json_struct.h>
 
-namespace redoxi_works::video_readers::base::v1
+#include <redoxi_common_cpp/redoxi_common_cpp.hpp>
+#include <redoxi_common_cpp/redoxi_json_struct_conversion.hpp>
+#include <redoxi_common_nodes/async_action_port/AsyncActionOutputPort.hpp>
+#include <redoxi_common_nodes/image_ports/ImageOutputPortSpec.hpp>
+#include <redoxi_common_nodes/base_nodes/OpenCloseNode.hpp>
+
+namespace redoxi_works::video_readers::base
 {
 class RedoxiVideoReaderBase;
 
@@ -41,7 +42,7 @@ struct InitConfig : public common_nodes::OpenCloseNode::InitConfig_t {
     }
 
     // json serialize
-    JS_OBJECT_WITH_SUPER(JS_SUPER(common_nodes::OpenCloseNode::InitConfig_t),
+    JS_OBJECT_WITH_SUPER(JS_SUPER(common_nodes::v2::OpenCloseNode::InitConfig_t),
                          JS_MEMBER(primary_output_spec),
                          JS_MEMBER(create_debug_pub),
                          JS_MEMBER(debug_pub_task_enqueue_name),
@@ -49,7 +50,7 @@ struct InitConfig : public common_nodes::OpenCloseNode::InitConfig_t {
 };
 
 //! The runtime config for RedoxiVideoReaderBase or its subclass
-class RuntimeConfig : public common_nodes::OpenCloseNode::RuntimeConfig_t
+class RuntimeConfig : public common_nodes::v2::OpenCloseNode::RuntimeConfig_t
 {
   public:
     // IMPORTANT: default output is rgb8, if you use bgr8, you need to specify it in the config
@@ -99,7 +100,7 @@ class RuntimeConfig : public common_nodes::OpenCloseNode::RuntimeConfig_t
     }
 
     // json serialize
-    JS_OBJECT_WITH_SUPER(JS_SUPER(common_nodes::OpenCloseNode::RuntimeConfig_t),
+    JS_OBJECT_WITH_SUPER(JS_SUPER(common_nodes::v2::OpenCloseNode::RuntimeConfig_t),
                          JS_MEMBER(frame_interval),
                          JS_MEMBER(output_image_size),
                          JS_MEMBER(output_image_encoding),
@@ -108,4 +109,4 @@ class RuntimeConfig : public common_nodes::OpenCloseNode::RuntimeConfig_t
                          JS_MEMBER(frame_enqueue_policy));
 };
 
-} // namespace redoxi_works::video_readers::base::v1
+} // namespace redoxi_works::video_readers::base
