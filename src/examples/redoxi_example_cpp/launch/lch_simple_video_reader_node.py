@@ -1,4 +1,8 @@
-# test lifecycle node activate and deactivate using nav2_lifecycle_manager
+# launch simple video reader node
+# make sure you have PYTHONPATH set currectly, you can use the following command to set it:
+# env | grep PYTHONPATH
+# and then copy the PYTHONPATH to .env file
+
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration

@@ -1,9 +1,9 @@
 #include <redoxi_common_nodes/_pch.hpp>
 
-#include <redoxi_common_nodes/base_nodes/v2/StartStopNode.hpp>
+#include <redoxi_common_nodes/base_nodes/StartStopNode.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 
-namespace redoxi_works::common_nodes::v2
+namespace redoxi_works::common_nodes
 {
 
 // StartStopNode::StartStopNode(const std::string &node_name, const rclcpp::NodeOptions &options)
@@ -144,4 +144,4 @@ int StartStopNode::stop()
     return _on_stopped();
 }
 
-} // namespace redoxi_works::common_nodes::v2
+} // namespace redoxi_works::common_nodes

@@ -42,7 +42,7 @@ struct InitConfig : public common_nodes::OpenCloseNode::InitConfig_t {
     }
 
     // json serialize
-    JS_OBJECT_WITH_SUPER(JS_SUPER(common_nodes::v2::OpenCloseNode::InitConfig_t),
+    JS_OBJECT_WITH_SUPER(JS_SUPER(common_nodes::OpenCloseNode::InitConfig_t),
                          JS_MEMBER(primary_output_spec),
                          JS_MEMBER(create_debug_pub),
                          JS_MEMBER(debug_pub_task_enqueue_name),
@@ -50,7 +50,7 @@ struct InitConfig : public common_nodes::OpenCloseNode::InitConfig_t {
 };
 
 //! The runtime config for RedoxiVideoReaderBase or its subclass
-class RuntimeConfig : public common_nodes::v2::OpenCloseNode::RuntimeConfig_t
+class RuntimeConfig : public common_nodes::OpenCloseNode::RuntimeConfig_t
 {
   public:
     // IMPORTANT: default output is rgb8, if you use bgr8, you need to specify it in the config
@@ -100,7 +100,7 @@ class RuntimeConfig : public common_nodes::v2::OpenCloseNode::RuntimeConfig_t
     }
 
     // json serialize
-    JS_OBJECT_WITH_SUPER(JS_SUPER(common_nodes::v2::OpenCloseNode::RuntimeConfig_t),
+    JS_OBJECT_WITH_SUPER(JS_SUPER(common_nodes::OpenCloseNode::RuntimeConfig_t),
                          JS_MEMBER(frame_interval),
                          JS_MEMBER(output_image_size),
                          JS_MEMBER(output_image_encoding),

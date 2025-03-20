@@ -16,7 +16,7 @@ find_package(xtensor REQUIRED)
 set(ROS_DEPENDENCIES rclcpp redoxi_video_reader)
 set(ADDITIONAL_DEPENDENCIES spdlog::spdlog TBB::tbb xtensor)
 
-option(BUILD_READ_VIDEO_FROM_FILE_NODE "Build read video from file node" ON)
+option(BUILD_SIMPLE_VIDEO_READER_NODE "Build simple video reader node example" ON)
 
 # Find each dependency
 foreach(dependency ${ROS_DEPENDENCIES})
@@ -65,8 +65,8 @@ function(configure_target target_name)
       PARENT_SCOPE)
 endfunction()
 
-if(BUILD_READ_VIDEO_FROM_FILE_NODE)
-  configure_target(read_video_from_file_node)
+if(BUILD_SIMPLE_VIDEO_READER_NODE)
+  configure_target(simple_video_reader_node)
 endif()
 
 # install targets

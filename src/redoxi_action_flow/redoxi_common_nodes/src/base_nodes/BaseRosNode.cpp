@@ -2,10 +2,10 @@
 
 #include <chrono>
 #include <thread>
-#include <redoxi_common_nodes/base_nodes/v2/BaseRosNode.hpp>
+#include <redoxi_common_nodes/base_nodes/BaseRosNode.hpp>
 #include <redoxi_common_cpp/ros_utils/common.hpp>
 
-namespace redoxi_works::common_nodes::v2
+namespace redoxi_works::common_nodes
 {
 
 BaseRosNode::BaseRosNode(const std::string &node_name, const rclcpp::NodeOptions &options)
@@ -138,4 +138,4 @@ BaseRosNode::~BaseRosNode() noexcept
     m_async_task_group.wait();
 }
 
-} // namespace redoxi_works::common_nodes::v2
+} // namespace redoxi_works::common_nodes

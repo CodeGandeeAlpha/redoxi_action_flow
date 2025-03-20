@@ -115,7 +115,7 @@ std::string VideoSourceFromUrl::get_video_url() const
 void VideoSourceFromUrl::set_video_url(const std::string &video_url)
 {
     //! Can only set video url in closed state
-    if (get_status() != NodeStatusCode::CLOSED) {
+    if (get_current_state().id() != NodeStatusCode::CLOSED) {
         RDX_RAISE_ERROR("[{}] Cannot set video url in non-closed state", __func__);
     }
     auto config = std::dynamic_pointer_cast<InitConfig_t>(m_init_config);

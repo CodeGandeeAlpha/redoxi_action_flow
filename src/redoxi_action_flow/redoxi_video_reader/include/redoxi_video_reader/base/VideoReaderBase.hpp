@@ -24,7 +24,7 @@ struct RedoxiVideoReaderImpl;
  * BEFORE_INIT -> [init()] -> CLOSED -> [open()] -> OPENED -> [start()] -> STARTED -> [stop()] -> STOPPED -> [close()] -> CLOSED
  * the action allowed at each state is shown in the comments of each function
  */
-class RedoxiVideoReaderBase : public common_nodes::v2::OpenCloseNode
+class RedoxiVideoReaderBase : public common_nodes::OpenCloseNode
 {
     friend struct RedoxiVideoReaderImpl;
     friend struct base::InitConfig;
@@ -62,7 +62,7 @@ class RedoxiVideoReaderBase : public common_nodes::v2::OpenCloseNode
     using SendResult_t = OutputPort_t::SendResult_t;
 
     // init config and runtime config types of OpenCloseNode
-    using BaseNode_t = common_nodes::v2::OpenCloseNode;
+    using BaseNode_t = common_nodes::OpenCloseNode;
     using BaseInitConfig_t = BaseNode_t::InitConfig_t;
     using BaseRuntimeConfig_t = BaseNode_t::RuntimeConfig_t;
 

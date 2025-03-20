@@ -291,7 +291,7 @@ std::shared_ptr<RedoxiVideoReaderBase::OutputPort_t>
 
 void RedoxiVideoReaderBase::_step()
 {
-    if (get_status() != NodeStatusCode::STARTED) {
+    if (get_current_state().id() != NodeStatusCode::STARTED) {
         return;
     }
 
