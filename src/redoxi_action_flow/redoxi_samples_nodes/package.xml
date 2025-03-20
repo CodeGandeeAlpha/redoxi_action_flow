@@ -16,7 +16,10 @@
   <depend>redoxi_video_reader</depend>
   <depend>redoxi_common_nodes</depend>
   <depend>redoxi_dnn_models</depend>
+  <depend>redoxi_cmake_utils</depend>
+
   <depend>cv_bridge</depend>
+  <depend>rclcpp_components</depend>
   <export>
     <build_type>ament_cmake</build_type>
   </export>

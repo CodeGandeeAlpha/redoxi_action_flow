@@ -13,11 +13,17 @@ find_package(TBB REQUIRED)
 find_package(xtensor REQUIRED)
 
 # dependencies for ros packages
-set(ROS_DEPENDENCIES rclcpp redoxi_video_reader)
+set(ROS_DEPENDENCIES rclcpp 
+      redoxi_video_reader 
+      redoxi_samples_nodes 
+      redoxi_dnn_models
+      yolo8_series)
+
 set(ADDITIONAL_DEPENDENCIES spdlog::spdlog TBB::tbb xtensor)
 
 option(BUILD_SIMPLE_VIDEO_READER_NODE "Build simple video reader node example" ON)
-
+option(BUILD_SIMPLE_VIDEO_READOUT_PIPELINE "Build simple video readout pipeline example" ON)
+option(BUILD_VIDEO_DETECTION_PIPELINE "Build video detection pipeline example" ON)
 # Find each dependency
 foreach(dependency ${ROS_DEPENDENCIES})
   find_package(${dependency} REQUIRED)
@@ -67,6 +73,14 @@ endfunction()
 
 if(BUILD_SIMPLE_VIDEO_READER_NODE)
   configure_target(simple_video_reader_node)
+endif()
+
+if(BUILD_SIMPLE_VIDEO_READOUT_PIPELINE)
+  configure_target(simple_video_readout_pipeline)
+endif()
+
+if(BUILD_VIDEO_DETECTION_PIPELINE)
+  configure_target(video_detection_pipeline)
 endif()
 
 # install targets

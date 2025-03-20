@@ -5,7 +5,7 @@
 namespace redoxi_works
 {
 class RandomFrameVideoGenerator;
-class RandomFrameVideoGeneratorRuntimeConfig : public RedoxiVideoReaderBase::RuntimeConfig_t
+class RandomFrameVideoGeneratorRuntimeConfig : public video_readers::RedoxiVideoReaderBase::RuntimeConfig_t
 {
   public:
     inline static const cv::Size DEFAULT_FRAME_SIZE{512, 512};
@@ -25,7 +25,7 @@ class RandomFrameVideoGeneratorRuntimeConfig : public RedoxiVideoReaderBase::Run
     }
 };
 
-class RandomFrameVideoGenerator : public RedoxiVideoReaderBase
+class RandomFrameVideoGenerator : public video_readers::RedoxiVideoReaderBase
 {
   public:
     RandomFrameVideoGenerator(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());

@@ -7,7 +7,7 @@
 #include <redoxi_common_cpp/ros_utils/StampedImagePub.hpp>
 #include <redoxi_shared_memory/SharedMemoryClient.hpp>
 
-namespace redoxi_works
+namespace redoxi_works::samples
 {
 class FrameRelayNode;
 
@@ -42,11 +42,10 @@ struct FrameRelayNodeRuntimeConfig : public common_nodes::StartStopNode::Runtime
                          JS_MEMBER(enable_debug_topics));
 };
 
+// start-stop node has no custom open/close operations, so you do not need to implement _open()/_close()
+// but as lifecycle node, you still need to do configure()/activate()/deactivate()/cleanup()
 class FrameRelayNode : public common_nodes::StartStopNode
 {
-  public:
-    FrameRelayNode(const std::string &node_name, const rclcpp::NodeOptions &options);
-
   public: // useful types
     using InputPort_t = image_ports::AsyncImageInputPort;
     using SourceData_t = InputPort_t::SourceData_t;
@@ -54,8 +53,12 @@ class FrameRelayNode : public common_nodes::StartStopNode
     using InitConfig_t = FrameRelayNodeInitConfig;
     using RuntimeConfig_t = FrameRelayNodeRuntimeConfig;
 
-    using BaseInitConfig_t = common_nodes::StartStopNode::InitConfig_t;
-    using BaseRuntimeConfig_t = common_nodes::StartStopNode::RuntimeConfig_t;
+    using BaseNode_t = common_nodes::StartStopNode;
+    using BaseInitConfig_t = BaseNode_t::InitConfig_t;
+    using BaseRuntimeConfig_t = BaseNode_t::RuntimeConfig_t;
+
+  public:
+    using BaseNode_t::BaseNode_t;
 
     //! Enable or disable debug topics
     void set_debug_topics_enabled(bool enable)
@@ -92,4 +95,4 @@ class FrameRelayNode : public common_nodes::StartStopNode
     StampedImagePub m_pub_frame_rejected;
 };
 
-} // namespace redoxi_works
+} // namespace redoxi_works::samples

@@ -11,7 +11,10 @@
 
   <depend>rclcpp</depend>
   <depend>redoxi_video_reader</depend>
-
+  <depend>redoxi_samples_nodes</depend>
+  <depend>redoxi_dnn_models</depend>
+  <depend>yolo8_series</depend>
+  
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 

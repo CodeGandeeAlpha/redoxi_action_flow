@@ -5,7 +5,7 @@
 
 namespace redoxi_works
 {
-class SimpleActionGenerator : public RedoxiVideoReaderBase
+class SimpleActionGenerator : public video_readers::RedoxiVideoReaderBase
 {
   public:
     SimpleActionGenerator(const std::string &name, const rclcpp::NodeOptions &options = rclcpp::NodeOptions());

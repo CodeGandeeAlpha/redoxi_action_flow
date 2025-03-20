@@ -14,7 +14,8 @@ find_package(redoxi_common_nodes REQUIRED)
 find_package(redoxi_dnn_models REQUIRED)
 find_package(Boost REQUIRED COMPONENTS timer)
 find_package(cv_bridge REQUIRED)
-
+find_package(rclcpp_components REQUIRED)
+find_package(redoxi_cmake_utils REQUIRED)
 # uncomment the following section in order to fill in further dependencies
 # manually. find_package(<dependency> REQUIRED)
 
@@ -47,7 +48,8 @@ ament_target_dependencies(
   redoxi_video_reader
   redoxi_common_nodes
   redoxi_dnn_models
-  cv_bridge)
+  cv_bridge
+  rclcpp_components)
 
 install(DIRECTORY include/ DESTINATION include)
 install(
@@ -56,6 +58,15 @@ install(
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
+
+# define components
+create_composable_components(redoxi_samples_nodes
+  SOURCE_FILE "src/redoxi_samples_nodes_components.cpp"
+  PLUGINS
+    "redoxi_works::node_pack::samples::FrameRelayNode"
+  EXECUTABLES
+    "node_pack_samples_FrameRelayNode"
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -70,7 +81,8 @@ if(BUILD_TESTING)
 endif()
 
 ament_export_dependencies(redoxi_samples_lib redoxi_video_reader
-                          redoxi_common_nodes redoxi_dnn_models cv_bridge)
+                          redoxi_common_nodes redoxi_dnn_models cv_bridge
+                          rclcpp_components)
 
 ament_export_include_directories(include)
 ament_export_libraries(redoxi_samples_nodes)

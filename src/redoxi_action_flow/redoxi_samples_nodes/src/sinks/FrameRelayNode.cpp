@@ -7,7 +7,7 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 
-namespace redoxi_works
+namespace redoxi_works::samples
 {
 
 FrameRelayNodeInitConfig::FrameRelayNodeInitConfig()
@@ -15,11 +15,6 @@ FrameRelayNodeInitConfig::FrameRelayNodeInitConfig()
     // default configuration for input port
     input_port_config->set_action_name("in/action");
     input_port_config->set_buffer_capacity(1);
-}
-
-FrameRelayNode::FrameRelayNode(const std::string &node_name, const rclcpp::NodeOptions &options)
-    : common_nodes::StartStopNode(node_name, options)
-{
 }
 
 int FrameRelayNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
@@ -188,4 +183,4 @@ int FrameRelayNode::_parse_frame(cv::Mat *output,
     return 0;
 }
 
-} // namespace redoxi_works
+} // namespace redoxi_works::samples
