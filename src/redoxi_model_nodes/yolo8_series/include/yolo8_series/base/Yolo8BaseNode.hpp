@@ -50,6 +50,7 @@ class Yolo8BaseNode : public common_nodes::StartStopNode
         using OutputActionDataTrait_t = typename OutputPort_t::ActionDataTrait_t;
         using OutputSourceData_t = typename OutputPort_t::SourceData_t;
         using OutputRequest_t = typename OutputPort_t::DeliveryRequest_t;
+        using OutputDownstreamSpec_t = typename OutputPort_t::DownstreamSpec_t;
     };
 
     using InitConfig_t = InitConfig<InferenceModel_t>;
@@ -58,15 +59,13 @@ class Yolo8BaseNode : public common_nodes::StartStopNode
     using BaseRuntimeConfig_t = common_nodes::StartStopNode::RuntimeConfig_t;
     using InferenceResource_t = InferenceResource<InferenceModel_t>;
     using DetectionResult_t = typename InferenceModel_t::SingleImageOutput_t;
+    using BaseNode_t = common_nodes::StartStopNode;
 
   public:
-    explicit Yolo8BaseNode(const std::string &node_name,
-                           const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
-
-    explicit Yolo8BaseNode(const rclcpp::NodeOptions &options = rclcpp::NodeOptions())
-        : Yolo8BaseNode("Yolo8BaseNode", options)
-    {
-    }
+    using BaseNode_t::BaseNode_t;
+    explicit Yolo8BaseNode<TModel>(const std::string &node_name,
+                                   const std::string &ros_namespace,
+                                   const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
 
     virtual ~Yolo8BaseNode() noexcept;
 
@@ -168,8 +167,9 @@ class Yolo8BaseNode : public common_nodes::StartStopNode
 
 template <YoloModelConcept TModel>
 Yolo8BaseNode<TModel>::Yolo8BaseNode(const std::string &node_name,
+                                     const std::string &ros_namespace,
                                      const rclcpp::NodeOptions &options)
-    : redoxi_works::common_nodes::StartStopNode(node_name, options)
+    : redoxi_works::common_nodes::StartStopNode(node_name, ros_namespace, options)
 {
     m_impl = std::make_shared<Impl>();
 }

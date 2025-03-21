@@ -64,8 +64,10 @@ create_composable_components(redoxi_samples_nodes
   SOURCE_FILE "src/redoxi_samples_nodes_components.cpp"
   PLUGINS
     "redoxi_works::node_pack::samples::FrameRelayNode"
+    "redoxi_works::node_pack::samples::DetectionRelayNode"
   EXECUTABLES
     "node_pack_samples_FrameRelayNode"
+    "node_pack_samples_DetectionRelayNode"
 )
 
 if(BUILD_TESTING)

@@ -6,7 +6,7 @@
 #include <redoxi_common_nodes/port_handlers/PullProcessReplyHandler.hpp>
 #include <json_struct/json_struct.h>
 
-namespace redoxi_works
+namespace redoxi_works::samples
 {
 
 struct DetectionRelayNodeInitConfig : public common_nodes::StartStopNode::InitConfig_t {
@@ -34,11 +34,8 @@ struct DetectionRelayNodeRuntimeConfig : public common_nodes::StartStopNode::Run
 
 class DetectionRelayNode : public common_nodes::StartStopNode
 {
-  public:
-    DetectionRelayNode(const std::string &node_name,
-                       const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
-
   public: // useful types
+    using BaseNode_t = common_nodes::StartStopNode;
     using InputPort_t = detection_ports::response_only::DetectionResponseInputPort;
     using SourceData_t = InputPort_t::SourceData_t;
     using ActionDataTrait_t = InputPort_t::ActionDataTrait_t;
@@ -47,6 +44,9 @@ class DetectionRelayNode : public common_nodes::StartStopNode
 
     using BaseInitConfig_t = common_nodes::StartStopNode::InitConfig_t;
     using BaseRuntimeConfig_t = common_nodes::StartStopNode::RuntimeConfig_t;
+
+    // introduce the base constructor
+    using BaseNode_t::BaseNode_t;
 
   protected:
     int _start() override;
@@ -67,4 +67,4 @@ class DetectionRelayNode : public common_nodes::StartStopNode
     StampedImagePub m_pub_visualization;
     std::shared_ptr<PortHandler_t> m_port_handler;
 };
-} // namespace redoxi_works
+} // namespace redoxi_works::samples

@@ -28,7 +28,11 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 #                  universal_mot_trackers \
 #                  rosboard"
 
-PackagesToBuild="redoxi_example_cpp redoxi_common_py rosboard"
+PackagesToBuild="redoxi_example_cpp \
+                 redoxi_common_py \
+                 redoxi_inference_onnx \
+                 yolo8_series \
+                 rosboard"
 
 # Check if --help flag is provided
 if [[ "$*" == *"--help"* ]]; then

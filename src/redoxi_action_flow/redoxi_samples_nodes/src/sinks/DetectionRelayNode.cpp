@@ -5,14 +5,8 @@
 #include <redoxi_dnn_models/visualizations.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 #include <redoxi_common_cpp/image_proc/FrameMediator.hpp>
-namespace redoxi_works
+namespace redoxi_works::samples
 {
-
-DetectionRelayNode::DetectionRelayNode(const std::string &node_name, const rclcpp::NodeOptions &options)
-    : common_nodes::StartStopNode(node_name, options)
-{
-}
-
 int DetectionRelayNode::_update_init_config(std::shared_ptr<BaseInitConfig_t> config)
 {
     RDX_INFO_DEV(this, __func__, false, "{}", "updating init config");
@@ -171,4 +165,4 @@ int DetectionRelayNode::_parse_detection(cv::Mat *output,
 }
 
 
-} // namespace redoxi_works
+} // namespace redoxi_works::samples
