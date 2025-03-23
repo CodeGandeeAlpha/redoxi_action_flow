@@ -65,7 +65,7 @@ frame_relay_node = Node(
 
 video_source_node_config = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
-        video_url=f"{RunConfig.WorkspaceRoot}/data/dancetrack/dancetrack-0039.mp4",
+        video_url=f"{RunConfig.WorkspaceRoot}/extern/RedoxiTrack/data/videos/dancetrack-0039.mp4",
         # optional published topics for monitoring
         primary_output_spec=videoSrcCfg.OutputPortConfig(
             downstream_specs=[

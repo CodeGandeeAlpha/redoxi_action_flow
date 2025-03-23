@@ -22,7 +22,7 @@ using NodeConfig_t = rdx::NodeConfigTemplate<InitConfig_t, RuntimeConfig_t>;
 #    error "TEST_DATA_DIR must be defined. Please make sure it's properly set in CMakeLists.txt"
 #endif
 const fs::path test_data_dir = TEST_DATA_DIR;
-const fs::path fn_video = "/soft/workspace/code/psf_ros2_ws/data/dancetrack/dancetrack-0039.mp4";
+const fs::path fn_video = test_data_dir / "videos/dancetrack-0039.mp4";
 
 int create_ordinary_node(int argc, char **argv);
 int create_lifecycle_node(int argc, char **argv);

@@ -49,7 +49,7 @@ const int relay_fps = 5;
 #    error "TEST_DATA_DIR must be defined. Please make sure it's properly set in CMakeLists.txt"
 #endif
 const fs::path test_data_dir = TEST_DATA_DIR;
-const fs::path fn_video = "/soft/workspace/code/psf_ros2_ws/data/dancetrack/dancetrack-0039.mp4";
+const fs::path fn_video = test_data_dir / "videos/dancetrack-0039.mp4";
 
 reader_node_params::NodeConfig_t create_reader_node_config();
 relay_node_params::NodeConfig_t create_relay_node_config();

@@ -73,7 +73,7 @@ const fs::path model_path = fs::path(TEST_MODEL_DIR) / "yolov8s.onnx";
 #    error "TEST_DATA_DIR must be defined. Please make sure it's properly set in CMakeLists.txt"
 #endif
 const fs::path test_data_dir = TEST_DATA_DIR;
-const fs::path fn_video = "/soft/workspace/code/psf_ros2_ws/data/dancetrack/dancetrack-0039.mp4";
+const fs::path fn_video = test_data_dir / "videos/dancetrack-0039.mp4";
 
 video_source_node_params::NodeConfig_t create_video_source_node_config();
 detection_node_params::NodeConfig_t create_detection_node_config();

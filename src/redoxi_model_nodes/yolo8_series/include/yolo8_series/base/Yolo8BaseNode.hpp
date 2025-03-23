@@ -66,6 +66,16 @@ class Yolo8BaseNode : public common_nodes::StartStopNode
     explicit Yolo8BaseNode<TModel>(const std::string &node_name,
                                    const std::string &ros_namespace,
                                    const rclcpp::NodeOptions &options = rclcpp::NodeOptions());
+    explicit Yolo8BaseNode<TModel>(const std::string &node_name,
+                                   const rclcpp::NodeOptions &options = rclcpp::NodeOptions())
+        : Yolo8BaseNode(node_name, "", options)
+    {
+    }
+
+    explicit Yolo8BaseNode<TModel>(const rclcpp::NodeOptions &options = rclcpp::NodeOptions())
+        : Yolo8BaseNode("Yolo8BaseNode", "", options)
+    {
+    }
 
     virtual ~Yolo8BaseNode() noexcept;
 
