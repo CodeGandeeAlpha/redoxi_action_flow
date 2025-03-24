@@ -18,7 +18,3 @@
 	url = https://github.com/CodeGandee/RedoxiTrack.git
 	branch = main
 
-[submodule "src/extern/dynamic_message_introspection"]
-	path = src/extern/dynamic_message_introspection
-	url = https://github.com/osrf/dynamic_message_introspection.git
-	branch = main
