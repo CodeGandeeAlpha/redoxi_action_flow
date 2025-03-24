@@ -4,10 +4,15 @@
 
 - install the latest ros2
 - checkout all code and submodules
+- install onnx, using `scripts/onnx-download.bash`
+- install v6d, using scripts in `scripts/v6d`
+- download yolo8 models, using `scripts/yolo8-onnx-download.bash`
 - build with `xbuild_working_nodes.sh`
 - run the examples in `redoxi_example_cpp`
 
-If any package is missing, please install it via apt, pip, rosdep or other ways.
+Currently the documentation is lacking, so you may need to read the CMakeLists.txt files of the packages to understand how to build things.
+
+Basically, if any package is missing, please install it via apt, pip, rosdep or other ways.
 
 ## Examples
 
