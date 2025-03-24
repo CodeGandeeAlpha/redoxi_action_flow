@@ -35,7 +35,7 @@ def get_logger_arg(node_name: str):
 
 video_source_node_config = videoSrcCfg.VideoSourceFromUrlNodeConfig(
     init_config=videoSrcCfg.VideoSourceFromUrlInitConfig(
-        video_url=f"{RunConfig.WorkspaceRoot}/extern/RedoxiTrack/data/videos/dancetrack-0039.mp4",
+        video_url=f"{RunConfig.WorkspaceRoot}/src/extern/RedoxiTrack/data/videos/dancetrack-0039.mp4",
         # optional published topics for monitoring
         primary_output_spec=videoSrcCfg.OutputPortConfig(
             data_topic_for_source_data=f"data_msg/source_data",  # get reliably published data for visualization
