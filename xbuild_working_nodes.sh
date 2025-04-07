@@ -32,6 +32,7 @@ PackagesToBuild="redoxi_example_cpp \
                  redoxi_common_py \
                  redoxi_inference_onnx \
                  yolo8_series \
+                 redoxi_cpp_tests \
                  rosboard"
 
 # Check if --help flag is provided

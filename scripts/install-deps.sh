@@ -14,7 +14,7 @@ apt-get install -y libtbb-dev xtensor-dev
 
 # required by the ros2_web_bridge
 if [ ! -z "$http_proxy" ]; then
-    sudo pip3 install simplejpeg --proxy="$http_proxy"
+    sudo pip3 install simplejpeg tornado --proxy="$http_proxy" --break-system-packages
 else
-    sudo pip3 install simplejpeg
+    sudo pip3 install simplejpeg tornado --break-system-packages
 fi
