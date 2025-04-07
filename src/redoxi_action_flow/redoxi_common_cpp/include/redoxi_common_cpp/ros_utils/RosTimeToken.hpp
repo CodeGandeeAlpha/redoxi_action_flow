@@ -1,0 +1,214 @@
+#pragma once
+
+#include <chrono>
+
+#include <tbb/concurrent_queue.h>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp_lifecycle/lifecycle_node.hpp>
+#include <rcpputils/asserts.hpp>
+#include <fmt/format.h>
+
+#include <redoxi_common_cpp/ros_utils/common.hpp>
+
+namespace redoxi_works
+{
+
+//! a token generator that generates a token with a ROS time interval
+//! @note the token is generated at the specified interval, if interval is 0, the token is always available
+//! @tparam TokenType the type of the token
+//! @tparam IntervalType the type of the interval, should be a std::chrono::duration
+template <typename TokenType = DummyTimeToken, typename IntervalType = DefaultTimeUnit_t>
+class _RosTimeToken
+{
+    static_assert(std::is_base_of<std::chrono::duration<typename IntervalType::rep, typename IntervalType::period>, IntervalType>::value,
+                  "IntervalType must be a std::chrono::duration");
+
+  private:
+    _RosTimeToken(IntervalType interval = IntervalType(0), size_t token_capacity = 1)
+    {
+        m_interval = interval;
+        m_token_capacity = token_capacity;
+        m_queue = std::make_shared<tbb::concurrent_bounded_queue<TokenType>>();
+        m_queue->set_capacity(token_capacity);
+    }
+
+  public:
+    _RosTimeToken(rclcpp::Node *node, IntervalType interval = IntervalType(0), size_t token_capacity = 1)
+        : _RosTimeToken(interval, token_capacity)
+    {
+        m_node = node;
+    }
+
+    _RosTimeToken(rclcpp_lifecycle::LifecycleNode *node, IntervalType interval = IntervalType(0), size_t token_capacity = 1)
+        : _RosTimeToken(interval, token_capacity)
+    {
+        m_lifecycle_node = node;
+    }
+
+    virtual ~_RosTimeToken()
+    {
+        stop();
+    }
+
+    //! start the timer, which creates tokens at the specified interval
+    //! @param interval the interval of the timer, if not specified, the interval is the same as the one in constructor
+    //! @param start_with_token if true, the token is created at start
+    //! @note if interval is 0, the token is always available
+    //! @return true if the timer is successfully started
+    //! @return false if the timer is already started
+    virtual bool start(std::optional<IntervalType> interval = std::nullopt, bool start_with_token = true)
+    {
+        if (m_is_started) {
+            return false;
+        }
+
+        if (interval) {
+            m_interval = interval.value();
+        }
+
+        // at start, we have one token available
+        if (start_with_token) {
+            _create_token();
+        }
+
+        // when interval is positive, create tokens at the specified interval
+        // when 0 or negative, the queue pretends to be always full, but tokens are created when popping
+        if (m_interval > IntervalType(0)) {
+            if (m_node) {
+                m_timer = m_node->create_wall_timer(m_interval, [this]() { _create_token(); });
+            } else if (m_lifecycle_node) {
+                m_timer = m_lifecycle_node->create_wall_timer(m_interval, [this]() { _create_token(); });
+            } else {
+                RDX_RAISE_ERROR("Node or LifecycleNode should be non nullptr in {}", __func__);
+            }
+        }
+
+        m_is_started = true;
+        return true;
+    }
+
+    //! stop the timer, which stops creating tokens
+    //! @return true if the timer is successfully stopped
+    //! @return false if the timer is not started
+    virtual bool stop()
+    {
+        if (!m_is_started) {
+            // already stopped
+            return false;
+        }
+
+        // stop the timer if it is valid
+        if (m_timer) {
+            m_timer->cancel();
+            m_timer.reset();
+        }
+
+        // if someone is waiting for the token, wake them up
+        m_queue->abort();
+
+        // reset the started flag
+        m_is_started = false;
+        return true;
+    }
+
+    //! Get the capacity of the token queue
+    virtual size_t get_token_capacity() const
+    {
+        return m_token_capacity;
+    }
+
+    //! reset the token queue, which removes all tokens in the queue
+    virtual void reset()
+    {
+        // clean up the queue
+        TokenType token;
+        while (m_queue->try_pop(token)) {
+        }
+    }
+
+    //! pop a token from the queue, does not wait until the token is available if not present
+    virtual bool try_pop_token(TokenType *token = nullptr)
+    {
+        bool ok = false;
+        if (m_is_started && m_interval == IntervalType(0)) {
+            // if the interval is 0, the token is always available
+            if (token) {
+                *token = _generate_token();
+            } // else do nothing
+            ok = true;
+        } else {
+            if (token) {
+                ok = m_queue->try_pop(*token);
+            } else {
+                TokenType _token;
+                ok = m_queue->try_pop(_token);
+            }
+        }
+        return ok;
+    }
+
+    //! pop a token from the queue, wait until the token is available if necessary
+    virtual bool pop_token(TokenType *token = nullptr)
+    {
+        if (m_is_started && m_interval == IntervalType(0)) {
+            // if the interval is 0, the token is always available
+            if (token) {
+                *token = _generate_token();
+            } // else do nothing
+        } else {
+            if (token) {
+                m_queue->pop(*token);
+            } else {
+                TokenType _token;
+                m_queue->pop(_token);
+            }
+        }
+        return true;
+    }
+
+    //! Get the number of tokens in the queue
+    virtual size_t get_num_tokens() const
+    {
+        return m_queue->size();
+    }
+
+    /**
+     * @brief create a token and push it to the queue
+     * @return true if the token is successfully created and pushed to the queue
+     * @return false if the token is not pushed to the queue
+     */
+    virtual bool _create_token()
+    {
+        TokenType token = _generate_token();
+        return m_queue->try_push(token);
+    }
+
+  protected:
+    //! create a token using default constructor
+    virtual TokenType _generate_token()
+    {
+        return TokenType();
+    }
+
+    rclcpp::Node *m_node = nullptr;
+    rclcpp_lifecycle::LifecycleNode *m_lifecycle_node = nullptr;
+    rclcpp::TimerBase::SharedPtr m_timer;
+    size_t m_token_capacity;
+    std::atomic<bool> m_is_started{false};
+    IntervalType m_interval;
+    std::shared_ptr<tbb::concurrent_bounded_queue<TokenType>> m_queue;
+};
+
+//! @brief a token generator that generates a token by every x-default-time-unit
+using RosTimeToken = _RosTimeToken<DummyTimeToken, DefaultTimeUnit_t>;
+
+//! @brief a token generator that generates a token by every x-milliseconds
+using RosTimeToken_ms = _RosTimeToken<DummyTimeToken, std::chrono::milliseconds>;
+
+//! @brief a token generator that generates a token by every x-seconds
+using RosTimeToken_sec = _RosTimeToken<DummyTimeToken, std::chrono::seconds>;
+
+//! @brief a token generator that generates a token by every x-microseconds
+using RosTimeToken_us = _RosTimeToken<DummyTimeToken, std::chrono::microseconds>;
+
+} // namespace redoxi_works

@@ -1,0 +1,57 @@
+.vscode/
+build/
+default.etcd/
+install/
+libs/
+log/
+Log/
+tmp/
+design.md
+output.log
+.env
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# checkpoint files
+*.ckpt
+*.pth
+*.pt
+*.onnx
+
+build-*/
+.cache/
+.bigdata/
+
+__pycache__/
+# src/extern/rosboard

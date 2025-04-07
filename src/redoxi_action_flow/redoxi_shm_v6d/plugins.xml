@@ -1,0 +1,20 @@
+<library path="redoxi_shm_v6d">
+    <class type="redoxi_works::shared_memory::VineyardShmClient" 
+           base_class_type="redoxi_works::shared_memory::SharedMemoryClient">
+        <description>
+            Vineyard shared memory client
+        </description>
+    </class>
+    <class type="redoxi_works::shared_memory::VineyardShmClient::VineyardDataBlock" 
+           base_class_type="redoxi_works::shared_memory::DataBlock">
+        <description>
+            Vineyard data block
+        </description>
+    </class>
+    <class type="redoxi_works::shared_memory::VineyardShmClient::VineyardParams" 
+           base_class_type="redoxi_works::shared_memory::KeyValueStore">
+        <description>
+            Vineyard params
+        </description>
+    </class>
+</library>

@@ -1,0 +1,92 @@
+[general]
+version = 1
+
+[[segment]]
+
+[[segment.mempool]]
+size = 32
+count = 30000
+
+[[segment.mempool]]
+size = 64
+count = 30000
+
+[[segment.mempool]]
+size = 128
+count = 25000
+
+[[segment.mempool]]
+size = 256
+count = 12500
+
+[[segment.mempool]]
+size = 512
+count = 30000
+
+[[segment.mempool]]
+size = 1024
+count = 20000
+
+[[segment.mempool]]
+size = 2048
+count = 7000
+
+[[segment.mempool]]
+size = 4096
+count = 7812
+
+[[segment.mempool]]
+size = 8192
+count = 3906
+
+[[segment.mempool]]
+size = 16384
+count = 1953
+
+[[segment.mempool]]
+size = 32768
+count = 976
+
+[[segment.mempool]]
+size = 65536
+count = 488
+
+[[segment.mempool]]
+size = 131072
+count = 244
+
+[[segment.mempool]]
+size = 262144
+count = 122
+
+[[segment.mempool]]
+size = 524288
+count = 610
+
+[[segment.mempool]]
+size = 1048576
+count = 300
+
+[[segment.mempool]]
+size = 2097152
+count = 70
+
+[[segment.mempool]]
+size = 4194304
+count = 30
+
+[[segment.mempool]]
+size = 8388608
+count = 30
+
+[[segment.mempool]]
+size = 16777216
+count = 20
+
+[[segment.mempool]]
+size = 33554432
+count = 10
+
+[[segment.mempool]]
+size = 67108864
+count = 10

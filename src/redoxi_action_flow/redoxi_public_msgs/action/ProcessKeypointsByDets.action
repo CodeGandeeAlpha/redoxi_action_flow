@@ -1,0 +1,18 @@
+# action for get body poses by detections and frame from pose detector model node
+unique_identifier_msgs/UUID x_uid
+redoxi_public_msgs/Control x_control
+redoxi_public_msgs/TaskMetadata x_task_metadata
+redoxi_public_msgs/Detection[] detections
+# redoxi_public_msgs/Frame frame
+redoxi_public_msgs/MultiDeviceFrame frame_bundle
+
+---
+redoxi_public_msgs/ReturnResponse x_return
+redoxi_public_msgs/Keypoints[] keypoints
+# 0: keypoints[i] is matched to detections[i], no need to check x_task_metadata.source_task_uid
+# 1: matched by x_task_metadata.source_task_uid, keypoints[i].x_task_metadata.source_task_uid == detections[k].x_uid iff keypoints[i] is for detections[k]
+bool is_matched_by_uid 0
+---
+# string feedback_msg
+# int64 feedback_code
+redoxi_public_msgs/FeedbackResponse x_feedback

@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>universal_mot_trackers</name>
+  <version>0.0.0</version>
+  <description>Multiple object tracking algorithms that are not specific to any object type</description>
+  <maintainer email="igamenovoer@xx.com">igamenovoer</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>ament_cmake_ros</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  
+  <depend>redoxi_common_nodes</depend>
+  <depend>redoxi_public_msgs</depend>
+  <depend>redoxi_common_py</depend>
+  <depend>redoxi_cmake_utils</depend>
+  <depend>RedoxiTrack</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

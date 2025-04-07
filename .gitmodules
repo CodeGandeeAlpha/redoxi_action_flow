@@ -1,0 +1,20 @@
+[submodule "src/extern/json_struct"]
+	path = src/extern/json_struct
+	url = https://github.com/jorgen/json_struct.git
+	branch = master
+
+[submodule "src/extern/vision_opencv"]
+	path = src/extern/vision_opencv
+	url = https://github.com/ros-perception/vision_opencv.git
+	branch = rolling
+
+[submodule "src/extern/rosboard"]
+	path = src/extern/rosboard
+	url = https://github.com/dheera/rosboard.git
+	branch = main
+
+[submodule "src/extern/RedoxiTrack"]
+	path = src/extern/RedoxiTrack
+	url = https://github.com/CodeGandee/RedoxiTrack.git
+	branch = main
+

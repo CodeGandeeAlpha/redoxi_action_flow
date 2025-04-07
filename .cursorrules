@@ -1,0 +1,3 @@
+# Rule: in C++, for short comment, prefer to use one-line dxygen style comment //! instead of block comment
+# Rule: in C++, for multi line comment, prefer to use doxygen block comment
+# Rule: in C++, when getting function name during compilation, use __func__ instead of __FUNCTION__

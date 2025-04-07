@@ -1,0 +1,32 @@
+<library path="redoxi_inference_rknn">
+    <class type="redoxi_works::inference::rknn::RknnModelInference" 
+           base_class_type="redoxi_works::inference::RedoxiModelInference">
+        <description>
+            RKNN model inference plugin for Redoxi framework
+        </description>
+    </class>
+    <class type="redoxi_works::inference::rknn::RknnModelConfig" 
+           base_class_type="redoxi_works::inference::KeyValueStore">
+        <description>
+            RKNN model configuration for Redoxi framework
+        </description>
+    </class>
+    <class type="redoxi_works::inference::rknn::RknnPortData" 
+           base_class_type="redoxi_works::inference::ModelPortData">
+        <description>
+            RKNN port data for Redoxi framework
+        </description>
+    </class>
+    <class type="redoxi_works::inference::rknn::RknnModelPortInfo" 
+           base_class_type="redoxi_works::inference::ModelPortInfo">
+        <description>
+            ONNX model port information for Redoxi framework
+        </description>
+    </class>
+    <class type="redoxi_works::inference::rknn::RknnInferenceInOutData" 
+           base_class_type="redoxi_works::inference::InferenceInOutData">
+        <description>
+            RKNN inference input/output data for Redoxi framework
+        </description>
+    </class>
+</library>
