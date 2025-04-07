@@ -24,7 +24,8 @@ namespace rdx_inf = redoxi_works::inference;
 namespace cmkeys = rdx_inf::common_config_keys;
 namespace cmdev = rdx_inf::common_device_types;
 const auto fn_model = fs::path(TEST_MODEL_DIR) / "yolov8s.onnx";
-const auto fn_image = fs::path(TEST_DATA_DIR) / "test_data" / "crowdpose" / "106848.jpg";
+// const auto fn_image = fs::path(TEST_DATA_DIR) / "test_data" / "crowdpose" / "106848.jpg";
+const auto fn_image = fs::path(TEST_OUTPUT_DIR) / "frame.jpg";
 const auto fn_pose_output = fs::path(TEST_OUTPUT_DIR) / "detection-out.jpg";
 const auto fn_tensor_output = fs::path(TEST_OUTPUT_DIR) / "test-tensor.npy";
 

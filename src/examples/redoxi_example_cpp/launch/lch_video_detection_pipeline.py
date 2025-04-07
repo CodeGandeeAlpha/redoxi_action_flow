@@ -10,6 +10,7 @@ import redoxi_common_py.configs.video_source_from_url as videoSrcCfg
 import redoxi_common_py.configs.detection_relay as detRelayCfg
 import yolo8_series.configs as yolo8Cfg
 
+
 class RunConfig:
     WorkspaceRoot = "/soft/workspace/code/redoxi_action_flow"
     LogLevel = "info"
@@ -127,7 +128,7 @@ video_source_node_config = videoSrcCfg.VideoSourceFromUrlNodeConfig(
         ),
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
-        step_interval=1000 * 1000 // 1,  # time in macroseconds (1e-6 s)
+        step_interval=1000 * 1000 // 25,  # time in macroseconds (1e-6 s)
         # optional, resize the frame to this size
         output_image_size={"width": 640, "height": -1},
         # retry policy, specify how to handle transmission failures

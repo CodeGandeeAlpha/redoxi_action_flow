@@ -1,5 +1,7 @@
 #pragma once
 
+#include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
 #include <tbb/concurrent_queue.h>
 #include <tbb/task_group.h>
 
@@ -548,6 +550,13 @@ int Yolo8BaseNode<TModel>::_do_inference(DetectionResult_t *output_result,
 
     // inference
     RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Doing inference", msg_uuid_str);
+    // {
+    //     // print some statistics of the image
+    //     auto image_mean = cv::mean(input_image);
+    //     RDX_INFO_DEV(this, __func__, false, "[msg_uid={}] Image mean: ({},{},{})",
+    //                  msg_uuid_str, image_mean[0], image_mean[1], image_mean[2]);
+    //     cv::imwrite("/soft/workspace/code/redoxi_action_flow/tmp/output/frame.jpg", input_image);
+    // }
     model->set_input_images(inout_data, {input_image}, RequiredImageEncoding);
     model->do_inference(inout_data);
 
