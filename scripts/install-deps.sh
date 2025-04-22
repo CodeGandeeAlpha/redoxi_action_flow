@@ -24,7 +24,7 @@ if [ "$PYTHON_MAJOR" -gt 3 ] || { [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR"
 fi
 
 if [ ! -z "$http_proxy" ]; then
-  sudo pip3 install simplejpeg --proxy="$http_proxy" $PIP_EXTRA_ARGS
+  sudo pip3 install simplejpeg tornado --proxy="$http_proxy" $PIP_EXTRA_ARGS --break-system-packages
 else
-  sudo pip3 install simplejpeg $PIP_EXTRA_ARGS
+  sudo pip3 install simplejpeg $PIP_EXTRA_ARGS tornado --break-system-packages
 fi

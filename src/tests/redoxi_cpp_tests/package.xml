@@ -1,15 +1,16 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>unit_tests_cpp</name>
+  <name>redoxi_cpp_tests</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Various simple tests for different components</description>
   <maintainer email="igamenovoer@xx.com">igamenovoer</maintainer>
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>rclcpp</depend>
+  <depend>yolo8_series</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

@@ -55,6 +55,12 @@ std::vector<SingleImageOutput> Yolo8DetectionModel::get_output_detections(
     postprocessor.postprocess(&outputs, tensor_data,
                               std::array<int64_t, 3>{tensor_shape[0], tensor_shape[1], tensor_shape[2]},
                               preprocess_info);
+
+    // {
+    //     for(auto& output : outputs) {
+    //         RDX_INFO_DEV(nullptr, __func__, "Detected {} objects", output.objects.size());
+    //     }
+    // }
     return outputs;
 }
 

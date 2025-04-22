@@ -12,7 +12,7 @@ import yolo8_series.configs as yolo8Cfg
 
 
 class RunConfig:
-    WorkspaceRoot = "/soft/workspace/code/psf_ros2_ws"
+    WorkspaceRoot = "/soft/workspace/code/redoxi_action_flow"
     LogLevel = "info"
     JsonParamKey = "param_as_json_string"  # used by ros nodes
 
@@ -50,7 +50,13 @@ detection_relay_node = Node(
     executable="node_pack_samples_DetectionRelayNode",
     name="detection_relay",
     namespace="detection_relay",
-    parameters=[detection_relay_config.to_json(ignore_none=True, compact=False)],
+    parameters=[
+        {
+            RunConfig.JsonParamKey: detection_relay_config.to_json(
+                ignore_none=True, compact=False
+            )
+        }
+    ],
     arguments=get_logger_arg("detection_relay"),
 )
 
@@ -73,8 +79,9 @@ detection_node_config = yolo8Cfg.Yolo8ModelNodeConfig(
                     yolo8Cfg.DownstreamSpec(
                         name="send_to_relay",
                         action_name="/detection_relay/input_detections",
-                    )
-                ]
+                    ),
+                ],
+                visualization_topic_for_target_data="vis/target_data",
             ),
         ),
     ),
@@ -121,7 +128,7 @@ video_source_node_config = videoSrcCfg.VideoSourceFromUrlNodeConfig(
         ),
     ),
     runtime_config=videoSrcCfg.VideoSourceFromUrlRuntimeConfig(
-        step_interval=1000 * 1000 // 50,  # time in macroseconds (1e-6 s)
+        step_interval=1000 * 1000 // 25,  # time in macroseconds (1e-6 s)
         # optional, resize the frame to this size
         output_image_size={"width": 640, "height": -1},
         # retry policy, specify how to handle transmission failures

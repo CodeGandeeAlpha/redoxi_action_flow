@@ -99,7 +99,7 @@ __all__ = (
 class ModelPostprocessConfig(JsonConvertible):
     conf_threshold: float = field(default=0.25)
     iou_threshold: float = field(default=0.45)
-    selected_class_ids: list[int] = field(factory=list)
+    selected_class_ids: list[int] = field(default=None)
 
 
 @define(kw_only=True)
