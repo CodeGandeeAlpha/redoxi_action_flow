@@ -3,31 +3,31 @@
 # Function to display help message
 display_help() {
     echo "Usage: $0 [OPTIONS]"
-    echo "Build ROS2 packages with specified options."
+    echo "Build ROS2 packages with specified options using pixi environment."
     echo
     echo "Options:"
     echo "  --help     Display this help message and exit"
     echo "  --verbose  Enable verbose output"
     echo "  --debug    Build in Debug mode"
     echo "  --release  Build in Release mode (default)"
+    echo "  --packages Build only specific packages (comma-separated)"
     echo
     echo "Example:"
     echo "  $0 --verbose --debug"
+    echo "  $0 --packages redoxi_example_cpp,redoxi_common_py"
 }
+
+# Check if pixi is available
+if ! command -v pixi &> /dev/null; then
+    echo "Error: pixi is not installed or not in PATH."
+    echo "Please install pixi first: https://pixi.sh/"
+    exit 1
+fi
 
 # Get the absolute path of the directory containing this script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-# PackagesToBuild="redoxi_common_nodes \
-#                  redoxi_inference \
-#                  redoxi_inference_onnx \
-#                  redoxi_dnn_models \
-#                  redoxi_shm_v6d \
-#                  yolo8_series \
-#                  test_package \
-#                  universal_mot_trackers \
-#                  rosboard"
-
+# Default packages to build
 PackagesToBuild="redoxi_example_cpp \
                  redoxi_common_py \
                  redoxi_inference_onnx \
@@ -35,10 +35,21 @@ PackagesToBuild="redoxi_example_cpp \
                  redoxi_cpp_tests \
                  rosboard"
 
+# Check if --packages flag is provided
+if [[ "$*" == *"--packages"* ]]; then
+    for arg in "$@"; do
+        if [[ $arg == --packages=* ]]; then
+            IFS=',' read -ra PACKAGES <<< "${arg#*=}"
+            PackagesToBuild="${PACKAGES[*]}"
+            break
+        fi
+    done
+fi
+
 # Check if --help flag is provided
 if [[ "$*" == *"--help"* ]]; then
     display_help
-    return
+    exit 0
 fi
 
 # Check if --verbose flag is provided
@@ -69,6 +80,25 @@ fi
 # PackagesToBuild="stream_worker psg_common psg_private_msgs psg_public_msgs video_reader"
 
 echo "Building with BUILD_TYPE=$BUILD_TYPE"
+echo "Packages: $PackagesToBuild"
+
+# Check if we're already in a pixi environment
+if [[ -z "$PIXI_ENVIRONMENT_NAME" ]]; then
+    echo "Starting build in pixi environment..."
+    # Run this script again inside pixi environment
+    exec pixi run bash "$0" "$@"
+fi
+
+echo "Running in pixi environment: $PIXI_ENVIRONMENT_NAME"
+
+# Setup Python environment variables for CMake (critical for pixi)
+export PYTHON_EXECUTABLE=$(which python)
+export Python_INCLUDE_DIR=$(python -c 'import sysconfig; print(sysconfig.get_path("include"))')
+export Python_NumPy_INCLUDE_DIR=$(python -c 'import numpy; print(numpy.get_include())')
+
+echo "Python executable: $PYTHON_EXECUTABLE"
+echo "Python include dir: $Python_INCLUDE_DIR"
+echo "NumPy include dir: $Python_NumPy_INCLUDE_DIR"
 
 # required by json_struct to use std data types
 # note that json_struct does not name these flags consistently,
@@ -102,7 +132,15 @@ colcon build --packages-up-to $PackagesToBuild \
     -DJSON_STRUCT_OPT_BUILD_TESTS=OFF \
     -DRKNPU_ROOT=$SCRIPT_DIR/tmp/rknpu-2.3 \
     -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DPython_EXECUTABLE:PATH=$PYTHON_EXECUTABLE \
+    -DPython_INCLUDE_DIR:PATH=$Python_INCLUDE_DIR \
+    -DPython_NumPy_INCLUDE_DIR=$Python_NumPy_INCLUDE_DIR \
+    -DPython3_EXECUTABLE:PATH=$PYTHON_EXECUTABLE \
+    -DPython3_INCLUDE_DIR:PATH=$Python_INCLUDE_DIR \
+    -DPython3_NumPy_INCLUDE_DIR=$Python_NumPy_INCLUDE_DIR \
+    -DPython_FIND_VIRTUALENV=ONLY \
+    -DPython3_FIND_VIRTUALENV=ONLY
 
 source install/setup.bash
 

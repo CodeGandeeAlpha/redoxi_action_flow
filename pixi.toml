@@ -1,0 +1,72 @@
+[project]
+name = "redoxi_action_flow"
+version = "0.1.0"
+description = "ROS 2 Jazzy development environment for Redoxi Action Flow"
+authors = ["igamenovoer <igamenovoer@xx.com>"]
+channels = ["robostack-jazzy", "conda-forge"]
+platforms = ["linux-64"]
+
+# Define environment-specific features
+[environments]
+default = { features = ["jazzy", "build-tools"] }
+
+# ROS 2 Jazzy feature with core dependencies
+[feature.jazzy.dependencies]
+ros-jazzy-desktop = "*"
+ros-jazzy-cv-bridge = "*"
+ros-jazzy-vision-opencv = "*"
+catkin_pkg = "*"
+empy = "*"
+lark = "*"
+colcon-common-extensions = "*"
+setuptools = "<=58.2.0"
+numpy = "*"
+python = "*"
+
+# Build tools feature
+[feature.build-tools.dependencies]
+cmake = "*"
+gcc = "*"
+gxx = "*"
+clang = "*"
+clang-tools = "*"
+pkg-config = "*"
+libboost-python = "*"
+libboost-python-devel = "*"
+
+# Tasks for common ROS 2 operations
+[tasks]
+build = "colcon build --symlink-install --cmake-args -DPython_FIND_VIRTUALENV=ONLY -DPython3_FIND_VIRTUALENV=ONLY"
+test = "colcon test"
+clean = "rm -rf build install log"
+setup-env = "source install/setup.bash"
+list-packages = "colcon list"
+
+# Development tasks
+dev-build = "colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Debug -DPython_FIND_VIRTUALENV=ONLY -DPython3_FIND_VIRTUALENV=ONLY"
+dev-test = "colcon test --pytest-args -v"
+
+# Custom build script with advanced options
+build-working = "bash xbuild_working_nodes.sh"
+build-working-debug = "bash xbuild_working_nodes.sh --debug"
+build-working-verbose = "bash xbuild_working_nodes.sh --verbose"
+
+# Advanced build with explicit Python/NumPy paths
+build-advanced = { cmd = """
+  export PYTHON_EXECUTABLE=$(which python)
+  export Python_INCLUDE_DIR=$(python -c 'import sysconfig; print(sysconfig.get_path("include"))')
+  export Python_NumPy_INCLUDE_DIR=$(python -c 'import numpy; print(numpy.get_include())')
+  colcon build --symlink-install --cmake-args \
+    -DPython_EXECUTABLE:PATH=$PYTHON_EXECUTABLE \
+    -DPython_INCLUDE_DIR:PATH=$Python_INCLUDE_DIR \
+    -DPython_NumPy_INCLUDE_DIR=$Python_NumPy_INCLUDE_DIR \
+    -DPython3_EXECUTABLE:PATH=$PYTHON_EXECUTABLE \
+    -DPython3_INCLUDE_DIR:PATH=$Python_INCLUDE_DIR \
+    -DPython3_NumPy_INCLUDE_DIR=$Python_NumPy_INCLUDE_DIR \
+    -DPython_FIND_VIRTUALENV=ONLY \
+    -DPython3_FIND_VIRTUALENV=ONLY
+""" }
+
+# This will automatically activate the ROS workspace on environment activation
+[activation]
+scripts = ["install/setup.bash"]
